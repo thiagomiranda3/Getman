@@ -1,0 +1,41 @@
+.brace {
+    -fx-fill: #000000;
+    -fx-font-weight: bold;
+}
+
+.bracket {
+    -fx-fill: #000000;
+    -fx-font-weight: bold;
+}
+
+.comma {
+    -fx-fill: #000000;
+}
+
+.colon {
+    -fx-fill: #000000;
+}
+
+.string {
+    -fx-fill: #008000;
+}
+
+.number {
+    -fx-fill: #0000FF;
+}
+
+.boolean {
+    -fx-fill: #000080;
+    -fx-font-weight: bold;
+}
+
+.styled-text-area {
+    -fx-background-color: #FFFFFF;
+    -fx-font-family: Consolas, monospace;
+    -fx-font-size: 14px;
+}
+
+.styled-text-area .content {
+    -fx-background-color: #FFFFFF;
+    -fx-cursor: text;
+}
