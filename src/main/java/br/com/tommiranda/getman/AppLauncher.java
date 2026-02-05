@@ -1,4 +1,4 @@
-package br.com.tommiranda;
+package br.com.tommiranda.getman;
 
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -16,7 +16,7 @@ public class AppLauncher extends Application {
         Parent root = loader.load();
         Scene scene = new Scene(root, 800, 600);
         scene.getStylesheets().add(getClass().getResource("/json-highlighting.css").toExternalForm());
-        primaryStage.setTitle("TomTools - Postman Replica");
+        primaryStage.setTitle("Getman");
         primaryStage.setScene(scene);
         primaryStage.show();
     }

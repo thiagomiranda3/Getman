@@ -1,4 +1,4 @@
-package br.com.tommiranda;
+package br.com.tommiranda.getman;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.collections.FXCollections;

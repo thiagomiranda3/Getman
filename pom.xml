@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>br.com.tommiranda</groupId>
-    <artifactId>tomtools</artifactId>
+    <artifactId>getman</artifactId>
     <version>1.0-SNAPSHOT</version>
 
     <properties>
@@ -54,7 +54,7 @@
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <configuration>
-                    <mainClass>br.com.tommiranda.Main</mainClass>
+                    <mainClass>br.com.tommiranda.getman.Main</mainClass>
                 </configuration>
             </plugin>
         </plugins>
