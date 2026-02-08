@@ -5,7 +5,6 @@ import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.StackPane;
 import org.fxmisc.richtext.CodeArea;
@@ -35,13 +34,13 @@ public class RequestTabController {
     private StackPane requestBodyContainer;
 
     @FXML
-    private TextArea requestHeadersArea;
+    private HeadersComponentController requestHeadersController;
 
     @FXML
     private StackPane responseBodyContainer;
 
     @FXML
-    private TextArea responseHeadersArea;
+    private HeadersComponentController responseHeadersController;
 
     @FXML
     private Label statusLabel;
@@ -56,9 +55,9 @@ public class RequestTabController {
     private CodeArea responseBodyCodeArea;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
-            .version(HttpClient.Version.HTTP_2)
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
+                                                    .version(HttpClient.Version.HTTP_2)
+                                                    .connectTimeout(Duration.ofSeconds(10))
+                                                    .build();
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -91,9 +90,12 @@ public class RequestTabController {
             responseBodyCodeArea.setStyleSpans(0, computeHighlighting(newText));
         });
         responseBodyContainer.getChildren().add(responseBodyCodeArea);
-        
+
         // Set default headers
-        requestHeadersArea.setText("Content-Type: application/json\nAccept: application/json");
+        requestHeadersController.setHeadersText("Content-Type: application/json\nAccept: application/json");
+
+        // Set response headers to read-only
+        responseHeadersController.setReadOnly(true);
     }
 
     @FXML
@@ -101,7 +103,7 @@ public class RequestTabController {
         String url = urlField.getText();
         String method = methodComboBox.getValue();
         String body = requestBodyCodeArea.getText();
-        String headersText = requestHeadersArea.getText();
+        String headersText = requestHeadersController.getHeadersText();
 
         if (url == null || url.isEmpty()) {
             responseBodyCodeArea.replaceText("Error: URL cannot be empty");
@@ -113,8 +115,8 @@ public class RequestTabController {
 
         try {
             HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofMinutes(1));
+                                                            .uri(URI.create(url))
+                                                            .timeout(Duration.ofMinutes(1));
 
             // Add headers
             if (headersText != null && !headersText.isEmpty()) {
@@ -152,47 +154,47 @@ public class RequestTabController {
             timeLabel.setText("Time: ...");
             sizeLabel.setText("Size: ...");
             responseBodyCodeArea.replaceText("");
-            responseHeadersArea.setText("");
+            responseHeadersController.setHeadersText("");
 
             long startTime = System.currentTimeMillis();
 
             httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                    .thenApply(response -> {
-                        long endTime = System.currentTimeMillis();
-                        long duration = endTime - startTime;
-                        String bodyText = response.body();
-                        int size = bodyText.getBytes().length;
+                      .thenApply(response -> {
+                          long endTime = System.currentTimeMillis();
+                          long duration = endTime - startTime;
+                          String bodyText = response.body();
+                          int size = bodyText.getBytes().length;
 
-                        javafx.application.Platform.runLater(() -> {
-                            statusLabel.setText("Status: " + response.statusCode());
-                            timeLabel.setText("Time: " + duration + " ms");
-                            sizeLabel.setText("Size: " + size + " bytes");
-                            StringBuilder headersSb = new StringBuilder();
-                            response.headers().map().forEach((k, v) -> headersSb.append(k).append(": ").append(v).append("\n"));
-                            responseHeadersArea.setText(headersSb.toString());
-                        });
-                        return bodyText;
-                    })
-                    .thenAccept(responseString -> {
-                        String formattedResponse = responseString;
-                        try {
-                            Object json = objectMapper.readValue(responseString, Object.class);
-                            formattedResponse = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(json);
-                        } catch (Exception e) {
-                            // Not a valid JSON or empty, keep original string
-                        }
-                        String finalResponse = formattedResponse;
-                        javafx.application.Platform.runLater(() -> responseBodyCodeArea.replaceText(finalResponse));
-                    })
-                    .exceptionally(e -> {
-                        javafx.application.Platform.runLater(() -> {
-                            statusLabel.setText("Status: Error");
-                            timeLabel.setText("Time: ");
-                            sizeLabel.setText("Size: ");
-                            responseBodyCodeArea.replaceText("Error: " + e.getMessage());
-                        });
-                        return null;
-                    });
+                          javafx.application.Platform.runLater(() -> {
+                              statusLabel.setText("Status: " + response.statusCode());
+                              timeLabel.setText("Time: " + duration + " ms");
+                              sizeLabel.setText("Size: " + size + " bytes");
+                              StringBuilder headersSb = new StringBuilder();
+                              response.headers().map().forEach((k, v) -> headersSb.append(k).append(": ").append(v).append("\n"));
+                              responseHeadersController.setHeadersText(headersSb.toString());
+                          });
+                          return bodyText;
+                      })
+                      .thenAccept(responseString -> {
+                          String formattedResponse = responseString;
+                          try {
+                              Object json = objectMapper.readValue(responseString, Object.class);
+                              formattedResponse = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(json);
+                          } catch (Exception e) {
+                              // Not a valid JSON or empty, keep original string
+                          }
+                          String finalResponse = formattedResponse;
+                          javafx.application.Platform.runLater(() -> responseBodyCodeArea.replaceText(finalResponse));
+                      })
+                      .exceptionally(e -> {
+                          javafx.application.Platform.runLater(() -> {
+                              statusLabel.setText("Status: Error");
+                              timeLabel.setText("Time: ");
+                              sizeLabel.setText("Size: ");
+                              responseBodyCodeArea.replaceText("Error: " + e.getMessage());
+                          });
+                          return null;
+                      });
 
         } catch (Exception e) {
             statusLabel.setText("Status: Error");
@@ -209,13 +211,13 @@ public class RequestTabController {
         while (matcher.find()) {
             String styleClass =
                     matcher.group("BRACE") != null ? "brace" :
-                    matcher.group("BRACKET") != null ? "bracket" :
-                    matcher.group("COMMA") != null ? "comma" :
-                    matcher.group("COLON") != null ? "colon" :
-                    matcher.group("STRING") != null ? "string" :
-                    matcher.group("NUMBER") != null ? "number" :
-                    matcher.group("BOOLEAN") != null ? "boolean" :
-                    null; /* never happens */
+                            matcher.group("BRACKET") != null ? "bracket" :
+                                    matcher.group("COMMA") != null ? "comma" :
+                                            matcher.group("COLON") != null ? "colon" :
+                                                    matcher.group("STRING") != null ? "string" :
+                                                            matcher.group("NUMBER") != null ? "number" :
+                                                                    matcher.group("BOOLEAN") != null ? "boolean" :
+                                                                            null; /* never happens */
             assert styleClass != null;
             spansBuilder.add(Collections.emptyList(), matcher.start() - lastKwEnd);
             spansBuilder.add(Collections.singleton(styleClass), matcher.end() - matcher.start());

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<VBox spacing="5.0" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="br.com.tommiranda.getman.HeadersComponentController">
+    <children>
+        <HBox spacing="10.0" alignment="CENTER_RIGHT">
+            <children>
+                <ToggleButton fx:id="textModeButton" text="Text">
+                    <toggleGroup>
+                        <ToggleGroup fx:id="viewModeGroup"/>
+                    </toggleGroup>
+                </ToggleButton>
+                <ToggleButton fx:id="tableModeButton" text="Table" selected="true" toggleGroup="$viewModeGroup"/>
+            </children>
+            <padding>
+                <Insets right="5.0" top="5.0"/>
+            </padding>
+        </HBox>
+        <StackPane VBox.vgrow="ALWAYS">
+            <children>
+                <TextArea fx:id="headersTextArea" promptText="Key: Value (one per line)" visible="false"/>
+                <VBox fx:id="tableContainer" spacing="5.0">
+                    <children>
+                        <TableView fx:id="headersTable" VBox.vgrow="ALWAYS" editable="true">
+                            <columns>
+                                <TableColumn fx:id="keyColumn" text="Key" prefWidth="200.0"/>
+                                <TableColumn fx:id="valueColumn" text="Value" prefWidth="200.0"/>
+                            </columns>
+                            <columnResizePolicy>
+                                <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
+                            </columnResizePolicy>
+                        </TableView>
+                        <HBox spacing="5.0" alignment="CENTER_RIGHT" fx:id="tableControls">
+                            <Button text="Add Header" onAction="#handleAddHeader"/>
+                            <Button text="Remove Selected" onAction="#handleRemoveHeader"/>
+                        </HBox>
+                    </children>
+                </VBox>
+            </children>
+        </StackPane>
+    </children>
+</VBox>

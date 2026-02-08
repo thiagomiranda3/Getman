@@ -31,15 +31,17 @@ public class MainController {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/request_tab.fxml"));
             BorderPane requestView = loader.load();
-            
+
             Tab tab = new Tab("New Request");
             tab.setContent(requestView);
-            
+
             // Add before the last tab (which is the + tab)
             int index = mainTabPane.getTabs().size() - 1;
             // Safety check, though + tab should always be there
-            if (index < 0) index = 0;
-            
+            if (index < 0) {
+                index = 0;
+            }
+
             mainTabPane.getTabs().add(index, tab);
             mainTabPane.getSelectionModel().select(tab);
         } catch (IOException e) {
