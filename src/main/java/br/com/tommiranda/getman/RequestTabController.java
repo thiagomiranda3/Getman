@@ -19,6 +19,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -71,6 +72,17 @@ public class RequestTabController {
             "(?<BOOLEAN>\\b(true|false|null)\\b)"
     );
 
+    private String tabId;
+    private StateManager stateManager;
+
+    public void setTabId(String tabId) {
+        this.tabId = tabId;
+    }
+
+    public void setStateManager(StateManager stateManager) {
+        this.stateManager = stateManager;
+    }
+
     @FXML
     public void initialize() {
         methodComboBox.setItems(FXCollections.observableArrayList("GET", "POST", "PUT", "DELETE", "PATCH"));
@@ -98,6 +110,62 @@ public class RequestTabController {
         responseHeadersController.setReadOnly(true);
     }
 
+    public void loadState(RequestData data) {
+        if (data == null) {
+            return;
+        }
+
+        if (data.getMethod() != null) {
+            methodComboBox.setValue(data.getMethod());
+        }
+        if (data.getUrl() != null) {
+            urlField.setText(data.getUrl());
+        }
+        if (data.getRequestBody() != null) {
+            requestBodyCodeArea.replaceText(data.getRequestBody());
+        }
+        if (data.getRequestHeaders() != null) {
+            requestHeadersController.setHeadersText(data.getRequestHeaders());
+        }
+
+        if (data.getResponseBody() != null) {
+            responseBodyCodeArea.replaceText(data.getResponseBody());
+        }
+        if (data.getResponseHeaders() != null) {
+            responseHeadersController.setHeadersText(data.getResponseHeaders());
+        }
+
+        if (data.getStatus() != null) {
+            statusLabel.setText(data.getStatus());
+        }
+        if (data.getTime() != null) {
+            timeLabel.setText(data.getTime());
+        }
+        if (data.getSize() != null) {
+            sizeLabel.setText(data.getSize());
+        }
+    }
+
+    public void saveState() {
+        if (stateManager == null || tabId == null) {
+            return;
+        }
+
+        RequestData data = new RequestData();
+        data.setId(tabId);
+        data.setMethod(methodComboBox.getValue());
+        data.setUrl(urlField.getText());
+        data.setRequestBody(requestBodyCodeArea.getText());
+        data.setRequestHeaders(requestHeadersController.getHeadersText());
+        data.setResponseBody(responseBodyCodeArea.getText());
+        data.setResponseHeaders(responseHeadersController.getHeadersText());
+        data.setStatus(statusLabel.getText());
+        data.setTime(timeLabel.getText());
+        data.setSize(sizeLabel.getText());
+
+        CompletableFuture.runAsync(() -> stateManager.saveRequestData(data));
+    }
+
     @FXML
     public void handleSendRequest() {
         String url = urlField.getText();
@@ -105,15 +173,15 @@ public class RequestTabController {
         String body = requestBodyCodeArea.getText();
         String headersText = requestHeadersController.getHeadersText();
 
-        if (url == null || url.isEmpty()) {
-            responseBodyCodeArea.replaceText("Error: URL cannot be empty");
-            statusLabel.setText("Status: Error");
-            timeLabel.setText("Time: ");
-            sizeLabel.setText("Size: ");
-            return;
-        }
-
         try {
+            if (url == null || url.isEmpty()) {
+                responseBodyCodeArea.replaceText("Error: URL cannot be empty");
+                statusLabel.setText("Status: Error");
+                timeLabel.setText("Time: ");
+                sizeLabel.setText("Size: ");
+                return;
+            }
+
             HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                                                             .uri(URI.create(url))
                                                             .timeout(Duration.ofMinutes(1));
@@ -184,12 +252,16 @@ public class RequestTabController {
                               // Not a valid JSON or empty, keep original string
                           }
                           String finalResponse = formattedResponse;
-                          javafx.application.Platform.runLater(() -> responseBodyCodeArea.replaceText(finalResponse));
+                          javafx.application.Platform.runLater(() -> {
+                              responseBodyCodeArea.replaceText(finalResponse);
+                          });
                       })
                       .exceptionally(e -> {
+                          long endTime = System.currentTimeMillis();
+                          long duration = endTime - startTime;
                           javafx.application.Platform.runLater(() -> {
                               statusLabel.setText("Status: Error");
-                              timeLabel.setText("Time: ");
+                              timeLabel.setText("Time: " + duration + " ms");
                               sizeLabel.setText("Size: ");
                               responseBodyCodeArea.replaceText("Error: " + e.getMessage());
                           });
@@ -201,6 +273,8 @@ public class RequestTabController {
             timeLabel.setText("Time: ");
             sizeLabel.setText("Size: ");
             responseBodyCodeArea.replaceText("Error building request: " + e.getMessage());
+        } finally {
+            saveState();
         }
     }
 

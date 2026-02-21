@@ -1,7 +1,5 @@
-package br.com.tommiranda.getman;
+import br.com.tommiranda.getman.AppLauncher;
 
-public class Main {
-    static void main(String[] args) {
-        AppLauncher.bootstrap(args);
-    }
+void main(String[] args) {
+    AppLauncher.bootstrap(args);
 }
