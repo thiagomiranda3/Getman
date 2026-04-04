@@ -23,6 +23,12 @@ class HttpRequestTabModel extends HiveObject {
   @HiveField(5)
   bool isSending;
 
+  @HiveField(6)
+  String? collectionNodeId;
+
+  @HiveField(7)
+  String? collectionName;
+
   HttpRequestTabModel({
     required this.config,
     this.responseBody,
@@ -30,6 +36,8 @@ class HttpRequestTabModel extends HiveObject {
     this.statusCode,
     this.durationMs,
     this.isSending = false,
+    this.collectionNodeId,
+    this.collectionName,
   });
 
   HttpRequestTabModel copyWith({
@@ -39,6 +47,8 @@ class HttpRequestTabModel extends HiveObject {
     int? statusCode,
     int? durationMs,
     bool? isSending,
+    String? collectionNodeId,
+    String? collectionName,
   }) {
     return HttpRequestTabModel(
       config: config ?? this.config,
@@ -47,6 +57,8 @@ class HttpRequestTabModel extends HiveObject {
       statusCode: statusCode ?? this.statusCode,
       durationMs: durationMs ?? this.durationMs,
       isSending: isSending ?? this.isSending,
+      collectionNodeId: collectionNodeId ?? this.collectionNodeId,
+      collectionName: collectionName ?? this.collectionName,
     );
   }
 
@@ -56,6 +68,8 @@ class HttpRequestTabModel extends HiveObject {
     'responseHeaders': responseHeaders,
     'statusCode': statusCode,
     'durationMs': durationMs,
+    'collectionNodeId': collectionNodeId,
+    'collectionName': collectionName,
   };
 
   factory HttpRequestTabModel.fromJson(Map<String, dynamic> json) => HttpRequestTabModel(
@@ -66,5 +80,7 @@ class HttpRequestTabModel extends HiveObject {
         : null,
     statusCode: json['statusCode'],
     durationMs: json['durationMs'],
+    collectionNodeId: json['collectionNodeId'],
+    collectionName: json['collectionName'],
   );
 }

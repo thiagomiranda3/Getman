@@ -223,7 +223,11 @@ class _CollectionNodeWidget extends ConsumerWidget {
           if (node.config != null) {
             ref
                 .read(tabsProvider.notifier)
-                .addTab(config: node.config!.copyWith());
+                .addTab(
+                  config: node.config!.copyWith(),
+                  collectionNodeId: node.id,
+                  collectionName: node.name,
+                );
           }
         },
         trailing: _NodeContextMenu(node: node),

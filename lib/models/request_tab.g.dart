@@ -23,13 +23,15 @@ class HttpRequestTabModelAdapter extends TypeAdapter<HttpRequestTabModel> {
       statusCode: fields[3] as int?,
       durationMs: fields[4] as int?,
       isSending: fields[5] as bool,
+      collectionNodeId: fields[6] as String?,
+      collectionName: fields[7] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, HttpRequestTabModel obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.config)
       ..writeByte(1)
@@ -41,7 +43,11 @@ class HttpRequestTabModelAdapter extends TypeAdapter<HttpRequestTabModel> {
       ..writeByte(4)
       ..write(obj.durationMs)
       ..writeByte(5)
-      ..write(obj.isSending);
+      ..write(obj.isSending)
+      ..writeByte(6)
+      ..write(obj.collectionNodeId)
+      ..writeByte(7)
+      ..write(obj.collectionName);
   }
 
   @override

@@ -38,8 +38,20 @@ class TabsNotifier extends StateNotifier<TabsState> {
     return TabsState(tabs: tabs, activeIndex: 0);
   }
 
-  void addTab({HttpRequestConfig? config}) {
-    final newTab = HttpRequestTabModel(config: config ?? HttpRequestConfig());
+  void addTab({HttpRequestConfig? config, String? collectionNodeId, String? collectionName}) {
+    if (collectionNodeId != null) {
+      final existingIndex = state.tabs.indexWhere((t) => t.collectionNodeId == collectionNodeId);
+      if (existingIndex != -1) {
+        state = state.copyWith(activeIndex: existingIndex);
+        return;
+      }
+    }
+
+    final newTab = HttpRequestTabModel(
+      config: config ?? HttpRequestConfig(),
+      collectionNodeId: collectionNodeId,
+      collectionName: collectionName,
+    );
     state = state.copyWith(
       tabs: [...state.tabs, newTab],
       activeIndex: state.tabs.length,

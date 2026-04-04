@@ -1,5 +1,6 @@
 import 'dart:convert' as convert;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:code_text_field/code_text_field.dart';
 import 'package:highlight/languages/json.dart';
@@ -67,25 +68,45 @@ class _RequestViewState extends ConsumerState<RequestView> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: [
-          _buildUrlBar(),
-          const SizedBox(height: 16),
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: _buildRequestConfig()),
-                const VerticalDivider(),
-                Expanded(child: _buildResponseSection()),
-              ],
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyS, control: true): _handleSave,
+        const SingleActivator(LogicalKeyboardKey.keyS, meta: true): _handleSave,
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            _buildUrlBar(),
+            const SizedBox(height: 16),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: _buildRequestConfig()),
+                  const VerticalDivider(),
+                  Expanded(child: _buildResponseSection()),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
+  }
+
+  void _handleSave() {
+    if (widget.tab.collectionNodeId != null) {
+      ref.read(collectionsProvider.notifier).updateRequest(
+        widget.tab.collectionNodeId!,
+        widget.tab.config.copyWith(),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Request updated'), duration: Duration(seconds: 1)),
+      );
+    } else {
+      _showSaveDialog();
+    }
   }
 
   Widget _buildUrlBar() {
@@ -127,9 +148,9 @@ class _RequestViewState extends ConsumerState<RequestView> {
         ),
         const SizedBox(width: 8),
         IconButton(
-          icon: const Icon(Icons.save),
-          tooltip: 'Save to Collection',
-          onPressed: () => _showSaveDialog(),
+          icon: Icon(widget.tab.collectionNodeId != null ? Icons.save : Icons.save_as),
+          tooltip: widget.tab.collectionNodeId != null ? 'Update Request' : 'Save to Collection',
+          onPressed: _handleSave,
         ),
       ],
     );
@@ -293,7 +314,10 @@ class _RequestViewState extends ConsumerState<RequestView> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
             onPressed: () {
-              ref.read(collectionsProvider.notifier).saveRequest(controller.text, widget.tab.config.copyWith());
+              final id = ref.read(collectionsProvider.notifier).saveRequest(controller.text, widget.tab.config.copyWith());
+              ref.read(tabsProvider.notifier).updateCurrentTab(
+                widget.tab.copyWith(collectionNodeId: id),
+              );
               Navigator.pop(context);
             },
             child: const Text('Save'),

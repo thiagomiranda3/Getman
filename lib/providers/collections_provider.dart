@@ -25,7 +25,7 @@ class CollectionsNotifier extends StateNotifier<List<CollectionNode>> {
     StorageService.saveCollections(state);
   }
 
-  void saveRequest(String name, HttpRequestConfig config, {String? parentId}) {
+  String saveRequest(String name, HttpRequestConfig config, {String? parentId}) {
     final newNode = CollectionNode(
       name: name,
       isFolder: false,
@@ -36,6 +36,12 @@ class CollectionsNotifier extends StateNotifier<List<CollectionNode>> {
     } else {
       state = _loadAndSort(_addToParent(state, parentId, newNode));
     }
+    StorageService.saveCollections(state);
+    return newNode.id;
+  }
+
+  void updateRequest(String id, HttpRequestConfig config) {
+    state = _loadAndSort(_updateInTree(state, id, config));
     StorageService.saveCollections(state);
   }
 
@@ -168,6 +174,44 @@ class CollectionsNotifier extends StateNotifier<List<CollectionNode>> {
         children: _toggleFavoriteInTree(node.children, id),
       );
     }).toList();
+  }
+
+  List<CollectionNode> _updateInTree(List<CollectionNode> nodes, String id, HttpRequestConfig config) {
+    return nodes.map((node) {
+      if (node.id == id) {
+        return CollectionNode(
+          id: node.id,
+          name: node.name,
+          isFolder: node.isFolder,
+          isFavorite: node.isFavorite,
+          config: config,
+          children: node.children,
+        );
+      }
+      return CollectionNode(
+        id: node.id,
+        name: node.name,
+        isFolder: node.isFolder,
+        isFavorite: node.isFavorite,
+        config: node.config,
+        children: _updateInTree(node.children, id, config),
+      );
+    }).toList();
+  }
+
+  HttpRequestConfig? getConfig(String id) {
+    HttpRequestConfig? found;
+    void find(List<CollectionNode> nodes) {
+      for (var node in nodes) {
+        if (node.id == id) {
+          found = node.config;
+          return;
+        }
+        find(node.children);
+      }
+    }
+    find(state);
+    return found;
   }
 }
 
