@@ -8,6 +8,7 @@ import 'widgets/request_view.dart';
 import 'providers/tabs_provider.dart';
 import 'providers/collections_provider.dart';
 import 'models/request_tab.dart';
+import 'utils/neo_brutalist_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,16 +26,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Getman',
+      title: 'GETMAN',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.light),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.dark),
-        useMaterial3: true,
-      ),
+      theme: NeoBrutalistTheme.theme,
+      darkTheme: NeoBrutalistTheme.theme,
       home: const MainScreen(),
     );
   }
@@ -86,16 +81,16 @@ class MainScreen extends ConsumerWidget {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Unsaved Changes'),
-          content: const Text('You have unsaved changes. Are you sure you want to close this tab?'),
+          title: const Text('UNSAVED CHANGES'),
+          content: const Text('YOU HAVE UNSAVED CHANGES. ARE YOU SURE YOU WANT TO CLOSE THIS TAB?'),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
             TextButton(
               onPressed: () {
                 ref.read(tabsProvider.notifier).removeTab(index);
                 Navigator.pop(context);
               },
-              child: const Text('Close Anyway', style: TextStyle(color: Colors.red)),
+              child: const Text('CLOSE ANYWAY', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -107,25 +102,31 @@ class MainScreen extends ConsumerWidget {
 
   Widget _buildTabBar(BuildContext context, TabsState state, TabsNotifier notifier, WidgetRef ref) {
     return Container(
-      height: 40,
-      decoration: BoxDecoration(
-        color: Theme.of(context).secondaryHeaderColor.withValues(alpha: 0.5),
-        border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+      height: 60,
+      decoration: const BoxDecoration(
+        color: NeoBrutalistTheme.background,
+        border: Border(bottom: BorderSide(color: NeoBrutalistTheme.border, width: 3)),
       ),
       child: Row(
         children: [
           Expanded(
-            child: ListView.builder(
+            child: ReorderableListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: state.tabs.length,
+              onReorder: (oldIndex, newIndex) => notifier.reorderTabs(oldIndex, newIndex),
+              proxyDecorator: (child, index, animation) => Material(
+                color: Colors.transparent,
+                child: child,
+              ),
               itemBuilder: (context, index) {
                 final tab = state.tabs[index];
                 final isActive = state.activeIndex == index;
                 final isDirty = _isTabDirty(tab, ref);
-                final title = tab.collectionName ?? (tab.config.url.isEmpty ? 'New Request' : tab.config.url);
-                final displayTitle = title.length > 20 ? '${title.substring(0, 20)}...' : title;
+                final title = tab.collectionName ?? (tab.config.url.isEmpty ? 'NEW REQUEST' : tab.config.url);
+                final displayTitle = (title.length > 25 ? '${title.substring(0, 25)}...' : title).toUpperCase();
 
                 return Listener(
+                  key: ValueKey(tab.config.id),
                   onPointerDown: (event) {
                     if (event.buttons == kMiddleMouseButton) {
                       _confirmClose(context, index, ref);
@@ -134,12 +135,12 @@ class MainScreen extends ConsumerWidget {
                   child: GestureDetector(
                     onTap: () => notifier.setActiveIndex(index),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color: isActive ? Theme.of(context).canvasColor : Colors.transparent,
+                        color: isActive ? NeoBrutalistTheme.primary : Colors.transparent,
                         border: Border(
-                          right: BorderSide(color: Colors.grey.shade300),
-                          top: isActive ? BorderSide(color: Theme.of(context).primaryColor, width: 2) : BorderSide.none,
+                          right: const BorderSide(color: NeoBrutalistTheme.border, width: 3),
+                          bottom: isActive ? BorderSide.none : const BorderSide(color: NeoBrutalistTheme.border, width: 3),
                         ),
                       ),
                       child: Row(
@@ -147,14 +148,19 @@ class MainScreen extends ConsumerWidget {
                           Text(
                             displayTitle,
                             style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: isDirty ? FontWeight.bold : (isActive ? FontWeight.bold : FontWeight.normal),
-                              fontStyle: isDirty ? FontStyle.italic : FontStyle.normal,
+                              fontSize: 11,
+                              color: NeoBrutalistTheme.text,
+                              fontWeight: isDirty ? FontWeight.w900 : (isActive ? FontWeight.w900 : FontWeight.w500),
                             ),
                           ),
+                          if (isDirty) 
+                            const Padding(
+                              padding: EdgeInsets.only(left: 6),
+                              child: Text('*', style: TextStyle(color: NeoBrutalistTheme.secondary, fontSize: 16, fontWeight: FontWeight.w900)),
+                            ),
                           const SizedBox(width: 8),
                           IconButton(
-                            icon: const Icon(Icons.close, size: 14),
+                            icon: const Icon(Icons.close, size: 16, color: NeoBrutalistTheme.border),
                             onPressed: () => _confirmClose(context, index, ref),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
@@ -167,12 +173,18 @@ class MainScreen extends ConsumerWidget {
               },
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.add, size: 20),
-            onPressed: () => notifier.addTab(),
+          Container(
+            decoration: const BoxDecoration(
+              border: Border(left: BorderSide(color: NeoBrutalistTheme.border, width: 3)),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.add, size: 24, color: NeoBrutalistTheme.text),
+              onPressed: () => notifier.addTab(),
+            ),
           ),
         ],
       ),
     );
   }
 }
+

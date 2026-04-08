@@ -4,10 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:code_text_field/code_text_field.dart';
 import 'package:highlight/languages/json.dart';
-import 'package:flutter_highlight/themes/monokai-sublime.dart';
+import 'package:flutter_highlight/themes/arduino-light.dart';
 import '../providers/tabs_provider.dart';
 import '../providers/collections_provider.dart';
 import '../models/request_tab.dart';
+import '../utils/neo_brutalist_theme.dart';
 
 class RequestView extends ConsumerStatefulWidget {
   final HttpRequestTabModel tab;
@@ -21,6 +22,14 @@ class _RequestViewState extends ConsumerState<RequestView> {
   late TextEditingController _urlController;
   CodeController? _bodyController;
   CodeController? _responseController;
+  
+  final FocusNode _responseFocusNode = FocusNode();
+  final ScrollController _responseScrollController = ScrollController();
+  final ScrollController _requestScrollController = ScrollController();
+  final LayerLink _layerLink = LayerLink();
+  int? _cursorLine;
+  int? _requestCursorLine;
+  OverlayEntry? _tooltipEntry;
 
   @override
   void initState() {
@@ -34,6 +43,79 @@ class _RequestViewState extends ConsumerState<RequestView> {
       text: _getPrettifiedBody(widget.tab.responseBody),
       language: json,
     );
+    _responseController!.addListener(_onResponseSelectionChanged);
+    _bodyController!.addListener(_onRequestSelectionChanged);
+  }
+
+  void _onResponseSelectionChanged() {
+    final selection = _responseController!.selection;
+    if (selection.baseOffset >= 0) {
+      final textBefore = _responseController!.text.substring(0, selection.baseOffset);
+      final line = '\n'.allMatches(textBefore).length;
+      if (line != _cursorLine) {
+        setState(() {
+          _cursorLine = line;
+        });
+      }
+    } else {
+      if (_cursorLine != null) {
+        setState(() {
+          _cursorLine = null;
+        });
+      }
+    }
+  }
+
+  void _onRequestSelectionChanged() {
+    final selection = _bodyController!.selection;
+    if (selection.baseOffset >= 0) {
+      final textBefore = _bodyController!.text.substring(0, selection.baseOffset);
+      final line = '\n'.allMatches(textBefore).length;
+      if (line != _requestCursorLine) {
+        setState(() {
+          _requestCursorLine = line;
+        });
+      }
+    } else {
+      if (_requestCursorLine != null) {
+        setState(() {
+          _requestCursorLine = null;
+        });
+      }
+    }
+  }
+
+  void _showReadOnlyTooltip() {
+    _removeTooltip();
+    final overlay = Overlay.of(context);
+    
+    _tooltipEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        width: 200,
+        child: CompositedTransformFollower(
+          link: _layerLink,
+          showWhenUnlinked: false,
+          offset: const Offset(60, 40),
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: NeoBrutalistTheme.brutalBox(color: NeoBrutalistTheme.primary),
+              child: const Text('READ-ONLY TEXT!', 
+                style: TextStyle(color: NeoBrutalistTheme.primary, fontSize: 8, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ),
+      ),
+    );
+    
+    overlay.insert(_tooltipEntry!);
+    Future.delayed(const Duration(seconds: 2), _removeTooltip);
+  }
+
+  void _removeTooltip() {
+    _tooltipEntry?.remove();
+    _tooltipEntry = null;
   }
 
   String _getPrettifiedBody(String? body) {
@@ -61,8 +143,14 @@ class _RequestViewState extends ConsumerState<RequestView> {
   @override
   void dispose() {
     _urlController.dispose();
+    _bodyController?.removeListener(_onRequestSelectionChanged);
     _bodyController?.dispose();
+    _responseController?.removeListener(_onResponseSelectionChanged);
     _responseController?.dispose();
+    _responseFocusNode.dispose();
+    _responseScrollController.dispose();
+    _requestScrollController.dispose();
+    _removeTooltip();
     super.dispose();
   }
 
@@ -74,17 +162,17 @@ class _RequestViewState extends ConsumerState<RequestView> {
         const SingleActivator(LogicalKeyboardKey.keyS, meta: true): _handleSave,
       },
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
             _buildUrlBar(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Expanded(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(child: _buildRequestConfig()),
-                  const VerticalDivider(),
+                  const VerticalDivider(width: 48, thickness: 3, color: NeoBrutalistTheme.border),
                   Expanded(child: _buildResponseSection()),
                 ],
               ),
@@ -102,7 +190,17 @@ class _RequestViewState extends ConsumerState<RequestView> {
         widget.tab.config.copyWith(),
       );
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Request updated'), duration: Duration(seconds: 1)),
+        SnackBar(
+          backgroundColor: NeoBrutalistTheme.primary,
+          elevation: 0,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+            side: const BorderSide(color: NeoBrutalistTheme.border, width: 3),
+          ),
+          content: const Text('REQUEST UPDATED!', style: TextStyle(color: NeoBrutalistTheme.text, fontSize: 12, fontWeight: FontWeight.w900)),
+          duration: const Duration(seconds: 1),
+        ),
       );
     } else {
       _showSaveDialog();
@@ -110,49 +208,100 @@ class _RequestViewState extends ConsumerState<RequestView> {
   }
 
   Widget _buildUrlBar() {
-    return Row(
-      children: [
-        DropdownButton<String>(
-          value: widget.tab.config.method,
-          items: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
-              .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-              .toList(),
-          onChanged: (val) {
-            if (val != null) {
-              ref.read(tabsProvider.notifier).updateCurrentTab(
-                widget.tab.copyWith(config: widget.tab.config.copyWith(method: val)),
-              );
-            }
-          },
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: TextField(
-            controller: _urlController,
-            decoration: const InputDecoration(
-              hintText: 'Enter URL',
-              border: OutlineInputBorder(),
-              isDense: true,
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: NeoBrutalistTheme.brutalBox(offset: 6),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: const BoxDecoration(
+              border: Border(right: BorderSide(color: NeoBrutalistTheme.border, width: 3)),
             ),
-            onChanged: (val) {
-               ref.read(tabsProvider.notifier).updateCurrentTab(
-                widget.tab.copyWith(config: widget.tab.config.copyWith(url: val)),
-              );
-            },
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                dropdownColor: NeoBrutalistTheme.surface,
+                value: widget.tab.config.method,
+                style: TextStyle(
+                  color: NeoBrutalistTheme.text, 
+                  fontWeight: FontWeight.w900, 
+                  fontSize: 12,
+                ),
+                selectedItemBuilder: (context) {
+                  return ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map((m) {
+                    return Container(
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: NeoBrutalistTheme.getMethodColor(m),
+                        border: Border.all(color: NeoBrutalistTheme.border, width: 2),
+                      ),
+                      child: Text(m, style: const TextStyle(color: NeoBrutalistTheme.text, fontWeight: FontWeight.w900, fontSize: 12)),
+                    );
+                  }).toList();
+                },
+                items: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
+                    .map((m) => DropdownMenuItem(
+                      value: m, 
+                      child: Container(
+                        width: 100,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: NeoBrutalistTheme.getMethodColor(m),
+                          border: Border.all(color: NeoBrutalistTheme.border, width: 2),
+                        ),
+                        child: Text(m, style: const TextStyle(color: NeoBrutalistTheme.text, fontWeight: FontWeight.w900, fontSize: 12)),
+                      ),
+                    ))
+                    .toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    ref.read(tabsProvider.notifier).updateCurrentTab(
+                      widget.tab.copyWith(config: widget.tab.config.copyWith(method: val)),
+                    );
+                  }
+                },
+              ),
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        ElevatedButton(
-          onPressed: widget.tab.isSending ? null : () => ref.read(tabsProvider.notifier).sendRequest(),
-          child: widget.tab.isSending ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Send'),
-        ),
-        const SizedBox(width: 8),
-        IconButton(
-          icon: Icon(widget.tab.collectionNodeId != null ? Icons.save : Icons.save_as),
-          tooltip: widget.tab.collectionNodeId != null ? 'Update Request' : 'Save to Collection',
-          onPressed: _handleSave,
-        ),
-      ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: TextField(
+              controller: _urlController,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: NeoBrutalistTheme.text),
+              decoration: const InputDecoration(
+                hintText: 'Enter URL...',
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                isDense: true,
+                filled: false,
+              ),
+              onChanged: (val) {
+                 ref.read(tabsProvider.notifier).updateCurrentTab(
+                  widget.tab.copyWith(config: widget.tab.config.copyWith(url: val)),
+                );
+              },
+            ),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton(
+            onPressed: widget.tab.isSending ? null : () => ref.read(tabsProvider.notifier).sendRequest(),
+            style: ElevatedButton.styleFrom(
+               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            ),
+            child: widget.tab.isSending 
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 3, color: NeoBrutalistTheme.text)) 
+              : const Text('SEND'),
+          ),
+          const SizedBox(width: 12),
+          IconButton(
+            icon: Icon(widget.tab.collectionNodeId != null ? Icons.save : Icons.save_as, color: NeoBrutalistTheme.secondary, size: 28),
+            tooltip: widget.tab.collectionNodeId != null ? 'Update Request' : 'Save to Collection',
+            onPressed: _handleSave,
+          ),
+        ],
+      ),
     );
   }
 
@@ -164,33 +313,47 @@ class _RequestViewState extends ConsumerState<RequestView> {
         children: [
           const TabBar(
             isScrollable: true,
+            indicator: BoxDecoration(
+              color: NeoBrutalistTheme.primary,
+              border: Border(
+                top: BorderSide(color: NeoBrutalistTheme.border, width: 3),
+                left: BorderSide(color: NeoBrutalistTheme.border, width: 3),
+                right: BorderSide(color: NeoBrutalistTheme.border, width: 3),
+              ),
+            ),
+            labelColor: NeoBrutalistTheme.text,
+            unselectedLabelColor: NeoBrutalistTheme.text,
+            labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
             tabs: [
-              Tab(text: 'Params'),
-              Tab(text: 'Headers'),
-              Tab(text: 'Body'),
+              Tab(text: 'PARAMS'),
+              Tab(text: 'HEADERS'),
+              Tab(text: 'BODY'),
             ],
           ),
           Expanded(
-            child: TabBarView(
-              children: [
-                _KeyValueEditor(
-                  items: widget.tab.config.params,
-                  onChanged: (map) {
-                    ref.read(tabsProvider.notifier).updateCurrentTab(
-                      widget.tab.copyWith(config: widget.tab.config.copyWith(params: map)),
-                    );
-                  },
-                ),
-                _KeyValueEditor(
-                  items: widget.tab.config.headers,
-                  onChanged: (map) {
-                    ref.read(tabsProvider.notifier).updateCurrentTab(
-                      widget.tab.copyWith(config: widget.tab.config.copyWith(headers: map)),
-                    );
-                  },
-                ),
-                _buildBodyEditor(),
-              ],
+            child: Container(
+              decoration: NeoBrutalistTheme.brutalBox(offset: 0),
+              child: TabBarView(
+                children: [
+                  _KeyValueEditor(
+                    items: widget.tab.config.params,
+                    onChanged: (map) {
+                      ref.read(tabsProvider.notifier).updateCurrentTab(
+                        widget.tab.copyWith(config: widget.tab.config.copyWith(params: map)),
+                      );
+                    },
+                  ),
+                  _KeyValueEditor(
+                    items: widget.tab.config.headers,
+                    onChanged: (map) {
+                      ref.read(tabsProvider.notifier).updateCurrentTab(
+                        widget.tab.copyWith(config: widget.tab.config.copyWith(headers: map)),
+                      );
+                    },
+                  ),
+                  _buildBodyEditor(),
+                ],
+              ),
             ),
           ),
         ],
@@ -199,37 +362,80 @@ class _RequestViewState extends ConsumerState<RequestView> {
   }
 
   Widget _buildBodyEditor() {
-    return CodeTheme(
-      data: CodeThemeData(styles: monokaiSublimeTheme),
-      child: CodeField(
-        controller: _bodyController!,
-        expands: true,
-        textStyle: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-        onChanged: (val) {
-           ref.read(tabsProvider.notifier).updateCurrentTab(
-             widget.tab.copyWith(config: widget.tab.config.copyWith(body: val)),
-           );
-        },
+    final customTheme = Map<String, TextStyle>.from(arduinoLightTheme);
+    customTheme['root'] = customTheme['root']!.copyWith(backgroundColor: Colors.transparent);
+
+    return Container(
+      color: NeoBrutalistTheme.editorBackground,
+      child: Stack(
+        children: [
+          AnimatedBuilder(
+            animation: Listenable.merge([_requestScrollController, _bodyController!]),
+            builder: (context, _) {
+              if (_requestCursorLine == null) return const SizedBox();
+              const double fontSize = 13;
+              const double lineHeight = fontSize * 1.5;
+              const double topPadding = 0; 
+              final double top = topPadding + (_requestCursorLine! * lineHeight) - _requestScrollController.offset;
+              
+              return Positioned(
+                top: top,
+                left: 0,
+                right: 0,
+                height: lineHeight,
+                child: IgnorePointer(
+                  child: Container(color: NeoBrutalistTheme.primary.withValues(alpha: 0.1)),
+                ),
+              );
+            },
+          ),
+          CodeTheme(
+            data: CodeThemeData(styles: customTheme),
+            child: TextField(
+              controller: _bodyController!,
+              scrollController: _requestScrollController,
+              maxLines: null,
+              expands: true,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.5),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.all(12),
+              ),
+              onChanged: (val) {
+                 ref.read(tabsProvider.notifier).updateCurrentTab(
+                   widget.tab.copyWith(config: widget.tab.config.copyWith(body: val)),
+                 );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildResponseSection() {
     if (widget.tab.statusCode == null && !widget.tab.isSending) {
-       return const Center(child: Text('Hit Send to get a response'));
+       return Center(child: Column(
+         mainAxisAlignment: MainAxisAlignment.center,
+         children: [
+           const Icon(Icons.bolt, size: 64, color: NeoBrutalistTheme.secondary),
+           const SizedBox(height: 24),
+           const Text('HIT SEND TO GET A RESPONSE', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: NeoBrutalistTheme.text)),
+         ],
+       ));
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          padding: const EdgeInsets.only(bottom: 12.0),
           child: Row(
             children: [
               if (widget.tab.statusCode != null)
-                _ResponseMetadataItem(label: 'Status', value: widget.tab.statusCode.toString(), color: _getStatusColor(widget.tab.statusCode!)),
+                _ResponseMetadataItem(label: 'STATUS', value: widget.tab.statusCode.toString(), color: _getStatusColor(widget.tab.statusCode!)),
               if (widget.tab.durationMs != null)
-                 _ResponseMetadataItem(label: 'Time', value: '${widget.tab.durationMs} ms'),
+                 _ResponseMetadataItem(label: 'TIME', value: '${widget.tab.durationMs} ms', color: NeoBrutalistTheme.secondary),
             ],
           ),
         ),
@@ -239,17 +445,31 @@ class _RequestViewState extends ConsumerState<RequestView> {
             child: Column(
               children: [
                 const TabBar(
+                  indicator: BoxDecoration(
+                    color: NeoBrutalistTheme.primary,
+                    border: Border(
+                      top: BorderSide(color: NeoBrutalistTheme.border, width: 3),
+                      left: BorderSide(color: NeoBrutalistTheme.border, width: 3),
+                      right: BorderSide(color: NeoBrutalistTheme.border, width: 3),
+                    ),
+                  ),
+                  labelColor: NeoBrutalistTheme.text,
+                  unselectedLabelColor: NeoBrutalistTheme.text,
+                  labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
                   tabs: [
-                    Tab(text: 'Body'),
-                    Tab(text: 'Headers'),
+                    Tab(text: 'BODY'),
+                    Tab(text: 'HEADERS'),
                   ],
                 ),
                 Expanded(
-                  child: TabBarView(
-                    children: [
-                      _buildResponseBody(),
-                      _buildResponseHeaders(),
-                    ],
+                  child: Container(
+                    decoration: NeoBrutalistTheme.brutalBox(offset: 0),
+                    child: TabBarView(
+                      children: [
+                        _buildResponseBody(),
+                        _buildResponseHeaders(),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -263,23 +483,64 @@ class _RequestViewState extends ConsumerState<RequestView> {
   Widget _buildResponseBody() {
     if (widget.tab.responseBody == null) return const SizedBox();
     
-    return Container(
-      width: double.infinity,
-      color: monokaiSublimeTheme['root']?.backgroundColor ?? const Color(0xff23241f),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
-        child: CodeTheme(
-          data: const CodeThemeData(styles: monokaiSublimeTheme),
-          child: Builder(
-            builder: (context) {
-              return SelectableText.rich(
-                _responseController!.buildTextSpan(
-                  context: context,
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-                  withComposing: false,
+    final customTheme = Map<String, TextStyle>.from(arduinoLightTheme);
+    customTheme['root'] = customTheme['root']!.copyWith(backgroundColor: Colors.transparent);
+
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: Container(
+        width: double.infinity,
+        color: NeoBrutalistTheme.editorBackground,
+        child: KeyboardListener(
+          focusNode: _responseFocusNode,
+          onKeyEvent: (event) {
+            if (event is KeyDownEvent && event.character != null) {
+              _showReadOnlyTooltip();
+            }
+          },
+          child: Stack(
+            children: [
+              AnimatedBuilder(
+                animation: Listenable.merge([_responseScrollController, _responseController!]),
+                builder: (context, _) {
+                  if (_cursorLine == null) return const SizedBox();
+                  const double fontSize = 13;
+                  const double lineHeight = fontSize * 1.5;
+                  const double topPadding = 12;
+                  final double top = topPadding + (_cursorLine! * lineHeight) - _responseScrollController.offset;
+                  
+                  return Positioned(
+                    top: top,
+                    left: 0,
+                    right: 0,
+                    height: lineHeight,
+                    child: IgnorePointer(
+                      child: Container(color: NeoBrutalistTheme.primary.withValues(alpha: 0.1)),
+                    ),
+                  );
+                },
+              ),
+              CodeTheme(
+                data: CodeThemeData(styles: customTheme),
+                child: Builder(
+                  builder: (context) {
+                    return TextField(
+                      controller: _responseController!,
+                      scrollController: _responseScrollController,
+                      readOnly: true,
+                      showCursor: true,
+                      cursorColor: NeoBrutalistTheme.primary,
+                      maxLines: null,
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.5),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.all(12),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
+              ),
+            ],
           ),
         ),
       ),
@@ -291,36 +552,36 @@ class _RequestViewState extends ConsumerState<RequestView> {
     return ListView(
       children: widget.tab.responseHeaders!.entries.map((e) => ListTile(
         dense: true,
-        title: Text(e.key, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(e.value),
+        title: Text(e.key.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: NeoBrutalistTheme.primary)),
+        subtitle: Text(e.value, style: const TextStyle(fontSize: 10, color: NeoBrutalistTheme.text)),
       )).toList(),
     );
   }
 
   Color _getStatusColor(int code) {
-    if (code >= 200 && code < 300) return Colors.green;
-    if (code >= 400) return Colors.red;
-    return Colors.orange;
+    if (code >= 200 && code < 300) return Colors.greenAccent;
+    if (code >= 400) return Colors.redAccent;
+    return Colors.orangeAccent;
   }
 
   void _showSaveDialog() {
-    final controller = TextEditingController(text: 'New Request');
+    final controller = TextEditingController(text: 'NEW REQUEST');
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Save to Collection'),
-        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(labelText: 'Request Name')),
+        title: const Text('SAVE TO COLLECTION'),
+        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(labelText: 'REQUEST NAME')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
           TextButton(
             onPressed: () {
               final id = ref.read(collectionsProvider.notifier).saveRequest(controller.text, widget.tab.config.copyWith());
               ref.read(tabsProvider.notifier).updateCurrentTab(
-                widget.tab.copyWith(collectionNodeId: id),
+                widget.tab.copyWith(collectionNodeId: id, collectionName: controller.text),
               );
               Navigator.pop(context);
             },
-            child: const Text('Save'),
+            child: const Text('SAVE'),
           ),
         ],
       ),
@@ -336,12 +597,18 @@ class _ResponseMetadataItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 16.0),
+    return Container(
+      margin: const EdgeInsets.only(right: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color?.withValues(alpha: 0.2) ?? NeoBrutalistTheme.primary.withValues(alpha: 0.2),
+        border: Border.all(color: NeoBrutalistTheme.border, width: 2),
+        borderRadius: BorderRadius.circular(4),
+      ),
       child: Row(
         children: [
-          Text('$label: ', style: const TextStyle(color: Colors.grey)),
-          Text(value, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+          Text('$label: ', style: const TextStyle(color: NeoBrutalistTheme.text, fontSize: 10, fontWeight: FontWeight.bold)),
+          Text(value, style: TextStyle(color: NeoBrutalistTheme.text, fontWeight: FontWeight.w900, fontSize: 11)),
         ],
       ),
     );
@@ -381,49 +648,57 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
+      padding: const EdgeInsets.all(12),
       itemCount: _list.length,
       itemBuilder: (context, index) {
-        return Row(
-          children: [
-            Expanded(
-              child: TextField(
-                decoration: const InputDecoration(hintText: 'Key', isDense: true),
-                controller: TextEditingController(text: _list[index].key)..selection = TextSelection.fromPosition(TextPosition(offset: _list[index].key.length)),
-                onChanged: (val) {
-                  _list[index] = MapEntry(val, _list[index].value);
-                  if (index == _list.length - 1 && val.isNotEmpty) {
-                    _list.add(const MapEntry('', ''));
-                  }
-                  _update();
-                  setState(() {});
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  decoration: const InputDecoration(hintText: 'KEY', isDense: true, contentPadding: EdgeInsets.all(12)),
+                  controller: TextEditingController(text: _list[index].key)..selection = TextSelection.fromPosition(TextPosition(offset: _list[index].key.length)),
+                  onChanged: (val) {
+                    _list[index] = MapEntry(val, _list[index].value);
+                    if (index == _list.length - 1 && val.isNotEmpty) {
+                      _list.add(const MapEntry('', ''));
+                    }
+                    _update();
+                    setState(() {});
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  decoration: const InputDecoration(hintText: 'VALUE', isDense: true, contentPadding: EdgeInsets.all(12)),
+                  controller: TextEditingController(text: _list[index].value)..selection = TextSelection.fromPosition(TextPosition(offset: _list[index].value.length)),
+                  onChanged: (val) {
+                    _list[index] = MapEntry(_list[index].key, val);
+                     _update();
+                     setState(() {});
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 24, color: Colors.red),
+                onPressed: () {
+                  setState(() {
+                    _list.removeAt(index);
+                    if (_list.isEmpty) _list.add(const MapEntry('', ''));
+                    _update();
+                  });
                 },
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TextField(
-                decoration: const InputDecoration(hintText: 'Value', isDense: true),
-                controller: TextEditingController(text: _list[index].value)..selection = TextSelection.fromPosition(TextPosition(offset: _list[index].value.length)),
-                onChanged: (val) {
-                  _list[index] = MapEntry(_list[index].key, val);
-                   _update();
-                   setState(() {});
-                },
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete, size: 16),
-              onPressed: () {
-                setState(() {
-                  _list.removeAt(index);
-                  if (_list.isEmpty) _list.add(const MapEntry('', ''));
-                  _update();
-                });
-              },
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
   }
 }
+

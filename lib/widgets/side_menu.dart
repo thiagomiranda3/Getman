@@ -5,6 +5,7 @@ import '../providers/collections_provider.dart';
 import '../providers/tabs_provider.dart';
 import '../providers/settings_provider.dart';
 import '../models/collection_node.dart';
+import '../utils/neo_brutalist_theme.dart';
 
 class SideMenu extends ConsumerWidget {
   const SideMenu({super.key});
@@ -15,17 +16,30 @@ class SideMenu extends ConsumerWidget {
       length: 2,
       child: Container(
         width: 300,
-        decoration: BoxDecoration(
-          border: Border(right: BorderSide(color: Colors.grey.shade300)),
+        decoration: const BoxDecoration(
+          color: NeoBrutalistTheme.surface,
+          border: Border(right: BorderSide(color: NeoBrutalistTheme.border, width: 3)),
         ),
         child: Column(
           children: [
-            _buildHeader(context, ref),
-            const TabBar(
-              tabs: [
-                Tab(text: 'Collections'),
-                Tab(text: 'History'),
-              ],
+            const _SideMenuHeader(),
+            Container(
+              decoration: const BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: NeoBrutalistTheme.border, width: 3),
+                  bottom: BorderSide(color: NeoBrutalistTheme.border, width: 3),
+                ),
+              ),
+              child: const TabBar(
+                indicator: BoxDecoration(color: NeoBrutalistTheme.primary),
+                labelColor: NeoBrutalistTheme.text,
+                unselectedLabelColor: NeoBrutalistTheme.text,
+                labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+                tabs: [
+                  Tab(text: 'COLLECTIONS'),
+                  Tab(text: 'HISTORY'),
+                ],
+              ),
             ),
             Expanded(
               child: TabBarView(
@@ -40,24 +54,29 @@ class SideMenu extends ConsumerWidget {
       ),
     );
   }
+}
 
-  Widget _buildHeader(BuildContext context, WidgetRef ref) {
+class _SideMenuHeader extends ConsumerWidget {
+  const _SideMenuHeader();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
-      padding: const EdgeInsets.all(8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text('Getman', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          const Text('GETMAN', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: NeoBrutalistTheme.text, letterSpacing: -1)),
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.create_new_folder),
-                tooltip: 'New Folder',
+                icon: const Icon(Icons.create_new_folder, color: NeoBrutalistTheme.text, size: 20),
+                tooltip: 'NEW FOLDER',
                 onPressed: () => _showNewFolderDialog(context, ref),
               ),
               IconButton(
-                icon: const Icon(Icons.settings),
-                tooltip: 'Settings',
+                icon: const Icon(Icons.settings, color: NeoBrutalistTheme.text, size: 20),
+                tooltip: 'SETTINGS',
                 onPressed: () => _showSettingsDialog(context, ref),
               ),
             ],
@@ -72,22 +91,22 @@ class SideMenu extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('New Folder'),
+        title: const Text('NEW FOLDER'),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(hintText: 'Folder Name'),
+          decoration: const InputDecoration(hintText: 'FOLDER NAME'),
           autofocus: true,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          TextButton(
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
+          ElevatedButton(
             onPressed: () {
               if (controller.text.isNotEmpty) {
                 ref.read(collectionsProvider.notifier).addFolder(controller.text);
                 Navigator.pop(context);
               }
             },
-            child: const Text('Create'),
+            child: const Text('CREATE'),
           ),
         ],
       ),
@@ -99,17 +118,17 @@ class SideMenu extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Global Settings'),
+        title: const Text('SETTINGS'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              title: const Text('History Limit'),
+              title: const Text('HISTORY LIMIT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               trailing: SizedBox(
-                width: 60,
+                width: 80,
                 child: TextField(
                   keyboardType: TextInputType.number,
-                  decoration: InputDecoration(hintText: settings.historyLimit.toString()),
+                  decoration: InputDecoration(hintText: settings.historyLimit.toString(), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
                   onSubmitted: (val) {
                     final limit = int.tryParse(val);
                     if (limit != null) {
@@ -119,8 +138,11 @@ class SideMenu extends ConsumerWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 8),
             SwitchListTile(
-              title: const Text('Save Response in History'),
+              activeThumbColor: NeoBrutalistTheme.secondary,
+              activeTrackColor: NeoBrutalistTheme.primary,
+              title: const Text('SAVE RESPONSE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               value: settings.saveResponseInHistory,
               onChanged: (val) {
                 ref.read(settingsProvider.notifier).updateSaveResponseInHistory(val);
@@ -129,7 +151,7 @@ class SideMenu extends ConsumerWidget {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CLOSE')),
         ],
       ),
     );
@@ -146,13 +168,21 @@ class _HistoryList extends ConsumerWidget {
         final config = history[index];
         return ListTile(
           dense: true,
-          title: Text(config.url.isEmpty ? '(No URL)' : config.url, maxLines: 1, overflow: TextOverflow.ellipsis),
+          title: Text(config.url.isEmpty ? '(NO URL)' : config.url, 
+            maxLines: 1, 
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          ),
           subtitle: Row(
             children: [
-              _MethodBadge(method: config.method),
+              _MethodBadge(method: config.method, small: true),
               if (config.statusCode != null) ...[
                 const SizedBox(width: 8),
-                Text(config.statusCode.toString(), style: TextStyle(color: _getStatusColor(config.statusCode!))),
+                Text(config.statusCode.toString(), style: TextStyle(
+                  color: _getStatusColor(config.statusCode!),
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                )),
               ],
             ],
           ),
@@ -165,9 +195,9 @@ class _HistoryList extends ConsumerWidget {
   }
 
   Color _getStatusColor(int code) {
-    if (code >= 200 && code < 300) return Colors.green;
-    if (code >= 400) return Colors.red;
-    return Colors.orange;
+    if (code >= 200 && code < 300) return Colors.green.shade700;
+    if (code >= 400) return Colors.red.shade700;
+    return Colors.orange.shade700;
   }
 }
 
@@ -204,9 +234,11 @@ class _CollectionNodeWidget extends ConsumerWidget {
         onAcceptWithDetails: (details) => ref.read(collectionsProvider.notifier).moveNode(details.data, node.id),
         builder: (context, candidateData, rejectedData) {
           return ExpansionTile(
+            collapsedIconColor: NeoBrutalistTheme.text,
+            iconColor: NeoBrutalistTheme.text,
             leading: Icon(node.isFavorite ? Icons.star : Icons.folder,
-                size: 16, color: node.isFavorite ? Colors.amber : null),
-            title: Text(node.name, style: const TextStyle(fontSize: 14)),
+                size: 20, color: node.isFavorite ? NeoBrutalistTheme.primary : NeoBrutalistTheme.secondary),
+            title: Text(node.name.toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900)),
             trailing: _NodeContextMenu(node: node),
             children: node.children
                 .map((c) => _CollectionNodeWidget(node: c, depth: depth + 1))
@@ -216,9 +248,9 @@ class _CollectionNodeWidget extends ConsumerWidget {
       );
     } else {
       content = ListTile(
-        contentPadding: EdgeInsets.only(left: 16.0 + (depth * 16)),
+        contentPadding: EdgeInsets.only(left: 16.0 + (depth * 20)),
         leading: _MethodBadge(method: node.config?.method ?? 'GET', small: true),
-        title: Text(node.name, style: const TextStyle(fontSize: 13)),
+        title: Text(node.name.toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
         onTap: () {
           if (node.config != null) {
             ref
@@ -237,11 +269,12 @@ class _CollectionNodeWidget extends ConsumerWidget {
     return Draggable<String>(
       data: node.id,
       feedback: Material(
-        elevation: 4,
+        elevation: 0,
+        color: Colors.transparent,
         child: Container(
-          padding: const EdgeInsets.all(8),
-          color: Theme.of(context).cardColor,
-          child: Text(node.name),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: NeoBrutalistTheme.brutalBox(color: NeoBrutalistTheme.primary),
+          child: Text(node.name.toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: NeoBrutalistTheme.text)),
         ),
       ),
       childWhenDragging: Opacity(opacity: 0.5, child: content),
@@ -262,7 +295,13 @@ class _NodeContextMenuState extends ConsumerState<_NodeContextMenu> {
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert, size: 16),
+      icon: const Icon(Icons.more_vert, size: 20, color: NeoBrutalistTheme.text),
+      color: NeoBrutalistTheme.surface,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(4),
+        side: const BorderSide(color: NeoBrutalistTheme.border, width: 3),
+      ),
       onSelected: (val) {
         switch (val) {
           case 'rename':
@@ -280,12 +319,12 @@ class _NodeContextMenuState extends ConsumerState<_NodeContextMenu> {
         }
       },
       itemBuilder: (context) => [
-        if (widget.node.isFolder && widget.node.config == null) // only top level? user said "for the top folder... favorite button"
-           PopupMenuItem(value: 'favorite', child: Text(widget.node.isFavorite ? 'Unfavorite' : 'Favorite')),
-        const PopupMenuItem(value: 'rename', child: Text('Rename')),
+        if (widget.node.isFolder && widget.node.config == null)
+           PopupMenuItem(value: 'favorite', child: Text(widget.node.isFavorite ? 'UNFAVORITE' : 'FAVORITE', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold))),
+        PopupMenuItem(value: 'rename', child: Text('RENAME', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold))),
         if (widget.node.isFolder)
-           const PopupMenuItem(value: 'add_subfolder', child: Text('Add Subfolder')),
-        const PopupMenuItem(value: 'delete', child: Text('Delete')),
+           PopupMenuItem(value: 'add_subfolder', child: Text('ADD SUBFOLDER', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold))),
+        PopupMenuItem(value: 'delete', child: Text('DELETE', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red))),
       ],
     );
   }
@@ -295,16 +334,16 @@ class _NodeContextMenuState extends ConsumerState<_NodeContextMenu> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Rename'),
+        title: const Text('RENAME'),
         content: TextField(controller: controller, autofocus: true),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
           TextButton(
             onPressed: () {
               ref.read(collectionsProvider.notifier).renameNode(widget.node.id, controller.text);
               Navigator.pop(context);
             },
-            child: const Text('Save'),
+            child: const Text('SAVE'),
           ),
         ],
       ),
@@ -316,16 +355,16 @@ class _NodeContextMenuState extends ConsumerState<_NodeContextMenu> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Add Subfolder'),
+        title: const Text('ADD SUBFOLDER'),
         content: TextField(controller: controller, autofocus: true),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
           TextButton(
             onPressed: () {
               ref.read(collectionsProvider.notifier).addFolder(controller.text, parentId: widget.node.id);
               Navigator.pop(context);
             },
-            child: const Text('Add'),
+            child: const Text('ADD'),
           ),
         ],
       ),
@@ -340,26 +379,18 @@ class _MethodBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color color;
-    switch (method) {
-      case 'GET': color = Colors.green; break;
-      case 'POST': color = Colors.blue; break;
-      case 'PUT': color = Colors.orange; break;
-      case 'DELETE': color = Colors.red; break;
-      case 'PATCH': color = Colors.purple; break;
-      default: color = Colors.grey;
-    }
+    final color = NeoBrutalistTheme.getMethodColor(method);
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: small ? 4 : 6, vertical: 2),
+      padding: EdgeInsets.symmetric(horizontal: small ? 6 : 10, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
+        color: color,
+        border: Border.all(color: NeoBrutalistTheme.border, width: 2),
       ),
       child: Text(
         method,
-        style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: small ? 10 : 12),
+        style: TextStyle(color: NeoBrutalistTheme.text, fontWeight: FontWeight.w900, fontSize: small ? 10 : 12),
       ),
     );
   }
 }
+

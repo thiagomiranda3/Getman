@@ -6,7 +6,6 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
   SettingsNotifier() : super(StorageService.getSettings());
 
   void updateHistoryLimit(int limit) {
-    state.historyLimit = limit;
     state = SettingsModel(
       historyLimit: limit,
       saveResponseInHistory: state.saveResponseInHistory,
@@ -15,7 +14,6 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
   }
 
   void updateSaveResponseInHistory(bool save) {
-    state.saveResponseInHistory = save;
     state = SettingsModel(
       historyLimit: state.historyLimit,
       saveResponseInHistory: save,

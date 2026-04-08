@@ -75,6 +75,27 @@ class TabsNotifier extends StateNotifier<TabsState> {
     state = state.copyWith(activeIndex: index);
   }
 
+  void reorderTabs(int oldIndex, int newIndex) {
+    final tabs = [...state.tabs];
+    if (oldIndex < newIndex) {
+      newIndex -= 1;
+    }
+    final item = tabs.removeAt(oldIndex);
+    tabs.insert(newIndex, item);
+
+    int newActiveIndex = state.activeIndex;
+    if (oldIndex == state.activeIndex) {
+      newActiveIndex = newIndex;
+    } else if (oldIndex < state.activeIndex && newIndex >= state.activeIndex) {
+      newActiveIndex -= 1;
+    } else if (oldIndex > state.activeIndex && newIndex <= state.activeIndex) {
+      newActiveIndex += 1;
+    }
+
+    state = state.copyWith(tabs: tabs, activeIndex: newActiveIndex);
+    StorageService.saveTabs(state.tabs);
+  }
+
   void updateCurrentTab(HttpRequestTabModel tab) {
     final newTabs = [...state.tabs];
     newTabs[state.activeIndex] = tab;
