@@ -2,9 +2,9 @@ import 'dart:convert' as convert;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:code_text_field/code_text_field.dart';
-import 'package:highlight/languages/json.dart';
-import 'package:flutter_highlight/themes/arduino-light.dart';
+import 'package:re_editor/re_editor.dart';
+import 'package:re_highlight/styles/arduino-light.dart';
+import 'package:re_highlight/languages/json.dart';
 import '../providers/tabs_provider.dart';
 import '../providers/collections_provider.dart';
 import '../models/request_tab.dart';
@@ -20,102 +20,27 @@ class RequestView extends ConsumerStatefulWidget {
 
 class _RequestViewState extends ConsumerState<RequestView> {
   late TextEditingController _urlController;
-  CodeController? _bodyController;
-  CodeController? _responseController;
+  CodeLineEditingController? _bodyController;
+  CodeLineEditingController? _responseController;
   
   final FocusNode _responseFocusNode = FocusNode();
   final ScrollController _responseScrollController = ScrollController();
   final ScrollController _requestScrollController = ScrollController();
   final LayerLink _layerLink = LayerLink();
-  int? _cursorLine;
-  int? _requestCursorLine;
-  OverlayEntry? _tooltipEntry;
 
   @override
   void initState() {
     super.initState();
     _urlController = TextEditingController(text: widget.tab.config.url);
-    _bodyController = CodeController(
-      text: widget.tab.config.body,
-      language: json,
-    );
-    _responseController = CodeController(
-      text: _getPrettifiedBody(widget.tab.responseBody),
-      language: json,
-    );
-    _responseController!.addListener(_onResponseSelectionChanged);
-    _bodyController!.addListener(_onRequestSelectionChanged);
+    _bodyController = CodeLineEditingController.fromText(widget.tab.config.body);
+    _responseController = CodeLineEditingController.fromText(_getPrettifiedBody(widget.tab.responseBody));
+    _bodyController!.addListener(_onBodyChanged);
   }
 
-  void _onResponseSelectionChanged() {
-    final selection = _responseController!.selection;
-    if (selection.baseOffset >= 0) {
-      final textBefore = _responseController!.text.substring(0, selection.baseOffset);
-      final line = '\n'.allMatches(textBefore).length;
-      if (line != _cursorLine) {
-        setState(() {
-          _cursorLine = line;
-        });
-      }
-    } else {
-      if (_cursorLine != null) {
-        setState(() {
-          _cursorLine = null;
-        });
-      }
-    }
-  }
-
-  void _onRequestSelectionChanged() {
-    final selection = _bodyController!.selection;
-    if (selection.baseOffset >= 0) {
-      final textBefore = _bodyController!.text.substring(0, selection.baseOffset);
-      final line = '\n'.allMatches(textBefore).length;
-      if (line != _requestCursorLine) {
-        setState(() {
-          _requestCursorLine = line;
-        });
-      }
-    } else {
-      if (_requestCursorLine != null) {
-        setState(() {
-          _requestCursorLine = null;
-        });
-      }
-    }
-  }
-
-  void _showReadOnlyTooltip() {
-    _removeTooltip();
-    final overlay = Overlay.of(context);
-    
-    _tooltipEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        width: 200,
-        child: CompositedTransformFollower(
-          link: _layerLink,
-          showWhenUnlinked: false,
-          offset: const Offset(60, 40),
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: NeoBrutalistTheme.brutalBox(color: NeoBrutalistTheme.primary),
-              child: const Text('READ-ONLY TEXT!', 
-                style: TextStyle(color: NeoBrutalistTheme.primary, fontSize: 8, fontWeight: FontWeight.bold)),
-            ),
-          ),
-        ),
-      ),
-    );
-    
-    overlay.insert(_tooltipEntry!);
-    Future.delayed(const Duration(seconds: 2), _removeTooltip);
-  }
-
-  void _removeTooltip() {
-    _tooltipEntry?.remove();
-    _tooltipEntry = null;
+  void _onBodyChanged() {
+     ref.read(tabsProvider.notifier).updateCurrentTab(
+       widget.tab.copyWith(config: widget.tab.config.copyWith(body: _bodyController!.text)),
+     );
   }
 
   String _getPrettifiedBody(String? body) {
@@ -143,14 +68,12 @@ class _RequestViewState extends ConsumerState<RequestView> {
   @override
   void dispose() {
     _urlController.dispose();
-    _bodyController?.removeListener(_onRequestSelectionChanged);
+    _bodyController?.removeListener(_onBodyChanged);
     _bodyController?.dispose();
-    _responseController?.removeListener(_onResponseSelectionChanged);
     _responseController?.dispose();
     _responseFocusNode.dispose();
     _responseScrollController.dispose();
     _requestScrollController.dispose();
-    _removeTooltip();
     super.dispose();
   }
 
@@ -362,53 +285,32 @@ class _RequestViewState extends ConsumerState<RequestView> {
   }
 
   Widget _buildBodyEditor() {
-    final customTheme = Map<String, TextStyle>.from(arduinoLightTheme);
-    customTheme['root'] = customTheme['root']!.copyWith(backgroundColor: Colors.transparent);
-
     return Container(
       color: NeoBrutalistTheme.editorBackground,
-      child: Stack(
-        children: [
-          AnimatedBuilder(
-            animation: Listenable.merge([_requestScrollController, _bodyController!]),
-            builder: (context, _) {
-              if (_requestCursorLine == null) return const SizedBox();
-              const double fontSize = 13;
-              const double lineHeight = fontSize * 1.5;
-              const double topPadding = 0; 
-              final double top = topPadding + (_requestCursorLine! * lineHeight) - _requestScrollController.offset;
-              
-              return Positioned(
-                top: top,
-                left: 0,
-                right: 0,
-                height: lineHeight,
-                child: IgnorePointer(
-                  child: Container(color: NeoBrutalistTheme.primary.withValues(alpha: 0.1)),
-                ),
-              );
-            },
-          ),
-          CodeTheme(
-            data: CodeThemeData(styles: customTheme),
-            child: TextField(
-              controller: _bodyController!,
-              scrollController: _requestScrollController,
-              maxLines: null,
-              expands: true,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.5),
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.all(12),
+      child: CodeEditor(
+        controller: _bodyController!,
+        wordWrap: true,
+        style: CodeEditorStyle(
+          fontSize: 13,
+          fontFamily: 'monospace',
+          backgroundColor: Colors.transparent,
+          cursorColor: NeoBrutalistTheme.primary,
+          selectionColor: NeoBrutalistTheme.primary.withValues(alpha: 0.3),
+          codeTheme: CodeHighlightTheme(
+            languages: {
+              'json': CodeHighlightThemeMode(
+                mode: langJson,
               ),
-              onChanged: (val) {
-                 ref.read(tabsProvider.notifier).updateCurrentTab(
-                   widget.tab.copyWith(config: widget.tab.config.copyWith(body: val)),
-                 );
-              },
-            ),
+            },
+            theme: arduinoLightTheme,
           ),
-        ],
+        ),
+        indicatorBuilder: (context, controller, chunkController, notifier) {
+          return DefaultCodeLineNumber(
+            controller: controller,
+            notifier: notifier,
+          );
+        },
       ),
     );
   }
@@ -482,66 +384,37 @@ class _RequestViewState extends ConsumerState<RequestView> {
 
   Widget _buildResponseBody() {
     if (widget.tab.responseBody == null) return const SizedBox();
-    
-    final customTheme = Map<String, TextStyle>.from(arduinoLightTheme);
-    customTheme['root'] = customTheme['root']!.copyWith(backgroundColor: Colors.transparent);
 
     return CompositedTransformTarget(
       link: _layerLink,
       child: Container(
         width: double.infinity,
         color: NeoBrutalistTheme.editorBackground,
-        child: KeyboardListener(
-          focusNode: _responseFocusNode,
-          onKeyEvent: (event) {
-            if (event is KeyDownEvent && event.character != null) {
-              _showReadOnlyTooltip();
-            }
-          },
-          child: Stack(
-            children: [
-              AnimatedBuilder(
-                animation: Listenable.merge([_responseScrollController, _responseController!]),
-                builder: (context, _) {
-                  if (_cursorLine == null) return const SizedBox();
-                  const double fontSize = 13;
-                  const double lineHeight = fontSize * 1.5;
-                  const double topPadding = 12;
-                  final double top = topPadding + (_cursorLine! * lineHeight) - _responseScrollController.offset;
-                  
-                  return Positioned(
-                    top: top,
-                    left: 0,
-                    right: 0,
-                    height: lineHeight,
-                    child: IgnorePointer(
-                      child: Container(color: NeoBrutalistTheme.primary.withValues(alpha: 0.1)),
-                    ),
-                  );
-                },
-              ),
-              CodeTheme(
-                data: CodeThemeData(styles: customTheme),
-                child: Builder(
-                  builder: (context) {
-                    return TextField(
-                      controller: _responseController!,
-                      scrollController: _responseScrollController,
-                      readOnly: true,
-                      showCursor: true,
-                      cursorColor: NeoBrutalistTheme.primary,
-                      maxLines: null,
-                      style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.5),
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.all(12),
-                      ),
-                    );
-                  },
+        child: CodeEditor(
+          controller: _responseController!,
+          readOnly: true,
+          wordWrap: true,
+          style: CodeEditorStyle(
+            fontSize: 13,
+            fontFamily: 'monospace',
+            backgroundColor: Colors.transparent,
+            cursorColor: NeoBrutalistTheme.primary,
+            selectionColor: NeoBrutalistTheme.primary.withValues(alpha: 0.3),
+            codeTheme: CodeHighlightTheme(
+              languages: {
+                'json': CodeHighlightThemeMode(
+                  mode: langJson,
                 ),
-              ),
-            ],
+              },
+              theme: arduinoLightTheme,
+            ),
           ),
+          indicatorBuilder: (context, controller, chunkController, notifier) {
+            return DefaultCodeLineNumber(
+              controller: controller,
+              notifier: notifier,
+            );
+          },
         ),
       ),
     );

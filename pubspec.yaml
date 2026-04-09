@@ -12,9 +12,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   dio: ^5.8.0+1
   flutter_riverpod: ^2.6.1
-  code_text_field: ^1.1.0
-  highlight: ^0.7.0
-  flutter_highlight: ^0.7.0
+  re_editor: ^0.8.0
+  re_highlight: ^0.0.3
   google_fonts: ^6.2.1
   flutter_json_view: ^1.1.5
   hive: ^2.2.3

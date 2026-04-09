@@ -54,7 +54,7 @@ class MainScreen extends ConsumerWidget {
                 Expanded(
                   child: IndexedStack(
                     index: tabsState.activeIndex,
-                    children: tabsState.tabs.map((tab) => RequestView(key: ValueKey(tab.config.id), tab: tab)).toList(),
+                    children: tabsState.tabs.map((tab) => RequestView(key: ValueKey('view_${tab.tabId}'), tab: tab)).toList(),
                   ),
                 ),
               ],
@@ -126,7 +126,7 @@ class MainScreen extends ConsumerWidget {
                 final displayTitle = (title.length > 25 ? '${title.substring(0, 25)}...' : title).toUpperCase();
 
                 return Listener(
-                  key: ValueKey(tab.config.id),
+                  key: ValueKey('tab_${tab.tabId}'),
                   onPointerDown: (event) {
                     if (event.buttons == kMiddleMouseButton) {
                       _confirmClose(context, index, ref);

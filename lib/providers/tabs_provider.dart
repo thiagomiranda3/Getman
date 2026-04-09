@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
+import 'package:uuid/uuid.dart';
 import '../models/request_tab.dart';
 import '../models/request_config.dart';
 import '../services/storage_service.dart';
@@ -35,7 +36,20 @@ class TabsNotifier extends StateNotifier<TabsState> {
         activeIndex: 0,
       );
     }
-    return TabsState(tabs: tabs, activeIndex: 0);
+    
+    // Ensure all tabs have unique IDs to avoid ReorderableListView key conflicts
+    final Set<String> seenIds = {};
+    final List<HttpRequestTabModel> uniqueTabs = [];
+    for (var tab in tabs) {
+      if (seenIds.contains(tab.tabId)) {
+        uniqueTabs.add(tab.copyWith(tabId: const Uuid().v4()));
+      } else {
+        uniqueTabs.add(tab);
+        seenIds.add(tab.tabId);
+      }
+    }
+
+    return TabsState(tabs: uniqueTabs, activeIndex: 0);
   }
 
   void addTab({HttpRequestConfig? config, String? collectionNodeId, String? collectionName}) {

@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'package:uuid/uuid.dart';
 import 'request_config.dart';
 
 part 'request_tab.g.dart';
@@ -29,6 +30,9 @@ class HttpRequestTabModel extends HiveObject {
   @HiveField(7)
   String? collectionName;
 
+  @HiveField(8)
+  String tabId;
+
   HttpRequestTabModel({
     required this.config,
     this.responseBody,
@@ -38,7 +42,8 @@ class HttpRequestTabModel extends HiveObject {
     this.isSending = false,
     this.collectionNodeId,
     this.collectionName,
-  });
+    String? tabId,
+  }) : tabId = tabId ?? const Uuid().v4();
 
   HttpRequestTabModel copyWith({
     HttpRequestConfig? config,
@@ -49,6 +54,7 @@ class HttpRequestTabModel extends HiveObject {
     bool? isSending,
     String? collectionNodeId,
     String? collectionName,
+    String? tabId,
   }) {
     return HttpRequestTabModel(
       config: config ?? this.config,
@@ -59,6 +65,7 @@ class HttpRequestTabModel extends HiveObject {
       isSending: isSending ?? this.isSending,
       collectionNodeId: collectionNodeId ?? this.collectionNodeId,
       collectionName: collectionName ?? this.collectionName,
+      tabId: tabId ?? this.tabId,
     );
   }
 
@@ -70,6 +77,7 @@ class HttpRequestTabModel extends HiveObject {
     'durationMs': durationMs,
     'collectionNodeId': collectionNodeId,
     'collectionName': collectionName,
+    'tabId': tabId,
   };
 
   factory HttpRequestTabModel.fromJson(Map<String, dynamic> json) => HttpRequestTabModel(
@@ -82,5 +90,6 @@ class HttpRequestTabModel extends HiveObject {
     durationMs: json['durationMs'],
     collectionNodeId: json['collectionNodeId'],
     collectionName: json['collectionName'],
+    tabId: json['tabId'],
   );
 }

@@ -6,7 +6,7 @@ This file serves as the foundational context for Getman, a Postman-like HTTP cli
 - **State Management**: [Riverpod](https://riverpod.dev/) (`StateNotifier`).
 - **Persistence**: [Hive](https://pub.dev/packages/hive) (Local NoSQL database).
 - **Networking**: [Dio](https://pub.dev/packages/dio).
-- **Code Editing**: [code_text_field](https://pub.dev/packages/code_text_field) with Monokai Sublime theme.
+- **Code Editing**: [re_editor](https://pub.dev/packages/re_editor) with `re_highlight`.
 
 ## Project Structure
 - `lib/models/`: Hive-annotated data models.
@@ -17,17 +17,26 @@ This file serves as the foundational context for Getman, a Postman-like HTTP cli
 
 ## Key Implementation Details
 ### 1. Highlighted & Selectable Response View
-To ensure the response is both syntax-highlighted and natively selectable on desktop, we use:
+To ensure the response is both syntax-highlighted and natively selectable on desktop, we use `CodeEditor` from `re_editor` in `readOnly: true` mode. This allows for native selection, syntax highlighting via `re_highlight`, and built-in line numbers.
 ```dart
-SelectableText.rich(
-  _responseController!.buildTextSpan(
-    context: context,
-    style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-    withComposing: false,
+CodeEditor(
+  controller: _responseController!,
+  readOnly: true,
+  wordWrap: true,
+  style: CodeEditorStyle(
+    codeTheme: CodeHighlightTheme(
+      languages: { 'json': CodeHighlightThemeMode(mode: langJson) },
+      theme: arduinoLightTheme,
+    ),
   ),
+  indicatorBuilder: (context, controller, chunkController, notifier) {
+    return DefaultCodeLineNumber(
+      controller: controller,
+      notifier: notifier,
+    );
+  },
 )
 ```
-This is wrapped in a `CodeTheme` to apply the `monokaiSublimeTheme`.
 
 ### 2. Drag-and-Drop Collections
 Implemented in `lib/widgets/side_menu.dart` using `Draggable<String>` and `DragTarget<String>`. 
