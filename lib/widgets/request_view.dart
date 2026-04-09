@@ -79,6 +79,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyS, control: true): _handleSave,
@@ -88,15 +89,15 @@ class _RequestViewState extends ConsumerState<RequestView> {
         padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
-            _buildUrlBar(),
+            _buildUrlBar(context),
             const SizedBox(height: 24),
             Expanded(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _buildRequestConfig()),
-                  const VerticalDivider(width: 48, thickness: 3, color: NeoBrutalistTheme.border),
-                  Expanded(child: _buildResponseSection()),
+                  Expanded(child: _buildRequestConfig(context)),
+                  VerticalDivider(width: 48, thickness: 3, color: theme.dividerColor),
+                  Expanded(child: _buildResponseSection(context)),
                 ],
               ),
             ),
@@ -107,6 +108,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
   }
 
   void _handleSave() {
+    final theme = Theme.of(context);
     if (widget.tab.collectionNodeId != null) {
       ref.read(collectionsProvider.notifier).updateRequest(
         widget.tab.collectionNodeId!,
@@ -114,14 +116,14 @@ class _RequestViewState extends ConsumerState<RequestView> {
       );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: NeoBrutalistTheme.primary,
+          backgroundColor: theme.primaryColor,
           elevation: 0,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(4),
-            side: const BorderSide(color: NeoBrutalistTheme.border, width: 3),
+            side: BorderSide(color: theme.dividerColor, width: 3),
           ),
-          content: const Text('REQUEST UPDATED!', style: TextStyle(color: NeoBrutalistTheme.text, fontSize: 12, fontWeight: FontWeight.w900)),
+          content: Text('REQUEST UPDATED!', style: TextStyle(color: theme.colorScheme.onPrimary, fontSize: 12, fontWeight: FontWeight.w900)),
           duration: const Duration(seconds: 1),
         ),
       );
@@ -130,23 +132,24 @@ class _RequestViewState extends ConsumerState<RequestView> {
     }
   }
 
-  Widget _buildUrlBar() {
+  Widget _buildUrlBar(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(6),
-      decoration: NeoBrutalistTheme.brutalBox(offset: 6),
+      decoration: NeoBrutalistTheme.brutalBox(context, offset: 6),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: const BoxDecoration(
-              border: Border(right: BorderSide(color: NeoBrutalistTheme.border, width: 3)),
+            decoration: BoxDecoration(
+              border: Border(right: BorderSide(color: theme.dividerColor, width: 3)),
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
-                dropdownColor: NeoBrutalistTheme.surface,
+                dropdownColor: theme.colorScheme.surface,
                 value: widget.tab.config.method,
                 style: TextStyle(
-                  color: NeoBrutalistTheme.text, 
+                  color: theme.colorScheme.onSurface, 
                   fontWeight: FontWeight.w900, 
                   fontSize: 12,
                 ),
@@ -157,9 +160,9 @@ class _RequestViewState extends ConsumerState<RequestView> {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: NeoBrutalistTheme.getMethodColor(m),
-                        border: Border.all(color: NeoBrutalistTheme.border, width: 2),
+                        border: Border.all(color: theme.dividerColor, width: 2),
                       ),
-                      child: Text(m, style: const TextStyle(color: NeoBrutalistTheme.text, fontWeight: FontWeight.w900, fontSize: 12)),
+                      child: Text(m, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 12)),
                     );
                   }).toList();
                 },
@@ -171,9 +174,9 @@ class _RequestViewState extends ConsumerState<RequestView> {
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: NeoBrutalistTheme.getMethodColor(m),
-                          border: Border.all(color: NeoBrutalistTheme.border, width: 2),
+                          border: Border.all(color: theme.dividerColor, width: 2),
                         ),
-                        child: Text(m, style: const TextStyle(color: NeoBrutalistTheme.text, fontWeight: FontWeight.w900, fontSize: 12)),
+                        child: Text(m, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 12)),
                       ),
                     ))
                     .toList(),
@@ -191,7 +194,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
           Expanded(
             child: TextField(
               controller: _urlController,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: NeoBrutalistTheme.text),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
               decoration: const InputDecoration(
                 hintText: 'Enter URL...',
                 border: InputBorder.none,
@@ -214,12 +217,12 @@ class _RequestViewState extends ConsumerState<RequestView> {
                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             ),
             child: widget.tab.isSending 
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 3, color: NeoBrutalistTheme.text)) 
+              ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 3, color: theme.colorScheme.onPrimary)) 
               : const Text('SEND'),
           ),
           const SizedBox(width: 12),
           IconButton(
-            icon: Icon(widget.tab.collectionNodeId != null ? Icons.save : Icons.save_as, color: NeoBrutalistTheme.secondary, size: 28),
+            icon: Icon(widget.tab.collectionNodeId != null ? Icons.save : Icons.save_as, color: theme.colorScheme.secondary, size: 28),
             tooltip: widget.tab.collectionNodeId != null ? 'Update Request' : 'Save to Collection',
             onPressed: _handleSave,
           ),
@@ -228,26 +231,27 @@ class _RequestViewState extends ConsumerState<RequestView> {
     );
   }
 
-  Widget _buildRequestConfig() {
+  Widget _buildRequestConfig(BuildContext context) {
+    final theme = Theme.of(context);
     return DefaultTabController(
       length: 3,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const TabBar(
+          TabBar(
             isScrollable: true,
             indicator: BoxDecoration(
-              color: NeoBrutalistTheme.primary,
+              color: theme.primaryColor,
               border: Border(
-                top: BorderSide(color: NeoBrutalistTheme.border, width: 3),
-                left: BorderSide(color: NeoBrutalistTheme.border, width: 3),
-                right: BorderSide(color: NeoBrutalistTheme.border, width: 3),
+                top: BorderSide(color: theme.dividerColor, width: 3),
+                left: BorderSide(color: theme.dividerColor, width: 3),
+                right: BorderSide(color: theme.dividerColor, width: 3),
               ),
             ),
-            labelColor: NeoBrutalistTheme.text,
-            unselectedLabelColor: NeoBrutalistTheme.text,
-            labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
-            tabs: [
+            labelColor: theme.colorScheme.onSurface,
+            unselectedLabelColor: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+            tabs: const [
               Tab(text: 'PARAMS'),
               Tab(text: 'HEADERS'),
               Tab(text: 'BODY'),
@@ -255,7 +259,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
           ),
           Expanded(
             child: Container(
-              decoration: NeoBrutalistTheme.brutalBox(offset: 0),
+              decoration: NeoBrutalistTheme.brutalBox(context, offset: 0),
               child: TabBarView(
                 children: [
                   _KeyValueEditor(
@@ -274,7 +278,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
                       );
                     },
                   ),
-                  _buildBodyEditor(),
+                  _buildBodyEditor(context),
                 ],
               ),
             ),
@@ -284,9 +288,10 @@ class _RequestViewState extends ConsumerState<RequestView> {
     );
   }
 
-  Widget _buildBodyEditor() {
+  Widget _buildBodyEditor(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
-      color: NeoBrutalistTheme.editorBackground,
+      color: theme.colorScheme.surface,
       child: CodeEditor(
         controller: _bodyController!,
         wordWrap: true,
@@ -294,16 +299,16 @@ class _RequestViewState extends ConsumerState<RequestView> {
           fontSize: 13,
           fontFamily: 'monospace',
           backgroundColor: Colors.transparent,
-          cursorColor: NeoBrutalistTheme.primary,
-          selectionColor: NeoBrutalistTheme.primary.withValues(alpha: 0.3),
-          cursorLineColor: NeoBrutalistTheme.primary.withValues(alpha: 0.1),
+          cursorColor: theme.primaryColor,
+          selectionColor: theme.primaryColor.withValues(alpha: 0.3),
+          cursorLineColor: theme.primaryColor.withValues(alpha: 0.1),
           codeTheme: CodeHighlightTheme(
             languages: {
               'json': CodeHighlightThemeMode(
                 mode: langJson,
               ),
             },
-            theme: arduinoLightTheme,
+            theme: arduinoLightTheme, // Still using light but with transparent bg
           ),
         ),
         indicatorBuilder: (context, controller, chunkController, notifier) {
@@ -316,14 +321,15 @@ class _RequestViewState extends ConsumerState<RequestView> {
     );
   }
 
-  Widget _buildResponseSection() {
+  Widget _buildResponseSection(BuildContext context) {
+    final theme = Theme.of(context);
     if (widget.tab.statusCode == null && !widget.tab.isSending) {
        return Center(child: Column(
          mainAxisAlignment: MainAxisAlignment.center,
          children: [
-           const Icon(Icons.bolt, size: 64, color: NeoBrutalistTheme.secondary),
+           Icon(Icons.bolt, size: 64, color: theme.colorScheme.secondary),
            const SizedBox(height: 24),
-           const Text('HIT SEND TO GET A RESPONSE', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: NeoBrutalistTheme.text)),
+           Text('HIT SEND TO GET A RESPONSE', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface)),
          ],
        ));
     }
@@ -338,7 +344,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
               if (widget.tab.statusCode != null)
                 _ResponseMetadataItem(label: 'STATUS', value: widget.tab.statusCode.toString(), color: _getStatusColor(widget.tab.statusCode!)),
               if (widget.tab.durationMs != null)
-                 _ResponseMetadataItem(label: 'TIME', value: '${widget.tab.durationMs} ms', color: NeoBrutalistTheme.secondary),
+                 _ResponseMetadataItem(label: 'TIME', value: '${widget.tab.durationMs} ms', color: theme.colorScheme.secondary),
             ],
           ),
         ),
@@ -347,30 +353,30 @@ class _RequestViewState extends ConsumerState<RequestView> {
             length: 2,
             child: Column(
               children: [
-                const TabBar(
+                TabBar(
                   indicator: BoxDecoration(
-                    color: NeoBrutalistTheme.primary,
+                    color: theme.primaryColor,
                     border: Border(
-                      top: BorderSide(color: NeoBrutalistTheme.border, width: 3),
-                      left: BorderSide(color: NeoBrutalistTheme.border, width: 3),
-                      right: BorderSide(color: NeoBrutalistTheme.border, width: 3),
+                      top: BorderSide(color: theme.dividerColor, width: 3),
+                      left: BorderSide(color: theme.dividerColor, width: 3),
+                      right: BorderSide(color: theme.dividerColor, width: 3),
                     ),
                   ),
-                  labelColor: NeoBrutalistTheme.text,
-                  unselectedLabelColor: NeoBrutalistTheme.text,
-                  labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
-                  tabs: [
+                  labelColor: theme.colorScheme.onSurface,
+                  unselectedLabelColor: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+                  tabs: const [
                     Tab(text: 'BODY'),
                     Tab(text: 'HEADERS'),
                   ],
                 ),
                 Expanded(
                   child: Container(
-                    decoration: NeoBrutalistTheme.brutalBox(offset: 0),
+                    decoration: NeoBrutalistTheme.brutalBox(context, offset: 0),
                     child: TabBarView(
                       children: [
-                        _buildResponseBody(),
-                        _buildResponseHeaders(),
+                        _buildResponseBody(context),
+                        _buildResponseHeaders(context),
                       ],
                     ),
                   ),
@@ -383,14 +389,15 @@ class _RequestViewState extends ConsumerState<RequestView> {
     );
   }
 
-  Widget _buildResponseBody() {
+  Widget _buildResponseBody(BuildContext context) {
+    final theme = Theme.of(context);
     if (widget.tab.responseBody == null) return const SizedBox();
 
     return CompositedTransformTarget(
       link: _layerLink,
       child: Container(
         width: double.infinity,
-        color: NeoBrutalistTheme.editorBackground,
+        color: theme.colorScheme.surface,
         child: CodeEditor(
           controller: _responseController!,
           readOnly: true,
@@ -399,9 +406,9 @@ class _RequestViewState extends ConsumerState<RequestView> {
             fontSize: 13,
             fontFamily: 'monospace',
             backgroundColor: Colors.transparent,
-            cursorColor: NeoBrutalistTheme.primary,
-            selectionColor: NeoBrutalistTheme.primary.withValues(alpha: 0.3),
-            cursorLineColor: NeoBrutalistTheme.primary.withValues(alpha: 0.2),
+            cursorColor: theme.primaryColor,
+            selectionColor: theme.primaryColor.withValues(alpha: 0.3),
+            cursorLineColor: theme.primaryColor.withValues(alpha: 0.2),
             codeTheme: CodeHighlightTheme(
               languages: {
                 'json': CodeHighlightThemeMode(
@@ -422,13 +429,14 @@ class _RequestViewState extends ConsumerState<RequestView> {
     );
   }
 
-  Widget _buildResponseHeaders() {
+  Widget _buildResponseHeaders(BuildContext context) {
+    final theme = Theme.of(context);
     if (widget.tab.responseHeaders == null) return const SizedBox();
     return ListView(
       children: widget.tab.responseHeaders!.entries.map((e) => ListTile(
         dense: true,
-        title: Text(e.key.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: NeoBrutalistTheme.primary)),
-        subtitle: Text(e.value, style: const TextStyle(fontSize: 10, color: NeoBrutalistTheme.text)),
+        title: Text(e.key.toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: theme.primaryColor)),
+        subtitle: Text(e.value, style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurface)),
       )).toList(),
     );
   }
@@ -472,18 +480,19 @@ class _ResponseMetadataItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(right: 12),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color?.withValues(alpha: 0.2) ?? NeoBrutalistTheme.primary.withValues(alpha: 0.2),
-        border: Border.all(color: NeoBrutalistTheme.border, width: 2),
+        color: color?.withValues(alpha: 0.2) ?? theme.primaryColor.withValues(alpha: 0.2),
+        border: Border.all(color: theme.dividerColor, width: 2),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Row(
         children: [
-          Text('$label: ', style: const TextStyle(color: NeoBrutalistTheme.text, fontSize: 10, fontWeight: FontWeight.bold)),
-          Text(value, style: TextStyle(color: NeoBrutalistTheme.text, fontWeight: FontWeight.w900, fontSize: 11)),
+          Text('$label: ', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 10, fontWeight: FontWeight.bold)),
+          Text(value, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w900, fontSize: 11)),
         ],
       ),
     );
@@ -576,4 +585,3 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
     );
   }
 }
-

@@ -10,6 +10,8 @@ import 'providers/collections_provider.dart';
 import 'models/request_tab.dart';
 import 'utils/neo_brutalist_theme.dart';
 
+import 'providers/settings_provider.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await StorageService.init();
@@ -20,16 +22,19 @@ void main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    
     return MaterialApp(
       title: 'GETMAN',
       debugShowCheckedModeBanner: false,
-      theme: NeoBrutalistTheme.theme,
-      darkTheme: NeoBrutalistTheme.theme,
+      theme: NeoBrutalistTheme.lightTheme,
+      darkTheme: NeoBrutalistTheme.darkTheme,
+      themeMode: settings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
       home: const MainScreen(),
     );
   }
@@ -101,11 +106,12 @@ class MainScreen extends ConsumerWidget {
   }
 
   Widget _buildTabBar(BuildContext context, TabsState state, TabsNotifier notifier, WidgetRef ref) {
+    final theme = Theme.of(context);
     return Container(
       height: 60,
-      decoration: const BoxDecoration(
-        color: NeoBrutalistTheme.background,
-        border: Border(bottom: BorderSide(color: NeoBrutalistTheme.border, width: 3)),
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        border: Border(bottom: BorderSide(color: theme.dividerColor, width: 3)),
       ),
       child: Row(
         children: [
@@ -140,10 +146,10 @@ class MainScreen extends ConsumerWidget {
                       child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color: isActive ? NeoBrutalistTheme.primary : Colors.transparent,
+                        color: isActive ? theme.primaryColor : Colors.transparent,
                         border: Border(
-                          right: const BorderSide(color: NeoBrutalistTheme.border, width: 3),
-                          bottom: isActive ? BorderSide.none : const BorderSide(color: NeoBrutalistTheme.border, width: 3),
+                          right: BorderSide(color: theme.dividerColor, width: 3),
+                          bottom: isActive ? BorderSide.none : BorderSide(color: theme.dividerColor, width: 3),
                         ),
                       ),
                       child: Row(
@@ -152,18 +158,18 @@ class MainScreen extends ConsumerWidget {
                             displayTitle,
                             style: TextStyle(
                               fontSize: 11,
-                              color: NeoBrutalistTheme.text,
+                              color: theme.colorScheme.onSurface,
                               fontWeight: isDirty ? FontWeight.w900 : (isActive ? FontWeight.w900 : FontWeight.w500),
                             ),
                           ),
                           if (isDirty) 
-                            const Padding(
-                              padding: EdgeInsets.only(left: 6),
-                              child: Text('*', style: TextStyle(color: NeoBrutalistTheme.secondary, fontSize: 16, fontWeight: FontWeight.w900)),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 6),
+                              child: Text('*', style: TextStyle(color: theme.colorScheme.secondary, fontSize: 16, fontWeight: FontWeight.w900)),
                             ),
                           const SizedBox(width: 8),
                           IconButton(
-                            icon: const Icon(Icons.close, size: 16, color: NeoBrutalistTheme.border),
+                            icon: Icon(Icons.close, size: 16, color: theme.dividerColor),
                             onPressed: () => _confirmClose(context, index, ref),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
@@ -178,11 +184,11 @@ class MainScreen extends ConsumerWidget {
           ),
         ),
           Container(
-            decoration: const BoxDecoration(
-              border: Border(left: BorderSide(color: NeoBrutalistTheme.border, width: 3)),
+            decoration: BoxDecoration(
+              border: Border(left: BorderSide(color: theme.dividerColor, width: 3)),
             ),
             child: IconButton(
-              icon: const Icon(Icons.add, size: 24, color: NeoBrutalistTheme.text),
+              icon: Icon(Icons.add, size: 24, color: theme.colorScheme.onSurface),
               onPressed: () => notifier.addTab(),
             ),
           ),

@@ -3,15 +3,18 @@ import 'package:google_fonts/google_fonts.dart';
 
 class NeoBrutalistTheme {
   // Neo-Brutalist Colors
-  static const Color background = Color(0xFFF8F7F2); // Off-White
-  static const Color surface = Color(0xFFFFFFFF); // White
-  static const Color editorBackground = Color(0xFFFFFFFF);
+  static const Color backgroundLight = Color(0xFFF8F7F2); // Off-White
+  static const Color surfaceLight = Color(0xFFFFFFFF); // White
+  static const Color textLight = Color(0xFF000000); // Black
+  static const Color borderLight = Color(0xFF000000); // Black
+
+  static const Color backgroundDark = Color(0xFF121212); // Deep Black
+  static const Color surfaceDark = Color(0xFF1E1E1E); // Dark Gray
+  static const Color textDark = Color(0xFFFFFFFF); // White
+  static const Color borderDark = Color(0xFFFFFFFF); // White
+
   static const Color primary = Color(0xFFFDE047); // Vibrant Yellow
   static const Color secondary = Color(0xFF7C3AED); // Violet
-  static const Color accent = Color(0xFF000000); // Black
-  static const Color border = Color(0xFF000000); // Black
-  static const Color text = Color(0xFF000000); // Black
-  static const Color shadow = Color(0xFF000000); // Black
   static const Color lightGray = Color(0xFFE5E7EB);
 
   static Color getMethodColor(String method) {
@@ -25,36 +28,54 @@ class NeoBrutalistTheme {
     }
   }
 
-  static ThemeData get theme {
+  static ThemeData get lightTheme => _createTheme(Brightness.light);
+  static ThemeData get darkTheme => _createTheme(Brightness.dark);
+
+  static ThemeData _createTheme(Brightness brightness) {
+    final bool isDark = brightness == Brightness.dark;
+    final Color background = isDark ? backgroundDark : backgroundLight;
+    final Color surface = isDark ? surfaceDark : surfaceLight;
+    final Color text = isDark ? textDark : textLight;
+    final Color border = isDark ? borderDark : borderLight;
+    
     final baseTextTheme = GoogleFonts.lexendTextTheme();
     
     return ThemeData(
       useMaterial3: true, 
-      brightness: Brightness.light,
+      brightness: brightness,
       primaryColor: primary,
       scaffoldBackgroundColor: background,
       canvasColor: surface,
       dividerColor: border,
       hoverColor: primary.withValues(alpha: 0.1),
       splashColor: primary.withValues(alpha: 0.2),
-      colorScheme: const ColorScheme.light(
-        primary: primary,
-        secondary: secondary,
-        surface: surface,
-        onPrimary: text,
-        onSecondary: Colors.white,
-        onSurface: text,
-      ),
+      colorScheme: isDark 
+        ? const ColorScheme.dark(
+            primary: primary,
+            secondary: secondary,
+            surface: surfaceDark,
+            onPrimary: textLight,
+            onSecondary: Colors.white,
+            onSurface: textDark,
+          )
+        : const ColorScheme.light(
+            primary: primary,
+            secondary: secondary,
+            surface: surfaceLight,
+            onPrimary: textLight,
+            onSecondary: Colors.white,
+            onSurface: textLight,
+          ),
       textTheme: baseTextTheme.apply(
         bodyColor: text,
         displayColor: text,
       ).copyWith(
-        bodyMedium: baseTextTheme.bodyMedium?.copyWith(fontSize: 14, fontWeight: FontWeight.w500),
-        bodySmall: baseTextTheme.bodySmall?.copyWith(fontSize: 12),
-        titleMedium: baseTextTheme.titleMedium?.copyWith(fontSize: 16, fontWeight: FontWeight.bold),
-        titleLarge: baseTextTheme.titleLarge?.copyWith(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+        bodyMedium: baseTextTheme.bodyMedium?.copyWith(fontSize: 14, fontWeight: FontWeight.w500, color: text),
+        bodySmall: baseTextTheme.bodySmall?.copyWith(fontSize: 12, color: text),
+        titleMedium: baseTextTheme.titleMedium?.copyWith(fontSize: 16, fontWeight: FontWeight.bold, color: text),
+        titleLarge: baseTextTheme.titleLarge?.copyWith(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5, color: text),
       ),
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: surface,
         elevation: 0,
         centerTitle: false,
@@ -65,7 +86,7 @@ class NeoBrutalistTheme {
         labelColor: text,
         unselectedLabelColor: text.withValues(alpha: 0.7),
         indicatorSize: TabBarIndicatorSize.tab,
-        indicator: const BoxDecoration(
+        indicator: BoxDecoration(
           color: primary,
           border: Border(
             top: BorderSide(color: border, width: 3),
@@ -78,11 +99,11 @@ class NeoBrutalistTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primary,
-          foregroundColor: text,
+          foregroundColor: textLight,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(4),
-            side: const BorderSide(color: border, width: 3),
+            side: BorderSide(color: border, width: 3),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
@@ -97,7 +118,7 @@ class NeoBrutalistTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: text,
-          side: const BorderSide(color: border, width: 3),
+          side: BorderSide(color: border, width: 3),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
@@ -113,18 +134,18 @@ class NeoBrutalistTheme {
         filled: true,
         fillColor: surface,
         border: OutlineInputBorder(
-          borderSide: const BorderSide(color: border, width: 3),
+          borderSide: BorderSide(color: border, width: 3),
           borderRadius: BorderRadius.circular(4),
         ),
         enabledBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: border, width: 3),
+          borderSide: BorderSide(color: border, width: 3),
           borderRadius: BorderRadius.circular(4),
         ),
         focusedBorder: OutlineInputBorder(
           borderSide: const BorderSide(color: secondary, width: 3),
           borderRadius: BorderRadius.circular(4),
         ),
-        labelStyle: const TextStyle(color: text, fontWeight: FontWeight.bold),
+        labelStyle: TextStyle(color: text, fontWeight: FontWeight.bold),
         hintStyle: TextStyle(color: text.withValues(alpha: 0.5)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
@@ -133,40 +154,43 @@ class NeoBrutalistTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(4),
-          side: const BorderSide(color: border, width: 3),
+          side: BorderSide(color: border, width: 3),
         ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: background,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
-          side: const BorderSide(color: border, width: 4),
+          side: BorderSide(color: border, width: 4),
         ),
-        titleTextStyle: const TextStyle(color: text, fontSize: 18, fontWeight: FontWeight.w900),
-        contentTextStyle: const TextStyle(color: text, fontSize: 14),
+        titleTextStyle: TextStyle(color: text, fontSize: 18, fontWeight: FontWeight.w900),
+        contentTextStyle: TextStyle(color: text, fontSize: 14),
       ),
       listTileTheme: ListTileThemeData(
         selectedTileColor: primary,
-        selectedColor: text,
-        titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, color: text),
+        selectedColor: textLight,
+        titleTextStyle: TextStyle(fontWeight: FontWeight.bold, color: text),
         subtitleTextStyle: TextStyle(color: text.withValues(alpha: 0.7)),
       ),
     );
   }
 
-  static BoxDecoration brutalBox({
-    Color color = surface, 
+  static BoxDecoration brutalBox(
+    BuildContext context, {
+    Color? color, 
     double borderWidth = 3, 
     double offset = 4,
     BorderRadius? borderRadius,
   }) {
+    final theme = Theme.of(context);
+    final border = theme.dividerColor;
     return BoxDecoration(
-      color: color,
+      color: color ?? theme.cardColor,
       borderRadius: borderRadius ?? BorderRadius.circular(4),
       border: Border.all(color: border, width: borderWidth),
       boxShadow: [
         BoxShadow(
-          color: shadow,
+          color: border,
           offset: Offset(offset, offset),
           blurRadius: 0,
         ),
@@ -174,13 +198,15 @@ class NeoBrutalistTheme {
     );
   }
 
-  static BoxDecoration brutalTab({bool active = false}) {
+  static BoxDecoration brutalTab(BuildContext context, {bool active = false}) {
+    final theme = Theme.of(context);
+    final border = theme.dividerColor;
     return BoxDecoration(
-      color: active ? primary : surface,
+      color: active ? theme.primaryColor : theme.cardColor,
       border: Border(
-        right: const BorderSide(color: border, width: 2),
-        bottom: active ? BorderSide.none : const BorderSide(color: border, width: 2),
-        top: active ? const BorderSide(color: border, width: 4) : BorderSide.none,
+        right: BorderSide(color: border, width: 2),
+        bottom: active ? BorderSide.none : BorderSide(color: border, width: 2),
+        top: active ? BorderSide(color: border, width: 4) : BorderSide.none,
       ),
     );
   }

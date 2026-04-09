@@ -12,30 +12,31 @@ class SideMenu extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     return DefaultTabController(
       length: 2,
       child: Container(
         width: 300,
-        decoration: const BoxDecoration(
-          color: NeoBrutalistTheme.surface,
-          border: Border(right: BorderSide(color: NeoBrutalistTheme.border, width: 3)),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          border: Border(right: BorderSide(color: theme.dividerColor, width: 3)),
         ),
         child: Column(
           children: [
             const _SideMenuHeader(),
             Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(
-                  top: BorderSide(color: NeoBrutalistTheme.border, width: 3),
-                  bottom: BorderSide(color: NeoBrutalistTheme.border, width: 3),
+                  top: BorderSide(color: theme.dividerColor, width: 3),
+                  bottom: BorderSide(color: theme.dividerColor, width: 3),
                 ),
               ),
-              child: const TabBar(
-                indicator: BoxDecoration(color: NeoBrutalistTheme.primary),
-                labelColor: NeoBrutalistTheme.text,
-                unselectedLabelColor: NeoBrutalistTheme.text,
-                labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
-                tabs: [
+              child: TabBar(
+                indicator: BoxDecoration(color: theme.primaryColor),
+                labelColor: theme.colorScheme.onSurface,
+                unselectedLabelColor: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+                tabs: const [
                   Tab(text: 'COLLECTIONS'),
                   Tab(text: 'HISTORY'),
                 ],
@@ -61,23 +62,48 @@ class _SideMenuHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final settings = ref.watch(settingsProvider);
+    
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
         children: [
-          const Text('GETMAN', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: NeoBrutalistTheme.text, letterSpacing: -1)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('GETMAN', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: theme.colorScheme.onSurface, letterSpacing: -1)),
+              Row(
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.create_new_folder, color: theme.colorScheme.onSurface, size: 20),
+                    tooltip: 'NEW FOLDER',
+                    onPressed: () => _showNewFolderDialog(context, ref),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.settings, color: theme.colorScheme.onSurface, size: 20),
+                    tooltip: 'SETTINGS',
+                    onPressed: () => _showSettingsDialog(context, ref),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
-              IconButton(
-                icon: const Icon(Icons.create_new_folder, color: NeoBrutalistTheme.text, size: 20),
-                tooltip: 'NEW FOLDER',
-                onPressed: () => _showNewFolderDialog(context, ref),
-              ),
-              IconButton(
-                icon: const Icon(Icons.settings, color: NeoBrutalistTheme.text, size: 20),
-                tooltip: 'SETTINGS',
-                onPressed: () => _showSettingsDialog(context, ref),
+              Icon(settings.isDarkMode ? Icons.dark_mode : Icons.light_mode, size: 16, color: theme.colorScheme.onSurface),
+              const SizedBox(width: 8),
+              const Text('DARK MODE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900)),
+              const Spacer(),
+              SizedBox(
+                height: 24,
+                child: Switch(
+                  value: settings.isDarkMode,
+                  onChanged: (val) => ref.read(settingsProvider.notifier).updateDarkMode(val),
+                  activeThumbColor: theme.colorScheme.secondary,
+                  activeTrackColor: theme.primaryColor,
+                ),
               ),
             ],
           ),
@@ -115,6 +141,7 @@ class _SideMenuHeader extends ConsumerWidget {
 
   void _showSettingsDialog(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
+    final theme = Theme.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -140,8 +167,8 @@ class _SideMenuHeader extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             SwitchListTile(
-              activeThumbColor: NeoBrutalistTheme.secondary,
-              activeTrackColor: NeoBrutalistTheme.primary,
+              activeThumbColor: theme.colorScheme.secondary,
+              activeTrackColor: theme.primaryColor,
               title: const Text('SAVE RESPONSE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               value: settings.saveResponseInHistory,
               onChanged: (val) {
@@ -159,6 +186,8 @@ class _SideMenuHeader extends ConsumerWidget {
 }
 
 class _HistoryList extends ConsumerWidget {
+  const _HistoryList();
+  
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final history = ref.watch(historyProvider);
@@ -227,6 +256,7 @@ class _CollectionNodeWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     Widget content;
     if (node.isFolder) {
       content = DragTarget<String>(
@@ -234,10 +264,10 @@ class _CollectionNodeWidget extends ConsumerWidget {
         onAcceptWithDetails: (details) => ref.read(collectionsProvider.notifier).moveNode(details.data, node.id),
         builder: (context, candidateData, rejectedData) {
           return ExpansionTile(
-            collapsedIconColor: NeoBrutalistTheme.text,
-            iconColor: NeoBrutalistTheme.text,
+            collapsedIconColor: theme.colorScheme.onSurface,
+            iconColor: theme.colorScheme.onSurface,
             leading: Icon(node.isFavorite ? Icons.star : Icons.folder,
-                size: 20, color: node.isFavorite ? NeoBrutalistTheme.primary : NeoBrutalistTheme.secondary),
+                size: 20, color: node.isFavorite ? theme.primaryColor : theme.colorScheme.secondary),
             title: Text(node.name.toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900)),
             trailing: _NodeContextMenu(node: node),
             children: node.children
@@ -273,8 +303,8 @@ class _CollectionNodeWidget extends ConsumerWidget {
         color: Colors.transparent,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: NeoBrutalistTheme.brutalBox(color: NeoBrutalistTheme.primary),
-          child: Text(node.name.toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: NeoBrutalistTheme.text)),
+          decoration: NeoBrutalistTheme.brutalBox(context, color: theme.primaryColor),
+          child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface)),
         ),
       ),
       childWhenDragging: Opacity(opacity: 0.5, child: content),
@@ -294,13 +324,14 @@ class _NodeContextMenu extends ConsumerStatefulWidget {
 class _NodeContextMenuState extends ConsumerState<_NodeContextMenu> {
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert, size: 20, color: NeoBrutalistTheme.text),
-      color: NeoBrutalistTheme.surface,
+      icon: Icon(Icons.more_vert, size: 20, color: theme.colorScheme.onSurface),
+      color: theme.colorScheme.surface,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(4),
-        side: const BorderSide(color: NeoBrutalistTheme.border, width: 3),
+        side: BorderSide(color: theme.dividerColor, width: 3),
       ),
       onSelected: (val) {
         switch (val) {
@@ -379,18 +410,18 @@ class _MethodBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final color = NeoBrutalistTheme.getMethodColor(method);
     return Container(
       padding: EdgeInsets.symmetric(horizontal: small ? 6 : 10, vertical: 2),
       decoration: BoxDecoration(
         color: color,
-        border: Border.all(color: NeoBrutalistTheme.border, width: 2),
+        border: Border.all(color: theme.dividerColor, width: 2),
       ),
       child: Text(
         method,
-        style: TextStyle(color: NeoBrutalistTheme.text, fontWeight: FontWeight.w900, fontSize: small ? 10 : 12),
+        style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: small ? 10 : 12),
       ),
     );
   }
 }
-

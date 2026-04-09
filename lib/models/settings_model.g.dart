@@ -19,17 +19,20 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
     return SettingsModel(
       historyLimit: fields[0] as int,
       saveResponseInHistory: fields[1] as bool,
+      isDarkMode: fields[2] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, SettingsModel obj) {
     writer
-      ..writeByte(2)
+      ..writeByte(3)
       ..writeByte(0)
       ..write(obj.historyLimit)
       ..writeByte(1)
-      ..write(obj.saveResponseInHistory);
+      ..write(obj.saveResponseInHistory)
+      ..writeByte(2)
+      ..write(obj.isDarkMode);
   }
 
   @override

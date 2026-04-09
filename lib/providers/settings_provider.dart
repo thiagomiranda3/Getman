@@ -5,20 +5,33 @@ import '../services/storage_service.dart';
 class SettingsNotifier extends StateNotifier<SettingsModel> {
   SettingsNotifier() : super(StorageService.getSettings());
 
-  void updateHistoryLimit(int limit) {
-    state = SettingsModel(
-      historyLimit: limit,
-      saveResponseInHistory: state.saveResponseInHistory,
-    );
+  void _save(SettingsModel newSettings) {
+    state = newSettings;
     StorageService.saveSettings(state);
   }
 
+  void updateHistoryLimit(int limit) {
+    _save(SettingsModel(
+      historyLimit: limit,
+      saveResponseInHistory: state.saveResponseInHistory,
+      isDarkMode: state.isDarkMode,
+    ));
+  }
+
   void updateSaveResponseInHistory(bool save) {
-    state = SettingsModel(
+    _save(SettingsModel(
       historyLimit: state.historyLimit,
       saveResponseInHistory: save,
-    );
-    StorageService.saveSettings(state);
+      isDarkMode: state.isDarkMode,
+    ));
+  }
+
+  void updateDarkMode(bool isDark) {
+    _save(SettingsModel(
+      historyLimit: state.historyLimit,
+      saveResponseInHistory: state.saveResponseInHistory,
+      isDarkMode: isDark,
+    ));
   }
 }
 
