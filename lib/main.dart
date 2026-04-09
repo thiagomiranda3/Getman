@@ -113,6 +113,7 @@ class MainScreen extends ConsumerWidget {
             child: ReorderableListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: state.tabs.length,
+              buildDefaultDragHandles: false,
               onReorder: (oldIndex, newIndex) => notifier.reorderTabs(oldIndex, newIndex),
               proxyDecorator: (child, index, animation) => Material(
                 color: Colors.transparent,
@@ -125,16 +126,18 @@ class MainScreen extends ConsumerWidget {
                 final title = tab.collectionName ?? (tab.config.url.isEmpty ? 'NEW REQUEST' : tab.config.url);
                 final displayTitle = (title.length > 25 ? '${title.substring(0, 25)}...' : title).toUpperCase();
 
-                return Listener(
+                return ReorderableDragStartListener(
                   key: ValueKey('tab_${tab.tabId}'),
-                  onPointerDown: (event) {
-                    if (event.buttons == kMiddleMouseButton) {
-                      _confirmClose(context, index, ref);
-                    }
-                  },
-                  child: GestureDetector(
-                    onTap: () => notifier.setActiveIndex(index),
-                    child: Container(
+                  index: index,
+                  child: Listener(
+                    onPointerDown: (event) {
+                      if (event.buttons == kMiddleMouseButton) {
+                        _confirmClose(context, index, ref);
+                      }
+                    },
+                    child: GestureDetector(
+                      onTap: () => notifier.setActiveIndex(index),
+                      child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
                         color: isActive ? NeoBrutalistTheme.primary : Colors.transparent,
@@ -169,10 +172,11 @@ class MainScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
+        ),
           Container(
             decoration: const BoxDecoration(
               border: Border(left: BorderSide(color: NeoBrutalistTheme.border, width: 3)),

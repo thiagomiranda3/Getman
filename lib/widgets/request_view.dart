@@ -296,6 +296,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
           backgroundColor: Colors.transparent,
           cursorColor: NeoBrutalistTheme.primary,
           selectionColor: NeoBrutalistTheme.primary.withValues(alpha: 0.3),
+          cursorLineColor: NeoBrutalistTheme.primary.withValues(alpha: 0.1),
           codeTheme: CodeHighlightTheme(
             languages: {
               'json': CodeHighlightThemeMode(
@@ -400,6 +401,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
             backgroundColor: Colors.transparent,
             cursorColor: NeoBrutalistTheme.primary,
             selectionColor: NeoBrutalistTheme.primary.withValues(alpha: 0.3),
+            cursorLineColor: NeoBrutalistTheme.primary.withValues(alpha: 0.2),
             codeTheme: CodeHighlightTheme(
               languages: {
                 'json': CodeHighlightThemeMode(
