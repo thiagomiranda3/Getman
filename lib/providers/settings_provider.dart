@@ -21,6 +21,10 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
   void updateDarkMode(bool isDark) {
     _save(state.copyWith(isDarkMode: isDark));
   }
+
+  void updateCompactMode(bool isCompact) {
+    _save(state.copyWith(isCompactMode: isCompact));
+  }
 }
 
 final settingsProvider = StateNotifierProvider<SettingsNotifier, SettingsModel>((ref) {

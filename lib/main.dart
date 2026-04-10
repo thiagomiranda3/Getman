@@ -108,8 +108,10 @@ class MainScreen extends ConsumerWidget {
 
   Widget _buildTabBar(BuildContext context, int activeIndex, List<String> tabIds, TabsNotifier notifier, WidgetRef ref) {
     final theme = Theme.of(context);
+    final settings = ref.watch(settingsProvider);
+
     return Container(
-      height: 60,
+      height: settings.isCompactMode ? 40 : 60,
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor,
         border: Border(bottom: BorderSide(color: theme.dividerColor, width: 3)),
@@ -138,7 +140,7 @@ class MainScreen extends ConsumerWidget {
                     final isActive = activeIndex == index;
                     final isDirty = _isTabDirty(tab, ref);
                     final title = tab.collectionName ?? (tab.config.url.isEmpty ? 'NEW REQUEST' : tab.config.url);
-                    final displayTitle = (title.length > 25 ? '${title.substring(0, 25)}...' : title).toUpperCase();
+                    final displayTitle = (title.length > (settings.isCompactMode ? 15 : 25) ? '${title.substring(0, (settings.isCompactMode ? 15 : 25))}...' : title).toUpperCase();
 
                     return ReorderableDragStartListener(
                       index: index,
@@ -151,7 +153,7 @@ class MainScreen extends ConsumerWidget {
                         child: GestureDetector(
                           onTap: () => notifier.setActiveIndex(index),
                           child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: EdgeInsets.symmetric(horizontal: settings.isCompactMode ? 8 : 16),
                           decoration: BoxDecoration(
                             color: isActive ? theme.primaryColor : Colors.transparent,
                             border: Border(
@@ -164,7 +166,7 @@ class MainScreen extends ConsumerWidget {
                               Text(
                                 displayTitle,
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: settings.isCompactMode ? 9 : 11,
                                   color: theme.colorScheme.onSurface,
                                   fontWeight: isDirty ? FontWeight.w900 : (isActive ? FontWeight.w900 : FontWeight.w500),
                                 ),
@@ -172,11 +174,11 @@ class MainScreen extends ConsumerWidget {
                               if (isDirty) 
                                 Padding(
                                   padding: const EdgeInsets.only(left: 6),
-                                  child: Text('*', style: TextStyle(color: theme.colorScheme.secondary, fontSize: 16, fontWeight: FontWeight.w900)),
+                                  child: Text('*', style: TextStyle(color: theme.colorScheme.secondary, fontSize: settings.isCompactMode ? 12 : 16, fontWeight: FontWeight.w900)),
                                 ),
-                              const SizedBox(width: 8),
+                              SizedBox(width: settings.isCompactMode ? 4 : 8),
                               IconButton(
-                                icon: Icon(Icons.close, size: 16, color: theme.dividerColor),
+                                icon: Icon(Icons.close, size: settings.isCompactMode ? 12 : 16, color: theme.dividerColor),
                                 onPressed: () => _confirmClose(context, index, ref),
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(),
@@ -197,7 +199,7 @@ class MainScreen extends ConsumerWidget {
               border: Border(left: BorderSide(color: theme.dividerColor, width: 3)),
             ),
             child: IconButton(
-              icon: Icon(Icons.add, size: 24, color: theme.colorScheme.onSurface),
+              icon: Icon(Icons.add, size: settings.isCompactMode ? 18 : 24, color: theme.colorScheme.onSurface),
               onPressed: () => notifier.addTab(),
             ),
           ),

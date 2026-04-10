@@ -7,8 +7,10 @@ import 'package:re_highlight/styles/arduino-light.dart';
 import 'package:re_highlight/languages/json.dart';
 import '../providers/tabs_provider.dart';
 import '../providers/collections_provider.dart';
+import '../providers/settings_provider.dart';
 import '../models/request_tab.dart';
 import '../utils/neo_brutalist_theme.dart';
+import '../utils/layout_constants.dart';
 
 class RequestView extends ConsumerStatefulWidget {
   final String tabId;
@@ -90,6 +92,8 @@ class _RequestViewState extends ConsumerState<RequestView> {
   @override
   Widget build(BuildContext context) {
     final tab = ref.watch(tabsProvider.select((s) => s.tabs.firstWhere((t) => t.tabId == widget.tabId)));
+    final settings = ref.watch(settingsProvider);
+    final layout = LayoutConstants(settings.isCompactMode);
     
     // Sync controllers if model changed from outside
     if (_urlController.text != tab.config.url) {
@@ -106,18 +110,18 @@ class _RequestViewState extends ConsumerState<RequestView> {
         const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () => _handleSave(tab),
       },
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: EdgeInsets.all(layout.pagePadding),
         child: Column(
           children: [
-            _buildUrlBar(context, tab),
-            const SizedBox(height: 24),
+            _buildUrlBar(context, tab, layout),
+            SizedBox(height: layout.sectionSpacing),
             Expanded(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _buildRequestConfig(context, tab)),
-                  VerticalDivider(width: 48, thickness: 3, color: theme.dividerColor),
-                  Expanded(child: _buildResponseSection(context, tab)),
+                  Expanded(child: _buildRequestConfig(context, tab, layout)),
+                  VerticalDivider(width: layout.verticalDividerWidth, thickness: 3, color: theme.dividerColor),
+                  Expanded(child: _buildResponseSection(context, tab, layout)),
                 ],
               ),
             ),
@@ -152,15 +156,15 @@ class _RequestViewState extends ConsumerState<RequestView> {
     }
   }
 
-  Widget _buildUrlBar(BuildContext context, HttpRequestTabModel tab) {
+  Widget _buildUrlBar(BuildContext context, HttpRequestTabModel tab, LayoutConstants layout) {
     final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(6),
-      decoration: NeoBrutalistTheme.brutalBox(context, offset: 6),
+      decoration: NeoBrutalistTheme.brutalBox(context, offset: layout.cardOffset),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: EdgeInsets.symmetric(horizontal: layout.isCompact ? 8 : 12),
             decoration: BoxDecoration(
               border: Border(right: BorderSide(color: theme.dividerColor, width: 3)),
             ),
@@ -171,18 +175,18 @@ class _RequestViewState extends ConsumerState<RequestView> {
                 style: TextStyle(
                   color: theme.colorScheme.onSurface, 
                   fontWeight: FontWeight.w900, 
-                  fontSize: 12,
+                  fontSize: layout.fontSizeNormal,
                 ),
                 selectedItemBuilder: (context) {
                   return ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map((m) {
                     return Container(
                       alignment: Alignment.center,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: EdgeInsets.symmetric(horizontal: layout.isCompact ? 8 : 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: NeoBrutalistTheme.getMethodColor(m),
                         border: Border.all(color: theme.dividerColor, width: 2),
                       ),
-                      child: Text(m, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 12)),
+                      child: Text(m, style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: layout.fontSizeNormal)),
                     );
                   }).toList();
                 },
@@ -190,13 +194,13 @@ class _RequestViewState extends ConsumerState<RequestView> {
                     .map((m) => DropdownMenuItem(
                       value: m, 
                       child: Container(
-                        width: 100,
+                        width: layout.isCompact ? 80 : 100,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: NeoBrutalistTheme.getMethodColor(m),
                           border: Border.all(color: theme.dividerColor, width: 2),
                         ),
-                        child: Text(m, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 12)),
+                        child: Text(m, style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: layout.fontSizeNormal)),
                       ),
                     ))
                     .toList(),
@@ -213,11 +217,11 @@ class _RequestViewState extends ConsumerState<RequestView> {
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: layout.isCompact ? 8 : 12),
           Expanded(
             child: TextField(
               controller: _urlController,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
+              style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
               decoration: const InputDecoration(
                 hintText: 'Enter URL...',
                 border: InputBorder.none,
@@ -237,19 +241,22 @@ class _RequestViewState extends ConsumerState<RequestView> {
               },
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: layout.isCompact ? 8 : 12),
           ElevatedButton(
             onPressed: tab.isSending ? null : () => ref.read(tabsProvider.notifier).sendRequest(),
             style: ElevatedButton.styleFrom(
-               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+               padding: EdgeInsets.symmetric(
+                 horizontal: layout.buttonPaddingHorizontal, 
+                 vertical: layout.buttonPaddingVertical
+               ),
             ),
             child: tab.isSending 
               ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 3, color: theme.colorScheme.onPrimary)) 
-              : const Text('SEND'),
+              : Text('SEND', style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w900)),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: layout.isCompact ? 8 : 12),
           IconButton(
-            icon: Icon(tab.collectionNodeId != null ? Icons.save : Icons.save_as, color: theme.colorScheme.secondary, size: 28),
+            icon: Icon(tab.collectionNodeId != null ? Icons.save : Icons.save_as, color: theme.colorScheme.secondary, size: layout.isCompact ? 24 : 28),
             tooltip: tab.collectionNodeId != null ? 'Update Request' : 'Save to Collection',
             onPressed: () => _handleSave(tab),
           ),
@@ -258,7 +265,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
     );
   }
 
-  Widget _buildRequestConfig(BuildContext context, HttpRequestTabModel tab) {
+  Widget _buildRequestConfig(BuildContext context, HttpRequestTabModel tab, LayoutConstants layout) {
     final theme = Theme.of(context);
     return DefaultTabController(
       length: 3,
@@ -277,7 +284,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
             ),
             labelColor: theme.colorScheme.onSurface,
             unselectedLabelColor: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-            labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+            labelStyle: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.w900),
             tabs: const [
               Tab(text: 'PARAMS'),
               Tab(text: 'HEADERS'),
@@ -311,7 +318,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
                       });
                     },
                   ),
-                  _buildBodyEditor(context),
+                  _buildBodyEditor(context, layout),
                 ],
               ),
             ),
@@ -321,7 +328,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
     );
   }
 
-  Widget _buildBodyEditor(BuildContext context) {
+  Widget _buildBodyEditor(BuildContext context, LayoutConstants layout) {
     final theme = Theme.of(context);
     return Container(
       color: theme.colorScheme.surface,
@@ -329,7 +336,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
         controller: _bodyController!,
         wordWrap: true,
         style: CodeEditorStyle(
-          fontSize: 13,
+          fontSize: layout.isCompact ? 12 : 13,
           fontFamily: 'monospace',
           backgroundColor: Colors.transparent,
           cursorColor: theme.primaryColor,
@@ -354,15 +361,15 @@ class _RequestViewState extends ConsumerState<RequestView> {
     );
   }
 
-  Widget _buildResponseSection(BuildContext context, HttpRequestTabModel tab) {
+  Widget _buildResponseSection(BuildContext context, HttpRequestTabModel tab, LayoutConstants layout) {
     final theme = Theme.of(context);
     if (tab.statusCode == null && !tab.isSending) {
        return Center(child: Column(
          mainAxisAlignment: MainAxisAlignment.center,
          children: [
-           Icon(Icons.bolt, size: 64, color: theme.colorScheme.secondary),
-           const SizedBox(height: 24),
-           Text('HIT SEND TO GET A RESPONSE', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface)),
+           Icon(Icons.bolt, size: layout.isCompact ? 48 : 64, color: theme.colorScheme.secondary),
+           SizedBox(height: layout.sectionSpacing),
+           Text('HIT SEND TO GET A RESPONSE', style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface)),
          ],
        ));
     }
@@ -371,15 +378,15 @@ class _RequestViewState extends ConsumerState<RequestView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 12.0),
+          padding: EdgeInsets.only(bottom: layout.isCompact ? 8.0 : 12.0),
           child: Wrap(
             spacing: 12,
             runSpacing: 8,
             children: [
               if (tab.statusCode != null)
-                _ResponseMetadataItem(label: 'STATUS', value: tab.statusCode.toString(), color: _getStatusColor(tab.statusCode!)),
+                _ResponseMetadataItem(label: 'STATUS', value: tab.statusCode.toString(), color: _getStatusColor(tab.statusCode!), layout: layout),
               if (tab.durationMs != null)
-                 _ResponseMetadataItem(label: 'TIME', value: '${tab.durationMs} ms', color: theme.colorScheme.secondary),
+                 _ResponseMetadataItem(label: 'TIME', value: '${tab.durationMs} ms', color: theme.colorScheme.secondary, layout: layout),
             ],
           ),
         ),
@@ -399,7 +406,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
                   ),
                   labelColor: theme.colorScheme.onSurface,
                   unselectedLabelColor: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                  labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+                  labelStyle: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.w900),
                   tabs: const [
                     Tab(text: 'BODY'),
                     Tab(text: 'HEADERS'),
@@ -410,8 +417,8 @@ class _RequestViewState extends ConsumerState<RequestView> {
                     decoration: NeoBrutalistTheme.brutalBox(context, offset: 0),
                     child: TabBarView(
                       children: [
-                        _buildResponseBody(context, tab),
-                        _buildResponseHeaders(context, tab),
+                        _buildResponseBody(context, tab, layout),
+                        _buildResponseHeaders(context, tab, layout),
                       ],
                     ),
                   ),
@@ -424,7 +431,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
     );
   }
 
-  Widget _buildResponseBody(BuildContext context, HttpRequestTabModel tab) {
+  Widget _buildResponseBody(BuildContext context, HttpRequestTabModel tab, LayoutConstants layout) {
     final theme = Theme.of(context);
     if (tab.responseBody == null) return const SizedBox();
 
@@ -442,7 +449,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
           readOnly: true,
           wordWrap: true,
           style: CodeEditorStyle(
-            fontSize: 13,
+            fontSize: layout.isCompact ? 12 : 13,
             fontFamily: 'monospace',
             backgroundColor: Colors.transparent,
             cursorColor: theme.primaryColor,
@@ -467,14 +474,14 @@ class _RequestViewState extends ConsumerState<RequestView> {
       );
   }
 
-  Widget _buildResponseHeaders(BuildContext context, HttpRequestTabModel tab) {
+  Widget _buildResponseHeaders(BuildContext context, HttpRequestTabModel tab, LayoutConstants layout) {
     final theme = Theme.of(context);
     if (tab.responseHeaders == null) return const SizedBox();
     return ListView(
       children: tab.responseHeaders!.entries.map((e) => ListTile(
         dense: true,
-        title: Text(e.key.toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: theme.primaryColor)),
-        subtitle: Text(e.value, style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurface)),
+        title: Text(e.key.toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: layout.fontSizeSmall, color: theme.primaryColor)),
+        subtitle: Text(e.value, style: TextStyle(fontSize: layout.fontSizeSmall, color: theme.colorScheme.onSurface)),
       )).toList(),
     );
   }
@@ -514,40 +521,42 @@ class _ResponseMetadataItem extends StatelessWidget {
   final String label;
   final String value;
   final Color? color;
-  const _ResponseMetadataItem({required this.label, required this.value, this.color});
+  final LayoutConstants layout;
+  const _ResponseMetadataItem({required this.label, required this.value, this.color, required this.layout});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: EdgeInsets.only(right: layout.isCompact ? 8 : 12),
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: layout.isCompact ? 4 : 8),
       decoration: BoxDecoration(
         color: color?.withValues(alpha: 0.2) ?? theme.primaryColor.withValues(alpha: 0.2),
         border: Border.all(color: theme.dividerColor, width: 2),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text('$label: ', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 10, fontWeight: FontWeight.bold)),
-          Text(value, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w900, fontSize: 11)),
+          Text('$label: ', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold)),
+          Text(value, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w900, fontSize: layout.fontSizeNormal)),
         ],
       ),
     );
   }
 }
 
-class _KeyValueEditor extends StatefulWidget {
+class _KeyValueEditor extends ConsumerStatefulWidget {
   final Map<String, String> items;
   final Function(Map<String, String>) onChanged;
 
   const _KeyValueEditor({required this.items, required this.onChanged});
 
   @override
-  _KeyValueEditorState createState() => _KeyValueEditorState();
+  ConsumerState<_KeyValueEditor> createState() => _KeyValueEditorState();
 }
 
-class _KeyValueEditorState extends State<_KeyValueEditor> {
+class _KeyValueEditorState extends ConsumerState<_KeyValueEditor> {
   late List<TextEditingController> _keyControllers;
   late List<TextEditingController> _valControllers;
 
@@ -620,18 +629,25 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final settings = ref.watch(settingsProvider);
+    final layout = LayoutConstants(settings.isCompactMode);
+
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(layout.isCompact ? 8 : 12),
       itemCount: _keyControllers.length,
       itemBuilder: (context, index) {
         return Padding(
-          padding: const EdgeInsets.only(bottom: 12.0),
+          padding: EdgeInsets.only(bottom: layout.isCompact ? 8.0 : 12.0),
           child: Row(
             children: [
               Expanded(
                 child: TextField(
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  decoration: const InputDecoration(hintText: 'KEY', isDense: true, contentPadding: EdgeInsets.all(12)),
+                  style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    hintText: 'KEY', 
+                    isDense: true, 
+                    contentPadding: EdgeInsets.all(layout.isCompact ? 8 : 12)
+                  ),
                   controller: _keyControllers[index],
                   onChanged: (val) {
                     if (index == _keyControllers.length - 1 && val.isNotEmpty) {
@@ -644,20 +660,24 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
                   },
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: layout.isCompact ? 8 : 12),
               Expanded(
                 child: TextField(
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  decoration: const InputDecoration(hintText: 'VALUE', isDense: true, contentPadding: EdgeInsets.all(12)),
+                  style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    hintText: 'VALUE', 
+                    isDense: true, 
+                    contentPadding: EdgeInsets.all(layout.isCompact ? 8 : 12)
+                  ),
                   controller: _valControllers[index],
                   onChanged: (val) {
                      _update();
                   },
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: layout.isCompact ? 4 : 8),
               IconButton(
-                icon: const Icon(Icons.delete_outline, size: 24, color: Colors.red),
+                icon: Icon(Icons.delete_outline, size: layout.isCompact ? 20 : 24, color: Colors.red),
                 onPressed: () {
                   setState(() {
                     _keyControllers[index].dispose();
