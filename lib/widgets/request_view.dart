@@ -118,20 +118,43 @@ class _RequestViewState extends ConsumerState<RequestView> {
             _buildUrlBar(context, tab, layout, settings),
             SizedBox(height: layout.sectionSpacing),
             Expanded(
-              child: Flex(
-                direction: settings.isVerticalLayout ? Axis.vertical : Axis.horizontal,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: _buildRequestConfig(context, tab, layout)),
-                  if (settings.isVerticalLayout)
-                    Padding(
-                      padding: EdgeInsets.symmetric(vertical: layout.isCompact ? 8 : 12),
-                      child: Divider(height: 3, thickness: 3, color: theme.dividerColor),
-                    )
-                  else
-                    VerticalDivider(width: layout.verticalDividerWidth, thickness: 3, color: theme.dividerColor),
-                  Expanded(child: _buildResponseSection(context, tab, layout)),
-                ],
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final totalSize = settings.isVerticalLayout ? constraints.maxHeight : constraints.maxWidth;
+                  return Flex(
+                    direction: settings.isVerticalLayout ? Axis.vertical : Axis.horizontal,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Flexible(
+                        flex: (settings.splitRatio * 1000).toInt(),
+                        child: _buildRequestConfig(context, tab, layout),
+                      ),
+                      GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onPanUpdate: (details) {
+                          final delta = settings.isVerticalLayout ? details.delta.dy : details.delta.dx;
+                          double newRatio = settings.splitRatio + (delta / totalSize);
+                          if (newRatio < 0.1) newRatio = 0.1;
+                          if (newRatio > 0.9) newRatio = 0.9;
+                          ref.read(settingsProvider.notifier).updateSplitRatio(newRatio);
+                        },
+                        child: MouseRegion(
+                          cursor: settings.isVerticalLayout ? SystemMouseCursors.resizeUpDown : SystemMouseCursors.resizeLeftRight,
+                          child: settings.isVerticalLayout
+                            ? Padding(
+                                padding: EdgeInsets.symmetric(vertical: layout.isCompact ? 8 : 12),
+                                child: Divider(height: 3, thickness: 3, color: theme.dividerColor),
+                              )
+                            : VerticalDivider(width: layout.verticalDividerWidth, thickness: 3, color: theme.dividerColor),
+                        ),
+                      ),
+                      Flexible(
+                        flex: ((1 - settings.splitRatio) * 1000).toInt(),
+                        child: _buildResponseSection(context, tab, layout),
+                      ),
+                    ],
+                  );
+                }
               ),
             ),
           ],

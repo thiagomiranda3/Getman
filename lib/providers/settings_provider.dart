@@ -29,6 +29,10 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
   void updateVerticalLayout(bool isVertical) {
     _save(state.copyWith(isVerticalLayout: isVertical));
   }
+
+  void updateSplitRatio(double ratio) {
+    _save(state.copyWith(splitRatio: ratio));
+  }
 }
 
 final settingsProvider = StateNotifierProvider<SettingsNotifier, SettingsModel>((ref) {
