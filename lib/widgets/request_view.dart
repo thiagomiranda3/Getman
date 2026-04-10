@@ -26,6 +26,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
   late TextEditingController _urlController;
   CodeLineEditingController? _bodyController;
   CodeLineEditingController? _responseController;
+  double? _localSplitRatio;
   
   final FocusNode _responseFocusNode = FocusNode();
   final ScrollController _responseScrollController = ScrollController();
@@ -121,22 +122,33 @@ class _RequestViewState extends ConsumerState<RequestView> {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final totalSize = settings.isVerticalLayout ? constraints.maxHeight : constraints.maxWidth;
+                  final currentRatio = _localSplitRatio ?? settings.splitRatio;
+                  
                   return Flex(
                     direction: settings.isVerticalLayout ? Axis.vertical : Axis.horizontal,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Flexible(
-                        flex: (settings.splitRatio * 1000).toInt(),
+                        flex: (currentRatio * 1000).toInt(),
                         child: _buildRequestConfig(context, tab, layout),
                       ),
                       GestureDetector(
                         behavior: HitTestBehavior.translucent,
                         onPanUpdate: (details) {
                           final delta = settings.isVerticalLayout ? details.delta.dy : details.delta.dx;
-                          double newRatio = settings.splitRatio + (delta / totalSize);
-                          if (newRatio < 0.1) newRatio = 0.1;
-                          if (newRatio > 0.9) newRatio = 0.9;
-                          ref.read(settingsProvider.notifier).updateSplitRatio(newRatio);
+                          setState(() {
+                            _localSplitRatio = (_localSplitRatio ?? settings.splitRatio) + (delta / totalSize);
+                            if (_localSplitRatio! < 0.1) _localSplitRatio = 0.1;
+                            if (_localSplitRatio! > 0.9) _localSplitRatio = 0.9;
+                          });
+                        },
+                        onPanEnd: (_) {
+                          if (_localSplitRatio != null) {
+                            ref.read(settingsProvider.notifier).updateSplitRatio(_localSplitRatio!);
+                            // We don't reset _localSplitRatio to null here because 
+                            // settingsProvider will take a moment to update and we want to keep the UI steady.
+                            // The sync below handles external changes.
+                          }
                         },
                         child: MouseRegion(
                           cursor: settings.isVerticalLayout ? SystemMouseCursors.resizeUpDown : SystemMouseCursors.resizeLeftRight,
@@ -149,7 +161,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
                         ),
                       ),
                       Flexible(
-                        flex: ((1 - settings.splitRatio) * 1000).toInt(),
+                        flex: ((1 - currentRatio) * 1000).toInt(),
                         child: _buildResponseSection(context, tab, layout),
                       ),
                     ],
