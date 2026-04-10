@@ -1,4 +1,3 @@
-import 'dart:convert' as convert;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,9 +10,8 @@ import '../providers/tabs_provider.dart';
 import '../providers/collections_provider.dart';
 import '../providers/settings_provider.dart';
 import '../models/request_tab.dart';
-import '../models/settings_model.dart';
 import '../utils/neo_brutalist_theme.dart';
-import '../utils/layout_constants.dart';
+import '../utils/json_utils.dart';
 
 class RequestView extends ConsumerStatefulWidget {
   final String tabId;
@@ -24,7 +22,6 @@ class RequestView extends ConsumerStatefulWidget {
 }
 
 class _RequestViewState extends ConsumerState<RequestView> {
-  late TextEditingController _urlController;
   CodeLineEditingController? _bodyController;
   CodeLineEditingController? _responseController;
   double? _localSplitRatio;
@@ -38,12 +35,10 @@ class _RequestViewState extends ConsumerState<RequestView> {
     super.initState();
     final tab = _getTab();
     if (tab != null) {
-      _urlController = TextEditingController(text: tab.config.url);
       _bodyController = CodeLineEditingController.fromText(tab.config.body);
-      _responseController = CodeLineEditingController.fromText(_getPrettifiedBody(tab.responseBody));
+      _responseController = CodeLineEditingController();
       _bodyController!.addListener(_onBodyChanged);
     } else {
-      _urlController = TextEditingController();
       _bodyController = CodeLineEditingController();
       _responseController = CodeLineEditingController();
     }
@@ -67,32 +62,19 @@ class _RequestViewState extends ConsumerState<RequestView> {
      });
   }
 
-  String _getPrettifiedBody(String? body) {
-    if (body == null || body.isEmpty) return '';
-    try {
-      final decoded = convert.json.decode(body);
-      return const convert.JsonEncoder.withIndent('    ').convert(decoded);
-    } catch (_) {
-      return body;
-    }
-  }
-
   @override
   void didUpdateWidget(RequestView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.tabId != widget.tabId) {
        final tab = _getTab();
        if (tab != null) {
-        _urlController.text = tab.config.url;
         _bodyController?.text = tab.config.body;
-        _responseController?.text = _getPrettifiedBody(tab.responseBody);
        }
     }
   }
 
   @override
   void dispose() {
-    _urlController.dispose();
     _bodyController?.removeListener(_onBodyChanged);
     _bodyController?.dispose();
     _responseController?.dispose();
@@ -104,31 +86,22 @@ class _RequestViewState extends ConsumerState<RequestView> {
 
   @override
   Widget build(BuildContext context) {
-    final tab = ref.watch(tabsProvider.select((s) => s.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId)));
-    if (tab == null) return const SizedBox.shrink();
+    final tabExists = ref.watch(tabsProvider.select((s) => s.tabs.any((t) => t.tabId == widget.tabId)));
+    if (!tabExists) return const SizedBox.shrink();
     
     final settings = ref.watch(settingsProvider);
-    final layout = LayoutConstants(settings.isCompactMode);
+    final layout = Theme.of(context).extension<LayoutExtension>()!;
     
-    // Sync controllers if model changed from outside
-    if (_urlController.text != tab.config.url) {
-       _urlController.text = tab.config.url;
-    }
-    // We don't sync _bodyController here because it would mess up typing.
-    // _bodyController is synced in didUpdateWidget if tabId changes,
-    // or it's updated via _onBodyChanged.
-    
-    final theme = Theme.of(context);
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyS, control: true): () => _handleSave(tab),
-        const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () => _handleSave(tab),
+        const SingleActivator(LogicalKeyboardKey.keyS, control: true): () => _handleSave(),
+        const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () => _handleSave(),
       },
       child: Padding(
         padding: EdgeInsets.all(layout.pagePadding),
         child: Column(
           children: [
-            _buildUrlBar(context, tab, layout, settings),
+            _UrlBar(tabId: widget.tabId, onSave: _handleSave),
             SizedBox(height: layout.sectionSpacing),
             Expanded(
               child: LayoutBuilder(
@@ -142,39 +115,27 @@ class _RequestViewState extends ConsumerState<RequestView> {
                     children: [
                       Flexible(
                         flex: (currentRatio * 1000).toInt(),
-                        child: _buildRequestConfig(context, tab, layout),
+                        child: _RequestConfigSection(tabId: widget.tabId, bodyController: _bodyController!),
                       ),
-                      GestureDetector(
-                        behavior: HitTestBehavior.translucent,
-                        onPanUpdate: (details) {
-                          final delta = settings.isVerticalLayout ? details.delta.dy : details.delta.dx;
+                      _Splitter(
+                        isVertical: settings.isVerticalLayout,
+                        totalSize: totalSize,
+                        onUpdate: (delta) {
                           setState(() {
                             _localSplitRatio = (_localSplitRatio ?? settings.splitRatio) + (delta / totalSize);
                             if (_localSplitRatio! < 0.1) _localSplitRatio = 0.1;
                             if (_localSplitRatio! > 0.9) _localSplitRatio = 0.9;
                           });
                         },
-                        onPanEnd: (_) {
+                        onEnd: () {
                           if (_localSplitRatio != null) {
                             ref.read(settingsProvider.notifier).updateSplitRatio(_localSplitRatio!);
-                            // We don't reset _localSplitRatio to null here because 
-                            // settingsProvider will take a moment to update and we want to keep the UI steady.
-                            // The sync below handles external changes.
                           }
                         },
-                        child: MouseRegion(
-                          cursor: settings.isVerticalLayout ? SystemMouseCursors.resizeUpDown : SystemMouseCursors.resizeLeftRight,
-                          child: settings.isVerticalLayout
-                            ? Padding(
-                                padding: EdgeInsets.symmetric(vertical: layout.isCompact ? 8 : 12),
-                                child: Divider(height: 3, thickness: 3, color: theme.dividerColor),
-                              )
-                            : VerticalDivider(width: layout.verticalDividerWidth, thickness: 3, color: theme.dividerColor),
-                        ),
                       ),
                       Flexible(
                         flex: ((1 - currentRatio) * 1000).toInt(),
-                        child: _buildResponseSection(context, tab, layout),
+                        child: _ResponseSection(tabId: widget.tabId, responseController: _responseController!),
                       ),
                     ],
                   );
@@ -187,7 +148,9 @@ class _RequestViewState extends ConsumerState<RequestView> {
     );
   }
 
-  void _handleSave(HttpRequestTabModel tab) {
+  void _handleSave() {
+    final tab = _getTab();
+    if (tab == null) return;
     final theme = Theme.of(context);
     if (tab.collectionNodeId != null) {
       ref.read(collectionsProvider.notifier).updateRequest(
@@ -208,12 +171,73 @@ class _RequestViewState extends ConsumerState<RequestView> {
         ),
       );
     } else {
-      _showSaveDialog(tab);
+      _showSaveDialog(context, ref, tab);
     }
   }
+}
 
-  Widget _buildUrlBar(BuildContext context, HttpRequestTabModel tab, LayoutConstants layout, SettingsModel settings) {
+void _showSaveDialog(BuildContext context, WidgetRef ref, HttpRequestTabModel tab) {
+  final controller = TextEditingController(text: 'NEW REQUEST');
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('SAVE TO COLLECTION'),
+      content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(labelText: 'REQUEST NAME')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
+        TextButton(
+          onPressed: () {
+            final id = ref.read(collectionsProvider.notifier).saveRequest(controller.text, tab.config.copyWith());
+            ref.read(tabsProvider.notifier).updateCurrentTab(
+              tab.copyWith(collectionNodeId: id, collectionName: controller.text),
+            );
+            Navigator.pop(context);
+          },
+          child: const Text('SAVE'),
+        ),
+      ],
+    ),
+  );
+}
+
+class _UrlBar extends ConsumerStatefulWidget {
+  final String tabId;
+  final VoidCallback onSave;
+  const _UrlBar({required this.tabId, required this.onSave});
+
+  @override
+  ConsumerState<_UrlBar> createState() => _UrlBarState();
+}
+
+class _UrlBarState extends ConsumerState<_UrlBar> {
+  late TextEditingController _urlController;
+
+  @override
+  void initState() {
+    super.initState();
+    final tab = ref.read(tabsProvider).tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+    _urlController = TextEditingController(text: tab?.config.url ?? '');
+  }
+
+  @override
+  void dispose() {
+    _urlController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tab = ref.watch(tabsProvider.select((s) => s.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId)));
+    if (tab == null) return const SizedBox.shrink();
+
+    if (_urlController.text != tab.config.url) {
+       _urlController.text = tab.config.url;
+    }
+
+    final settings = ref.watch(settingsProvider);
+    final layout = Theme.of(context).extension<LayoutExtension>()!;
     final theme = Theme.of(context);
+
     return Container(
       padding: const EdgeInsets.all(6),
       decoration: NeoBrutalistTheme.brutalBox(context, offset: layout.cardOffset),
@@ -262,12 +286,9 @@ class _RequestViewState extends ConsumerState<RequestView> {
                     .toList(),
                 onChanged: (val) {
                   if (val != null && tab.config.method != val) {
-                    Future.microtask(() {
-                      if (!mounted) return;
-                      ref.read(tabsProvider.notifier).updateCurrentTab(
-                        tab.copyWith(config: tab.config.copyWith(method: val)),
-                      );
-                    });
+                    ref.read(tabsProvider.notifier).updateCurrentTab(
+                      tab.copyWith(config: tab.config.copyWith(method: val)),
+                    );
                   }
                 },
               ),
@@ -288,12 +309,9 @@ class _RequestViewState extends ConsumerState<RequestView> {
               ),
               onChanged: (val) {
                  if (tab.config.url == val) return;
-                 Future.microtask(() {
-                   if (!mounted) return;
-                   ref.read(tabsProvider.notifier).updateCurrentTab(
-                    tab.copyWith(config: tab.config.copyWith(url: val)),
-                  );
-                 });
+                 ref.read(tabsProvider.notifier).updateCurrentTab(
+                  tab.copyWith(config: tab.config.copyWith(url: val)),
+                );
               },
             ),
           ),
@@ -314,7 +332,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
           IconButton(
             icon: Icon(tab.collectionNodeId != null ? Icons.save : Icons.save_as, color: theme.colorScheme.secondary, size: layout.isCompact ? 24 : 28),
             tooltip: tab.collectionNodeId != null ? 'Update Request' : 'Save to Collection',
-            onPressed: () => _handleSave(tab),
+            onPressed: widget.onSave,
           ),
           SizedBox(width: layout.isCompact ? 4 : 8),
           IconButton(
@@ -330,9 +348,56 @@ class _RequestViewState extends ConsumerState<RequestView> {
       ),
     );
   }
+}
 
-  Widget _buildRequestConfig(BuildContext context, HttpRequestTabModel tab, LayoutConstants layout) {
+class _Splitter extends ConsumerWidget {
+  final bool isVertical;
+  final double totalSize;
+  final Function(double) onUpdate;
+  final VoidCallback onEnd;
+
+  const _Splitter({
+    required this.isVertical,
+    required this.totalSize,
+    required this.onUpdate,
+    required this.onEnd,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final layout = Theme.of(context).extension<LayoutExtension>()!;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onPanUpdate: (details) => onUpdate(isVertical ? details.delta.dy : details.delta.dx),
+      onPanEnd: (_) => onEnd(),
+      child: MouseRegion(
+        cursor: isVertical ? SystemMouseCursors.resizeUpDown : SystemMouseCursors.resizeLeftRight,
+        child: isVertical
+          ? Padding(
+              padding: EdgeInsets.symmetric(vertical: layout.isCompact ? 8 : 12),
+              child: Divider(height: 3, thickness: 3, color: theme.dividerColor),
+            )
+          : VerticalDivider(width: layout.verticalDividerWidth, thickness: 3, color: theme.dividerColor),
+      ),
+    );
+  }
+}
+
+class _RequestConfigSection extends ConsumerWidget {
+  final String tabId;
+  final CodeLineEditingController bodyController;
+  const _RequestConfigSection({required this.tabId, required this.bodyController});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tab = ref.watch(tabsProvider.select((s) => s.tabs.firstWhereOrNull((t) => t.tabId == tabId)));
+    if (tab == null) return const SizedBox.shrink();
+
+    final theme = Theme.of(context);
+    final layout = Theme.of(context).extension<LayoutExtension>()!;
+
     return DefaultTabController(
       length: 3,
       child: Column(
@@ -365,26 +430,20 @@ class _RequestViewState extends ConsumerState<RequestView> {
                   _KeyValueEditor(
                     items: tab.config.params,
                     onChanged: (map) {
-                      Future.microtask(() {
-                        if (!mounted) return;
-                        ref.read(tabsProvider.notifier).updateCurrentTab(
-                          tab.copyWith(config: tab.config.copyWith(params: map)),
-                        );
-                      });
+                      ref.read(tabsProvider.notifier).updateCurrentTab(
+                        tab.copyWith(config: tab.config.copyWith(params: map)),
+                      );
                     },
                   ),
                   _KeyValueEditor(
                     items: tab.config.headers,
                     onChanged: (map) {
-                      Future.microtask(() {
-                        if (!mounted) return;
-                        ref.read(tabsProvider.notifier).updateCurrentTab(
-                          tab.copyWith(config: tab.config.copyWith(headers: map)),
-                        );
-                      });
+                      ref.read(tabsProvider.notifier).updateCurrentTab(
+                        tab.copyWith(config: tab.config.copyWith(headers: map)),
+                      );
                     },
                   ),
-                  _buildBodyEditor(context, layout),
+                  _buildBodyEditor(context, theme),
                 ],
               ),
             ),
@@ -394,12 +453,11 @@ class _RequestViewState extends ConsumerState<RequestView> {
     );
   }
 
-  Widget _buildBodyEditor(BuildContext context, LayoutConstants layout) {
-    final theme = Theme.of(context);
+  Widget _buildBodyEditor(BuildContext context, ThemeData theme) {
     return Container(
       color: theme.colorScheme.surface,
       child: CodeEditor(
-        controller: _bodyController!,
+        controller: bodyController,
         wordWrap: true,
         style: CodeEditorStyle(
           fontSize: 13,
@@ -414,7 +472,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
                 mode: langJson,
               ),
             },
-            theme: arduinoLightTheme, // Still using light but with transparent bg
+            theme: arduinoLightTheme,
           ),
         ),
         indicatorBuilder: (context, controller, chunkController, notifier) {
@@ -426,9 +484,21 @@ class _RequestViewState extends ConsumerState<RequestView> {
       ),
     );
   }
+}
 
-  Widget _buildResponseSection(BuildContext context, HttpRequestTabModel tab, LayoutConstants layout) {
+class _ResponseSection extends ConsumerWidget {
+  final String tabId;
+  final CodeLineEditingController responseController;
+  const _ResponseSection({required this.tabId, required this.responseController});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tab = ref.watch(tabsProvider.select((s) => s.tabs.firstWhereOrNull((t) => t.tabId == tabId)));
+    if (tab == null) return const SizedBox.shrink();
+
     final theme = Theme.of(context);
+    final layout = Theme.of(context).extension<LayoutExtension>()!;
+
     if (tab.statusCode == null && !tab.isSending) {
        return Center(child: Column(
          mainAxisAlignment: MainAxisAlignment.center,
@@ -483,8 +553,8 @@ class _RequestViewState extends ConsumerState<RequestView> {
                     decoration: NeoBrutalistTheme.brutalBox(context, offset: 0),
                     child: TabBarView(
                       children: [
-                        _buildResponseBody(context, tab, layout),
-                        _buildResponseHeaders(context, tab, layout),
+                        _ResponseBodyView(tabId: tabId, responseController: responseController),
+                        _ResponseHeadersView(tabId: tabId),
                       ],
                     ),
                   ),
@@ -497,21 +567,52 @@ class _RequestViewState extends ConsumerState<RequestView> {
     );
   }
 
-  Widget _buildResponseBody(BuildContext context, HttpRequestTabModel tab, LayoutConstants layout) {
-    final theme = Theme.of(context);
-    if (tab.responseBody == null) return const SizedBox();
+  Color _getStatusColor(int code) {
+    if (code >= 200 && code < 300) return Colors.greenAccent;
+    if (code >= 400) return Colors.redAccent;
+    return Colors.orangeAccent;
+  }
+}
 
-    // Sync response controller if body changed
-    final prettified = _getPrettifiedBody(tab.responseBody);
-    if (_responseController?.text != prettified) {
-       _responseController?.text = prettified;
+class _ResponseBodyView extends ConsumerStatefulWidget {
+  final String tabId;
+  final CodeLineEditingController responseController;
+  const _ResponseBodyView({required this.tabId, required this.responseController});
+
+  @override
+  ConsumerState<_ResponseBodyView> createState() => _ResponseBodyViewState();
+}
+
+class _ResponseBodyViewState extends ConsumerState<_ResponseBodyView> {
+  @override
+  void initState() {
+    super.initState();
+    _updateBody();
+  }
+
+  Future<void> _updateBody() async {
+    final tab = ref.read(tabsProvider).tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+    final prettified = await JsonUtils.prettify(tab?.responseBody);
+    if (mounted) {
+      widget.responseController.text = prettified;
     }
+  }
 
+  @override
+  Widget build(BuildContext context) {
+    // Listen for changes in response body
+    ref.listen(tabsProvider.select((s) => s.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId)?.responseBody), (prev, next) {
+      if (prev != next) {
+        _updateBody();
+      }
+    });
+
+    final theme = Theme.of(context);
     return Container(
         width: double.infinity,
         color: theme.colorScheme.surface,
         child: CodeEditor(
-          controller: _responseController!,
+          controller: widget.responseController,
           readOnly: true,
           wordWrap: true,
           style: CodeEditorStyle(
@@ -539,46 +640,32 @@ class _RequestViewState extends ConsumerState<RequestView> {
         ),
       );
   }
+}
 
-  Widget _buildResponseHeaders(BuildContext context, HttpRequestTabModel tab, LayoutConstants layout) {
+class _ResponseHeadersView extends ConsumerWidget {
+  final String tabId;
+  const _ResponseHeadersView({required this.tabId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final headers = ref.watch(tabsProvider.select((s) => s.tabs.firstWhereOrNull((t) => t.tabId == tabId)?.responseHeaders));
+    if (headers == null) return const SizedBox();
+    
+    final layout = Theme.of(context).extension<LayoutExtension>()!;
     final theme = Theme.of(context);
-    if (tab.responseHeaders == null) return const SizedBox();
-    return ListView(
-      children: tab.responseHeaders!.entries.map((e) => ListTile(
-        dense: true,
-        title: Text(e.key.toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: layout.fontSizeNormal, color: theme.primaryColor)),
-        subtitle: Text(e.value, style: TextStyle(fontSize: layout.fontSizeNormal, color: theme.colorScheme.onSurface)),
-      )).toList(),
-    );
-  }
 
-  Color _getStatusColor(int code) {
-    if (code >= 200 && code < 300) return Colors.greenAccent;
-    if (code >= 400) return Colors.redAccent;
-    return Colors.orangeAccent;
-  }
+    final entries = headers.entries.toList();
 
-  void _showSaveDialog(HttpRequestTabModel tab) {
-    final controller = TextEditingController(text: 'NEW REQUEST');
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('SAVE TO COLLECTION'),
-        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(labelText: 'REQUEST NAME')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
-          TextButton(
-            onPressed: () {
-              final id = ref.read(collectionsProvider.notifier).saveRequest(controller.text, tab.config.copyWith());
-              ref.read(tabsProvider.notifier).updateCurrentTab(
-                tab.copyWith(collectionNodeId: id, collectionName: controller.text),
-              );
-              Navigator.pop(context);
-            },
-            child: const Text('SAVE'),
-          ),
-        ],
-      ),
+    return ListView.builder(
+      itemCount: entries.length,
+      itemBuilder: (context, index) {
+        final e = entries[index];
+        return ListTile(
+          dense: true,
+          title: Text(e.key.toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: layout.fontSizeNormal, color: theme.primaryColor)),
+          subtitle: Text(e.value, style: TextStyle(fontSize: layout.fontSizeNormal, color: theme.colorScheme.onSurface)),
+        );
+      },
     );
   }
 }
@@ -587,7 +674,7 @@ class _ResponseMetadataItem extends StatelessWidget {
   final String label;
   final String value;
   final Color? color;
-  final LayoutConstants layout;
+  final LayoutExtension layout;
   const _ResponseMetadataItem({required this.label, required this.value, this.color, required this.layout});
 
   @override
@@ -648,11 +735,7 @@ class _KeyValueEditorState extends ConsumerState<_KeyValueEditor> {
   @override
   void didUpdateWidget(_KeyValueEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Only re-init if the map entries actually changed from outside
     if (!_isSame(oldWidget.items, widget.items)) {
-       // To avoid losing focus while typing, we should be careful here.
-       // But usually, changes come from user typing which we already handle.
-       // If changes come from outside (e.g. loading a request), we re-init.
        _disposeControllers();
        _initControllers();
     }
@@ -695,11 +778,9 @@ class _KeyValueEditorState extends ConsumerState<_KeyValueEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final settings = ref.watch(settingsProvider);
-    final layout = LayoutConstants(settings.isCompactMode);
+    final layout = Theme.of(context).extension<LayoutExtension>()!;
 
     return ListView.builder(
-      padding: EdgeInsets.all(layout.isCompact ? 8 : 12),
       itemCount: _keyControllers.length,
       itemBuilder: (context, index) {
         return Padding(

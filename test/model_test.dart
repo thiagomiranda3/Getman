@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/models/request_config.dart';
-import 'package:getman/models/settings_model.dart';
 
 void main() {
   group('Model Serialization Tests', () {
@@ -21,13 +20,17 @@ void main() {
       expect(fromJson.body, config.body);
     });
 
-    test('SettingsModel toJson/fromJson', () {
-      final settings = SettingsModel(historyLimit: 50, saveResponseInHistory: true);
-      final json = settings.toJson();
-      final fromJson = SettingsModel.fromJson(json);
+    test('HttpRequestConfig Equality', () {
+      final config1 = HttpRequestConfig(url: 'https://test.com', method: 'GET');
+      final config2 = HttpRequestConfig(url: 'https://test.com', method: 'GET');
+      // They have different auto-generated IDs, so we set them same for test
+      config2.id = config1.id;
 
-      expect(fromJson.historyLimit, 50);
-      expect(fromJson.saveResponseInHistory, true);
+      expect(config1 == config2, true);
+      expect(config1.hashCode == config2.hashCode, true);
+
+      final config3 = config1.copyWith(method: 'POST');
+      expect(config1 == config3, false);
     });
   });
 }

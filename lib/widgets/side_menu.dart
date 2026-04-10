@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_fancy_tree_view/flutter_fancy_tree_view.dart';
 import '../providers/history_provider.dart';
 import '../providers/collections_provider.dart';
 import '../providers/tabs_provider.dart';
 import '../providers/settings_provider.dart';
 import '../models/collection_node.dart';
 import '../utils/neo_brutalist_theme.dart';
-import '../utils/layout_constants.dart';
 
 class SideMenu extends ConsumerWidget {
   const SideMenu({super.key});
@@ -14,8 +14,7 @@ class SideMenu extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final settings = ref.watch(settingsProvider);
-    final layout = LayoutConstants(settings.isCompactMode);
+    final layout = Theme.of(context).extension<LayoutExtension>()!;
     
     return DefaultTabController(
       length: 2,
@@ -49,8 +48,8 @@ class SideMenu extends ConsumerWidget {
             Expanded(
               child: TabBarView(
                 children: [
-                  _CollectionsList(),
-                  _HistoryList(),
+                  const _CollectionsList(),
+                  const _HistoryList(),
                 ],
               ),
             ),
@@ -67,15 +66,14 @@ class _SideMenuHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final settings = ref.watch(settingsProvider);
-    final layout = LayoutConstants(settings.isCompactMode);
+    final layout = Theme.of(context).extension<LayoutExtension>()!;
     
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: settings.isCompactMode ? 12 : 20),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: layout.headerPaddingVertical),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('GETMAN', style: TextStyle(fontWeight: FontWeight.w900, fontSize: settings.isCompactMode ? 18 : 24, color: theme.colorScheme.onSurface, letterSpacing: -1)),
+          Text('GETMAN', style: TextStyle(fontWeight: FontWeight.w900, fontSize: layout.headerFontSize, color: theme.colorScheme.onSurface, letterSpacing: -1)),
           Row(
             children: [
               IconButton(
@@ -204,8 +202,7 @@ class _HistoryList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final history = ref.watch(historyProvider);
-    final settings = ref.watch(settingsProvider);
-    final layout = LayoutConstants(settings.isCompactMode);
+    final layout = Theme.of(context).extension<LayoutExtension>()!;
 
     return ListView.builder(
       itemCount: history.length,
@@ -246,17 +243,47 @@ class _HistoryList extends ConsumerWidget {
   }
 }
 
-class _CollectionsList extends ConsumerWidget {
+class _CollectionsList extends ConsumerStatefulWidget {
+  const _CollectionsList();
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CollectionsList> createState() => _CollectionsListState();
+}
+
+class _CollectionsListState extends ConsumerState<_CollectionsList> {
+  late final TreeController<CollectionNode> _treeController;
+
+  @override
+  void initState() {
+    super.initState();
+    final collections = ref.read(collectionsProvider);
+    _treeController = TreeController<CollectionNode>(
+      roots: collections,
+      childrenProvider: (node) => node.children,
+    );
+  }
+
+  @override
+  void dispose() {
+    _treeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final collections = ref.watch(collectionsProvider);
+    _treeController.roots = collections;
+
     return DragTarget<String>(
       onAcceptWithDetails: (details) => ref.read(collectionsProvider.notifier).moveNode(details.data, null),
       builder: (context, candidateData, rejectedData) {
-        return ListView.builder(
-          itemCount: collections.length,
-          itemBuilder: (context, index) {
-            return _CollectionNodeWidget(node: collections[index]);
+        return AnimatedTreeView<CollectionNode>(
+          treeController: _treeController,
+          nodeBuilder: (context, entry) {
+            return _CollectionNodeWidget(
+              entry: entry,
+              onToggle: () => _treeController.toggleExpansion(entry.node),
+            );
           },
         );
       },
@@ -265,16 +292,19 @@ class _CollectionsList extends ConsumerWidget {
 }
 
 class _CollectionNodeWidget extends ConsumerWidget {
-  final CollectionNode node;
-  final int depth;
+  final TreeEntry<CollectionNode> entry;
+  final VoidCallback onToggle;
 
-  const _CollectionNodeWidget({required this.node, this.depth = 0});
+  const _CollectionNodeWidget({
+    required this.entry,
+    required this.onToggle,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final settings = ref.watch(settingsProvider);
-    final layout = LayoutConstants(settings.isCompactMode);
+    final layout = Theme.of(context).extension<LayoutExtension>()!;
+    final node = entry.node;
 
     Widget content;
     if (node.isFolder) {
@@ -282,39 +312,55 @@ class _CollectionNodeWidget extends ConsumerWidget {
         onWillAcceptWithDetails: (details) => details.data != node.id,
         onAcceptWithDetails: (details) => ref.read(collectionsProvider.notifier).moveNode(details.data, node.id),
         builder: (context, candidateData, rejectedData) {
-          return ExpansionTile(
-            collapsedIconColor: theme.colorScheme.onSurface,
-            iconColor: theme.colorScheme.onSurface,
-            visualDensity: settings.isCompactMode ? VisualDensity.compact : null,
-            leading: Icon(node.isFavorite ? Icons.star : Icons.folder,
-                size: layout.iconSize, color: node.isFavorite ? theme.primaryColor : theme.colorScheme.secondary),
-            title: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.w900)),
-            trailing: _NodeContextMenu(node: node),
-            children: node.children
-                .map((c) => _CollectionNodeWidget(node: c, depth: depth + 1))
-                .toList(),
+          return InkWell(
+            onTap: onToggle,
+            child: TreeIndentation(
+              entry: entry,
+              child: Row(
+                children: [
+                  Icon(
+                    entry.isExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
+                    size: layout.smallIconSize,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                  Icon(node.isFavorite ? Icons.star : Icons.folder,
+                      size: layout.iconSize, color: node.isFavorite ? theme.primaryColor : theme.colorScheme.secondary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.w900)),
+                  ),
+                  _NodeContextMenu(node: node),
+                ],
+              ),
+            ),
           );
         },
       );
     } else {
-      content = ListTile(
-        dense: true,
-        visualDensity: settings.isCompactMode ? VisualDensity.compact : null,
-        contentPadding: EdgeInsets.only(left: 16.0 + (depth * (settings.isCompactMode ? 12 : 20))),
-        leading: _MethodBadge(method: node.config?.method ?? 'GET', small: true),
-        title: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold)),
+      content = InkWell(
         onTap: () {
           if (node.config != null) {
-            ref
-                .read(tabsProvider.notifier)
-                .addTab(
+            ref.read(tabsProvider.notifier).addTab(
                   config: node.config!.copyWith(),
                   collectionNodeId: node.id,
                   collectionName: node.name,
                 );
           }
         },
-        trailing: _NodeContextMenu(node: node),
+        child: TreeIndentation(
+          entry: entry,
+          child: Row(
+            children: [
+              SizedBox(width: layout.smallIconSize), // Indent match for arrow
+              _MethodBadge(method: node.config?.method ?? 'GET', small: true),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold)),
+              ),
+              _NodeContextMenu(node: node),
+            ],
+          ),
+        ),
       );
     }
 
@@ -347,8 +393,7 @@ class _NodeContextMenuState extends ConsumerState<_NodeContextMenu> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final settings = ref.watch(settingsProvider);
-    final layout = LayoutConstants(settings.isCompactMode);
+    final layout = Theme.of(context).extension<LayoutExtension>()!;
 
     return PopupMenuButton<String>(
       icon: Icon(Icons.more_vert, size: layout.iconSize, color: theme.colorScheme.onSurface),
@@ -436,8 +481,7 @@ class _MethodBadge extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final settings = ref.watch(settingsProvider);
-    final layout = LayoutConstants(settings.isCompactMode);
+    final layout = Theme.of(context).extension<LayoutExtension>()!;
     final color = NeoBrutalistTheme.getMethodColor(method);
     
     return Container(

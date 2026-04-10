@@ -43,6 +43,14 @@ void main() {
     expect(state[1].name, 'A');
     expect(state[2].name, 'B');
 
+    // Recursive sort test
+    notifier.addFolder('subB', parentId: state[1].id); // folder A
+    notifier.addFolder('subA', parentId: state[1].id); // folder A
+    
+    state = container.read(collectionsProvider);
+    expect(state[1].children[0].name, 'subA');
+    expect(state[1].children[1].name, 'subB');
+
     tempDir.deleteSync(recursive: true);
   });
 }

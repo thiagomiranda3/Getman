@@ -1,5 +1,6 @@
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
+import 'package:collection/collection.dart';
 
 part 'request_config.g.dart';
 
@@ -115,4 +116,37 @@ class HttpRequestConfig extends HiveObject {
     statusCode: json['statusCode'],
     durationMs: json['durationMs'],
   );
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! HttpRequestConfig) return false;
+
+    const mapEquality = MapEquality<String, String>();
+    return other.method == method &&
+        other.url == url &&
+        mapEquality.equals(other.headers, headers) &&
+        mapEquality.equals(other.params, params) &&
+        other.body == body &&
+        mapEquality.equals(other.auth, auth) &&
+        other.responseBody == responseBody &&
+        mapEquality.equals(other.responseHeaders, responseHeaders) &&
+        other.statusCode == statusCode &&
+        other.durationMs == durationMs;
+  }
+
+  @override
+  int get hashCode {
+    const mapEquality = MapEquality<String, String>();
+    return method.hashCode ^
+        url.hashCode ^
+        mapEquality.hash(headers) ^
+        mapEquality.hash(params) ^
+        body.hashCode ^
+        mapEquality.hash(auth) ^
+        responseBody.hashCode ^
+        mapEquality.hash(responseHeaders ?? {}) ^
+        statusCode.hashCode ^
+        durationMs.hashCode;
+  }
 }

@@ -1,6 +1,7 @@
 import 'package:hive/hive.dart';
 import 'request_config.dart';
 import 'package:uuid/uuid.dart';
+import 'package:collection/collection.dart';
 
 part 'collection_node.g.dart';
 
@@ -53,4 +54,27 @@ class CollectionNode extends HiveObject {
     config: json['config'] != null ? HttpRequestConfig.fromJson(json['config']) : null,
     isFavorite: json['isFavorite'] ?? false,
   );
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! CollectionNode) return false;
+
+    return other.id == id &&
+        other.name == name &&
+        other.isFolder == isFolder &&
+        other.isFavorite == isFavorite &&
+        other.config == config &&
+        const ListEquality().equals(other.children, children);
+  }
+
+  @override
+  int get hashCode {
+    return id.hashCode ^
+        name.hashCode ^
+        isFolder.hashCode ^
+        isFavorite.hashCode ^
+        config.hashCode ^
+        const ListEquality().hash(children);
+  }
 }

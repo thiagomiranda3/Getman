@@ -1,5 +1,6 @@
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
+import 'package:collection/collection.dart';
 import 'request_config.dart';
 
 part 'request_tab.g.dart';
@@ -92,4 +93,33 @@ class HttpRequestTabModel extends HiveObject {
     collectionName: json['collectionName'],
     tabId: json['tabId'],
   );
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! HttpRequestTabModel) return false;
+
+    return other.tabId == tabId &&
+        other.config == config &&
+        other.responseBody == responseBody &&
+        const MapEquality<String, String>().equals(other.responseHeaders, responseHeaders) &&
+        other.statusCode == statusCode &&
+        other.durationMs == durationMs &&
+        other.isSending == isSending &&
+        other.collectionNodeId == collectionNodeId &&
+        other.collectionName == collectionName;
+  }
+
+  @override
+  int get hashCode {
+    return tabId.hashCode ^
+        config.hashCode ^
+        responseBody.hashCode ^
+        const MapEquality<String, String>().hash(responseHeaders ?? {}) ^
+        statusCode.hashCode ^
+        durationMs.hashCode ^
+        isSending.hashCode ^
+        collectionNodeId.hashCode ^
+        collectionName.hashCode;
+  }
 }

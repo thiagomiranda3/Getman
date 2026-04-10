@@ -1,12 +1,17 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
+import 'package:collection/collection.dart';
 import '../models/request_tab.dart';
 import '../models/request_config.dart';
+import '../models/collection_node.dart';
 import '../services/storage_service.dart';
 import 'history_provider.dart';
 import 'settings_provider.dart';
+import 'dio_provider.dart';
+import 'collections_provider.dart';
 
 class TabsState {
   final List<HttpRequestTabModel> tabs;
@@ -24,7 +29,7 @@ class TabsState {
 
 class TabsNotifier extends StateNotifier<TabsState> {
   final Ref ref;
-  final Dio _dio = Dio();
+  Timer? _debounceTimer;
 
   TabsNotifier(this.ref) : super(_loadInitialState());
 
@@ -52,6 +57,20 @@ class TabsNotifier extends StateNotifier<TabsState> {
     return TabsState(tabs: uniqueTabs, activeIndex: 0);
   }
 
+  void _scheduleSave() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(seconds: 10), () {
+      StorageService.saveTabs(state.tabs);
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    StorageService.saveTabs(state.tabs); // Final save on dispose
+    super.dispose();
+  }
+
   void addTab({HttpRequestConfig? config, String? collectionNodeId, String? collectionName}) {
     if (collectionNodeId != null) {
       final existingIndex = state.tabs.indexWhere((t) => t.collectionNodeId == collectionNodeId);
@@ -70,7 +89,7 @@ class TabsNotifier extends StateNotifier<TabsState> {
       tabs: [...state.tabs, newTab],
       activeIndex: state.tabs.length,
     );
-    StorageService.saveTabs(state.tabs);
+    _scheduleSave();
   }
 
   void removeTab(int index) {
@@ -82,10 +101,11 @@ class TabsNotifier extends StateNotifier<TabsState> {
       newActiveIndex = newTabs.length - 1;
     }
     state = state.copyWith(tabs: newTabs, activeIndex: newActiveIndex);
-    StorageService.saveTabs(state.tabs);
+    _scheduleSave();
   }
 
   void setActiveIndex(int index) {
+    if (state.activeIndex == index) return;
     state = state.copyWith(activeIndex: index);
   }
 
@@ -107,14 +127,15 @@ class TabsNotifier extends StateNotifier<TabsState> {
     }
 
     state = state.copyWith(tabs: tabs, activeIndex: newActiveIndex);
-    StorageService.saveTabs(state.tabs);
+    _scheduleSave();
   }
 
   void updateCurrentTab(HttpRequestTabModel tab) {
+    if (state.tabs[state.activeIndex] == tab) return;
     final newTabs = [...state.tabs];
     newTabs[state.activeIndex] = tab;
     state = state.copyWith(tabs: newTabs);
-    StorageService.saveTabs(state.tabs);
+    _scheduleSave();
   }
 
   Future<void> sendRequest() async {
@@ -125,7 +146,8 @@ class TabsNotifier extends StateNotifier<TabsState> {
 
     final stopwatch = Stopwatch()..start();
     try {
-      final response = await _dio.request(
+      final dio = ref.read(dioProvider);
+      final response = await dio.request(
         config.url,
         data: config.body.isNotEmpty ? config.body : null,
         queryParameters: config.params,
@@ -224,4 +246,29 @@ class TabsNotifier extends StateNotifier<TabsState> {
 
 final tabsProvider = StateNotifierProvider<TabsNotifier, TabsState>((ref) {
   return TabsNotifier(ref);
+});
+
+final isTabDirtyProvider = Provider.family<bool, String>((ref, tabId) {
+  final tab = ref.watch(tabsProvider.select((s) => s.tabs.firstWhereOrNull((t) => t.tabId == tabId)));
+  if (tab == null || tab.collectionNodeId == null) return false;
+
+  final collections = ref.watch(collectionsProvider);
+  
+  HttpRequestConfig? savedConfig;
+  bool find(List<CollectionNode> nodes) {
+    for (var node in nodes) {
+      if (node.id == tab.collectionNodeId) {
+        savedConfig = node.config;
+        return true;
+      }
+      if (find(node.children)) return true;
+    }
+    return false;
+  }
+  find(collections);
+
+  if (savedConfig == null) return false;
+  
+  // Efficient comparison using overridden == operator
+  return tab.config != savedConfig;
 });

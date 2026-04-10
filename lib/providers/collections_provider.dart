@@ -7,12 +7,28 @@ class CollectionsNotifier extends StateNotifier<List<CollectionNode>> {
   CollectionsNotifier() : super(_loadAndSort(StorageService.getCollections()));
 
   static List<CollectionNode> _loadAndSort(List<CollectionNode> collections) {
-    collections.sort((a, b) {
+    final sorted = List<CollectionNode>.from(collections);
+    sorted.sort((a, b) {
       if (a.isFavorite && !b.isFavorite) return -1;
       if (!a.isFavorite && b.isFavorite) return 1;
+      if (a.isFolder && !b.isFolder) return -1;
+      if (!a.isFolder && b.isFolder) return 1;
       return a.name.toLowerCase().compareTo(b.name.toLowerCase());
     });
-    return collections;
+
+    for (var i = 0; i < sorted.length; i++) {
+      if (sorted[i].children.isNotEmpty) {
+        sorted[i] = CollectionNode(
+          id: sorted[i].id,
+          name: sorted[i].name,
+          isFolder: sorted[i].isFolder,
+          isFavorite: sorted[i].isFavorite,
+          config: sorted[i].config,
+          children: _loadAndSort(sorted[i].children),
+        );
+      }
+    }
+    return sorted;
   }
 
   void addFolder(String name, {String? parentId}) {
