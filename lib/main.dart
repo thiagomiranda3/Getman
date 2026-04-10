@@ -7,6 +7,8 @@ import 'widgets/side_menu.dart';
 import 'widgets/request_view.dart';
 import 'providers/tabs_provider.dart';
 import 'providers/collections_provider.dart';
+import 'models/collection_node.dart';
+import 'models/request_config.dart';
 import 'models/request_tab.dart';
 import 'utils/neo_brutalist_theme.dart';
 
@@ -73,11 +75,27 @@ class MainScreen extends ConsumerWidget {
 
   bool _isTabDirty(HttpRequestTabModel tab, WidgetRef ref) {
     if (tab.collectionNodeId == null) return false;
-    final savedConfig = ref.read(collectionsProvider.notifier).getConfig(tab.collectionNodeId!);
-    if (savedConfig == null) return false;
+    
+    // Watch collections so this tab rebuilds when a save happens
+    final collections = ref.watch(collectionsProvider);
+    
+    HttpRequestConfig? savedConfig;
+    void find(List<CollectionNode> nodes) {
+      for (var node in nodes) {
+        if (node.id == tab.collectionNodeId) {
+          savedConfig = node.config;
+          return;
+        }
+        find(node.children);
+      }
+    }
+    find(collections);
+
+    final config = savedConfig;
+    if (config == null) return false;
     
     final currentJson = json.encode(tab.config.toJson());
-    final savedJson = json.encode(savedConfig.toJson());
+    final savedJson = json.encode(config.toJson());
     return currentJson != savedJson;
   }
 
@@ -137,6 +155,9 @@ class MainScreen extends ConsumerWidget {
                   key: ValueKey('tab_$tabId'),
                   builder: (context, ref, _) {
                     final tab = ref.watch(tabsProvider.select((s) => s.tabs.firstWhere((t) => t.tabId == tabId)));
+                    // Watch collections to rebuild when saved
+                    ref.watch(collectionsProvider);
+                    
                     final isActive = activeIndex == index;
                     final isDirty = _isTabDirty(tab, ref);
                     final title = tab.collectionName ?? (tab.config.url.isEmpty ? 'NEW REQUEST' : tab.config.url);

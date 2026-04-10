@@ -54,6 +54,9 @@ Whenever state is modified in a Provider, the corresponding `StorageService.save
 - **macOS Outgoing Connections**: Enabled via `com.apple.security.network.client` in `.entitlements` files.
 - **Git**: `.gitignore` is configured to exclude build artifacts, `.hive` files, and `.dart_tool`.
 
+## Development Mandates
+- **Always Build & Verify**: You MUST always build the project (using `flutter analyze` or full build) and make sure it AT LEAST runs before you call something done. No changes should be left unverified.
+
 ## Future Roadmap Ideas
 - Environment Variable support.
 - JSON schema validation.

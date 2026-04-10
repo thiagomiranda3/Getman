@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:re_highlight/styles/arduino-light.dart';
 import 'package:re_highlight/languages/json.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../providers/tabs_provider.dart';
 import '../providers/collections_provider.dart';
 import '../providers/settings_provider.dart';
@@ -60,7 +61,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
     if (body == null || body.isEmpty) return '';
     try {
       final decoded = convert.json.decode(body);
-      return const convert.JsonEncoder.withIndent('  ').convert(decoded);
+      return const convert.JsonEncoder.withIndent('    ').convert(decoded);
     } catch (_) {
       return body;
     }
@@ -336,8 +337,8 @@ class _RequestViewState extends ConsumerState<RequestView> {
         controller: _bodyController!,
         wordWrap: true,
         style: CodeEditorStyle(
-          fontSize: layout.isCompact ? 12 : 13,
-          fontFamily: 'monospace',
+          fontSize: 13,
+          fontFamily: GoogleFonts.jetBrainsMono().fontFamily,
           backgroundColor: Colors.transparent,
           cursorColor: theme.primaryColor,
           selectionColor: theme.primaryColor.withValues(alpha: 0.3),
@@ -449,8 +450,8 @@ class _RequestViewState extends ConsumerState<RequestView> {
           readOnly: true,
           wordWrap: true,
           style: CodeEditorStyle(
-            fontSize: layout.isCompact ? 12 : 13,
-            fontFamily: 'monospace',
+            fontSize: 13,
+            fontFamily: GoogleFonts.jetBrainsMono().fontFamily,
             backgroundColor: Colors.transparent,
             cursorColor: theme.primaryColor,
             selectionColor: theme.primaryColor.withValues(alpha: 0.3),
@@ -480,8 +481,8 @@ class _RequestViewState extends ConsumerState<RequestView> {
     return ListView(
       children: tab.responseHeaders!.entries.map((e) => ListTile(
         dense: true,
-        title: Text(e.key.toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: layout.fontSizeSmall, color: theme.primaryColor)),
-        subtitle: Text(e.value, style: TextStyle(fontSize: layout.fontSizeSmall, color: theme.colorScheme.onSurface)),
+        title: Text(e.key.toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: layout.fontSizeNormal, color: theme.primaryColor)),
+        subtitle: Text(e.value, style: TextStyle(fontSize: layout.fontSizeNormal, color: theme.colorScheme.onSurface)),
       )).toList(),
     );
   }
