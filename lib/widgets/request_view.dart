@@ -43,9 +43,15 @@ class _RequestViewState extends ConsumerState<RequestView> {
 
   void _onBodyChanged() {
      final tab = _getTab();
-     ref.read(tabsProvider.notifier).updateCurrentTab(
-       tab.copyWith(config: tab.config.copyWith(body: _bodyController!.text)),
-     );
+     final newText = _bodyController!.text;
+     if (tab.config.body == newText) return;
+     
+     Future.microtask(() {
+       if (!mounted) return;
+       ref.read(tabsProvider.notifier).updateCurrentTab(
+         tab.copyWith(config: tab.config.copyWith(body: newText)),
+       );
+     });
   }
 
   String _getPrettifiedBody(String? body) {
@@ -195,10 +201,13 @@ class _RequestViewState extends ConsumerState<RequestView> {
                     ))
                     .toList(),
                 onChanged: (val) {
-                  if (val != null) {
-                    ref.read(tabsProvider.notifier).updateCurrentTab(
-                      tab.copyWith(config: tab.config.copyWith(method: val)),
-                    );
+                  if (val != null && tab.config.method != val) {
+                    Future.microtask(() {
+                      if (!mounted) return;
+                      ref.read(tabsProvider.notifier).updateCurrentTab(
+                        tab.copyWith(config: tab.config.copyWith(method: val)),
+                      );
+                    });
                   }
                 },
               ),
@@ -218,9 +227,13 @@ class _RequestViewState extends ConsumerState<RequestView> {
                 filled: false,
               ),
               onChanged: (val) {
-                 ref.read(tabsProvider.notifier).updateCurrentTab(
-                  tab.copyWith(config: tab.config.copyWith(url: val)),
-                );
+                 if (tab.config.url == val) return;
+                 Future.microtask(() {
+                   if (!mounted) return;
+                   ref.read(tabsProvider.notifier).updateCurrentTab(
+                    tab.copyWith(config: tab.config.copyWith(url: val)),
+                  );
+                 });
               },
             ),
           ),
@@ -279,17 +292,23 @@ class _RequestViewState extends ConsumerState<RequestView> {
                   _KeyValueEditor(
                     items: tab.config.params,
                     onChanged: (map) {
-                      ref.read(tabsProvider.notifier).updateCurrentTab(
-                        tab.copyWith(config: tab.config.copyWith(params: map)),
-                      );
+                      Future.microtask(() {
+                        if (!mounted) return;
+                        ref.read(tabsProvider.notifier).updateCurrentTab(
+                          tab.copyWith(config: tab.config.copyWith(params: map)),
+                        );
+                      });
                     },
                   ),
                   _KeyValueEditor(
                     items: tab.config.headers,
                     onChanged: (map) {
-                      ref.read(tabsProvider.notifier).updateCurrentTab(
-                        tab.copyWith(config: tab.config.copyWith(headers: map)),
-                      );
+                      Future.microtask(() {
+                        if (!mounted) return;
+                        ref.read(tabsProvider.notifier).updateCurrentTab(
+                          tab.copyWith(config: tab.config.copyWith(headers: map)),
+                        );
+                      });
                     },
                   ),
                   _buildBodyEditor(context),
@@ -353,7 +372,9 @@ class _RequestViewState extends ConsumerState<RequestView> {
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 12.0),
-          child: Row(
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 8,
             children: [
               if (tab.statusCode != null)
                 _ResponseMetadataItem(label: 'STATUS', value: tab.statusCode.toString(), color: _getStatusColor(tab.statusCode!)),

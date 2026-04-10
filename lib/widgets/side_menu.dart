@@ -140,46 +140,51 @@ class _SideMenuHeader extends ConsumerWidget {
   }
 
   void _showSettingsDialog(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(settingsProvider);
     final theme = Theme.of(context);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('SETTINGS'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text('HISTORY LIMIT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              trailing: SizedBox(
-                width: 80,
-                child: TextField(
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(hintText: settings.historyLimit.toString(), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
-                  onSubmitted: (val) {
-                    final limit = int.tryParse(val);
-                    if (limit != null) {
-                      ref.read(settingsProvider.notifier).updateHistoryLimit(limit);
-                    }
+      builder: (context) => Consumer(
+        builder: (context, ref, _) {
+          final settings = ref.watch(settingsProvider);
+          return AlertDialog(
+            title: const Text('SETTINGS'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  title: const Text('HISTORY LIMIT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  trailing: SizedBox(
+                    width: 80,
+                    child: TextField(
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+                      controller: TextEditingController(text: settings.historyLimit.toString())
+                        ..selection = TextSelection.fromPosition(TextPosition(offset: settings.historyLimit.toString().length)),
+                      onChanged: (val) {
+                        final limit = int.tryParse(val);
+                        if (limit != null) {
+                          ref.read(settingsProvider.notifier).updateHistoryLimit(limit);
+                        }
+                      },
+                    ),
+                  ),
+                ),                const SizedBox(height: 8),
+                SwitchListTile(
+                  activeThumbColor: theme.colorScheme.secondary,
+                  activeTrackColor: theme.primaryColor,
+                  title: const Text('SAVE RESPONSE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  value: settings.saveResponseInHistory,
+                  onChanged: (val) {
+                    ref.read(settingsProvider.notifier).updateSaveResponseInHistory(val);
                   },
                 ),
-              ),
+              ],
             ),
-            const SizedBox(height: 8),
-            SwitchListTile(
-              activeThumbColor: theme.colorScheme.secondary,
-              activeTrackColor: theme.primaryColor,
-              title: const Text('SAVE RESPONSE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              value: settings.saveResponseInHistory,
-              onChanged: (val) {
-                ref.read(settingsProvider.notifier).updateSaveResponseInHistory(val);
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CLOSE')),
-        ],
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('CLOSE')),
+            ],
+          );
+        },
       ),
     );
   }

@@ -11,27 +11,15 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
   }
 
   void updateHistoryLimit(int limit) {
-    _save(SettingsModel(
-      historyLimit: limit,
-      saveResponseInHistory: state.saveResponseInHistory,
-      isDarkMode: state.isDarkMode,
-    ));
+    _save(state.copyWith(historyLimit: limit));
   }
 
   void updateSaveResponseInHistory(bool save) {
-    _save(SettingsModel(
-      historyLimit: state.historyLimit,
-      saveResponseInHistory: save,
-      isDarkMode: state.isDarkMode,
-    ));
+    _save(state.copyWith(saveResponseInHistory: save));
   }
 
   void updateDarkMode(bool isDark) {
-    _save(SettingsModel(
-      historyLimit: state.historyLimit,
-      saveResponseInHistory: state.saveResponseInHistory,
-      isDarkMode: isDark,
-    ));
+    _save(state.copyWith(isDarkMode: isDark));
   }
 }
 

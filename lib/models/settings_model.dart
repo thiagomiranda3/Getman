@@ -19,6 +19,18 @@ class SettingsModel extends HiveObject {
     this.isDarkMode = false,
   });
 
+  SettingsModel copyWith({
+    int? historyLimit,
+    bool? saveResponseInHistory,
+    bool? isDarkMode,
+  }) {
+    return SettingsModel(
+      historyLimit: historyLimit ?? this.historyLimit,
+      saveResponseInHistory: saveResponseInHistory ?? this.saveResponseInHistory,
+      isDarkMode: isDarkMode ?? this.isDarkMode,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
     'historyLimit': historyLimit,
     'saveResponseInHistory': saveResponseInHistory,
