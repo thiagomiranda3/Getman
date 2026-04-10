@@ -8,10 +8,10 @@ class HttpRequestConfig extends HiveObject {
   @HiveField(0)
   String id;
 
-  @HiveField(1)
+  @HiveField(1, defaultValue: 'GET')
   String method;
 
-  @HiveField(2)
+  @HiveField(2, defaultValue: '')
   String url;
 
   @HiveField(3)
@@ -20,7 +20,7 @@ class HttpRequestConfig extends HiveObject {
   @HiveField(4)
   Map<String, String> params;
 
-  @HiveField(5)
+  @HiveField(5, defaultValue: '')
   String body;
 
   @HiveField(6)

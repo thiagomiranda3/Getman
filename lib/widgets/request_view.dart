@@ -11,8 +11,8 @@ import '../models/request_tab.dart';
 import '../utils/neo_brutalist_theme.dart';
 
 class RequestView extends ConsumerStatefulWidget {
-  final HttpRequestTabModel tab;
-  const RequestView({super.key, required this.tab});
+  final String tabId;
+  const RequestView({super.key, required this.tabId});
 
   @override
   ConsumerState<RequestView> createState() => _RequestViewState();
@@ -26,20 +26,25 @@ class _RequestViewState extends ConsumerState<RequestView> {
   final FocusNode _responseFocusNode = FocusNode();
   final ScrollController _responseScrollController = ScrollController();
   final ScrollController _requestScrollController = ScrollController();
-  final LayerLink _layerLink = LayerLink();
 
   @override
   void initState() {
     super.initState();
-    _urlController = TextEditingController(text: widget.tab.config.url);
-    _bodyController = CodeLineEditingController.fromText(widget.tab.config.body);
-    _responseController = CodeLineEditingController.fromText(_getPrettifiedBody(widget.tab.responseBody));
+    final tab = _getTab();
+    _urlController = TextEditingController(text: tab.config.url);
+    _bodyController = CodeLineEditingController.fromText(tab.config.body);
+    _responseController = CodeLineEditingController.fromText(_getPrettifiedBody(tab.responseBody));
     _bodyController!.addListener(_onBodyChanged);
   }
 
+  HttpRequestTabModel _getTab() {
+    return ref.read(tabsProvider).tabs.firstWhere((t) => t.tabId == widget.tabId);
+  }
+
   void _onBodyChanged() {
+     final tab = _getTab();
      ref.read(tabsProvider.notifier).updateCurrentTab(
-       widget.tab.copyWith(config: widget.tab.config.copyWith(body: _bodyController!.text)),
+       tab.copyWith(config: tab.config.copyWith(body: _bodyController!.text)),
      );
   }
 
@@ -56,12 +61,11 @@ class _RequestViewState extends ConsumerState<RequestView> {
   @override
   void didUpdateWidget(RequestView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.tab.config.id != widget.tab.config.id) {
-       _urlController.text = widget.tab.config.url;
-       _bodyController?.text = widget.tab.config.body;
-    }
-    if (oldWidget.tab.responseBody != widget.tab.responseBody) {
-       _responseController?.text = _getPrettifiedBody(widget.tab.responseBody);
+    if (oldWidget.tabId != widget.tabId) {
+       final tab = _getTab();
+       _urlController.text = tab.config.url;
+       _bodyController?.text = tab.config.body;
+       _responseController?.text = _getPrettifiedBody(tab.responseBody);
     }
   }
 
@@ -79,25 +83,35 @@ class _RequestViewState extends ConsumerState<RequestView> {
 
   @override
   Widget build(BuildContext context) {
+    final tab = ref.watch(tabsProvider.select((s) => s.tabs.firstWhere((t) => t.tabId == widget.tabId)));
+    
+    // Sync controllers if model changed from outside
+    if (_urlController.text != tab.config.url) {
+       _urlController.text = tab.config.url;
+    }
+    // We don't sync _bodyController here because it would mess up typing.
+    // _bodyController is synced in didUpdateWidget if tabId changes,
+    // or it's updated via _onBodyChanged.
+    
     final theme = Theme.of(context);
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyS, control: true): _handleSave,
-        const SingleActivator(LogicalKeyboardKey.keyS, meta: true): _handleSave,
+        const SingleActivator(LogicalKeyboardKey.keyS, control: true): () => _handleSave(tab),
+        const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () => _handleSave(tab),
       },
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
-            _buildUrlBar(context),
+            _buildUrlBar(context, tab),
             const SizedBox(height: 24),
             Expanded(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _buildRequestConfig(context)),
+                  Expanded(child: _buildRequestConfig(context, tab)),
                   VerticalDivider(width: 48, thickness: 3, color: theme.dividerColor),
-                  Expanded(child: _buildResponseSection(context)),
+                  Expanded(child: _buildResponseSection(context, tab)),
                 ],
               ),
             ),
@@ -107,12 +121,12 @@ class _RequestViewState extends ConsumerState<RequestView> {
     );
   }
 
-  void _handleSave() {
+  void _handleSave(HttpRequestTabModel tab) {
     final theme = Theme.of(context);
-    if (widget.tab.collectionNodeId != null) {
+    if (tab.collectionNodeId != null) {
       ref.read(collectionsProvider.notifier).updateRequest(
-        widget.tab.collectionNodeId!,
-        widget.tab.config.copyWith(),
+        tab.collectionNodeId!,
+        tab.config.copyWith(),
       );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -128,11 +142,11 @@ class _RequestViewState extends ConsumerState<RequestView> {
         ),
       );
     } else {
-      _showSaveDialog();
+      _showSaveDialog(tab);
     }
   }
 
-  Widget _buildUrlBar(BuildContext context) {
+  Widget _buildUrlBar(BuildContext context, HttpRequestTabModel tab) {
     final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(6),
@@ -147,7 +161,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 dropdownColor: theme.colorScheme.surface,
-                value: widget.tab.config.method,
+                value: tab.config.method,
                 style: TextStyle(
                   color: theme.colorScheme.onSurface, 
                   fontWeight: FontWeight.w900, 
@@ -183,7 +197,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
                 onChanged: (val) {
                   if (val != null) {
                     ref.read(tabsProvider.notifier).updateCurrentTab(
-                      widget.tab.copyWith(config: widget.tab.config.copyWith(method: val)),
+                      tab.copyWith(config: tab.config.copyWith(method: val)),
                     );
                   }
                 },
@@ -205,33 +219,33 @@ class _RequestViewState extends ConsumerState<RequestView> {
               ),
               onChanged: (val) {
                  ref.read(tabsProvider.notifier).updateCurrentTab(
-                  widget.tab.copyWith(config: widget.tab.config.copyWith(url: val)),
+                  tab.copyWith(config: tab.config.copyWith(url: val)),
                 );
               },
             ),
           ),
           const SizedBox(width: 12),
           ElevatedButton(
-            onPressed: widget.tab.isSending ? null : () => ref.read(tabsProvider.notifier).sendRequest(),
+            onPressed: tab.isSending ? null : () => ref.read(tabsProvider.notifier).sendRequest(),
             style: ElevatedButton.styleFrom(
                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             ),
-            child: widget.tab.isSending 
+            child: tab.isSending 
               ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 3, color: theme.colorScheme.onPrimary)) 
               : const Text('SEND'),
           ),
           const SizedBox(width: 12),
           IconButton(
-            icon: Icon(widget.tab.collectionNodeId != null ? Icons.save : Icons.save_as, color: theme.colorScheme.secondary, size: 28),
-            tooltip: widget.tab.collectionNodeId != null ? 'Update Request' : 'Save to Collection',
-            onPressed: _handleSave,
+            icon: Icon(tab.collectionNodeId != null ? Icons.save : Icons.save_as, color: theme.colorScheme.secondary, size: 28),
+            tooltip: tab.collectionNodeId != null ? 'Update Request' : 'Save to Collection',
+            onPressed: () => _handleSave(tab),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildRequestConfig(BuildContext context) {
+  Widget _buildRequestConfig(BuildContext context, HttpRequestTabModel tab) {
     final theme = Theme.of(context);
     return DefaultTabController(
       length: 3,
@@ -263,18 +277,18 @@ class _RequestViewState extends ConsumerState<RequestView> {
               child: TabBarView(
                 children: [
                   _KeyValueEditor(
-                    items: widget.tab.config.params,
+                    items: tab.config.params,
                     onChanged: (map) {
                       ref.read(tabsProvider.notifier).updateCurrentTab(
-                        widget.tab.copyWith(config: widget.tab.config.copyWith(params: map)),
+                        tab.copyWith(config: tab.config.copyWith(params: map)),
                       );
                     },
                   ),
                   _KeyValueEditor(
-                    items: widget.tab.config.headers,
+                    items: tab.config.headers,
                     onChanged: (map) {
                       ref.read(tabsProvider.notifier).updateCurrentTab(
-                        widget.tab.copyWith(config: widget.tab.config.copyWith(headers: map)),
+                        tab.copyWith(config: tab.config.copyWith(headers: map)),
                       );
                     },
                   ),
@@ -321,9 +335,9 @@ class _RequestViewState extends ConsumerState<RequestView> {
     );
   }
 
-  Widget _buildResponseSection(BuildContext context) {
+  Widget _buildResponseSection(BuildContext context, HttpRequestTabModel tab) {
     final theme = Theme.of(context);
-    if (widget.tab.statusCode == null && !widget.tab.isSending) {
+    if (tab.statusCode == null && !tab.isSending) {
        return Center(child: Column(
          mainAxisAlignment: MainAxisAlignment.center,
          children: [
@@ -341,10 +355,10 @@ class _RequestViewState extends ConsumerState<RequestView> {
           padding: const EdgeInsets.only(bottom: 12.0),
           child: Row(
             children: [
-              if (widget.tab.statusCode != null)
-                _ResponseMetadataItem(label: 'STATUS', value: widget.tab.statusCode.toString(), color: _getStatusColor(widget.tab.statusCode!)),
-              if (widget.tab.durationMs != null)
-                 _ResponseMetadataItem(label: 'TIME', value: '${widget.tab.durationMs} ms', color: theme.colorScheme.secondary),
+              if (tab.statusCode != null)
+                _ResponseMetadataItem(label: 'STATUS', value: tab.statusCode.toString(), color: _getStatusColor(tab.statusCode!)),
+              if (tab.durationMs != null)
+                 _ResponseMetadataItem(label: 'TIME', value: '${tab.durationMs} ms', color: theme.colorScheme.secondary),
             ],
           ),
         ),
@@ -375,8 +389,8 @@ class _RequestViewState extends ConsumerState<RequestView> {
                     decoration: NeoBrutalistTheme.brutalBox(context, offset: 0),
                     child: TabBarView(
                       children: [
-                        _buildResponseBody(context),
-                        _buildResponseHeaders(context),
+                        _buildResponseBody(context, tab),
+                        _buildResponseHeaders(context, tab),
                       ],
                     ),
                   ),
@@ -389,13 +403,17 @@ class _RequestViewState extends ConsumerState<RequestView> {
     );
   }
 
-  Widget _buildResponseBody(BuildContext context) {
+  Widget _buildResponseBody(BuildContext context, HttpRequestTabModel tab) {
     final theme = Theme.of(context);
-    if (widget.tab.responseBody == null) return const SizedBox();
+    if (tab.responseBody == null) return const SizedBox();
 
-    return CompositedTransformTarget(
-      link: _layerLink,
-      child: Container(
+    // Sync response controller if body changed
+    final prettified = _getPrettifiedBody(tab.responseBody);
+    if (_responseController?.text != prettified) {
+       _responseController?.text = prettified;
+    }
+
+    return Container(
         width: double.infinity,
         color: theme.colorScheme.surface,
         child: CodeEditor(
@@ -425,15 +443,14 @@ class _RequestViewState extends ConsumerState<RequestView> {
             );
           },
         ),
-      ),
-    );
+      );
   }
 
-  Widget _buildResponseHeaders(BuildContext context) {
+  Widget _buildResponseHeaders(BuildContext context, HttpRequestTabModel tab) {
     final theme = Theme.of(context);
-    if (widget.tab.responseHeaders == null) return const SizedBox();
+    if (tab.responseHeaders == null) return const SizedBox();
     return ListView(
-      children: widget.tab.responseHeaders!.entries.map((e) => ListTile(
+      children: tab.responseHeaders!.entries.map((e) => ListTile(
         dense: true,
         title: Text(e.key.toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: theme.primaryColor)),
         subtitle: Text(e.value, style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurface)),
@@ -447,7 +464,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
     return Colors.orangeAccent;
   }
 
-  void _showSaveDialog() {
+  void _showSaveDialog(HttpRequestTabModel tab) {
     final controller = TextEditingController(text: 'NEW REQUEST');
     showDialog(
       context: context,
@@ -458,9 +475,9 @@ class _RequestViewState extends ConsumerState<RequestView> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
           TextButton(
             onPressed: () {
-              final id = ref.read(collectionsProvider.notifier).saveRequest(controller.text, widget.tab.config.copyWith());
+              final id = ref.read(collectionsProvider.notifier).saveRequest(controller.text, tab.config.copyWith());
               ref.read(tabsProvider.notifier).updateCurrentTab(
-                widget.tab.copyWith(collectionNodeId: id, collectionName: controller.text),
+                tab.copyWith(collectionNodeId: id, collectionName: controller.text),
               );
               Navigator.pop(context);
             },
@@ -510,20 +527,71 @@ class _KeyValueEditor extends StatefulWidget {
 }
 
 class _KeyValueEditorState extends State<_KeyValueEditor> {
-  late List<MapEntry<String, String>> _list;
+  late List<TextEditingController> _keyControllers;
+  late List<TextEditingController> _valControllers;
 
   @override
   void initState() {
     super.initState();
-    _list = widget.items.entries.toList();
-    _list.add(const MapEntry('', ''));
+    _initControllers();
+  }
+
+  void _initControllers() {
+    _keyControllers = [];
+    _valControllers = [];
+    
+    for (var entry in widget.items.entries) {
+      _keyControllers.add(TextEditingController(text: entry.key));
+      _valControllers.add(TextEditingController(text: entry.value));
+    }
+    // Add one empty row
+    _keyControllers.add(TextEditingController());
+    _valControllers.add(TextEditingController());
+  }
+
+  @override
+  void didUpdateWidget(_KeyValueEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Only re-init if the map entries actually changed from outside
+    if (!_isSame(oldWidget.items, widget.items)) {
+       // To avoid losing focus while typing, we should be careful here.
+       // But usually, changes come from user typing which we already handle.
+       // If changes come from outside (e.g. loading a request), we re-init.
+       _disposeControllers();
+       _initControllers();
+    }
+  }
+
+  bool _isSame(Map<String, String> a, Map<String, String> b) {
+    if (a.length != b.length) return false;
+    for (var key in a.keys) {
+      if (a[key] != b[key]) return false;
+    }
+    return true;
+  }
+
+  void _disposeControllers() {
+    for (var c in _keyControllers) {
+      c.dispose();
+    }
+    for (var c in _valControllers) {
+      c.dispose();
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposeControllers();
+    super.dispose();
   }
 
   void _update() {
     final Map<String, String> map = {};
-    for (var entry in _list) {
-      if (entry.key.isNotEmpty) {
-        map[entry.key] = entry.value;
+    for (int i = 0; i < _keyControllers.length; i++) {
+      final key = _keyControllers[i].text;
+      final val = _valControllers[i].text;
+      if (key.isNotEmpty) {
+        map[key] = val;
       }
     }
     widget.onChanged(map);
@@ -533,7 +601,7 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
   Widget build(BuildContext context) {
     return ListView.builder(
       padding: const EdgeInsets.all(12),
-      itemCount: _list.length,
+      itemCount: _keyControllers.length,
       itemBuilder: (context, index) {
         return Padding(
           padding: const EdgeInsets.only(bottom: 12.0),
@@ -543,14 +611,15 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
                 child: TextField(
                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                   decoration: const InputDecoration(hintText: 'KEY', isDense: true, contentPadding: EdgeInsets.all(12)),
-                  controller: TextEditingController(text: _list[index].key)..selection = TextSelection.fromPosition(TextPosition(offset: _list[index].key.length)),
+                  controller: _keyControllers[index],
                   onChanged: (val) {
-                    _list[index] = MapEntry(val, _list[index].value);
-                    if (index == _list.length - 1 && val.isNotEmpty) {
-                      _list.add(const MapEntry('', ''));
+                    if (index == _keyControllers.length - 1 && val.isNotEmpty) {
+                      setState(() {
+                        _keyControllers.add(TextEditingController());
+                        _valControllers.add(TextEditingController());
+                      });
                     }
                     _update();
-                    setState(() {});
                   },
                 ),
               ),
@@ -559,11 +628,9 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
                 child: TextField(
                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                   decoration: const InputDecoration(hintText: 'VALUE', isDense: true, contentPadding: EdgeInsets.all(12)),
-                  controller: TextEditingController(text: _list[index].value)..selection = TextSelection.fromPosition(TextPosition(offset: _list[index].value.length)),
+                  controller: _valControllers[index],
                   onChanged: (val) {
-                    _list[index] = MapEntry(_list[index].key, val);
                      _update();
-                     setState(() {});
                   },
                 ),
               ),
@@ -572,8 +639,14 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
                 icon: const Icon(Icons.delete_outline, size: 24, color: Colors.red),
                 onPressed: () {
                   setState(() {
-                    _list.removeAt(index);
-                    if (_list.isEmpty) _list.add(const MapEntry('', ''));
+                    _keyControllers[index].dispose();
+                    _valControllers[index].dispose();
+                    _keyControllers.removeAt(index);
+                    _valControllers.removeAt(index);
+                    if (_keyControllers.isEmpty) {
+                      _keyControllers.add(TextEditingController());
+                      _valControllers.add(TextEditingController());
+                    }
                     _update();
                   });
                 },

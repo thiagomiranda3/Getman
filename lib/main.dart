@@ -45,7 +45,8 @@ class MainScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tabsState = ref.watch(tabsProvider);
+    final activeIndex = ref.watch(tabsProvider.select((s) => s.activeIndex));
+    final tabIds = ref.watch(tabsProvider.select((s) => s.tabs.map((t) => t.tabId).toList()));
     final tabsNotifier = ref.read(tabsProvider.notifier);
 
     return Scaffold(
@@ -55,11 +56,11 @@ class MainScreen extends ConsumerWidget {
           Expanded(
             child: Column(
               children: [
-                _buildTabBar(context, tabsState, tabsNotifier, ref),
+                _buildTabBar(context, activeIndex, tabIds, tabsNotifier, ref),
                 Expanded(
                   child: IndexedStack(
-                    index: tabsState.activeIndex,
-                    children: tabsState.tabs.map((tab) => RequestView(key: ValueKey('view_${tab.tabId}'), tab: tab)).toList(),
+                    index: activeIndex,
+                    children: tabIds.map((id) => RequestView(key: ValueKey('view_$id'), tabId: id)).toList(),
                   ),
                 ),
               ],
@@ -105,7 +106,7 @@ class MainScreen extends ConsumerWidget {
     }
   }
 
-  Widget _buildTabBar(BuildContext context, TabsState state, TabsNotifier notifier, WidgetRef ref) {
+  Widget _buildTabBar(BuildContext context, int activeIndex, List<String> tabIds, TabsNotifier notifier, WidgetRef ref) {
     final theme = Theme.of(context);
     return Container(
       height: 60,
@@ -118,7 +119,7 @@ class MainScreen extends ConsumerWidget {
           Expanded(
             child: ReorderableListView.builder(
               scrollDirection: Axis.horizontal,
-              itemCount: state.tabs.length,
+              itemCount: tabIds.length,
               buildDefaultDragHandles: false,
               onReorder: (oldIndex, newIndex) => notifier.reorderTabs(oldIndex, newIndex),
               proxyDecorator: (child, index, animation) => Material(
@@ -126,59 +127,67 @@ class MainScreen extends ConsumerWidget {
                 child: child,
               ),
               itemBuilder: (context, index) {
-                final tab = state.tabs[index];
-                final isActive = state.activeIndex == index;
-                final isDirty = _isTabDirty(tab, ref);
-                final title = tab.collectionName ?? (tab.config.url.isEmpty ? 'NEW REQUEST' : tab.config.url);
-                final displayTitle = (title.length > 25 ? '${title.substring(0, 25)}...' : title).toUpperCase();
+                final tabId = tabIds[index];
+                // We need the tab data for the title and dirty state
+                // Since this is inside a builder, we can't use ref.watch easily for every tab
+                // but we can use a Consumer here if we want to be super efficient.
+                return Consumer(
+                  key: ValueKey('tab_$tabId'),
+                  builder: (context, ref, _) {
+                    final tab = ref.watch(tabsProvider.select((s) => s.tabs.firstWhere((t) => t.tabId == tabId)));
+                    final isActive = activeIndex == index;
+                    final isDirty = _isTabDirty(tab, ref);
+                    final title = tab.collectionName ?? (tab.config.url.isEmpty ? 'NEW REQUEST' : tab.config.url);
+                    final displayTitle = (title.length > 25 ? '${title.substring(0, 25)}...' : title).toUpperCase();
 
-                return ReorderableDragStartListener(
-                  key: ValueKey('tab_${tab.tabId}'),
-                  index: index,
-                  child: Listener(
-                    onPointerDown: (event) {
-                      if (event.buttons == kMiddleMouseButton) {
-                        _confirmClose(context, index, ref);
-                      }
-                    },
-                    child: GestureDetector(
-                      onTap: () => notifier.setActiveIndex(index),
-                      child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: isActive ? theme.primaryColor : Colors.transparent,
-                        border: Border(
-                          right: BorderSide(color: theme.dividerColor, width: 3),
-                          bottom: isActive ? BorderSide.none : BorderSide(color: theme.dividerColor, width: 3),
+                    return ReorderableDragStartListener(
+                      index: index,
+                      child: Listener(
+                        onPointerDown: (event) {
+                          if (event.buttons == kMiddleMouseButton) {
+                            _confirmClose(context, index, ref);
+                          }
+                        },
+                        child: GestureDetector(
+                          onTap: () => notifier.setActiveIndex(index),
+                          child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: isActive ? theme.primaryColor : Colors.transparent,
+                            border: Border(
+                              right: BorderSide(color: theme.dividerColor, width: 3),
+                              bottom: isActive ? BorderSide.none : BorderSide(color: theme.dividerColor, width: 3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Text(
+                                displayTitle,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: theme.colorScheme.onSurface,
+                                  fontWeight: isDirty ? FontWeight.w900 : (isActive ? FontWeight.w900 : FontWeight.w500),
+                                ),
+                              ),
+                              if (isDirty) 
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 6),
+                                  child: Text('*', style: TextStyle(color: theme.colorScheme.secondary, fontSize: 16, fontWeight: FontWeight.w900)),
+                                ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: Icon(Icons.close, size: 16, color: theme.dividerColor),
+                                onPressed: () => _confirmClose(context, index, ref),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          Text(
-                            displayTitle,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: theme.colorScheme.onSurface,
-                              fontWeight: isDirty ? FontWeight.w900 : (isActive ? FontWeight.w900 : FontWeight.w500),
-                            ),
-                          ),
-                          if (isDirty) 
-                            Padding(
-                              padding: const EdgeInsets.only(left: 6),
-                              child: Text('*', style: TextStyle(color: theme.colorScheme.secondary, fontSize: 16, fontWeight: FontWeight.w900)),
-                            ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: Icon(Icons.close, size: 16, color: theme.dividerColor),
-                            onPressed: () => _confirmClose(context, index, ref),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                        ],
-                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               );
             },
           ),

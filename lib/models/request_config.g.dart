@@ -18,11 +18,11 @@ class HttpRequestConfigAdapter extends TypeAdapter<HttpRequestConfig> {
     };
     return HttpRequestConfig(
       id: fields[0] as String?,
-      method: fields[1] as String,
-      url: fields[2] as String,
+      method: fields[1] == null ? 'GET' : fields[1] as String,
+      url: fields[2] == null ? '' : fields[2] as String,
       headers: (fields[3] as Map?)?.cast<String, String>(),
       params: (fields[4] as Map?)?.cast<String, String>(),
-      body: fields[5] as String,
+      body: fields[5] == null ? '' : fields[5] as String,
       auth: (fields[6] as Map?)?.cast<String, String>(),
       responseBody: fields[7] as String?,
       responseHeaders: (fields[8] as Map?)?.cast<String, String>(),

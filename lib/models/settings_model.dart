@@ -4,13 +4,13 @@ part 'settings_model.g.dart';
 
 @HiveType(typeId: 0)
 class SettingsModel extends HiveObject {
-  @HiveField(0)
+  @HiveField(0, defaultValue: 100)
   int historyLimit;
 
-  @HiveField(1)
+  @HiveField(1, defaultValue: false)
   bool saveResponseInHistory;
 
-  @HiveField(2)
+  @HiveField(2, defaultValue: false)
   bool isDarkMode;
 
   SettingsModel({

@@ -17,9 +17,9 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return SettingsModel(
-      historyLimit: fields[0] as int,
-      saveResponseInHistory: fields[1] as bool,
-      isDarkMode: fields[2] as bool,
+      historyLimit: fields[0] == null ? 100 : fields[0] as int,
+      saveResponseInHistory: fields[1] == null ? false : fields[1] as bool,
+      isDarkMode: fields[2] == null ? false : fields[2] as bool,
     );
   }
 
