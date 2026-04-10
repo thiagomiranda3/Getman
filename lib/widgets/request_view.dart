@@ -2,6 +2,7 @@ import 'dart:convert' as convert;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:collection/collection.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:re_highlight/styles/arduino-light.dart';
 import 'package:re_highlight/languages/json.dart';
@@ -36,18 +37,25 @@ class _RequestViewState extends ConsumerState<RequestView> {
   void initState() {
     super.initState();
     final tab = _getTab();
-    _urlController = TextEditingController(text: tab.config.url);
-    _bodyController = CodeLineEditingController.fromText(tab.config.body);
-    _responseController = CodeLineEditingController.fromText(_getPrettifiedBody(tab.responseBody));
-    _bodyController!.addListener(_onBodyChanged);
+    if (tab != null) {
+      _urlController = TextEditingController(text: tab.config.url);
+      _bodyController = CodeLineEditingController.fromText(tab.config.body);
+      _responseController = CodeLineEditingController.fromText(_getPrettifiedBody(tab.responseBody));
+      _bodyController!.addListener(_onBodyChanged);
+    } else {
+      _urlController = TextEditingController();
+      _bodyController = CodeLineEditingController();
+      _responseController = CodeLineEditingController();
+    }
   }
 
-  HttpRequestTabModel _getTab() {
-    return ref.read(tabsProvider).tabs.firstWhere((t) => t.tabId == widget.tabId);
+  HttpRequestTabModel? _getTab() {
+    return ref.read(tabsProvider).tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
   }
 
   void _onBodyChanged() {
      final tab = _getTab();
+     if (tab == null) return;
      final newText = _bodyController!.text;
      if (tab.config.body == newText) return;
      
@@ -74,9 +82,11 @@ class _RequestViewState extends ConsumerState<RequestView> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.tabId != widget.tabId) {
        final tab = _getTab();
-       _urlController.text = tab.config.url;
-       _bodyController?.text = tab.config.body;
-       _responseController?.text = _getPrettifiedBody(tab.responseBody);
+       if (tab != null) {
+        _urlController.text = tab.config.url;
+        _bodyController?.text = tab.config.body;
+        _responseController?.text = _getPrettifiedBody(tab.responseBody);
+       }
     }
   }
 
@@ -94,7 +104,9 @@ class _RequestViewState extends ConsumerState<RequestView> {
 
   @override
   Widget build(BuildContext context) {
-    final tab = ref.watch(tabsProvider.select((s) => s.tabs.firstWhere((t) => t.tabId == widget.tabId)));
+    final tab = ref.watch(tabsProvider.select((s) => s.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId)));
+    if (tab == null) return const SizedBox.shrink();
+    
     final settings = ref.watch(settingsProvider);
     final layout = LayoutConstants(settings.isCompactMode);
     

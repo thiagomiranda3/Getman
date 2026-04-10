@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/gestures.dart';
 import 'dart:convert';
+import 'package:collection/collection.dart';
 import 'services/storage_service.dart';
 import 'widgets/side_menu.dart';
 import 'widgets/request_view.dart';
@@ -154,7 +155,9 @@ class MainScreen extends ConsumerWidget {
                 return Consumer(
                   key: ValueKey('tab_$tabId'),
                   builder: (context, ref, _) {
-                    final tab = ref.watch(tabsProvider.select((s) => s.tabs.firstWhere((t) => t.tabId == tabId)));
+                    final tab = ref.watch(tabsProvider.select((s) => s.tabs.firstWhereOrNull((t) => t.tabId == tabId)));
+                    if (tab == null) return const SizedBox.shrink();
+                    
                     // Watch collections to rebuild when saved
                     ref.watch(collectionsProvider);
                     

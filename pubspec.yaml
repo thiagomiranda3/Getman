@@ -12,6 +12,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   dio: ^5.8.0+1
   flutter_riverpod: ^2.6.1
+  collection: ^1.18.0
   re_editor: ^0.8.0
   re_highlight: ^0.0.3
   google_fonts: ^6.2.1
