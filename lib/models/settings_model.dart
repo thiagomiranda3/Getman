@@ -16,11 +16,15 @@ class SettingsModel extends HiveObject {
   @HiveField(3, defaultValue: false)
   bool isCompactMode;
 
+  @HiveField(4, defaultValue: false)
+  bool isVerticalLayout;
+
   SettingsModel({
     this.historyLimit = 100,
     this.saveResponseInHistory = false,
     this.isDarkMode = false,
     this.isCompactMode = false,
+    this.isVerticalLayout = false,
   });
 
   SettingsModel copyWith({
@@ -28,12 +32,14 @@ class SettingsModel extends HiveObject {
     bool? saveResponseInHistory,
     bool? isDarkMode,
     bool? isCompactMode,
+    bool? isVerticalLayout,
   }) {
     return SettingsModel(
       historyLimit: historyLimit ?? this.historyLimit,
       saveResponseInHistory: saveResponseInHistory ?? this.saveResponseInHistory,
       isDarkMode: isDarkMode ?? this.isDarkMode,
       isCompactMode: isCompactMode ?? this.isCompactMode,
+      isVerticalLayout: isVerticalLayout ?? this.isVerticalLayout,
     );
   }
 
@@ -42,6 +48,7 @@ class SettingsModel extends HiveObject {
     'saveResponseInHistory': saveResponseInHistory,
     'isDarkMode': isDarkMode,
     'isCompactMode': isCompactMode,
+    'isVerticalLayout': isVerticalLayout,
   };
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) => SettingsModel(
@@ -49,5 +56,6 @@ class SettingsModel extends HiveObject {
     saveResponseInHistory: json['saveResponseInHistory'] ?? false,
     isDarkMode: json['isDarkMode'] ?? false,
     isCompactMode: json['isCompactMode'] ?? false,
+    isVerticalLayout: json['isVerticalLayout'] ?? false,
   );
 }

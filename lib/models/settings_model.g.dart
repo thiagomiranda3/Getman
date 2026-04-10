@@ -21,13 +21,14 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       saveResponseInHistory: fields[1] == null ? false : fields[1] as bool,
       isDarkMode: fields[2] == null ? false : fields[2] as bool,
       isCompactMode: fields[3] == null ? false : fields[3] as bool,
+      isVerticalLayout: fields[4] == null ? false : fields[4] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, SettingsModel obj) {
     writer
-      ..writeByte(4)
+      ..writeByte(5)
       ..writeByte(0)
       ..write(obj.historyLimit)
       ..writeByte(1)
@@ -35,7 +36,9 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       ..writeByte(2)
       ..write(obj.isDarkMode)
       ..writeByte(3)
-      ..write(obj.isCompactMode);
+      ..write(obj.isCompactMode)
+      ..writeByte(4)
+      ..write(obj.isVerticalLayout);
   }
 
   @override

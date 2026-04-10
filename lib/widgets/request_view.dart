@@ -10,6 +10,7 @@ import '../providers/tabs_provider.dart';
 import '../providers/collections_provider.dart';
 import '../providers/settings_provider.dart';
 import '../models/request_tab.dart';
+import '../models/settings_model.dart';
 import '../utils/neo_brutalist_theme.dart';
 import '../utils/layout_constants.dart';
 
@@ -114,14 +115,21 @@ class _RequestViewState extends ConsumerState<RequestView> {
         padding: EdgeInsets.all(layout.pagePadding),
         child: Column(
           children: [
-            _buildUrlBar(context, tab, layout),
+            _buildUrlBar(context, tab, layout, settings),
             SizedBox(height: layout.sectionSpacing),
             Expanded(
-              child: Row(
+              child: Flex(
+                direction: settings.isVerticalLayout ? Axis.vertical : Axis.horizontal,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(child: _buildRequestConfig(context, tab, layout)),
-                  VerticalDivider(width: layout.verticalDividerWidth, thickness: 3, color: theme.dividerColor),
+                  if (settings.isVerticalLayout)
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: layout.isCompact ? 8 : 12),
+                      child: Divider(height: 3, thickness: 3, color: theme.dividerColor),
+                    )
+                  else
+                    VerticalDivider(width: layout.verticalDividerWidth, thickness: 3, color: theme.dividerColor),
                   Expanded(child: _buildResponseSection(context, tab, layout)),
                 ],
               ),
@@ -157,7 +165,7 @@ class _RequestViewState extends ConsumerState<RequestView> {
     }
   }
 
-  Widget _buildUrlBar(BuildContext context, HttpRequestTabModel tab, LayoutConstants layout) {
+  Widget _buildUrlBar(BuildContext context, HttpRequestTabModel tab, LayoutConstants layout, SettingsModel settings) {
     final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(6),
@@ -260,6 +268,16 @@ class _RequestViewState extends ConsumerState<RequestView> {
             icon: Icon(tab.collectionNodeId != null ? Icons.save : Icons.save_as, color: theme.colorScheme.secondary, size: layout.isCompact ? 24 : 28),
             tooltip: tab.collectionNodeId != null ? 'Update Request' : 'Save to Collection',
             onPressed: () => _handleSave(tab),
+          ),
+          SizedBox(width: layout.isCompact ? 4 : 8),
+          IconButton(
+            icon: Icon(
+              settings.isVerticalLayout ? Icons.view_column_rounded : Icons.view_agenda_rounded, 
+              color: theme.colorScheme.onSurface, 
+              size: layout.isCompact ? 24 : 28
+            ),
+            tooltip: settings.isVerticalLayout ? 'Horizontal Layout' : 'Vertical Layout',
+            onPressed: () => ref.read(settingsProvider.notifier).updateVerticalLayout(!settings.isVerticalLayout),
           ),
         ],
       ),

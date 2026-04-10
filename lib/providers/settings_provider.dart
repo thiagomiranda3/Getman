@@ -25,6 +25,10 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
   void updateCompactMode(bool isCompact) {
     _save(state.copyWith(isCompactMode: isCompact));
   }
+
+  void updateVerticalLayout(bool isVertical) {
+    _save(state.copyWith(isVerticalLayout: isVertical));
+  }
 }
 
 final settingsProvider = StateNotifierProvider<SettingsNotifier, SettingsModel>((ref) {
