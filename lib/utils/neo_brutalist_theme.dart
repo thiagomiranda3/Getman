@@ -8,13 +8,17 @@ class NeoBrutalistTheme {
   static const Color textLight = Color(0xFF000000); // Black
   static const Color borderLight = Color(0xFF000000); // Black
 
-  static const Color backgroundDark = Color(0xFF121212); // Deep Black
-  static const Color surfaceDark = Color(0xFF1E1E1E); // Dark Gray
-  static const Color textDark = Color(0xFFFFFFFF); // White
-  static const Color borderDark = Color(0xFFFFFFFF); // White
+  static const Color backgroundDark = Color(0xFF1A1A1A); // Softer Black
+  static const Color surfaceDark = Color(0xFF242424); // Dark Gray
+  static const Color textDark = Color(0xFFE0E0E0); // Off-White
+  static const Color borderDark = Color(0xFF404040); // Muted Border
 
   static const Color primary = Color(0xFFFDE047); // Vibrant Yellow
+  static const Color primaryDark = Color(0xFFD4B92E); // Muted Yellow for Dark mode
+  
   static const Color secondary = Color(0xFF7C3AED); // Violet
+  static const Color secondaryDark = Color(0xFF6330BD); // Muted Violet for Dark mode
+  
   static const Color lightGray = Color(0xFFE5E7EB);
 
   static Color getMethodColor(String method) {
@@ -37,30 +41,32 @@ class NeoBrutalistTheme {
     final Color surface = isDark ? surfaceDark : surfaceLight;
     final Color text = isDark ? textDark : textLight;
     final Color border = isDark ? borderDark : borderLight;
+    final Color currentPrimary = isDark ? primaryDark : primary;
+    final Color currentSecondary = isDark ? secondaryDark : secondary;
     
     final baseTextTheme = GoogleFonts.lexendTextTheme();
     
     return ThemeData(
       useMaterial3: true, 
       brightness: brightness,
-      primaryColor: primary,
+      primaryColor: currentPrimary,
       scaffoldBackgroundColor: background,
       canvasColor: surface,
       dividerColor: border,
-      hoverColor: primary.withValues(alpha: 0.1),
-      splashColor: primary.withValues(alpha: 0.2),
+      hoverColor: currentPrimary.withValues(alpha: 0.1),
+      splashColor: currentPrimary.withValues(alpha: 0.2),
       colorScheme: isDark 
-        ? const ColorScheme.dark(
-            primary: primary,
-            secondary: secondary,
+        ? ColorScheme.dark(
+            primary: currentPrimary,
+            secondary: currentSecondary,
             surface: surfaceDark,
             onPrimary: textLight,
             onSecondary: Colors.white,
             onSurface: textDark,
           )
-        : const ColorScheme.light(
-            primary: primary,
-            secondary: secondary,
+        : ColorScheme.light(
+            primary: currentPrimary,
+            secondary: currentSecondary,
             surface: surfaceLight,
             onPrimary: textLight,
             onSecondary: Colors.white,
@@ -87,7 +93,7 @@ class NeoBrutalistTheme {
         unselectedLabelColor: text.withValues(alpha: 0.7),
         indicatorSize: TabBarIndicatorSize.tab,
         indicator: BoxDecoration(
-          color: primary,
+          color: currentPrimary,
           border: Border(
             top: BorderSide(color: border, width: 3),
             left: BorderSide(color: border, width: 3),
@@ -98,7 +104,7 @@ class NeoBrutalistTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: primary,
+          backgroundColor: currentPrimary,
           foregroundColor: textLight,
           elevation: 0,
           shape: RoundedRectangleBorder(
@@ -126,7 +132,7 @@ class NeoBrutalistTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: secondary,
+          foregroundColor: currentSecondary,
           textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
         ),
       ),
@@ -142,7 +148,7 @@ class NeoBrutalistTheme {
           borderRadius: BorderRadius.circular(4),
         ),
         focusedBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: secondary, width: 3),
+          borderSide: BorderSide(color: currentSecondary, width: 3),
           borderRadius: BorderRadius.circular(4),
         ),
         labelStyle: TextStyle(color: text, fontWeight: FontWeight.bold),
@@ -167,7 +173,7 @@ class NeoBrutalistTheme {
         contentTextStyle: TextStyle(color: text, fontSize: 14),
       ),
       listTileTheme: ListTileThemeData(
-        selectedTileColor: primary,
+        selectedTileColor: currentPrimary,
         selectedColor: textLight,
         titleTextStyle: TextStyle(fontWeight: FontWeight.bold, color: text),
         subtitleTextStyle: TextStyle(color: text.withValues(alpha: 0.7)),
