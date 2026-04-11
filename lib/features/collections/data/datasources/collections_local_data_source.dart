@@ -9,15 +9,22 @@ abstract class CollectionsLocalDataSource {
 class CollectionsLocalDataSourceImpl implements CollectionsLocalDataSource {
   static const String collectionsBoxName = 'collections';
 
+  Future<Box<CollectionNode>> _getBox() async {
+    if (Hive.isBoxOpen(collectionsBoxName)) {
+      return Hive.box<CollectionNode>(collectionsBoxName);
+    }
+    return await Hive.openBox<CollectionNode>(collectionsBoxName);
+  }
+
   @override
   Future<List<CollectionNode>> getCollections() async {
-    final box = Hive.box<CollectionNode>(collectionsBoxName);
+    final box = await _getBox();
     return box.values.toList();
   }
 
   @override
   Future<void> saveCollections(List<CollectionNode> collections) async {
-    final box = Hive.box<CollectionNode>(collectionsBoxName);
+    final box = await _getBox();
     await box.clear();
     await box.addAll(collections);
   }

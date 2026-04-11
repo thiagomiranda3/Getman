@@ -11,22 +11,29 @@ abstract class HistoryLocalDataSource {
 class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
   static const String historyBoxName = 'history';
 
+  Future<Box<HttpRequestConfig>> _getBox() async {
+    if (Hive.isBoxOpen(historyBoxName)) {
+      return Hive.box<HttpRequestConfig>(historyBoxName);
+    }
+    return await Hive.openBox<HttpRequestConfig>(historyBoxName);
+  }
+
   @override
   Future<List<HttpRequestConfig>> getHistory() async {
-    final box = Hive.box<HttpRequestConfig>(historyBoxName);
+    final box = await _getBox();
     return box.values.toList();
   }
 
   @override
   Future<void> saveHistory(List<HttpRequestConfig> history) async {
-    final box = Hive.box<HttpRequestConfig>(historyBoxName);
+    final box = await _getBox();
     await box.clear();
     await box.addAll(history);
   }
 
   @override
   Future<void> addToHistory(HttpRequestConfig config, int limit) async {
-    final box = Hive.box<HttpRequestConfig>(historyBoxName);
+    final box = await _getBox();
     final history = box.values.toList();
     
     // Remove if already exists (bring to top)
@@ -50,7 +57,7 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
 
   @override
   Future<void> clearHistory() async {
-    final box = Hive.box<HttpRequestConfig>(historyBoxName);
+    final box = await _getBox();
     await box.clear();
   }
 }

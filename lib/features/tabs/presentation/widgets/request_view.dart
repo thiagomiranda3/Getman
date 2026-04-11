@@ -83,6 +83,9 @@ class _RequestViewState extends State<RequestView> {
         
         return BlocBuilder<TabsBloc, TabsState>(
           builder: (context, tabsState) {
+            if (tabsState.isLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
             final tab = tabsState.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
             if (tab == null) return const SizedBox.shrink();
             

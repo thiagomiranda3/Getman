@@ -44,9 +44,11 @@ Future<SettingsEntity> init() async {
   Hive.registerAdapter(CollectionNodeAdapter());
 
   final settingsBox = await Hive.openBox<SettingsModel>('settings');
-  await Hive.openBox<HttpRequestConfig>('history');
-  await Hive.openBox<HttpRequestTabModel>('tabs');
-  await Hive.openBox<CollectionNode>('collections');
+  // Opening these asynchronously without awaiting them here, 
+  // they will be ensured by the data sources.
+  Hive.openBox<HttpRequestConfig>('history');
+  Hive.openBox<HttpRequestTabModel>('tabs');
+  Hive.openBox<CollectionNode>('collections');
 
   final initialSettings = settingsBox.get('current')?.toEntity() ?? const SettingsEntity();
 

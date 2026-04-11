@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
@@ -13,6 +14,8 @@ import '../../../history/presentation/bloc/history_bloc.dart';
 import '../../../history/presentation/bloc/history_event.dart';
 import 'tabs_event.dart';
 import 'tabs_state.dart';
+
+String _jsonEncode(dynamic data) => json.encode(data);
 
 class TabsBloc extends Bloc<TabsEvent, TabsState> {
   final TabsRepository repository;
@@ -60,6 +63,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   }
 
   Future<void> _onLoadTabs(LoadTabs event, Emitter<TabsState> emit) async {
+    emit(state.copyWith(isLoading: true));
     final tabs = await repository.getTabs();
     if (tabs.isEmpty) {
       emit(state.copyWith(
@@ -68,9 +72,10 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
           config: const HttpRequestConfigEntity(id: 'initial', url: ''),
         )],
         activeIndex: 0,
+        isLoading: false,
       ));
     } else {
-      emit(state.copyWith(tabs: tabs, activeIndex: 0));
+      emit(state.copyWith(tabs: tabs, activeIndex: 0, isLoading: false));
     }
   }
 
@@ -225,7 +230,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         responseBody = response.data;
       } else {
         try {
-          responseBody = json.encode(response.data);
+          responseBody = await compute(_jsonEncode, response.data);
         } catch (_) {
           responseBody = response.data.toString();
         }
@@ -280,12 +285,11 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
              errorBody = e.response!.data;
            } else {
              try {
-               errorBody = json.encode(e.response!.data);
+               errorBody = await compute(_jsonEncode, e.response!.data);
              } catch (_) {
                errorBody = e.response!.data.toString();
              }
-           }
-        } else {
+           }        } else {
           errorBody = e.message ?? e.toString();
         }
         statusCode = e.response?.statusCode;

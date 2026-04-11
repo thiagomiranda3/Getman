@@ -140,7 +140,9 @@ class _MainScreenState extends State<MainScreen> {
                                   child: child,
                                 );
                               },
-                              child: tabs.isEmpty
+                              child: tabsState.isLoading 
+                                ? const Center(key: ValueKey('loading'), child: CircularProgressIndicator())
+                                : tabs.isEmpty
                                   ? Center(
                                       key: const ValueKey('empty'),
                                       child: Column(

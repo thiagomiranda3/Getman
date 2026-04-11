@@ -9,15 +9,22 @@ abstract class TabsLocalDataSource {
 class TabsLocalDataSourceImpl implements TabsLocalDataSource {
   static const String tabsBoxName = 'tabs';
 
+  Future<Box<HttpRequestTabModel>> _getBox() async {
+    if (Hive.isBoxOpen(tabsBoxName)) {
+      return Hive.box<HttpRequestTabModel>(tabsBoxName);
+    }
+    return await Hive.openBox<HttpRequestTabModel>(tabsBoxName);
+  }
+
   @override
   Future<List<HttpRequestTabModel>> getTabs() async {
-    final box = Hive.box<HttpRequestTabModel>(tabsBoxName);
+    final box = await _getBox();
     return box.values.toList();
   }
 
   @override
   Future<void> saveTabs(List<HttpRequestTabModel> tabs) async {
-    final box = Hive.box<HttpRequestTabModel>(tabsBoxName);
+    final box = await _getBox();
     await box.clear();
     await box.addAll(tabs);
   }
