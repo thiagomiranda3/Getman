@@ -417,6 +417,7 @@ class _RequestConfigSection extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TabBar(
+            dividerColor: Colors.transparent,
             isScrollable: true,
             indicator: BoxDecoration(
               color: theme.primaryColor,
@@ -575,6 +576,7 @@ class _ResponseSection extends ConsumerWidget {
             child: Column(
               children: [
                 TabBar(
+                  dividerColor: Colors.transparent,
                   indicator: BoxDecoration(
                     color: theme.primaryColor,
                     border: Border(

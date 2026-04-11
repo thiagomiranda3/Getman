@@ -306,6 +306,7 @@ class NeoBrutalistTheme {
         shape: Border(bottom: BorderSide(color: border, width: 3)),
       ),
       tabBarTheme: TabBarThemeData(
+        dividerColor: Colors.transparent,
         labelColor: text,
         unselectedLabelColor: text.withValues(alpha: 0.7),
         indicatorSize: TabBarIndicatorSize.tab,
