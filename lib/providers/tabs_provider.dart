@@ -139,6 +139,53 @@ class TabsNotifier extends StateNotifier<TabsState> {
     _scheduleSave();
   }
 
+  void closeOtherTabs(int index) {
+    if (state.tabs.length <= 1) return;
+    final tabToKeep = state.tabs[index];
+    state = state.copyWith(
+      tabs: [tabToKeep],
+      activeIndex: 0,
+    );
+    _scheduleSave();
+  }
+
+  void closeTabsToTheRight(int index) {
+    if (index >= state.tabs.length - 1) return;
+    final newTabs = state.tabs.sublist(0, index + 1);
+    int newActiveIndex = state.activeIndex;
+    if (newActiveIndex > index) {
+      newActiveIndex = index;
+    }
+    state = state.copyWith(
+      tabs: newTabs,
+      activeIndex: newActiveIndex,
+    );
+    _scheduleSave();
+  }
+
+  void duplicateTab(int index) {
+    final tabToDuplicate = state.tabs[index];
+    final duplicatedTab = HttpRequestTabModel(
+      config: tabToDuplicate.config.copyWith(),
+      collectionNodeId: tabToDuplicate.collectionNodeId,
+      collectionName: tabToDuplicate.collectionName,
+    );
+    
+    final newTabs = [...state.tabs];
+    newTabs.insert(index + 1, duplicatedTab);
+    
+    int newActiveIndex = state.activeIndex;
+    if (newActiveIndex >= index + 1) {
+      newActiveIndex += 1;
+    }
+    
+    state = state.copyWith(
+      tabs: newTabs,
+      activeIndex: index + 1, // Focus the new tab
+    );
+    _scheduleSave();
+  }
+
   void cancelRequest(int index) {
     final tab = state.tabs[index];
     final token = _cancelTokens[tab.tabId];

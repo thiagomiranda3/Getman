@@ -186,6 +186,7 @@ class _TabWidget extends ConsumerStatefulWidget {
 class _TabWidgetState extends ConsumerState<_TabWidget> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
+  Offset? _tapPosition;
 
   @override
   void initState() {
@@ -202,6 +203,66 @@ class _TabWidgetState extends ConsumerState<_TabWidget> with SingleTickerProvide
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  void _showContextMenu(BuildContext context) {
+    if (_tapPosition == null) return;
+
+    final theme = Theme.of(context);
+    final tabsNotifier = ref.read(tabsProvider.notifier);
+    final tab = ref.read(tabsProvider).tabs[widget.index];
+
+    showMenu(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        _tapPosition!.dx,
+        _tapPosition!.dy,
+        _tapPosition!.dx + 1,
+        _tapPosition!.dy + 1,
+      ),
+      color: theme.scaffoldBackgroundColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(4),
+        side: BorderSide(color: theme.dividerColor, width: 3),
+      ),
+      elevation: 0,
+      items: <PopupMenuEntry>[
+        PopupMenuItem(
+          onTap: () => widget.onClose(),
+          child: _buildMenuItem(Icons.close, 'CLOSE'),
+        ),
+        PopupMenuItem(
+          onTap: () => tabsNotifier.closeOtherTabs(widget.index),
+          child: _buildMenuItem(Icons.tab_unselected, 'CLOSE OTHERS'),
+        ),
+        PopupMenuItem(
+          onTap: () => tabsNotifier.closeTabsToTheRight(widget.index),
+          child: _buildMenuItem(Icons.keyboard_double_arrow_right, 'CLOSE TO THE RIGHT'),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          onTap: () => tabsNotifier.duplicateTab(widget.index),
+          child: _buildMenuItem(Icons.copy, 'DUPLICATE'),
+        ),
+        PopupMenuItem(
+          onTap: () {
+            Clipboard.setData(ClipboardData(text: tab.config.url));
+          },
+          child: _buildMenuItem(Icons.link, 'COPY URL'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMenuItem(IconData icon, String text) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: theme.colorScheme.onSurface),
+        const SizedBox(width: 12),
+        Text(text, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+      ],
+    );
   }
 
   @override
@@ -233,6 +294,10 @@ class _TabWidgetState extends ConsumerState<_TabWidget> with SingleTickerProvide
             },
             child: GestureDetector(
               onTap: widget.onTap,
+              onSecondaryTapDown: (details) {
+                _tapPosition = details.globalPosition;
+              },
+              onSecondaryTap: () => _showContextMenu(context),
               child: Container(
                 height: layout.tabBarHeight,
                 constraints: BoxConstraints(
