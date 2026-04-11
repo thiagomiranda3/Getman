@@ -92,58 +92,66 @@ class _RequestViewState extends ConsumerState<RequestView> {
     
     final settings = ref.watch(settingsProvider);
     final layout = Theme.of(context).extension<LayoutExtension>()!;
-    
+    final activeIndex = ref.watch(tabsProvider.select((s) => s.activeIndex));
+    final tabs = ref.watch(tabsProvider.select((s) => s.tabs));
+    final isActive = tabs.asMap().entries.any((e) => e.key == activeIndex && e.value.tabId == widget.tabId);
+
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyS, control: true): () => _handleSave(),
         const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () => _handleSave(),
       },
-      child: Padding(
-        padding: EdgeInsets.all(layout.pagePadding),
-        child: Column(
-          children: [
-            _UrlBar(tabId: widget.tabId, onSave: _handleSave),
-            SizedBox(height: layout.sectionSpacing),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final totalSize = settings.isVerticalLayout ? constraints.maxHeight : constraints.maxWidth;
-                  final currentRatio = _localSplitRatio ?? settings.splitRatio;
-                  
-                  return Flex(
-                    direction: settings.isVerticalLayout ? Axis.vertical : Axis.horizontal,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Flexible(
-                        flex: (currentRatio * 1000).toInt(),
-                        child: _RequestConfigSection(tabId: widget.tabId, bodyController: _bodyController!),
-                      ),
-                      _Splitter(
-                        isVertical: settings.isVerticalLayout,
-                        totalSize: totalSize,
-                        onUpdate: (delta) {
-                          setState(() {
-                            _localSplitRatio = (_localSplitRatio ?? settings.splitRatio) + (delta / totalSize);
-                            if (_localSplitRatio! < 0.1) _localSplitRatio = 0.1;
-                            if (_localSplitRatio! > 0.9) _localSplitRatio = 0.9;
-                          });
-                        },
-                        onEnd: () {
-                          if (_localSplitRatio != null) {
-                            ref.read(settingsProvider.notifier).updateSplitRatio(_localSplitRatio!);
-                          }
-                        },
-                      ),
-                      Flexible(
-                        flex: ((1 - currentRatio) * 1000).toInt(),
-                        child: _ResponseSection(tabId: widget.tabId, responseController: _responseController!),
-                      ),
-                    ],
-                  );
-                }
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 300),
+        opacity: isActive ? 1.0 : 0.0,
+        curve: Curves.easeInOut,
+        child: Padding(
+          padding: EdgeInsets.all(layout.pagePadding),
+          child: Column(
+            children: [
+              _UrlBar(tabId: widget.tabId, onSave: _handleSave),
+              SizedBox(height: layout.sectionSpacing),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final totalSize = settings.isVerticalLayout ? constraints.maxHeight : constraints.maxWidth;
+                    final currentRatio = _localSplitRatio ?? settings.splitRatio;
+                    
+                    return Flex(
+                      direction: settings.isVerticalLayout ? Axis.vertical : Axis.horizontal,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Flexible(
+                          flex: (currentRatio * 1000).toInt(),
+                          child: _RequestConfigSection(tabId: widget.tabId, bodyController: _bodyController!),
+                        ),
+                        _Splitter(
+                          isVertical: settings.isVerticalLayout,
+                          totalSize: totalSize,
+                          onUpdate: (delta) {
+                            setState(() {
+                              _localSplitRatio = (_localSplitRatio ?? settings.splitRatio) + (delta / totalSize);
+                              if (_localSplitRatio! < 0.1) _localSplitRatio = 0.1;
+                              if (_localSplitRatio! > 0.9) _localSplitRatio = 0.9;
+                            });
+                          },
+                          onEnd: () {
+                            if (_localSplitRatio != null) {
+                              ref.read(settingsProvider.notifier).updateSplitRatio(_localSplitRatio!);
+                            }
+                          },
+                        ),
+                        Flexible(
+                          flex: ((1 - currentRatio) * 1000).toInt(),
+                          child: _ResponseSection(tabId: widget.tabId, responseController: _responseController!),
+                        ),
+                      ],
+                    );
+                  }
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -317,52 +325,58 @@ class _UrlBarState extends ConsumerState<_UrlBar> {
             ),
           ),
           SizedBox(width: layout.isCompact ? 8 : 12),
-          ElevatedButton(
-            onPressed: tab.isSending 
-              ? () {
-                  final index = ref.read(tabsProvider).tabs.indexWhere((t) => t.tabId == tab.tabId);
-                  if (index != -1) ref.read(tabsProvider.notifier).cancelRequest(index);
-                }
-              : () => ref.read(tabsProvider.notifier).sendRequest(),
-            style: ElevatedButton.styleFrom(
-               backgroundColor: tab.isSending ? Colors.red : null,
-               foregroundColor: tab.isSending ? Colors.white : null,
-               padding: EdgeInsets.symmetric(
-                 horizontal: layout.buttonPaddingHorizontal, 
-                 vertical: layout.buttonPaddingVertical
-               ),
-            ),
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: FadeTransition(opacity: animation, child: child)),
-              child: tab.isSending 
-                ? Row(
-                    key: const ValueKey('cancel'),
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
-                      const SizedBox(width: 8),
-                      Text('CANCEL', style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w900)),
-                    ],
-                  )
-                : Text('SEND', key: const ValueKey('send'), style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w900)),
+          BrutalBounce(
+            child: ElevatedButton(
+              onPressed: tab.isSending 
+                ? () {
+                    final index = ref.read(tabsProvider).tabs.indexWhere((t) => t.tabId == tab.tabId);
+                    if (index != -1) ref.read(tabsProvider.notifier).cancelRequest(index);
+                  }
+                : () => ref.read(tabsProvider.notifier).sendRequest(),
+              style: ElevatedButton.styleFrom(
+                 backgroundColor: tab.isSending ? Colors.red : null,
+                 foregroundColor: tab.isSending ? Colors.white : null,
+                 padding: EdgeInsets.symmetric(
+                   horizontal: layout.buttonPaddingHorizontal, 
+                   vertical: layout.buttonPaddingVertical
+                 ),
+              ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: FadeTransition(opacity: animation, child: child)),
+                child: tab.isSending 
+                  ? Row(
+                      key: const ValueKey('cancel'),
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                        const SizedBox(width: 8),
+                        Text('CANCEL', style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w900)),
+                      ],
+                    )
+                  : Text('SEND', key: const ValueKey('send'), style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w900)),
+              ),
             ),
           ),
           SizedBox(width: layout.isCompact ? 8 : 12),
-          IconButton(
-            icon: Icon(tab.collectionNodeId != null ? Icons.save : Icons.save_as, color: theme.colorScheme.secondary, size: layout.isCompact ? 24 : 28),
-            tooltip: tab.collectionNodeId != null ? 'Update Request' : 'Save to Collection',
-            onPressed: widget.onSave,
+          BrutalBounce(
+            child: IconButton(
+              icon: Icon(tab.collectionNodeId != null ? Icons.save : Icons.save_as, color: theme.colorScheme.secondary, size: layout.isCompact ? 24 : 28),
+              tooltip: tab.collectionNodeId != null ? 'Update Request' : 'Save to Collection',
+              onPressed: widget.onSave,
+            ),
           ),
           SizedBox(width: layout.isCompact ? 4 : 8),
-          IconButton(
-            icon: Icon(
-              settings.isVerticalLayout ? Icons.view_column_rounded : Icons.view_agenda_rounded, 
-              color: theme.colorScheme.onSurface, 
-              size: layout.isCompact ? 24 : 28
+          BrutalBounce(
+            child: IconButton(
+              icon: Icon(
+                settings.isVerticalLayout ? Icons.view_column_rounded : Icons.view_agenda_rounded, 
+                color: theme.colorScheme.onSurface, 
+                size: layout.isCompact ? 24 : 28
+              ),
+              tooltip: settings.isVerticalLayout ? 'Horizontal Layout' : 'Vertical Layout',
+              onPressed: () => ref.read(settingsProvider.notifier).updateVerticalLayout(!settings.isVerticalLayout),
             ),
-            tooltip: settings.isVerticalLayout ? 'Horizontal Layout' : 'Vertical Layout',
-            onPressed: () => ref.read(settingsProvider.notifier).updateVerticalLayout(!settings.isVerticalLayout),
           ),
         ],
       ),
@@ -661,40 +675,33 @@ class _ResponseBodyViewState extends ConsumerState<_ResponseBodyView> {
     return Container(
         width: double.infinity,
         color: theme.colorScheme.surface,
-        child: TweenAnimationBuilder<double>(
-          key: ValueKey(widget.responseController.text),
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeIn,
-          tween: Tween(begin: 0.0, end: 1.0),
-          builder: (context, opacity, child) => Opacity(opacity: opacity, child: child!),
-          child: CodeEditor(
-            controller: widget.responseController,
-            readOnly: true,
-            wordWrap: true,
-            findBuilder: (context, controller, readOnly) => _CodeFindPanel(controller: controller, readOnly: readOnly),
-            style: CodeEditorStyle(
-            fontSize: 13,
-            fontFamily: GoogleFonts.jetBrainsMono().fontFamily,
-            backgroundColor: Colors.transparent,
-            cursorColor: theme.primaryColor,
-            selectionColor: theme.primaryColor.withValues(alpha: 0.3),
-            cursorLineColor: theme.primaryColor.withValues(alpha: 0.2),
-            codeTheme: CodeHighlightTheme(
-              languages: {
-                'json': CodeHighlightThemeMode(
-                  mode: langJson,
-                ),
-              },
-              theme: arduinoLightTheme,
-            ),
+        child: CodeEditor(
+          controller: widget.responseController,
+          readOnly: true,
+          wordWrap: true,
+          findBuilder: (context, controller, readOnly) => _CodeFindPanel(controller: controller, readOnly: readOnly),
+          style: CodeEditorStyle(
+          fontSize: 13,
+          fontFamily: GoogleFonts.jetBrainsMono().fontFamily,
+          backgroundColor: Colors.transparent,
+          cursorColor: theme.primaryColor,
+          selectionColor: theme.primaryColor.withValues(alpha: 0.3),
+          cursorLineColor: theme.primaryColor.withValues(alpha: 0.2),
+          codeTheme: CodeHighlightTheme(
+            languages: {
+              'json': CodeHighlightThemeMode(
+                mode: langJson,
+              ),
+            },
+            theme: arduinoLightTheme,
           ),
-          indicatorBuilder: (context, controller, chunkController, notifier) {
-            return DefaultCodeLineNumber(
-              controller: controller,
-              notifier: notifier,
-            );
-          },
         ),
+        indicatorBuilder: (context, controller, chunkController, notifier) {
+          return DefaultCodeLineNumber(
+            controller: controller,
+            notifier: notifier,
+          );
+        },
       ),
     );
   }

@@ -81,6 +81,12 @@ class MainScreen extends ConsumerWidget {
   void _confirmClose(BuildContext context, int index, WidgetRef ref) {
     final tab = ref.read(tabsProvider).tabs[index];
     final isDirty = ref.read(isTabDirtyProvider(tab.tabId));
+    
+    // We'll use a local function to handle actual state removal
+    void performRemove() {
+      ref.read(tabsProvider.notifier).removeTab(index);
+    }
+
     if (isDirty) {
       showDialog(
         context: context,
@@ -91,8 +97,8 @@ class MainScreen extends ConsumerWidget {
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
             TextButton(
               onPressed: () {
-                ref.read(tabsProvider.notifier).removeTab(index);
                 Navigator.pop(context);
+                performRemove();
               },
               child: const Text('CLOSE ANYWAY', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
             ),
@@ -100,7 +106,7 @@ class MainScreen extends ConsumerWidget {
         ),
       );
     } else {
-      ref.read(tabsProvider.notifier).removeTab(index);
+      performRemove();
     }
   }
 
@@ -143,9 +149,11 @@ class MainScreen extends ConsumerWidget {
             decoration: BoxDecoration(
               border: Border(left: BorderSide(color: theme.dividerColor, width: 3)),
             ),
-            child: IconButton(
-              icon: Icon(Icons.add, size: layout.addIconSize, color: theme.colorScheme.onSurface),
-              onPressed: () => notifier.addTab(),
+            child: BrutalBounce(
+              child: IconButton(
+                icon: Icon(Icons.add, size: layout.addIconSize, color: theme.colorScheme.onSurface),
+                onPressed: () => notifier.addTab(),
+              ),
             ),
           ),
         ],
@@ -154,7 +162,7 @@ class MainScreen extends ConsumerWidget {
   }
 }
 
-class _TabWidget extends ConsumerWidget {
+class _TabWidget extends ConsumerStatefulWidget {
   final String tabId;
   final int index;
   final bool isActive;
@@ -171,69 +179,116 @@ class _TabWidget extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_TabWidget> createState() => _TabWidgetState();
+}
+
+class _TabWidgetState extends ConsumerState<_TabWidget> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = Theme.of(context).extension<LayoutExtension>()!;
-    final tab = ref.watch(tabsProvider.select((s) => s.tabs.firstWhereOrNull((t) => t.tabId == tabId)));
+    final tab = ref.watch(tabsProvider.select((s) => s.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId)));
     if (tab == null) return const SizedBox.shrink();
 
-    final isDirty = ref.watch(isTabDirtyProvider(tabId));
+    final isDirty = ref.watch(isTabDirtyProvider(widget.tabId));
     final title = tab.collectionName ?? (tab.config.url.isEmpty ? 'NEW REQUEST' : tab.config.url);
     final displayTitle = (title.length > layout.tabTitleMaxLength
         ? '${title.substring(0, layout.tabTitleMaxLength)}...' 
         : title).toUpperCase();
 
     return ReorderableDragStartListener(
-      index: index,
-      child: Listener(
-        onPointerDown: (event) {
-          if (event.buttons == kMiddleMouseButton) {
-            onClose();
-          }
-        },
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: layout.tabPaddingHorizontal),
-            decoration: BoxDecoration(
-              color: isActive ? theme.primaryColor : Colors.transparent,
-              border: Border(
-                right: BorderSide(color: theme.dividerColor, width: 3),
-                bottom: isActive ? BorderSide.none : BorderSide(color: theme.dividerColor, width: 3),
-              ),
-            ),
-            child: Row(
-              children: [
-                Text(
-                  displayTitle,
-                  style: TextStyle(
-                    fontSize: layout.tabFontSize,
-                    color: theme.colorScheme.onSurface,
-                    fontWeight: isDirty ? FontWeight.w900 : (isActive ? FontWeight.w900 : FontWeight.w500),
+      index: widget.index,
+      child: FadeTransition(
+        opacity: _animation,
+        child: SizeTransition(
+          sizeFactor: _animation,
+          axis: Axis.horizontal,
+          axisAlignment: -1.0,
+          child: Listener(
+            onPointerDown: (event) {
+              if (event.buttons == kMiddleMouseButton) {
+                _handleClose();
+              }
+            },
+            child: GestureDetector(
+              onTap: widget.onTap,
+              child: Container(
+                height: layout.tabBarHeight,
+                constraints: BoxConstraints(
+                  minWidth: layout.isCompact ? 80 : 120,
+                  maxWidth: layout.isCompact ? 150 : 250,
+                ),
+                padding: EdgeInsets.symmetric(horizontal: layout.tabPaddingHorizontal),
+                decoration: BoxDecoration(
+                  color: widget.isActive ? theme.primaryColor : Colors.transparent,
+                  border: Border(
+                    right: BorderSide(color: theme.dividerColor, width: 3),
+                    bottom: widget.isActive ? BorderSide.none : BorderSide(color: theme.dividerColor, width: 3),
                   ),
                 ),
-                if (isDirty)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 6),
-                    child: Text('*',
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        displayTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            color: theme.colorScheme.secondary,
-                            fontSize: layout.dirtyStarSize,
-                            fontWeight: FontWeight.w900)),
-                  ),
-                SizedBox(width: layout.tabSpacing),
-                IconButton(
-                  icon: Icon(Icons.close, size: layout.tabCloseIconSize, color: theme.dividerColor),
-                  onPressed: onClose,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
+                          fontSize: layout.tabFontSize,
+                          color: theme.colorScheme.onSurface,
+                          fontWeight: isDirty ? FontWeight.w900 : (widget.isActive ? FontWeight.w900 : FontWeight.w500),
+                        ),
+                      ),
+                    ),
+                    if (isDirty)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: Text('*',
+                            style: TextStyle(
+                                color: theme.colorScheme.secondary,
+                                fontSize: layout.dirtyStarSize,
+                                fontWeight: FontWeight.w900)),
+                      ),
+                    SizedBox(width: layout.tabSpacing),
+                    IconButton(
+                      icon: Icon(Icons.close, size: layout.tabCloseIconSize, color: theme.dividerColor),
+                      onPressed: _handleClose,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  void _handleClose() async {
+    await _controller.reverse();
+    widget.onClose();
   }
 }
 

@@ -77,15 +77,19 @@ class _SideMenuHeader extends ConsumerWidget {
           Text('GETMAN', style: TextStyle(fontWeight: FontWeight.w900, fontSize: layout.headerFontSize, color: theme.colorScheme.onSurface, letterSpacing: -1)),
           Row(
             children: [
-              IconButton(
-                icon: Icon(Icons.create_new_folder, color: theme.colorScheme.onSurface, size: layout.iconSize),
-                tooltip: 'NEW FOLDER',
-                onPressed: () => _showNewFolderDialog(context, ref),
+              BrutalBounce(
+                child: IconButton(
+                  icon: Icon(Icons.create_new_folder, color: theme.colorScheme.onSurface, size: layout.iconSize),
+                  tooltip: 'NEW FOLDER',
+                  onPressed: () => _showNewFolderDialog(context, ref),
+                ),
               ),
-              IconButton(
-                icon: Icon(Icons.settings, color: theme.colorScheme.onSurface, size: layout.iconSize),
-                tooltip: 'SETTINGS',
-                onPressed: () => _showSettingsDialog(context, ref),
+              BrutalBounce(
+                child: IconButton(
+                  icon: Icon(Icons.settings, color: theme.colorScheme.onSurface, size: layout.iconSize),
+                  tooltip: 'SETTINGS',
+                  onPressed: () => _showSettingsDialog(context, ref),
+                ),
               ),
             ],
           ),
