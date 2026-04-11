@@ -207,15 +207,26 @@ class _HistoryList extends ConsumerStatefulWidget {
 class _HistoryListState extends ConsumerState<_HistoryList> {
   final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
   late List<HttpRequestConfig> _items;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _items = List.from(ref.read(historyProvider));
+    _searchController.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final layout = theme.extension<LayoutExtension>()!;
+
     ref.listen<List<HttpRequestConfig>>(historyProvider, (prev, next) {
       if (next.length > _items.length) {
         // Items added to the top
@@ -244,14 +255,62 @@ class _HistoryListState extends ConsumerState<_HistoryList> {
       }
     });
 
-    if (_items.isEmpty) {
+    final query = _searchController.text.toLowerCase();
+    final filteredItems = query.isEmpty 
+      ? _items 
+      : _items.where((item) => 
+          item.url.toLowerCase().contains(query) || 
+          (item.statusCode?.toString().contains(query) ?? false) ||
+          item.method.toLowerCase().contains(query)
+        ).toList();
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'SEARCH HISTORY...',
+              hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+              prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: theme.dividerColor, width: 2)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              isDense: true,
+            ),
+            style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+          ),
+        ),
+        Expanded(
+          child: _buildList(query.isNotEmpty, filteredItems),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildList(bool isSearching, List<HttpRequestConfig> filteredItems) {
+    if (filteredItems.isEmpty) {
       return Center(
-        child: Text('NO HISTORY YET', style: TextStyle(
+        child: Text('NO RESULTS FOUND', style: TextStyle(
           fontSize: 12, 
           fontWeight: FontWeight.w900, 
           color: Theme.of(context).dividerColor.withValues(alpha: 0.5)
         )),
       );
+    }
+
+    if (isSearching) {
+       return ListView.builder(
+         itemCount: filteredItems.length,
+         itemBuilder: (context, index) {
+            return _HistoryItemWidget(
+              config: filteredItems[index], 
+              onTap: () {
+                ref.read(tabsProvider.notifier).addTab(config: filteredItems[index].copyWith());
+              },
+            );
+         },
+       );
     }
 
     return AnimatedList(
@@ -347,6 +406,7 @@ class _CollectionsList extends ConsumerStatefulWidget {
 
 class _CollectionsListState extends ConsumerState<_CollectionsList> {
   late final TreeController<CollectionNode> _treeController;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -356,32 +416,92 @@ class _CollectionsListState extends ConsumerState<_CollectionsList> {
       roots: collections,
       childrenProvider: (node) => node.children,
     );
+    _searchController.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _treeController.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  CollectionNode _cloneNode(CollectionNode node, {List<CollectionNode>? newChildren}) {
+    return CollectionNode(
+      id: node.id,
+      name: node.name,
+      isFolder: node.isFolder,
+      children: newChildren ?? node.children,
+      config: node.config,
+      isFavorite: node.isFavorite,
+    );
+  }
+
+  List<CollectionNode> _filterNodes(List<CollectionNode> nodes, String query) {
+    if (query.isEmpty) return nodes;
+    final lowerQuery = query.toLowerCase();
+    List<CollectionNode> result = [];
+    for (var node in nodes) {
+      final matchesSelf = node.name.toLowerCase().contains(lowerQuery) || (node.config?.url.toLowerCase().contains(lowerQuery) ?? false);
+      if (node.isFolder) {
+         final filteredChildren = _filterNodes(node.children, query);
+         if (matchesSelf || filteredChildren.isNotEmpty) {
+           result.add(_cloneNode(node, newChildren: filteredChildren));
+         }
+      } else if (matchesSelf) {
+         result.add(node);
+      }
+    }
+    return result;
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final layout = Theme.of(context).extension<LayoutExtension>()!;
     final collections = ref.watch(collectionsProvider);
-    _treeController.roots = collections;
+    final query = _searchController.text;
+    
+    final filteredRoots = _filterNodes(collections, query);
+    _treeController.roots = filteredRoots;
+    if (query.isNotEmpty) {
+       _treeController.expandAll();
+    }
 
-    return DragTarget<String>(
-      onAcceptWithDetails: (details) => ref.read(collectionsProvider.notifier).moveNode(details.data, null),
-      builder: (context, candidateData, rejectedData) {
-        return AnimatedTreeView<CollectionNode>(
-          treeController: _treeController,
-          nodeBuilder: (context, entry) {
-            return _CollectionNodeWidget(
-              entry: entry,
-              onToggle: () => _treeController.toggleExpansion(entry.node),
-            );
-          },
-        );
-      },
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'SEARCH COLLECTIONS...',
+              hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+              prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: theme.dividerColor, width: 2)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              isDense: true,
+            ),
+            style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+          ),
+        ),
+        Expanded(
+          child: DragTarget<String>(
+            onAcceptWithDetails: (details) => ref.read(collectionsProvider.notifier).moveNode(details.data, null),
+            builder: (context, candidateData, rejectedData) {
+              return AnimatedTreeView<CollectionNode>(
+                treeController: _treeController,
+                nodeBuilder: (context, entry) {
+                  return _CollectionNodeWidget(
+                    entry: entry,
+                    onToggle: () => _treeController.toggleExpansion(entry.node),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
