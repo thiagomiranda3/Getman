@@ -6,6 +6,7 @@ import 'package:re_editor/re_editor.dart';
 import 'package:re_highlight/styles/arduino-light.dart';
 import 'package:re_highlight/languages/json.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shimmer/shimmer.dart';
 import '../providers/tabs_provider.dart';
 import '../providers/collections_provider.dart';
 import '../providers/settings_provider.dart';
@@ -317,16 +318,35 @@ class _UrlBarState extends ConsumerState<_UrlBar> {
           ),
           SizedBox(width: layout.isCompact ? 8 : 12),
           ElevatedButton(
-            onPressed: tab.isSending ? null : () => ref.read(tabsProvider.notifier).sendRequest(),
+            onPressed: tab.isSending 
+              ? () {
+                  final index = ref.read(tabsProvider).tabs.indexWhere((t) => t.tabId == tab.tabId);
+                  if (index != -1) ref.read(tabsProvider.notifier).cancelRequest(index);
+                }
+              : () => ref.read(tabsProvider.notifier).sendRequest(),
             style: ElevatedButton.styleFrom(
+               backgroundColor: tab.isSending ? Colors.red : null,
+               foregroundColor: tab.isSending ? Colors.white : null,
                padding: EdgeInsets.symmetric(
                  horizontal: layout.buttonPaddingHorizontal, 
                  vertical: layout.buttonPaddingVertical
                ),
             ),
-            child: tab.isSending 
-              ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 3, color: theme.colorScheme.onPrimary)) 
-              : Text('SEND', style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w900)),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: FadeTransition(opacity: animation, child: child)),
+              child: tab.isSending 
+                ? Row(
+                    key: const ValueKey('cancel'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                      const SizedBox(width: 8),
+                      Text('CANCEL', style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w900)),
+                    ],
+                  )
+                : Text('SEND', key: const ValueKey('send'), style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w900)),
+            ),
           ),
           SizedBox(width: layout.isCompact ? 8 : 12),
           IconButton(
@@ -499,6 +519,35 @@ class _ResponseSection extends ConsumerWidget {
     final theme = Theme.of(context);
     final layout = Theme.of(context).extension<LayoutExtension>()!;
 
+    if (tab.isSending) {
+       return Shimmer.fromColors(
+         baseColor: theme.dividerColor.withValues(alpha: 0.1),
+         highlightColor: theme.dividerColor.withValues(alpha: 0.3),
+         child: Column(
+           crossAxisAlignment: CrossAxisAlignment.start,
+           children: [
+             Row(
+               children: [
+                 Container(width: 100, height: 32, decoration: BoxDecoration(color: Colors.white, border: Border.all(color: theme.dividerColor, width: 2))),
+                 const SizedBox(width: 12),
+                 Container(width: 100, height: 32, decoration: BoxDecoration(color: Colors.white, border: Border.all(color: theme.dividerColor, width: 2))),
+               ],
+             ),
+             const SizedBox(height: 24),
+             Expanded(
+               child: ListView.builder(
+                 itemCount: 15,
+                 itemBuilder: (_, __) => Padding(
+                   padding: const EdgeInsets.symmetric(vertical: 6),
+                   child: Container(width: double.infinity, height: 20, color: Colors.white),
+                 ),
+               ),
+             ),
+           ],
+         ),
+       );
+    }
+
     if (tab.statusCode == null && !tab.isSending) {
        return Center(child: Column(
          mainAxisAlignment: MainAxisAlignment.center,
@@ -611,11 +660,17 @@ class _ResponseBodyViewState extends ConsumerState<_ResponseBodyView> {
     return Container(
         width: double.infinity,
         color: theme.colorScheme.surface,
-        child: CodeEditor(
-          controller: widget.responseController,
-          readOnly: true,
-          wordWrap: true,
-          style: CodeEditorStyle(
+        child: TweenAnimationBuilder<double>(
+          key: ValueKey(widget.responseController.text),
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeIn,
+          tween: Tween(begin: 0.0, end: 1.0),
+          builder: (context, opacity, child) => Opacity(opacity: opacity, child: child!),
+          child: CodeEditor(
+            controller: widget.responseController,
+            readOnly: true,
+            wordWrap: true,
+            style: CodeEditorStyle(
             fontSize: 13,
             fontFamily: GoogleFonts.jetBrainsMono().fontFamily,
             backgroundColor: Colors.transparent,
@@ -638,7 +693,8 @@ class _ResponseBodyViewState extends ConsumerState<_ResponseBodyView> {
             );
           },
         ),
-      );
+      ),
+    );
   }
 }
 
@@ -680,14 +736,24 @@ class _ResponseMetadataItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      margin: EdgeInsets.only(right: layout.isCompact ? 8 : 12),
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: layout.isCompact ? 4 : 8),
-      decoration: BoxDecoration(
-        color: color?.withValues(alpha: 0.2) ?? theme.primaryColor.withValues(alpha: 0.2),
-        border: Border.all(color: theme.dividerColor, width: 2),
-        borderRadius: BorderRadius.circular(4),
-      ),
+    final baseColor = color ?? theme.primaryColor;
+    
+    return TweenAnimationBuilder<Color?>(
+      key: ValueKey(value),
+      duration: const Duration(milliseconds: 600),
+      tween: ColorTween(begin: baseColor.withValues(alpha: 1.0), end: baseColor.withValues(alpha: 0.2)),
+      builder: (context, animColor, child) {
+        return Container(
+          margin: EdgeInsets.only(right: layout.isCompact ? 8 : 12),
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: layout.isCompact ? 4 : 8),
+          decoration: BoxDecoration(
+            color: animColor,
+            border: Border.all(color: theme.dividerColor, width: 2),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: child,
+        );
+      },
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -783,66 +849,118 @@ class _KeyValueEditorState extends ConsumerState<_KeyValueEditor> {
     return ListView.builder(
       itemCount: _keyControllers.length,
       itemBuilder: (context, index) {
-        return Padding(
-          padding: EdgeInsets.only(bottom: layout.isCompact ? 8.0 : 12.0),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
-                  decoration: InputDecoration(
-                    hintText: 'KEY', 
-                    isDense: true, 
-                    contentPadding: EdgeInsets.all(layout.isCompact ? 8 : 12)
-                  ),
-                  controller: _keyControllers[index],
-                  onChanged: (val) {
-                    if (index == _keyControllers.length - 1 && val.isNotEmpty) {
-                      setState(() {
-                        _keyControllers.add(TextEditingController());
-                        _valControllers.add(TextEditingController());
-                      });
-                    }
-                    _update();
-                  },
-                ),
-              ),
-              SizedBox(width: layout.isCompact ? 8 : 12),
-              Expanded(
-                child: TextField(
-                  style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
-                  decoration: InputDecoration(
-                    hintText: 'VALUE', 
-                    isDense: true, 
-                    contentPadding: EdgeInsets.all(layout.isCompact ? 8 : 12)
-                  ),
-                  controller: _valControllers[index],
-                  onChanged: (val) {
-                     _update();
-                  },
-                ),
-              ),
-              SizedBox(width: layout.isCompact ? 4 : 8),
-              IconButton(
-                icon: Icon(Icons.delete_outline, size: layout.isCompact ? 20 : 24, color: Colors.red),
-                onPressed: () {
-                  setState(() {
-                    _keyControllers[index].dispose();
-                    _valControllers[index].dispose();
-                    _keyControllers.removeAt(index);
-                    _valControllers.removeAt(index);
-                    if (_keyControllers.isEmpty) {
-                      _keyControllers.add(TextEditingController());
-                      _valControllers.add(TextEditingController());
-                    }
-                    _update();
-                  });
-                },
-              ),
-            ],
-          ),
+        return _KeyValueRow(
+          key: ValueKey(index),
+          keyController: _keyControllers[index],
+          valController: _valControllers[index],
+          layout: layout,
+          isLast: index == _keyControllers.length - 1,
+          onKeyChanged: (val) {
+            if (index == _keyControllers.length - 1 && val.isNotEmpty) {
+               setState(() {
+                _keyControllers.add(TextEditingController());
+                _valControllers.add(TextEditingController());
+               });
+            }
+            _update();
+          },
+          onValChanged: (val) => _update(),
+          onDelete: () {
+            setState(() {
+               _keyControllers[index].dispose();
+               _valControllers[index].dispose();
+               _keyControllers.removeAt(index);
+               _valControllers.removeAt(index);
+               if (_keyControllers.isEmpty) {
+                 _keyControllers.add(TextEditingController());
+                 _valControllers.add(TextEditingController());
+               }
+               _update();
+            });
+          },
         );
       },
+    );
+  }
+}
+
+class _KeyValueRow extends StatefulWidget {
+  final TextEditingController keyController;
+  final TextEditingController valController;
+  final LayoutExtension layout;
+  final bool isLast;
+  final Function(String) onKeyChanged;
+  final Function(String) onValChanged;
+  final VoidCallback onDelete;
+
+  const _KeyValueRow({
+    super.key,
+    required this.keyController,
+    required this.valController,
+    required this.layout,
+    required this.isLast,
+    required this.onKeyChanged,
+    required this.onValChanged,
+    required this.onDelete,
+  });
+
+  @override
+  State<_KeyValueRow> createState() => _KeyValueRowState();
+}
+
+class _KeyValueRowState extends State<_KeyValueRow> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: EdgeInsets.only(bottom: widget.layout.isCompact ? 8.0 : 12.0),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        decoration: BoxDecoration(
+          color: _isHovered ? theme.hoverColor : Colors.transparent,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: _isHovered ? theme.dividerColor.withValues(alpha: 0.5) : Colors.transparent),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                style: TextStyle(fontSize: widget.layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                decoration: InputDecoration(
+                  hintText: 'KEY', 
+                  isDense: true, 
+                  contentPadding: EdgeInsets.all(widget.layout.isCompact ? 8 : 12)
+                ),
+                controller: widget.keyController,
+                onChanged: widget.onKeyChanged,
+              ),
+            ),
+            SizedBox(width: widget.layout.isCompact ? 8 : 12),
+            Expanded(
+              child: TextField(
+                style: TextStyle(fontSize: widget.layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                decoration: InputDecoration(
+                  hintText: 'VALUE', 
+                  isDense: true, 
+                  contentPadding: EdgeInsets.all(widget.layout.isCompact ? 8 : 12)
+                ),
+                controller: widget.valController,
+                onChanged: widget.onValChanged,
+              ),
+            ),
+            SizedBox(width: widget.layout.isCompact ? 4 : 8),
+            IconButton(
+              icon: Icon(Icons.delete_outline, size: widget.layout.isCompact ? 20 : 24, color: Colors.red),
+              onPressed: widget.onDelete,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

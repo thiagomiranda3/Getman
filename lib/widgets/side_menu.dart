@@ -6,6 +6,7 @@ import '../providers/collections_provider.dart';
 import '../providers/tabs_provider.dart';
 import '../providers/settings_provider.dart';
 import '../models/collection_node.dart';
+import '../models/request_config.dart';
 import '../utils/neo_brutalist_theme.dart';
 
 class SideMenu extends ConsumerWidget {
@@ -196,43 +197,137 @@ class _SideMenuHeader extends ConsumerWidget {
   }
 }
 
-class _HistoryList extends ConsumerWidget {
-  const _HistoryList();
+class _HistoryList extends ConsumerStatefulWidget {
+  const _HistoryList({super.key});
   
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final history = ref.watch(historyProvider);
-    final layout = Theme.of(context).extension<LayoutExtension>()!;
+  ConsumerState<_HistoryList> createState() => _HistoryListState();
+}
 
-    return ListView.builder(
-      itemCount: history.length,
-      itemBuilder: (context, index) {
-        final config = history[index];
-        return ListTile(
+class _HistoryListState extends ConsumerState<_HistoryList> {
+  final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
+  late List<HttpRequestConfig> _items;
+
+  @override
+  void initState() {
+    super.initState();
+    _items = List.from(ref.read(historyProvider));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<List<HttpRequestConfig>>(historyProvider, (prev, next) {
+      if (next.length > _items.length) {
+        // Items added to the top
+        final diff = next.length - _items.length;
+        for (int i = 0; i < diff; i++) {
+          _items.insert(i, next[i]);
+          _listKey.currentState?.insertItem(i, duration: const Duration(milliseconds: 400));
+        }
+      } else if (next.length < _items.length) {
+        // Items removed (likely clear history)
+        if (next.isEmpty) {
+          for (int i = _items.length - 1; i >= 0; i--) {
+            final removedItem = _items[i];
+            _listKey.currentState?.removeItem(
+              i, 
+              (context, animation) => _buildHistoryItem(removedItem, animation, isRemoved: true),
+              duration: const Duration(milliseconds: 300)
+            );
+          }
+          _items.clear();
+        } else {
+          // General removal (not common in history currently but for completeness)
+          _items = List.from(next);
+          setState(() {}); // Fallback rebuild
+        }
+      }
+    });
+
+    if (_items.isEmpty) {
+      return Center(
+        child: Text('NO HISTORY YET', style: TextStyle(
+          fontSize: 12, 
+          fontWeight: FontWeight.w900, 
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.5)
+        )),
+      );
+    }
+
+    return AnimatedList(
+      key: _listKey,
+      initialItemCount: _items.length,
+      itemBuilder: (context, index, animation) {
+        return _buildHistoryItem(_items[index], animation);
+      },
+    );
+  }
+
+  Widget _buildHistoryItem(HttpRequestConfig config, Animation<double> animation, {bool isRemoved = false}) {
+    return SizeTransition(
+      sizeFactor: animation,
+      child: FadeTransition(
+        opacity: animation,
+        child: _HistoryItemWidget(
+          config: config, 
+          onTap: isRemoved ? () {} : () {
+            ref.read(tabsProvider.notifier).addTab(config: config.copyWith());
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryItemWidget extends StatefulWidget {
+  final HttpRequestConfig config;
+  final VoidCallback onTap;
+  const _HistoryItemWidget({required this.config, required this.onTap});
+
+  @override
+  State<_HistoryItemWidget> createState() => _HistoryItemWidgetState();
+}
+
+class _HistoryItemWidgetState extends State<_HistoryItemWidget> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final layout = theme.extension<LayoutExtension>()!;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          color: _isHovered ? theme.hoverColor : Colors.transparent,
+          border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1), width: 1)),
+        ),
+        child: ListTile(
           dense: true,
-          title: Text(config.url.isEmpty ? '(NO URL)' : config.url, 
+          onTap: widget.onTap,
+          title: Text(widget.config.url.isEmpty ? '(NO URL)' : widget.config.url, 
             maxLines: 1, 
             overflow: TextOverflow.ellipsis,
             style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
           ),
           subtitle: Row(
             children: [
-              _MethodBadge(method: config.method, small: true),
-              if (config.statusCode != null) ...[
+              _MethodBadge(method: widget.config.method, small: true),
+              if (widget.config.statusCode != null) ...[
                 const SizedBox(width: 8),
-                Text(config.statusCode.toString(), style: TextStyle(
-                  color: _getStatusColor(config.statusCode!),
+                Text(widget.config.statusCode.toString(), style: TextStyle(
+                  color: _getStatusColor(widget.config.statusCode!),
                   fontWeight: FontWeight.w900,
                   fontSize: layout.fontSizeNormal,
                 )),
               ],
             ],
           ),
-          onTap: () {
-            ref.read(tabsProvider.notifier).addTab(config: config.copyWith());
-          },
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -291,46 +386,78 @@ class _CollectionsListState extends ConsumerState<_CollectionsList> {
   }
 }
 
-class _CollectionNodeWidget extends ConsumerWidget {
+class _CollectionNodeWidget extends ConsumerStatefulWidget {
   final TreeEntry<CollectionNode> entry;
   final VoidCallback onToggle;
 
   const _CollectionNodeWidget({
+    super.key,
     required this.entry,
     required this.onToggle,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CollectionNodeWidget> createState() => _CollectionNodeWidgetState();
+}
+
+class _CollectionNodeWidgetState extends ConsumerState<_CollectionNodeWidget> {
+  bool _isHovered = false;
+  bool _isDragOver = false;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = Theme.of(context).extension<LayoutExtension>()!;
-    final node = entry.node;
+    final layout = theme.extension<LayoutExtension>()!;
+    final node = widget.entry.node;
 
     Widget content;
     if (node.isFolder) {
       content = DragTarget<String>(
-        onWillAcceptWithDetails: (details) => details.data != node.id,
-        onAcceptWithDetails: (details) => ref.read(collectionsProvider.notifier).moveNode(details.data, node.id),
+        onWillAcceptWithDetails: (details) {
+          if (details.data == node.id) return false;
+          setState(() => _isDragOver = true);
+          return true;
+        },
+        onLeave: (_) => setState(() => _isDragOver = false),
+        onAcceptWithDetails: (details) {
+          setState(() => _isDragOver = false);
+          ref.read(collectionsProvider.notifier).moveNode(details.data, node.id);
+        },
         builder: (context, candidateData, rejectedData) {
           return InkWell(
-            onTap: onToggle,
-            child: TreeIndentation(
-              entry: entry,
-              child: Row(
-                children: [
-                  Icon(
-                    entry.isExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
-                    size: layout.smallIconSize,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+            onTap: widget.onToggle,
+            child: MouseRegion(
+              onEnter: (_) => setState(() => _isHovered = true),
+              onExit: (_) => setState(() => _isHovered = false),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                decoration: BoxDecoration(
+                  color: _isDragOver 
+                    ? theme.primaryColor.withValues(alpha: 0.3) 
+                    : (_isHovered ? theme.hoverColor : Colors.transparent),
+                  border: _isDragOver 
+                    ? Border.all(color: theme.primaryColor, width: 2) 
+                    : Border.all(color: Colors.transparent, width: 2),
+                ),
+                child: TreeIndentation(
+                  entry: widget.entry,
+                  child: Row(
+                    children: [
+                      Icon(
+                        widget.entry.isExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
+                        size: layout.smallIconSize,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                      Icon(node.isFavorite ? Icons.star : Icons.folder,
+                          size: layout.iconSize, color: node.isFavorite ? theme.primaryColor : theme.colorScheme.secondary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.w900)),
+                      ),
+                      _NodeContextMenu(node: node),
+                    ],
                   ),
-                  Icon(node.isFavorite ? Icons.star : Icons.folder,
-                      size: layout.iconSize, color: node.isFavorite ? theme.primaryColor : theme.colorScheme.secondary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.w900)),
-                  ),
-                  _NodeContextMenu(node: node),
-                ],
+                ),
               ),
             ),
           );
@@ -347,18 +474,28 @@ class _CollectionNodeWidget extends ConsumerWidget {
                 );
           }
         },
-        child: TreeIndentation(
-          entry: entry,
-          child: Row(
-            children: [
-              SizedBox(width: layout.smallIconSize), // Indent match for arrow
-              _MethodBadge(method: node.config?.method ?? 'GET', small: true),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold)),
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _isHovered = true),
+          onExit: (_) => setState(() => _isHovered = false),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            decoration: BoxDecoration(
+              color: _isHovered ? theme.hoverColor : Colors.transparent,
+            ),
+            child: TreeIndentation(
+              entry: widget.entry,
+              child: Row(
+                children: [
+                  SizedBox(width: layout.smallIconSize), // Indent match for arrow
+                  _MethodBadge(method: node.config?.method ?? 'GET', small: true),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold)),
+                  ),
+                  _NodeContextMenu(node: node),
+                ],
               ),
-              _NodeContextMenu(node: node),
-            ],
+            ),
           ),
         ),
       );

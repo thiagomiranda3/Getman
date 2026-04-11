@@ -30,6 +30,7 @@ class TabsState {
 class TabsNotifier extends StateNotifier<TabsState> {
   final Ref ref;
   Timer? _debounceTimer;
+  final Map<String, CancelToken> _cancelTokens = {};
 
   TabsNotifier(this.ref) : super(_loadInitialState());
 
@@ -138,9 +139,20 @@ class TabsNotifier extends StateNotifier<TabsState> {
     _scheduleSave();
   }
 
+  void cancelRequest(int index) {
+    final tab = state.tabs[index];
+    final token = _cancelTokens[tab.tabId];
+    if (token != null && !token.isCancelled) {
+      token.cancel('User cancelled request');
+    }
+  }
+
   Future<void> sendRequest() async {
     final activeTab = state.tabs[state.activeIndex];
     final config = activeTab.config;
+
+    final cancelToken = CancelToken();
+    _cancelTokens[activeTab.tabId] = cancelToken;
 
     updateCurrentTab(activeTab.copyWith(isSending: true));
 
@@ -155,6 +167,7 @@ class TabsNotifier extends StateNotifier<TabsState> {
           method: config.method,
           headers: config.headers,
         ),
+        cancelToken: cancelToken,
       );
 
       stopwatch.stop();
@@ -179,6 +192,7 @@ class TabsNotifier extends StateNotifier<TabsState> {
         responseHeaders: response.headers.map.map((k, v) => MapEntry(k, v.join(', '))),
       );
 
+      _cancelTokens.remove(activeTab.tabId);
       updateCurrentTab(updatedTab);
 
       // Save to History
@@ -196,6 +210,13 @@ class TabsNotifier extends StateNotifier<TabsState> {
       
       ref.read(historyProvider.notifier).addRequest(historyConfig);
     } catch (e) {
+      _cancelTokens.remove(activeTab.tabId);
+      
+      if (e is DioException && e.type == DioExceptionType.cancel) {
+        updateCurrentTab(activeTab.copyWith(isSending: false));
+        return;
+      }
+
       stopwatch.stop();
       String errorBody = e.toString();
       int? statusCode;
