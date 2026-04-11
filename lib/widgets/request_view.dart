@@ -3,7 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
 import 'package:re_editor/re_editor.dart';
-import 'package:re_highlight/styles/arduino-light.dart';
+import 'package:re_highlight/styles/atom-one-dark.dart';
+import 'package:re_highlight/styles/atom-one-light.dart';
 import 'package:re_highlight/languages/json.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
@@ -520,7 +521,7 @@ class _RequestConfigSection extends ConsumerWidget {
                 mode: langJson,
               ),
             },
-            theme: arduinoLightTheme,
+            theme: theme.brightness == Brightness.dark ? atomOneDarkTheme : atomOneLightTheme,
           ),
         ),
         indicatorBuilder: (context, controller, chunkController, notifier) {
@@ -706,7 +707,7 @@ class _ResponseBodyViewState extends ConsumerState<_ResponseBodyView> {
                 mode: langJson,
               ),
             },
-            theme: arduinoLightTheme,
+            theme: theme.brightness == Brightness.dark ? atomOneDarkTheme : atomOneLightTheme,
           ),
         ),
         indicatorBuilder: (context, controller, chunkController, notifier) {
