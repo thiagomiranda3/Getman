@@ -11,7 +11,6 @@ import 'features/collections/presentation/bloc/collections_bloc.dart';
 import 'features/collections/presentation/bloc/collections_event.dart';
 import 'features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'features/tabs/presentation/bloc/tabs_event.dart';
-import 'features/home/presentation/screens/main_screen.dart';
 import 'core/navigation/app_router.dart';
 
 void main() async {

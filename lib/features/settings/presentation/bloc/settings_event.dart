@@ -1,5 +1,4 @@
 import 'package:equatable/equatable.dart';
-import '../../domain/entities/settings_entity.dart';
 
 abstract class SettingsEvent extends Equatable {
   const SettingsEvent();

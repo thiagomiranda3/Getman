@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_fancy_tree_view/flutter_fancy_tree_view.dart';
-import 'package:collection/collection.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
-import 'package:getman/features/history/presentation/bloc/history_event.dart';
 import 'package:getman/features/history/presentation/bloc/history_state.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
@@ -537,7 +535,6 @@ class _CollectionNodeWidget extends StatefulWidget {
   final VoidCallback onToggle;
 
   const _CollectionNodeWidget({
-    super.key,
     required this.entry,
     required this.onToggle,
   });
