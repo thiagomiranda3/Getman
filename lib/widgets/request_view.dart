@@ -161,7 +161,14 @@ class _RequestViewState extends ConsumerState<RequestView> {
     final tab = _getTab();
     if (tab == null) return;
     final theme = Theme.of(context);
+    
+    // Validate if the node still exists in collections
+    bool exists = false;
     if (tab.collectionNodeId != null) {
+      exists = ref.read(collectionsProvider.notifier).nodeExists(tab.collectionNodeId!);
+    }
+
+    if (tab.collectionNodeId != null && exists) {
       ref.read(collectionsProvider.notifier).updateRequest(
         tab.collectionNodeId!,
         tab.config.copyWith(),
@@ -180,6 +187,12 @@ class _RequestViewState extends ConsumerState<RequestView> {
         ),
       );
     } else {
+      // If ID existed but node was deleted, clear the ID before showing dialog
+      if (tab.collectionNodeId != null && !exists) {
+        ref.read(tabsProvider.notifier).updateCurrentTab(
+          tab.copyWith(collectionNodeId: null, collectionName: null)
+        );
+      }
       _showSaveDialog(context, ref, tab);
     }
   }

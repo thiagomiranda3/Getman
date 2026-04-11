@@ -167,8 +167,8 @@ class TabsNotifier extends StateNotifier<TabsState> {
     final tabToDuplicate = state.tabs[index];
     final duplicatedTab = HttpRequestTabModel(
       config: tabToDuplicate.config.copyWith(),
-      collectionNodeId: tabToDuplicate.collectionNodeId,
-      collectionName: tabToDuplicate.collectionName,
+      collectionNodeId: null, // Clear link to collection
+      collectionName: null,   // Clear name so it's treated as a new request
     );
     
     final newTabs = [...state.tabs];
@@ -318,10 +318,15 @@ final tabsProvider = StateNotifierProvider<TabsNotifier, TabsState>((ref) {
 
 final isTabDirtyProvider = Provider.family<bool, String>((ref, tabId) {
   final tab = ref.watch(tabsProvider.select((s) => s.tabs.firstWhereOrNull((t) => t.tabId == tabId)));
-  if (tab == null || tab.collectionNodeId == null) return false;
+  if (tab == null) return false;
 
   final collections = ref.watch(collectionsProvider);
   
+  if (tab.collectionNodeId == null) {
+     // A tab is "dirty" if it's not saved AND has some non-default URL/config
+     return tab.config.url.isNotEmpty || tab.config.body.isNotEmpty || tab.config.params.isNotEmpty || tab.config.headers.isNotEmpty;
+  }
+
   HttpRequestConfig? savedConfig;
   bool find(List<CollectionNode> nodes) {
     for (var node in nodes) {
@@ -335,7 +340,11 @@ final isTabDirtyProvider = Provider.family<bool, String>((ref, tabId) {
   }
   find(collections);
 
-  if (savedConfig == null) return false;
+  if (savedConfig == null) {
+    // Orphaned tab (was saved but node was deleted)
+    // Treated as dirty because user probably wants to save it again.
+    return true; 
+  }
   
   // Efficient comparison using overridden == operator
   return tab.config != savedConfig;

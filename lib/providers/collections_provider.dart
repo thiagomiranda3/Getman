@@ -47,18 +47,46 @@ class CollectionsNotifier extends StateNotifier<List<CollectionNode>> {
       isFolder: false,
       config: config,
     );
+    
     if (parentId == null) {
       state = _loadAndSort([...state, newNode]);
     } else {
-      state = _loadAndSort(_addToParent(state, parentId, newNode));
+      final newState = _addToParent(state, parentId, newNode);
+      // Check if the node was actually added by comparing lengths or something similar
+      // but simpler is to just check if newState is different or explicitly verify parent existence
+      if (newState == state) {
+        // Parent not found, fallback to root
+        state = _loadAndSort([...state, newNode]);
+      } else {
+        state = _loadAndSort(newState);
+      }
     }
     StorageService.saveCollections(state);
     return newNode.id;
   }
 
+  bool nodeExists(String id) {
+    bool found = false;
+    void check(List<CollectionNode> nodes) {
+      for (var node in nodes) {
+        if (node.id == id) {
+          found = true;
+          return;
+        }
+        check(node.children);
+        if (found) return;
+      }
+    }
+    check(state);
+    return found;
+  }
+
   void updateRequest(String id, HttpRequestConfig config) {
-    state = _loadAndSort(_updateInTree(state, id, config));
-    StorageService.saveCollections(state);
+    final newState = _updateInTree(state, id, config);
+    if (newState != state) {
+      state = _loadAndSort(newState);
+      StorageService.saveCollections(state);
+    }
   }
 
   void deleteNode(String id) {
