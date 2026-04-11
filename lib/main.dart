@@ -129,7 +129,8 @@ class MainScreen extends ConsumerWidget {
               buildDefaultDragHandles: false,
               onReorder: (oldIndex, newIndex) => notifier.reorderTabs(oldIndex, newIndex),
               proxyDecorator: (child, index, animation) => Material(
-                color: Colors.transparent,
+                color: theme.scaffoldBackgroundColor,
+                elevation: 4,
                 child: child,
               ),
               itemBuilder: (context, index) {
@@ -240,7 +241,7 @@ class _TabWidgetState extends ConsumerState<_TabWidget> with SingleTickerProvide
                 ),
                 padding: EdgeInsets.symmetric(horizontal: layout.tabPaddingHorizontal),
                 decoration: BoxDecoration(
-                  color: widget.isActive ? theme.primaryColor : Colors.transparent,
+                  color: widget.isActive ? theme.primaryColor : theme.scaffoldBackgroundColor,
                   border: Border(
                     right: BorderSide(color: theme.dividerColor, width: 3),
                     bottom: widget.isActive ? BorderSide.none : BorderSide(color: theme.dividerColor, width: 3),
