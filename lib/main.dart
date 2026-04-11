@@ -11,22 +11,24 @@ import 'features/collections/presentation/bloc/collections_bloc.dart';
 import 'features/collections/presentation/bloc/collections_event.dart';
 import 'features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'features/tabs/presentation/bloc/tabs_event.dart';
+import 'features/settings/domain/entities/settings_entity.dart';
 import 'core/navigation/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await di.init();
-  runApp(const MyApp());
+  final initialSettings = await di.init();
+  runApp(MyApp(initialSettings: initialSettings));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final SettingsEntity initialSettings;
+  const MyApp({super.key, required this.initialSettings});
 
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider(create: (_) => di.sl<SettingsBloc>()..add(LoadSettings())),
+        BlocProvider(create: (_) => di.sl<SettingsBloc>()),
         BlocProvider(create: (_) => di.sl<HistoryBloc>()..add(LoadHistory())),
         BlocProvider(create: (_) => di.sl<CollectionsBloc>()..add(LoadCollections())),
         BlocProvider(create: (_) => di.sl<TabsBloc>()..add(LoadTabs())),
@@ -47,3 +49,4 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+

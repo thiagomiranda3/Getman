@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../domain/entities/settings_entity.dart';
 import '../../domain/usecases/settings_usecases.dart';
 import 'settings_event.dart';
 import 'settings_state.dart';
@@ -10,7 +11,8 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   SettingsBloc({
     required this.getSettingsUseCase,
     required this.saveSettingsUseCase,
-  }) : super(SettingsState.initial()) {
+    SettingsEntity? initialSettings,
+  }) : super(SettingsState(settings: initialSettings ?? const SettingsEntity())) {
     on<LoadSettings>(_onLoadSettings);
     on<UpdateDarkMode>(_onUpdateDarkMode);
     on<UpdateCompactMode>(_onUpdateCompactMode);

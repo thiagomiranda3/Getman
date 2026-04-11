@@ -258,54 +258,69 @@ class _HistoryListState extends State<_HistoryList> {
     final theme = Theme.of(context);
     final layout = theme.extension<LayoutExtension>()!;
 
-    return BlocListener<HistoryBloc, HistoryState>(
-      listener: (context, state) {
-        final next = state.history;
-        if (next.length > _items.length) {
-          final diff = next.length - _items.length;
-          for (int i = 0; i < diff; i++) {
-            _items.insert(i, next[i]);
-            _listKey.currentState?.insertItem(i, duration: const Duration(milliseconds: 400));
-          }
-        } else if (next.length < _items.length) {
-          if (next.isEmpty) {
-            for (int i = _items.length - 1; i >= 0; i--) {
-              final removedItem = _items[i];
-              _listKey.currentState?.removeItem(
-                i, 
-                (context, animation) => _buildHistoryItem(removedItem, animation, isRemoved: true),
-                duration: const Duration(milliseconds: 300)
-              );
+    return BlocBuilder<HistoryBloc, HistoryState>(
+      builder: (context, state) {
+        return BlocListener<HistoryBloc, HistoryState>(
+          listener: (context, state) {
+            final next = state.history;
+            if (_items.isEmpty && next.isNotEmpty) {
+              setState(() {
+                _items = List.from(next);
+              });
+              return;
             }
-            _items.clear();
-          } else {
-            _items = List.from(next);
-            setState(() {});
-          }
-        }
-      },
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'SEARCH HISTORY...',
-                hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
-                prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: theme.dividerColor, width: 2)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                isDense: true,
+
+            if (next.length > _items.length) {
+              final diff = next.length - _items.length;
+              for (int i = 0; i < diff; i++) {
+                _items.insert(i, next[i]);
+                _listKey.currentState?.insertItem(i, duration: const Duration(milliseconds: 400));
+              }
+            } else if (next.length < _items.length) {
+              if (next.isEmpty) {
+                for (int i = _items.length - 1; i >= 0; i--) {
+                  final removedItem = _items[i];
+                  _listKey.currentState?.removeItem(
+                    i, 
+                    (context, animation) => _buildHistoryItem(removedItem, animation, isRemoved: true),
+                    duration: const Duration(milliseconds: 300)
+                  );
+                }
+                _items.clear();
+                setState(() {});
+              } else {
+                setState(() {
+                  _items = List.from(next);
+                });
+              }
+            }
+          },
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'SEARCH HISTORY...',
+                    hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+                    prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: theme.dividerColor, width: 2)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    isDense: true,
+                  ),
+                  style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                ),
               ),
-              style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
-            ),
+              Expanded(
+                child: state.isLoading && _items.isEmpty 
+                  ? const Center(child: CircularProgressIndicator()) 
+                  : _buildList(),
+              ),
+            ],
           ),
-          Expanded(
-            child: _buildList(),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

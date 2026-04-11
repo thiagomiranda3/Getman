@@ -31,9 +31,11 @@ import '../../features/history/data/models/request_config_model.dart';
 import '../../features/tabs/data/models/request_tab_model.dart';
 import '../../features/collections/data/models/collection_node_model.dart';
 
+import '../../features/settings/domain/entities/settings_entity.dart';
+
 final sl = GetIt.instance;
 
-Future<void> init() async {
+Future<SettingsEntity> init() async {
   await Hive.initFlutter();
   
   Hive.registerAdapter(SettingsModelAdapter());
@@ -41,15 +43,18 @@ Future<void> init() async {
   Hive.registerAdapter(HttpRequestTabModelAdapter());
   Hive.registerAdapter(CollectionNodeAdapter());
 
-  await Hive.openBox<SettingsModel>('settings');
+  final settingsBox = await Hive.openBox<SettingsModel>('settings');
   await Hive.openBox<HttpRequestConfig>('history');
   await Hive.openBox<HttpRequestTabModel>('tabs');
   await Hive.openBox<CollectionNode>('collections');
 
+  final initialSettings = settingsBox.get('current')?.toEntity() ?? const SettingsEntity();
+
   // Features - Settings
-  sl.registerFactory(() => SettingsBloc(
+  sl.registerLazySingleton(() => SettingsBloc(
     getSettingsUseCase: sl(),
     saveSettingsUseCase: sl(),
+    initialSettings: initialSettings,
   ));
 
   sl.registerLazySingleton(() => GetSettingsUseCase(sl()));
@@ -60,7 +65,7 @@ Future<void> init() async {
   sl.registerLazySingleton<SettingsLocalDataSource>(() => SettingsLocalDataSourceImpl());
 
   // Features - History
-  sl.registerFactory(() => HistoryBloc(
+  sl.registerLazySingleton(() => HistoryBloc(
     getHistoryUseCase: sl(),
     addToHistoryUseCase: sl(),
     clearHistoryUseCase: sl(),
@@ -75,7 +80,7 @@ Future<void> init() async {
   sl.registerLazySingleton<HistoryLocalDataSource>(() => HistoryLocalDataSourceImpl());
 
   // Features - Collections
-  sl.registerFactory(() => CollectionsBloc(
+  sl.registerLazySingleton(() => CollectionsBloc(
     getCollectionsUseCase: sl(),
     saveCollectionsUseCase: sl(),
   ));
@@ -88,11 +93,12 @@ Future<void> init() async {
   sl.registerLazySingleton<CollectionsLocalDataSource>(() => CollectionsLocalDataSourceImpl());
 
   // Features - Tabs
-  sl.registerFactory(() => TabsBloc(
+  sl.registerLazySingleton(() => TabsBloc(
     repository: sl(),
     networkService: sl(),
     addToHistoryUseCase: sl(),
     getSettingsUseCase: sl(),
+    historyBloc: sl(),
   ));
 
   sl.registerLazySingleton<TabsRepository>(() => TabsRepositoryImpl(sl()));
@@ -102,4 +108,6 @@ Future<void> init() async {
   // Core
   sl.registerLazySingleton(() => NetworkService(dio: Dio()));
   sl.registerLazySingleton(() => AppRouter());
+
+  return initialSettings;
 }

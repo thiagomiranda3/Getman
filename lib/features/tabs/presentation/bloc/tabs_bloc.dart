@@ -9,6 +9,8 @@ import '../../../history/domain/entities/request_config_entity.dart';
 import '../../../history/domain/usecases/history_usecases.dart';
 import '../../../settings/domain/usecases/settings_usecases.dart';
 import '../../../../core/network/network_service.dart';
+import '../../../history/presentation/bloc/history_bloc.dart';
+import '../../../history/presentation/bloc/history_event.dart';
 import 'tabs_event.dart';
 import 'tabs_state.dart';
 
@@ -17,6 +19,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   final NetworkService networkService;
   final AddToHistoryUseCase addToHistoryUseCase;
   final GetSettingsUseCase getSettingsUseCase;
+  final HistoryBloc historyBloc;
   
   final Map<String, CancelToken> _cancelTokens = {};
   Timer? _debounceTimer;
@@ -27,6 +30,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     required this.networkService,
     required this.addToHistoryUseCase,
     required this.getSettingsUseCase,
+    required this.historyBloc,
   }) : super(const TabsState()) {
     on<LoadTabs>(_onLoadTabs);
     on<AddTab>(_onAddTab);
@@ -254,6 +258,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       }
       
       await addToHistoryUseCase(historyConfig, settings.historyLimit);
+      historyBloc.add(LoadHistory());
     } catch (e) {
       _cancelTokens.remove(activeTab.tabId);
       
@@ -311,6 +316,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         );
       }
       await addToHistoryUseCase(historyConfig, settings.historyLimit);
+      historyBloc.add(LoadHistory());
     }
   }
 

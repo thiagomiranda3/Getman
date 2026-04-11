@@ -89,6 +89,7 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return BlocBuilder<SettingsBloc, SettingsState>(
       builder: (context, settingsState) {
         final settings = settingsState.settings;
@@ -131,9 +132,46 @@ class _MainScreenState extends State<MainScreen> {
                         children: [
                           _buildTabBar(context, activeIndex, tabs),
                           Expanded(
-                            child: IndexedStack(
-                              index: activeIndex,
-                              children: tabs.map((t) => RequestView(key: ValueKey('view_${t.tabId}'), tabId: t.tabId)).toList(),
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              transitionBuilder: (child, animation) {
+                                return FadeTransition(
+                                  opacity: animation,
+                                  child: child,
+                                );
+                              },
+                              child: tabs.isEmpty
+                                  ? Center(
+                                      key: const ValueKey('empty'),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.bolt, size: 64, color: theme.dividerColor.withValues(alpha: 0.3)),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            'NO OPEN TABS',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w900,
+                                              color: theme.dividerColor.withValues(alpha: 0.3),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'PRESS CTRL+N TO CREATE A NEW REQUEST',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: theme.dividerColor.withValues(alpha: 0.2),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  : RequestView(
+                                      key: ValueKey('view_${tabs[activeIndex].tabId}'),
+                                      tabId: tabs[activeIndex].tabId,
+                                    ),
                             ),
                           ),
                         ],
@@ -185,24 +223,49 @@ class _MainScreenState extends State<MainScreen> {
               },
             ),
           ),
-          Container(
-            decoration: BoxDecoration(
-              border: Border(left: BorderSide(color: theme.dividerColor, width: 3)),
-            ),
-            child: BrutalBounce(
-              child: IconButton(
-                icon: Icon(Icons.add, size: layout.addIconSize, color: theme.colorScheme.onSurface),
-                onPressed: () => context.read<TabsBloc>().add(const AddTab()),
-              ),
-            ),
-          ),
+          _AddTabButton(layout: layout),
         ],
       ),
     );
   }
 }
 
-class _TabWidget extends StatelessWidget {
+class _AddTabButton extends StatefulWidget {
+  final LayoutExtension layout;
+
+  const _AddTabButton({required this.layout});
+
+  @override
+  State<_AddTabButton> createState() => _AddTabButtonState();
+}
+
+class _AddTabButtonState extends State<_AddTabButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          color: _isHovered ? theme.primaryColor : theme.scaffoldBackgroundColor,
+          border: Border(left: BorderSide(color: theme.dividerColor, width: 3)),
+        ),
+        child: BrutalBounce(
+          child: IconButton(
+            icon: Icon(Icons.add, size: widget.layout.addIconSize, color: theme.colorScheme.onSurface),
+            onPressed: () => context.read<TabsBloc>().add(const AddTab()),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TabWidget extends StatefulWidget {
   final String tabId;
   final int index;
   final bool isActive;
@@ -219,16 +282,55 @@ class _TabWidget extends StatelessWidget {
   });
 
   @override
+  State<_TabWidget> createState() => _TabWidgetState();
+}
+
+class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
+  bool _isHovered = false;
+  late AnimationController _sizeController;
+  late Animation<double> _sizeAnimation;
+  bool _isClosing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _sizeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _sizeAnimation = CurvedAnimation(
+      parent: _sizeController,
+      curve: Curves.easeOutCubic,
+    );
+    _sizeController.forward();
+  }
+
+  @override
+  void dispose() {
+    _sizeController.dispose();
+    super.dispose();
+  }
+
+  void _handleClose() {
+    if (_isClosing) return;
+    setState(() => _isClosing = true);
+    _sizeController.reverse().then((_) {
+      if (mounted) {
+        widget.onClose();
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = theme.extension<LayoutExtension>()!;
 
     return BlocBuilder<TabsBloc, TabsState>(
       builder: (context, state) {
-        final tab = state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+        final tab = state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
         if (tab == null) return const SizedBox.shrink();
 
-        // Using a BlocBuilder for Collections to check dirty state
         return BlocBuilder<CollectionsBloc, CollectionsState>(
           builder: (context, collState) {
             final isDirty = _isTabDirtyInternal(tab, collState.collections);
@@ -237,56 +339,69 @@ class _TabWidget extends StatelessWidget {
                 ? '${title.substring(0, layout.tabTitleMaxLength)}...' 
                 : title).toUpperCase();
 
-            return ReorderableDragStartListener(
-              index: index,
-              child: GestureDetector(
-                onTap: onTap,
-                onSecondaryTapDown: (details) => _showContextMenu(context, details.globalPosition, tab, index),
-                child: Container(
-                  height: layout.tabBarHeight,
-                  constraints: BoxConstraints(
-                    minWidth: layout.isCompact ? 80 : 120,
-                    maxWidth: layout.isCompact ? 150 : 250,
-                  ),
-                  padding: EdgeInsets.symmetric(horizontal: layout.tabPaddingHorizontal),
-                  decoration: BoxDecoration(
-                    color: isActive ? theme.primaryColor : theme.scaffoldBackgroundColor,
-                    border: Border(
-                      right: BorderSide(color: theme.dividerColor, width: 3),
-                      bottom: isActive ? BorderSide.none : BorderSide(color: theme.dividerColor, width: 3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          displayTitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: layout.tabFontSize,
-                            color: theme.colorScheme.onSurface,
-                            fontWeight: isDirty ? FontWeight.w900 : (isActive ? FontWeight.w900 : FontWeight.w500),
-                          ),
+            return SizeTransition(
+              sizeFactor: _sizeAnimation,
+              axis: Axis.horizontal,
+              axisAlignment: -1.0,
+              child: ReorderableDragStartListener(
+                index: widget.index,
+                child: MouseRegion(
+                  onEnter: (_) => setState(() => _isHovered = true),
+                  onExit: (_) => setState(() => _isHovered = false),
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: widget.onTap,
+                    onSecondaryTapDown: (details) => _showContextMenu(context, details.globalPosition, tab, widget.index),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      height: layout.tabBarHeight,
+                      constraints: BoxConstraints(
+                        minWidth: layout.isCompact ? 80 : 120,
+                        maxWidth: layout.isCompact ? 150 : 250,
+                      ),
+                      padding: EdgeInsets.symmetric(horizontal: layout.tabPaddingHorizontal),
+                      decoration: BoxDecoration(
+                        color: widget.isActive 
+                            ? theme.primaryColor 
+                            : (_isHovered ? theme.dividerColor.withValues(alpha: 0.2) : theme.scaffoldBackgroundColor),
+                        border: Border(
+                          right: BorderSide(color: theme.dividerColor, width: 3),
+                          bottom: widget.isActive ? BorderSide.none : BorderSide(color: theme.dividerColor, width: 3),
                         ),
                       ),
-                      if (isDirty)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 6),
-                          child: Text('*',
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              displayTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                  color: theme.colorScheme.secondary,
-                                  fontSize: layout.dirtyStarSize,
-                                  fontWeight: FontWeight.w900)),
-                        ),
-                      SizedBox(width: layout.tabSpacing),
-                      IconButton(
-                        icon: Icon(Icons.close, size: layout.tabCloseIconSize, color: theme.dividerColor),
-                        onPressed: onClose,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                                fontSize: layout.tabFontSize,
+                                color: theme.colorScheme.onSurface,
+                                fontWeight: isDirty ? FontWeight.w900 : (widget.isActive ? FontWeight.w900 : FontWeight.w500),
+                              ),
+                            ),
+                          ),
+                          if (isDirty)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 6),
+                              child: Text('*',
+                                  style: TextStyle(
+                                      color: theme.colorScheme.secondary,
+                                      fontSize: layout.dirtyStarSize,
+                                      fontWeight: FontWeight.w900)),
+                            ),
+                          SizedBox(width: layout.tabSpacing),
+                          IconButton(
+                            icon: Icon(Icons.close, size: layout.tabCloseIconSize, color: theme.dividerColor),
+                            onPressed: _handleClose,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -340,7 +455,7 @@ class _TabWidget extends StatelessWidget {
       elevation: 0,
       items: <PopupMenuEntry>[
         PopupMenuItem(
-          onTap: onClose,
+          onTap: _handleClose,
           child: _buildMenuItem(context, Icons.close, 'CLOSE'),
         ),
         PopupMenuItem(
