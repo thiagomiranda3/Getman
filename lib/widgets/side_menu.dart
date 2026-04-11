@@ -20,10 +20,8 @@ class SideMenu extends ConsumerWidget {
     return DefaultTabController(
       length: 2,
       child: Container(
-        width: layout.sideMenuWidth,
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
-          border: Border(right: BorderSide(color: theme.dividerColor, width: 3)),
         ),
         child: Column(
           children: [
@@ -39,7 +37,13 @@ class SideMenu extends ConsumerWidget {
                 indicator: BoxDecoration(color: theme.primaryColor),
                 labelColor: theme.colorScheme.onSurface,
                 unselectedLabelColor: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                labelStyle: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.w900),
+                labelStyle: TextStyle(
+                  fontSize: layout.fontSizeNormal, 
+                  fontWeight: FontWeight.w900,
+                  overflow: TextOverflow.fade
+                ),
+                padding: EdgeInsets.zero,
+                labelPadding: const EdgeInsets.symmetric(horizontal: 4),
                 tabs: const [
                   Tab(text: 'COLLECTIONS'),
                   Tab(text: 'HISTORY'),
@@ -74,8 +78,24 @@ class _SideMenuHeader extends ConsumerWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('GETMAN', style: TextStyle(fontWeight: FontWeight.w900, fontSize: layout.headerFontSize, color: theme.colorScheme.onSurface, letterSpacing: -1)),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'GETMAN', 
+                style: TextStyle(
+                  fontWeight: FontWeight.w900, 
+                  fontSize: layout.headerFontSize, 
+                  color: theme.colorScheme.onSurface, 
+                  letterSpacing: -1
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               BrutalBounce(
                 child: IconButton(
@@ -402,7 +422,7 @@ class _HistoryItemWidgetState extends State<_HistoryItemWidget> {
 }
 
 class _CollectionsList extends ConsumerStatefulWidget {
-  const _CollectionsList();
+  const _CollectionsList({super.key});
 
   @override
   ConsumerState<_CollectionsList> createState() => _CollectionsListState();

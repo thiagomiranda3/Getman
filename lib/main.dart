@@ -6,6 +6,7 @@ import 'package:collection/collection.dart';
 import 'services/storage_service.dart';
 import 'widgets/side_menu.dart';
 import 'widgets/request_view.dart';
+import 'widgets/splitter.dart';
 import 'providers/tabs_provider.dart';
 import 'utils/neo_brutalist_theme.dart';
 
@@ -39,14 +40,23 @@ class MyApp extends ConsumerWidget {
     }
 }
 
-class MainScreen extends ConsumerWidget {
+class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends ConsumerState<MainScreen> {
+  double? _localSideMenuWidth;
+
+  @override
+  Widget build(BuildContext context) {
     final activeIndex = ref.watch(tabsProvider.select((s) => s.activeIndex));
     final tabIds = ref.watch(tabsProvider.select((s) => s.tabs.map((t) => t.tabId).toList()));
     final tabsNotifier = ref.read(tabsProvider.notifier);
+    final settings = ref.watch(settingsProvider);
+    final currentSideMenuWidth = _localSideMenuWidth ?? settings.sideMenuWidth;
 
     return CallbackShortcuts(
       bindings: {
@@ -58,7 +68,23 @@ class MainScreen extends ConsumerWidget {
       child: Scaffold(
         body: Row(
           children: [
-            const SideMenu(),
+            SizedBox(
+              width: currentSideMenuWidth,
+              child: const SideMenu(),
+            ),
+            Splitter(
+              isVertical: false,
+              onUpdate: (delta) {
+                setState(() {
+                  _localSideMenuWidth = (currentSideMenuWidth + delta).clamp(200.0, 600.0);
+                });
+              },
+              onEnd: () {
+                if (_localSideMenuWidth != null) {
+                  ref.read(settingsProvider.notifier).updateSideMenuWidth(_localSideMenuWidth!);
+                }
+              },
+            ),
             Expanded(
               child: Column(
                 children: [

@@ -33,6 +33,10 @@ class SettingsNotifier extends StateNotifier<SettingsModel> {
   void updateSplitRatio(double ratio) {
     _save(state.copyWith(splitRatio: ratio));
   }
+
+  void updateSideMenuWidth(double width) {
+    _save(state.copyWith(sideMenuWidth: width));
+  }
 }
 
 final settingsProvider = StateNotifierProvider<SettingsNotifier, SettingsModel>((ref) {

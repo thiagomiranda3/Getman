@@ -8,6 +8,7 @@ import 'package:re_highlight/styles/atom-one-light.dart';
 import 'package:re_highlight/languages/json.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
+import 'splitter.dart';
 import '../providers/tabs_provider.dart';
 import '../providers/collections_provider.dart';
 import '../providers/settings_provider.dart';
@@ -126,9 +127,8 @@ class _RequestViewState extends ConsumerState<RequestView> {
                           flex: (currentRatio * 1000).toInt(),
                           child: _RequestConfigSection(tabId: widget.tabId, bodyController: _bodyController!),
                         ),
-                        _Splitter(
+                        Splitter(
                           isVertical: settings.isVerticalLayout,
-                          totalSize: totalSize,
                           onUpdate: (delta) {
                             setState(() {
                               _localSplitRatio = (_localSplitRatio ?? settings.splitRatio) + (delta / totalSize);
@@ -393,41 +393,6 @@ class _UrlBarState extends ConsumerState<_UrlBar> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _Splitter extends ConsumerWidget {
-  final bool isVertical;
-  final double totalSize;
-  final Function(double) onUpdate;
-  final VoidCallback onEnd;
-
-  const _Splitter({
-    required this.isVertical,
-    required this.totalSize,
-    required this.onUpdate,
-    required this.onEnd,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final layout = Theme.of(context).extension<LayoutExtension>()!;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onPanUpdate: (details) => onUpdate(isVertical ? details.delta.dy : details.delta.dx),
-      onPanEnd: (_) => onEnd(),
-      child: MouseRegion(
-        cursor: isVertical ? SystemMouseCursors.resizeUpDown : SystemMouseCursors.resizeLeftRight,
-        child: isVertical
-          ? Padding(
-              padding: EdgeInsets.symmetric(vertical: layout.isCompact ? 8 : 12),
-              child: Divider(height: 3, thickness: 3, color: theme.dividerColor),
-            )
-          : VerticalDivider(width: layout.verticalDividerWidth, thickness: 3, color: theme.dividerColor),
       ),
     );
   }

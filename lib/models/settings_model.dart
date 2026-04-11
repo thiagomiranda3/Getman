@@ -22,6 +22,9 @@ class SettingsModel extends HiveObject {
   @HiveField(5, defaultValue: 0.5)
   double splitRatio;
 
+  @HiveField(6, defaultValue: 300.0)
+  double sideMenuWidth;
+
   SettingsModel({
     this.historyLimit = 100,
     this.saveResponseInHistory = false,
@@ -29,6 +32,7 @@ class SettingsModel extends HiveObject {
     this.isCompactMode = false,
     this.isVerticalLayout = false,
     this.splitRatio = 0.5,
+    this.sideMenuWidth = 300.0,
   });
 
   SettingsModel copyWith({
@@ -38,6 +42,7 @@ class SettingsModel extends HiveObject {
     bool? isCompactMode,
     bool? isVerticalLayout,
     double? splitRatio,
+    double? sideMenuWidth,
   }) {
     return SettingsModel(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -46,6 +51,7 @@ class SettingsModel extends HiveObject {
       isCompactMode: isCompactMode ?? this.isCompactMode,
       isVerticalLayout: isVerticalLayout ?? this.isVerticalLayout,
       splitRatio: splitRatio ?? this.splitRatio,
+      sideMenuWidth: sideMenuWidth ?? this.sideMenuWidth,
     );
   }
 
@@ -56,6 +62,7 @@ class SettingsModel extends HiveObject {
     'isCompactMode': isCompactMode,
     'isVerticalLayout': isVerticalLayout,
     'splitRatio': splitRatio,
+    'sideMenuWidth': sideMenuWidth,
   };
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) => SettingsModel(
@@ -65,5 +72,6 @@ class SettingsModel extends HiveObject {
     isCompactMode: json['isCompactMode'] ?? false,
     isVerticalLayout: json['isVerticalLayout'] ?? false,
     splitRatio: json['splitRatio'] ?? 0.5,
+    sideMenuWidth: (json['sideMenuWidth'] ?? 300.0).toDouble(),
   );
 }
