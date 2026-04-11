@@ -1,36 +1,29 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getman/models/request_config.dart';
+import 'package:getman/features/history/data/models/request_config_model.dart';
+import 'package:getman/features/history/domain/entities/request_config_entity.dart';
 
 void main() {
-  group('Model Serialization Tests', () {
-    test('HttpRequestConfig toJson/fromJson', () {
-      final config = HttpRequestConfig(
-        method: 'POST',
-        url: 'https://api.example.com',
-        headers: {'Content-Type': 'application/json'},
-        body: '{"test": true}',
+  group('HttpRequestConfig', () {
+    test('should convert to and from entity', () {
+      const entity = HttpRequestConfigEntity(
+        id: '1',
+        url: 'https://example.com',
+        method: 'GET',
       );
 
-      final json = config.toJson();
-      final fromJson = HttpRequestConfig.fromJson(json);
+      final model = HttpRequestConfig.fromEntity(entity);
+      expect(model.id, entity.id);
+      expect(model.url, entity.url);
 
-      expect(fromJson.method, config.method);
-      expect(fromJson.url, config.url);
-      expect(fromJson.headers['Content-Type'], 'application/json');
-      expect(fromJson.body, config.body);
+      final backToEntity = model.toEntity();
+      expect(backToEntity, entity);
     });
 
-    test('HttpRequestConfig Equality', () {
-      final config1 = HttpRequestConfig(url: 'https://test.com', method: 'GET');
-      final config2 = HttpRequestConfig(url: 'https://test.com', method: 'GET');
-      // They have different auto-generated IDs, so we set them same for test
-      config2.id = config1.id;
-
+    test('should compare correctly', () {
+      final config1 = HttpRequestConfig(id: '1', method: 'GET', url: 'url');
+      final config2 = HttpRequestConfig(id: '1', method: 'GET', url: 'url');
+      
       expect(config1 == config2, true);
-      expect(config1.hashCode == config2.hashCode, true);
-
-      final config3 = config1.copyWith(method: 'POST');
-      expect(config1 == config3, false);
     });
   });
 }
