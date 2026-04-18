@@ -95,8 +95,8 @@ class ResponseSection extends StatelessWidget {
                           right: BorderSide(color: theme.dividerColor, width: 3),
                         ),
                       ),
-                      labelColor: theme.colorScheme.onSurface,
-                      unselectedLabelColor: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                      labelColor: theme.colorScheme.onPrimary,
+                      unselectedLabelColor: theme.colorScheme.onSurface,
                       labelStyle: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.w900),
                       tabs: const [
                         Tab(text: 'BODY'),
@@ -162,8 +162,8 @@ class ResponseMetadataItem extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('$label: ', style: TextStyle(color: theme.colorScheme.onSurface, fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold)),
-          Text(value, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w900, fontSize: layout.fontSizeNormal)),
+          Text('$label: ', style: TextStyle(color: Colors.white, fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold)),
+          Text(value, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: layout.fontSizeNormal)),
         ],
       ),
     );

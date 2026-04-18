@@ -218,7 +218,7 @@ class LayoutExtension extends ThemeExtension<LayoutExtension> {
 
 class NeoBrutalistTheme {
   // Neo-Brutalist Colors
-  static const Color backgroundLight = Color(0xFFF8F7F2); // Off-White
+  static const Color backgroundLight = Color(0xFFF3F4F6); // Refined Off-White
   static const Color surfaceLight = Color(0xFFFFFFFF); // White
   static const Color textLight = Color(0xFF000000); // Black
   static const Color borderLight = Color(0xFF000000); // Black
@@ -228,10 +228,10 @@ class NeoBrutalistTheme {
   static const Color textDark = Color(0xFFE0E0E0); // Off-White
   static const Color borderDark = Color(0xFF404040); // Muted Border
 
-  static const Color primary = Color(0xFFFDE047); // Vibrant Yellow
-  static const Color primaryDark = Color(0xFFD4B92E); // Muted Yellow for Dark mode
+  static const Color primary = Color(0xFFFFD700); // Refined Golden Yellow
+  static const Color primaryDark = Color(0xFFFFD700); // Keep it vibrant for Dark mode pop
   
-  static const Color secondary = Color(0xFF7C3AED); // Violet
+  static const Color secondary = Color(0xFF6D28D9); // Refined Deep Violet
   static const Color secondaryDark = Color(0xFF6330BD); // Muted Violet for Dark mode
   
   static const Color lightGray = Color(0xFFE5E7EB);
@@ -277,7 +277,7 @@ class NeoBrutalistTheme {
             primary: currentPrimary,
             secondary: currentSecondary,
             surface: surfaceDark,
-            onPrimary: textLight,
+            onPrimary: textLight, // Black text on Yellow
             onSecondary: Colors.white,
             onSurface: textDark,
           )
@@ -285,7 +285,7 @@ class NeoBrutalistTheme {
             primary: currentPrimary,
             secondary: currentSecondary,
             surface: surfaceLight,
-            onPrimary: textLight,
+            onPrimary: textLight, // Black text on Yellow
             onSecondary: Colors.white,
             onSurface: textLight,
           ),
@@ -307,8 +307,8 @@ class NeoBrutalistTheme {
       ),
       tabBarTheme: TabBarThemeData(
         dividerColor: Colors.transparent,
-        labelColor: text,
-        unselectedLabelColor: text.withValues(alpha: 0.7),
+        labelColor: textLight, // Black on Yellow active indicator
+        unselectedLabelColor: text, // White/Gray on Dark background
         indicatorSize: TabBarIndicatorSize.tab,
         indicator: BoxDecoration(
           color: currentPrimary,
@@ -323,14 +323,14 @@ class NeoBrutalistTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: currentPrimary,
-          foregroundColor: textLight,
+          foregroundColor: textLight, // Black text on Yellow
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(4),
             side: BorderSide(color: border, width: 3),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
+          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: textLight),
         ).copyWith(
           overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
             if (states.contains(WidgetState.hovered)) return Colors.white.withValues(alpha: 0.2);
@@ -392,7 +392,7 @@ class NeoBrutalistTheme {
       ),
       listTileTheme: ListTileThemeData(
         selectedTileColor: currentPrimary,
-        selectedColor: textLight,
+        selectedColor: textLight, // Black text on Yellow selected tile
         titleTextStyle: TextStyle(fontWeight: FontWeight.bold, color: text),
         subtitleTextStyle: TextStyle(color: text.withValues(alpha: 0.7)),
       ),

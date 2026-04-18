@@ -42,8 +42,8 @@ class SideMenu extends StatelessWidget {
               child: TabBar(
                 dividerColor: Colors.transparent,
                 indicator: BoxDecoration(color: theme.primaryColor),
-                labelColor: theme.colorScheme.onSurface,
-                unselectedLabelColor: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                labelColor: theme.colorScheme.onPrimary,
+                unselectedLabelColor: theme.colorScheme.onSurface,
                 labelStyle: TextStyle(
                   fontSize: layout.fontSizeNormal, 
                   fontWeight: FontWeight.w900,

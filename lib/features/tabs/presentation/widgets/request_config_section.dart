@@ -44,8 +44,8 @@ class RequestConfigSection extends StatelessWidget {
                     right: BorderSide(color: theme.dividerColor, width: 3),
                   ),
                 ),
-                labelColor: theme.colorScheme.onSurface,
-                unselectedLabelColor: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                labelColor: theme.colorScheme.onPrimary,
+                unselectedLabelColor: theme.colorScheme.onSurface,
                 labelStyle: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.w900),
                 tabs: const [
                   Tab(text: 'PARAMS'),
