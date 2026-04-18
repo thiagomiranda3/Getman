@@ -57,6 +57,8 @@ class _MainScreenState extends State<MainScreen> {
 
   void _confirmClose(BuildContext context, int index) {
     final tabsBloc = context.read<TabsBloc>();
+    if (index < 0 || index >= tabsBloc.state.tabs.length) return;
+    
     final tab = tabsBloc.state.tabs[index];
     final isDirty = _isTabDirty(context, tab.tabId);
     
@@ -165,6 +167,16 @@ class _MainScreenState extends State<MainScreen> {
                                               fontSize: 12,
                                               fontWeight: FontWeight.bold,
                                               color: theme.dividerColor.withValues(alpha: 0.2),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 24),
+                                          BrutalBounce(
+                                            child: ElevatedButton(
+                                              onPressed: () => context.read<TabsBloc>().add(const AddTab()),
+                                              style: ElevatedButton.styleFrom(
+                                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                              ),
+                                              child: const Text('NEW REQUEST'),
                                             ),
                                           ),
                                         ],
@@ -367,6 +379,8 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
                             ? theme.primaryColor 
                             : (_isHovered ? theme.dividerColor.withValues(alpha: 0.2) : theme.scaffoldBackgroundColor),
                         border: Border(
+                          top: BorderSide(color: theme.dividerColor, width: 3),
+                          left: widget.index == 0 ? BorderSide(color: theme.dividerColor, width: 3) : BorderSide.none,
                           right: BorderSide(color: theme.dividerColor, width: 3),
                           bottom: widget.isActive ? BorderSide.none : BorderSide(color: theme.dividerColor, width: 3),
                         ),

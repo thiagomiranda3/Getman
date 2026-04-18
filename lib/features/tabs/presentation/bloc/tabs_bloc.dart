@@ -103,11 +103,11 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   }
 
   void _onRemoveTab(RemoveTab event, Emitter<TabsState> emit) {
-    if (state.tabs.length <= 1) return;
-
     final newTabs = [...state.tabs]..removeAt(event.index);
     int newActiveIndex = state.activeIndex;
-    if (newActiveIndex >= newTabs.length) {
+    if (newTabs.isEmpty) {
+      newActiveIndex = -1;
+    } else if (newActiveIndex >= newTabs.length) {
       newActiveIndex = newTabs.length - 1;
     }
     emit(state.copyWith(tabs: newTabs, activeIndex: newActiveIndex));

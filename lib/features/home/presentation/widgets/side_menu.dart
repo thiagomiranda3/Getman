@@ -36,12 +36,21 @@ class SideMenu extends StatelessWidget {
               decoration: BoxDecoration(
                 border: Border(
                   top: BorderSide(color: theme.dividerColor, width: 3),
+                  left: BorderSide(color: theme.dividerColor, width: 3),
+                  right: BorderSide(color: theme.dividerColor, width: 3),
                   bottom: BorderSide(color: theme.dividerColor, width: 3),
                 ),
               ),
               child: TabBar(
                 dividerColor: Colors.transparent,
-                indicator: BoxDecoration(color: theme.primaryColor),
+                indicator: BoxDecoration(
+                  color: theme.primaryColor,
+                  border: Border(
+                    top: BorderSide(color: theme.dividerColor, width: 3),
+                    left: BorderSide(color: theme.dividerColor, width: 3),
+                    right: BorderSide(color: theme.dividerColor, width: 3),
+                  ),
+                ),
                 labelColor: theme.colorScheme.onPrimary,
                 unselectedLabelColor: theme.colorScheme.onSurface,
                 labelStyle: TextStyle(
