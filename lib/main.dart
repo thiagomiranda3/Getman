@@ -10,6 +10,8 @@ import 'features/collections/presentation/bloc/collections_bloc.dart';
 import 'features/collections/presentation/bloc/collections_event.dart';
 import 'features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:flutter/services.dart';
+import 'package:getman/core/navigation/intents.dart';
 import 'features/settings/domain/entities/settings_entity.dart';
 import 'core/navigation/app_router.dart';
 
@@ -35,13 +37,40 @@ class MyApp extends StatelessWidget {
       child: BlocBuilder<SettingsBloc, SettingsState>(
         builder: (context, state) {
           final settings = state.settings;
-          return MaterialApp.router(
-            title: 'GETMAN',
-            debugShowCheckedModeBanner: false,
-            theme: NeoBrutalistTheme.theme(Brightness.light, isCompact: settings.isCompactMode),
-            darkTheme: NeoBrutalistTheme.theme(Brightness.dark, isCompact: settings.isCompactMode),
-            themeMode: settings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-            routerConfig: di.sl<AppRouter>().router,
+          return Shortcuts(
+            shortcuts: <ShortcutActivator, Intent>{
+              const SingleActivator(LogicalKeyboardKey.keyN, control: true): const NewTabIntent(),
+              const SingleActivator(LogicalKeyboardKey.keyN, meta: true): const NewTabIntent(),
+              const SingleActivator(LogicalKeyboardKey.keyW, control: true): const CloseTabIntent(),
+              const SingleActivator(LogicalKeyboardKey.keyW, meta: true): const CloseTabIntent(),
+              const SingleActivator(LogicalKeyboardKey.keyS, control: true): const SaveRequestIntent(),
+              const SingleActivator(LogicalKeyboardKey.keyS, meta: true): const SaveRequestIntent(),
+              const SingleActivator(LogicalKeyboardKey.enter, control: true): const SendRequestIntent(),
+              const SingleActivator(LogicalKeyboardKey.enter, meta: true): const SendRequestIntent(),
+              const SingleActivator(LogicalKeyboardKey.keyB, control: true): const BeautifyJsonIntent(),
+              const SingleActivator(LogicalKeyboardKey.keyB, meta: true): const BeautifyJsonIntent(),
+            },
+            child: Actions(
+              actions: <Type, Action<Intent>>{
+                NewTabIntent: CallbackAction<NewTabIntent>(
+                  onInvoke: (intent) => context.read<TabsBloc>().add(const AddTab()),
+                ),
+              },
+              child: MaterialApp.router(
+                title: 'GETMAN',
+                debugShowCheckedModeBanner: false,
+                theme: NeoBrutalistTheme.theme(Brightness.light, isCompact: settings.isCompactMode),
+                darkTheme: NeoBrutalistTheme.theme(Brightness.dark, isCompact: settings.isCompactMode),
+                themeMode: settings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+                routerConfig: di.sl<AppRouter>().router,
+                builder: (context, child) {
+                  return Focus(
+                    autofocus: true,
+                    child: child ?? const SizedBox.shrink(),
+                  );
+                },
+              ),
+            ),
           );
         },
       ),

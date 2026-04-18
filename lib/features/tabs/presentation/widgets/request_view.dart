@@ -9,7 +9,6 @@ import 'package:re_highlight/styles/atom-one-light.dart';
 import 'package:re_highlight/languages/json.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:uuid/uuid.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
@@ -23,6 +22,7 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/core/theme/neo_brutalist_theme.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/core/utils/curl_utils.dart';
+import 'package:getman/core/navigation/intents.dart';
 
 class RequestView extends StatefulWidget {
   final String tabId;
@@ -92,60 +92,73 @@ class _RequestViewState extends State<RequestView> {
             
             final isActive = tabsState.tabs.asMap().entries.any((e) => e.key == tabsState.activeIndex && e.value.tabId == widget.tabId);
 
-            return CallbackShortcuts(
-              bindings: {
-                const SingleActivator(LogicalKeyboardKey.keyS, control: true): () => _handleSave(context, tab),
-                const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () => _handleSave(context, tab),
+            return Actions(
+              actions: <Type, Action<Intent>>{
+                SaveRequestIntent: CallbackAction<SaveRequestIntent>(
+                  onInvoke: (_) => _handleSave(context, tab),
+                ),
+                BeautifyJsonIntent: CallbackAction<BeautifyJsonIntent>(
+                  onInvoke: (_) async {
+                    if (_bodyController != null) {
+                      final prettified = await JsonUtils.prettify(_bodyController!.text);
+                      _bodyController!.text = prettified;
+                    }
+                    return null;
+                  },
+                ),
               },
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 300),
-                opacity: isActive ? 1.0 : 0.0,
-                curve: Curves.easeInOut,
-                child: Padding(
-                  padding: EdgeInsets.all(layout.pagePadding),
-                  child: Column(
-                    children: [
-                      _UrlBar(tabId: widget.tabId, onSave: () => _handleSave(context, tab)),
-                      SizedBox(height: layout.sectionSpacing),
-                      Expanded(
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            final totalSize = settings.isVerticalLayout ? constraints.maxHeight : constraints.maxWidth;
-                            final currentRatio = _localSplitRatio ?? settings.splitRatio;
-                            
-                            return Flex(
-                              direction: settings.isVerticalLayout ? Axis.vertical : Axis.horizontal,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Flexible(
-                                  flex: (currentRatio * 1000).toInt(),
-                                  child: _RequestConfigSection(tabId: widget.tabId, bodyController: _bodyController!),
-                                ),
-                                Splitter(
-                                  isVertical: settings.isVerticalLayout,
-                                  onUpdate: (delta) {
-                                    setState(() {
-                                      _localSplitRatio = (_localSplitRatio ?? settings.splitRatio) + (delta / totalSize);
-                                      if (_localSplitRatio! < 0.1) _localSplitRatio = 0.1;
-                                      if (_localSplitRatio! > 0.9) _localSplitRatio = 0.9;
-                                    });
-                                  },
-                                  onEnd: () {
-                                    if (_localSplitRatio != null) {
-                                      context.read<SettingsBloc>().add(UpdateSplitRatio(_localSplitRatio!));
-                                    }
-                                  },
-                                ),
-                                Flexible(
-                                  flex: ((1 - currentRatio) * 1000).toInt(),
-                                  child: _ResponseSection(tabId: widget.tabId, responseController: _responseController!),
-                                ),
-                              ],
-                            );
-                          }
+              child: Focus(
+                autofocus: true,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 300),
+                  opacity: isActive ? 1.0 : 0.0,
+                  curve: Curves.easeInOut,
+                  child: Padding(
+                    padding: EdgeInsets.all(layout.pagePadding),
+                    child: Column(
+                      children: [
+                        _UrlBar(tabId: widget.tabId, onSave: () => _handleSave(context, tab)),
+                        SizedBox(height: layout.sectionSpacing),
+                        Expanded(
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final totalSize = settings.isVerticalLayout ? constraints.maxHeight : constraints.maxWidth;
+                              final currentRatio = _localSplitRatio ?? settings.splitRatio;
+                              
+                              return Flex(
+                                direction: settings.isVerticalLayout ? Axis.vertical : Axis.horizontal,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Flexible(
+                                    flex: (currentRatio * 1000).toInt(),
+                                    child: _RequestConfigSection(tabId: widget.tabId, bodyController: _bodyController!),
+                                  ),
+                                  Splitter(
+                                    isVertical: settings.isVerticalLayout,
+                                    onUpdate: (delta) {
+                                      setState(() {
+                                        _localSplitRatio = (_localSplitRatio ?? settings.splitRatio) + (delta / totalSize);
+                                        if (_localSplitRatio! < 0.1) _localSplitRatio = 0.1;
+                                        if (_localSplitRatio! > 0.9) _localSplitRatio = 0.9;
+                                      });
+                                    },
+                                    onEnd: () {
+                                      if (_localSplitRatio != null) {
+                                        context.read<SettingsBloc>().add(UpdateSplitRatio(_localSplitRatio!));
+                                      }
+                                    },
+                                  ),
+                                  Flexible(
+                                    flex: ((1 - currentRatio) * 1000).toInt(),
+                                    child: _ResponseSection(tabId: widget.tabId, responseController: _responseController!),
+                                  ),
+                                ],
+                              );
+                            }
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -213,22 +226,11 @@ class _RequestViewState extends State<RequestView> {
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CANCEL')),
           TextButton(
             onPressed: () {
-               // We need a way to get the new ID back from CollectionsBloc or generate it here
-               // Since we use Uuid in Bloc, maybe we should let Bloc return it or use a callback
-               // For now, I'll generate it here and pass it
-               final newId = const Uuid().v4();
                context.read<CollectionsBloc>().add(SaveRequestToCollection(
                  controller.text, 
                  tab.config.copyWith(),
                ));
-               // Wait, SaveRequestToCollection in Bloc generates its own ID.
-               // To keep it simple, I'll just refetch the latest tab name/id if needed, 
-               // but the original code had saveRequest returning ID.
-               // I'll update the event to accept an optional ID.
                
-               // Actually, for now, I'll just close and let the user re-open if needed, 
-               // but the UX would be better if we updated the tab.
-               // I'll just use the name for now.
                context.read<TabsBloc>().add(UpdateTab(
                  tab.copyWith(collectionName: controller.text)
                ));
@@ -356,31 +358,29 @@ class _UrlBarState extends State<_UrlBar> {
                       onChanged: (val) {
                          if (tab.config.url == val) return;
 
+                         final tabsBloc = context.read<TabsBloc>();
+
                          if (val.trim().toLowerCase().startsWith('curl ')) {
                            final parsedConfig = CurlUtils.parse(val, id: tab.config.id);
                            if (parsedConfig != null) {
-                             // 1. Synchronously update everything except the potentially unprettified body first
-                             // This ensures the URL and Method change immediately
-                             context.read<TabsBloc>().add(UpdateTab(
+                             tabsBloc.add(UpdateTab(
                                tab.copyWith(config: parsedConfig),
                              ));
                              
                              _urlController.text = parsedConfig.url;
 
-                             // 2. Then, asynchronously prettify the body if it's JSON
+                             final requestViewState = context.findAncestorStateOfType<_RequestViewState>();
+
                              JsonUtils.prettify(parsedConfig.body).then((prettifiedBody) {
-                               // Get the latest tab from state to avoid using stale 'tab' instance
-                               final latestTabs = context.read<TabsBloc>().state.tabs;
-                               final latestTab = latestTabs.firstWhereOrNull((t) => t.tabId == tab.tabId);
+                               final latestTab = tabsBloc.state.tabs.firstWhereOrNull((t) => t.tabId == tab.tabId);
                                
                                if (latestTab != null) {
-                                 context.read<TabsBloc>().add(UpdateTab(
+                                 tabsBloc.add(UpdateTab(
                                    latestTab.copyWith(config: latestTab.config.copyWith(body: prettifiedBody)),
                                  ));
                                }
                                
-                               final requestViewState = context.findAncestorStateOfType<_RequestViewState>();
-                               if (requestViewState != null) {
+                               if (mounted && requestViewState != null) {
                                  requestViewState._bodyController?.text = prettifiedBody;
                                }
                              });
@@ -388,7 +388,7 @@ class _UrlBarState extends State<_UrlBar> {
                            }
                          }
 
-                         context.read<TabsBloc>().add(UpdateTab(
+                         tabsBloc.add(UpdateTab(
                           tab.copyWith(config: tab.config.copyWith(url: val)),
                         ));
                       },

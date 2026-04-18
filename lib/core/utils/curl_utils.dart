@@ -67,12 +67,9 @@ class CurlUtils {
     // 1. Single quoted strings: '...'
     // 2. Double quoted strings: "..."
     // 3. Unquoted words: [^\s]+
-    final regex = RegExp(r"'([^']*)'|""([^""]*)""|([^\s]+)");
+    final regex = RegExp(r"'([^']*)'|" '"' r'([^"]*)' '"' r"|([^\s]+)");
     
-    // Let's use a more reliable regex for double quotes
-    final betterRegex = RegExp(r"'([^']*)'|" + '"([^"]*)"' + r"|([^\s]+)");
-    
-    final matches = betterRegex.allMatches(command);
+    final matches = regex.allMatches(command);
     for (final match in matches) {
       if (match.group(1) != null) {
         args.add(match.group(1)!);

@@ -142,8 +142,6 @@ class _CollectionNodeWidgetState extends State<CollectionNodeWidget> {
   @override
   Widget build(BuildContext context) {
     final node = widget.entry.node;
-    final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
 
     return Draggable<String>(
       data: node.id,

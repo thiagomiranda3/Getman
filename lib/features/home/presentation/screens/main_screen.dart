@@ -13,6 +13,7 @@ import 'package:getman/features/collections/presentation/bloc/collections_bloc.d
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
 import 'package:getman/core/theme/neo_brutalist_theme.dart';
+import 'package:getman/core/navigation/intents.dart';
 import 'package:getman/features/home/presentation/widgets/side_menu.dart';
 
 class MainScreen extends StatefulWidget {
@@ -24,6 +25,21 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   double? _localSideMenuWidth;
+  final FocusNode _mainFocusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _mainFocusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _mainFocusNode.dispose();
+    super.dispose();
+  }
 
   bool _isTabDirty(BuildContext context, String tabId) {
     final tabsState = context.read<TabsBloc>().state;
@@ -102,96 +118,106 @@ class _MainScreenState extends State<MainScreen> {
             final activeIndex = tabsState.activeIndex;
             final tabs = tabsState.tabs;
 
-            return CallbackShortcuts(
-              bindings: {
-                const SingleActivator(LogicalKeyboardKey.keyN, control: true): () => context.read<TabsBloc>().add(const AddTab()),
-                const SingleActivator(LogicalKeyboardKey.keyN, meta: true): () => context.read<TabsBloc>().add(const AddTab()),
-                const SingleActivator(LogicalKeyboardKey.keyW, control: true): () => _confirmClose(context, activeIndex),
-                const SingleActivator(LogicalKeyboardKey.keyW, meta: true): () => _confirmClose(context, activeIndex),
+            return Actions(
+              actions: <Type, Action<Intent>>{
+                CloseTabIntent: CallbackAction<CloseTabIntent>(
+                  onInvoke: (_) => _confirmClose(context, activeIndex),
+                ),
+                SendRequestIntent: CallbackAction<SendRequestIntent>(
+                  onInvoke: (_) {
+                    if (activeIndex >= 0 && activeIndex < tabs.length && !tabs[activeIndex].isSending) {
+                      context.read<TabsBloc>().add(SendRequest());
+                    }
+                    return null;
+                  },
+                ),
               },
-              child: Scaffold(
-                body: Row(
-                  children: [
-                    SizedBox(
-                      width: currentSideMenuWidth,
-                      child: const SideMenu(),
-                    ),
-                    Splitter(
-                      isVertical: false,
-                      onUpdate: (delta) {
-                        setState(() {
-                          _localSideMenuWidth = (currentSideMenuWidth + delta).clamp(200.0, 600.0);
-                        });
-                      },
-                      onEnd: () {
-                        if (_localSideMenuWidth != null) {
-                          context.read<SettingsBloc>().add(UpdateSideMenuWidth(_localSideMenuWidth!));
-                        }
-                      },
-                    ),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          _buildTabBar(context, activeIndex, tabs),
-                          Expanded(
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 200),
-                              transitionBuilder: (child, animation) {
-                                return FadeTransition(
-                                  opacity: animation,
-                                  child: child,
-                                );
-                              },
-                              child: tabsState.isLoading 
-                                ? const Center(key: ValueKey('loading'), child: CircularProgressIndicator())
-                                : tabs.isEmpty
-                                  ? Center(
-                                      key: const ValueKey('empty'),
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(Icons.bolt, size: 64, color: theme.dividerColor.withValues(alpha: 0.3)),
-                                          const SizedBox(height: 16),
-                                          Text(
-                                            'NO OPEN TABS',
-                                            style: TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.w900,
-                                              color: theme.dividerColor.withValues(alpha: 0.3),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            'PRESS CTRL+N TO CREATE A NEW REQUEST',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                              color: theme.dividerColor.withValues(alpha: 0.2),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 24),
-                                          BrutalBounce(
-                                            child: ElevatedButton(
-                                              onPressed: () => context.read<TabsBloc>().add(const AddTab()),
-                                              style: ElevatedButton.styleFrom(
-                                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                                              ),
-                                              child: const Text('NEW REQUEST'),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    )
-                                  : RequestView(
-                                      key: ValueKey('view_${tabs[activeIndex].tabId}'),
-                                      tabId: tabs[activeIndex].tabId,
-                                    ),
-                            ),
-                          ),
-                        ],
+              child: Focus(
+                focusNode: _mainFocusNode,
+                child: Scaffold(
+                  body: Row(
+                    children: [
+                      SizedBox(
+                        width: currentSideMenuWidth,
+                        child: const SideMenu(),
                       ),
-                    ),
-                  ],
+                      Splitter(
+                        isVertical: false,
+                        onUpdate: (delta) {
+                          setState(() {
+                            _localSideMenuWidth = (currentSideMenuWidth + delta).clamp(200.0, 600.0);
+                          });
+                        },
+                        onEnd: () {
+                          if (_localSideMenuWidth != null) {
+                            context.read<SettingsBloc>().add(UpdateSideMenuWidth(_localSideMenuWidth!));
+                          }
+                        },
+                      ),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            _buildTabBar(context, activeIndex, tabs),
+                            Expanded(
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 200),
+                                transitionBuilder: (child, animation) {
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: child,
+                                  );
+                                },
+                                child: tabsState.isLoading 
+                                  ? const Center(key: ValueKey('loading'), child: CircularProgressIndicator())
+                                  : tabs.isEmpty
+                                    ? Center(
+                                        key: const ValueKey('empty'),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.bolt, size: 64, color: theme.dividerColor.withValues(alpha: 0.3)),
+                                            const SizedBox(height: 16),
+                                            Text(
+                                              'NO OPEN TABS',
+                                              style: TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.w900,
+                                                color: theme.dividerColor.withValues(alpha: 0.3),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              'PRESS CTRL+N TO CREATE A NEW REQUEST',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                color: theme.dividerColor.withValues(alpha: 0.2),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 24),
+                                            BrutalBounce(
+                                              child: ElevatedButton(
+                                                onPressed: () => context.read<TabsBloc>().add(const AddTab()),
+                                                style: ElevatedButton.styleFrom(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                                ),
+                                                child: const Text('NEW REQUEST'),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    : RequestView(
+                                        key: ValueKey('view_${tabs[activeIndex].tabId}'),
+                                        tabId: tabs[activeIndex].tabId,
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
