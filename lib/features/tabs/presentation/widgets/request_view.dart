@@ -397,7 +397,7 @@ class _UrlBarState extends State<_UrlBar> {
                   SizedBox(width: layout.isCompact ? 8 : 12),
                   BrutalBounce(
                     child: IconButton(
-                      icon: Icon(Icons.code, color: theme.colorScheme.primary, size: layout.isCompact ? 24 : 28),
+                      icon: Icon(Icons.code, color: theme.colorScheme.secondary, size: layout.isCompact ? 24 : 28),
                       tooltip: 'Copy as cURL',
                       onPressed: () {
                         final curl = CurlUtils.generate(tab.config);
@@ -406,7 +406,7 @@ class _UrlBarState extends State<_UrlBar> {
                           SnackBar(
                             content: const Text('cURL command copied to clipboard'),
                             behavior: SnackBarBehavior.floating,
-                            backgroundColor: theme.colorScheme.primary,
+                            backgroundColor: theme.colorScheme.secondary,
                           ),
                         );
                       },
@@ -550,35 +550,55 @@ class _RequestConfigSection extends StatelessWidget {
   }
 
   Widget _buildBodyEditor(BuildContext context, ThemeData theme) {
-    return Container(
-      color: theme.colorScheme.surface,
-      child: CodeEditor(
-        controller: bodyController,
-        wordWrap: true,
-        findBuilder: (context, controller, readOnly) => _CodeFindPanel(controller: controller, readOnly: readOnly),
-        style: CodeEditorStyle(
-          fontSize: 13,
-          fontFamily: GoogleFonts.jetBrainsMono().fontFamily,
-          backgroundColor: Colors.transparent,
-          cursorColor: theme.primaryColor,
-          selectionColor: theme.primaryColor.withValues(alpha: 0.3),
-          cursorLineColor: theme.primaryColor.withValues(alpha: 0.1),
-          codeTheme: CodeHighlightTheme(
-            languages: {
-              'json': CodeHighlightThemeMode(
-                mode: langJson,
+    final layout = theme.extension<LayoutExtension>()!;
+    
+    return Stack(
+      children: [
+        Container(
+          color: theme.colorScheme.surface,
+          child: CodeEditor(
+            controller: bodyController,
+            wordWrap: true,
+            findBuilder: (context, controller, readOnly) => _CodeFindPanel(controller: controller, readOnly: readOnly),
+            style: CodeEditorStyle(
+              fontSize: 13,
+              fontFamily: GoogleFonts.jetBrainsMono().fontFamily,
+              backgroundColor: Colors.transparent,
+              cursorColor: theme.primaryColor,
+              selectionColor: theme.primaryColor.withValues(alpha: 0.3),
+              cursorLineColor: theme.primaryColor.withValues(alpha: 0.1),
+              codeTheme: CodeHighlightTheme(
+                languages: {
+                  'json': CodeHighlightThemeMode(
+                    mode: langJson,
+                  ),
+                },
+                theme: theme.brightness == Brightness.dark ? atomOneDarkTheme : atomOneLightTheme,
               ),
+            ),
+            indicatorBuilder: (context, controller, chunkController, notifier) {
+              return DefaultCodeLineNumber(
+                controller: controller,
+                notifier: notifier,
+              );
             },
-            theme: theme.brightness == Brightness.dark ? atomOneDarkTheme : atomOneLightTheme,
           ),
         ),
-        indicatorBuilder: (context, controller, chunkController, notifier) {
-          return DefaultCodeLineNumber(
-            controller: controller,
-            notifier: notifier,
-          );
-        },
-      ),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: BrutalBounce(
+            child: IconButton(
+              icon: Icon(Icons.auto_fix_high, color: theme.colorScheme.secondary, size: layout.isCompact ? 20 : 24),
+              tooltip: 'Beautify JSON',
+              onPressed: () async {
+                final prettified = await JsonUtils.prettify(bodyController.text);
+                bodyController.text = prettified;
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

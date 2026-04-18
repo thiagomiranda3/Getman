@@ -145,7 +145,7 @@ class _UrlBarState extends State<UrlBar> {
                   SizedBox(width: layout.isCompact ? 8 : 12),
                   BrutalBounce(
                     child: IconButton(
-                      icon: Icon(Icons.code, color: theme.colorScheme.primary, size: layout.isCompact ? 24 : 28),
+                      icon: Icon(Icons.code, color: theme.colorScheme.secondary, size: layout.isCompact ? 24 : 28),
                       tooltip: 'Copy as cURL',
                       onPressed: () {
                         final curl = CurlUtils.generate(tab.config);
@@ -154,7 +154,7 @@ class _UrlBarState extends State<UrlBar> {
                           SnackBar(
                             content: const Text('cURL command copied to clipboard'),
                             behavior: SnackBarBehavior.floating,
-                            backgroundColor: theme.colorScheme.primary,
+                            backgroundColor: theme.colorScheme.secondary,
                           ),
                         );
                       },
