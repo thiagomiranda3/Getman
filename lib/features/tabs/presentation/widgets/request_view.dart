@@ -22,6 +22,7 @@ import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/core/theme/neo_brutalist_theme.dart';
 import 'package:getman/core/utils/json_utils.dart';
+import 'package:getman/core/utils/curl_utils.dart';
 
 class RequestView extends StatefulWidget {
   final String tabId;
@@ -345,7 +346,7 @@ class _UrlBarState extends State<_UrlBar> {
                       controller: _urlController,
                       style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
                       decoration: const InputDecoration(
-                        hintText: 'Enter URL...',
+                        hintText: 'Enter URL or paste cURL...',
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,
@@ -354,6 +355,39 @@ class _UrlBarState extends State<_UrlBar> {
                       ),
                       onChanged: (val) {
                          if (tab.config.url == val) return;
+
+                         if (val.trim().toLowerCase().startsWith('curl ')) {
+                           final parsedConfig = CurlUtils.parse(val, id: tab.config.id);
+                           if (parsedConfig != null) {
+                             // 1. Synchronously update everything except the potentially unprettified body first
+                             // This ensures the URL and Method change immediately
+                             context.read<TabsBloc>().add(UpdateTab(
+                               tab.copyWith(config: parsedConfig),
+                             ));
+                             
+                             _urlController.text = parsedConfig.url;
+
+                             // 2. Then, asynchronously prettify the body if it's JSON
+                             JsonUtils.prettify(parsedConfig.body).then((prettifiedBody) {
+                               // Get the latest tab from state to avoid using stale 'tab' instance
+                               final latestTabs = context.read<TabsBloc>().state.tabs;
+                               final latestTab = latestTabs.firstWhereOrNull((t) => t.tabId == tab.tabId);
+                               
+                               if (latestTab != null) {
+                                 context.read<TabsBloc>().add(UpdateTab(
+                                   latestTab.copyWith(config: latestTab.config.copyWith(body: prettifiedBody)),
+                                 ));
+                               }
+                               
+                               final requestViewState = context.findAncestorStateOfType<_RequestViewState>();
+                               if (requestViewState != null) {
+                                 requestViewState._bodyController?.text = prettifiedBody;
+                               }
+                             });
+                             return;
+                           }
+                         }
+
                          context.read<TabsBloc>().add(UpdateTab(
                           tab.copyWith(config: tab.config.copyWith(url: val)),
                         ));
@@ -361,6 +395,24 @@ class _UrlBarState extends State<_UrlBar> {
                     ),
                   ),
                   SizedBox(width: layout.isCompact ? 8 : 12),
+                  BrutalBounce(
+                    child: IconButton(
+                      icon: Icon(Icons.code, color: theme.colorScheme.primary, size: layout.isCompact ? 24 : 28),
+                      tooltip: 'Copy as cURL',
+                      onPressed: () {
+                        final curl = CurlUtils.generate(tab.config);
+                        Clipboard.setData(ClipboardData(text: curl));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('cURL command copied to clipboard'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: theme.colorScheme.primary,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  SizedBox(width: layout.isCompact ? 4 : 8),
                   BrutalBounce(
                     child: ElevatedButton(
                       onPressed: tab.isSending 

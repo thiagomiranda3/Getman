@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/di/injection_container.dart' as di;
 import 'core/theme/neo_brutalist_theme.dart';
 import 'features/settings/presentation/bloc/settings_bloc.dart';
-import 'features/settings/presentation/bloc/settings_event.dart';
 import 'features/settings/presentation/bloc/settings_state.dart';
 import 'features/history/presentation/bloc/history_bloc.dart';
 import 'features/history/presentation/bloc/history_event.dart';
