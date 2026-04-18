@@ -1,0 +1,79 @@
+import 'package:equatable/equatable.dart';
+import '../../domain/entities/request_tab_entity.dart';
+import '../../../history/domain/entities/request_config_entity.dart';
+
+abstract class TabsEvent extends Equatable {
+  const TabsEvent();
+  @override
+  List<Object?> get props => [];
+}
+
+class LoadTabs extends TabsEvent {}
+
+class AddTab extends TabsEvent {
+  final HttpRequestConfigEntity? config;
+  final String? collectionNodeId;
+  final String? collectionName;
+  const AddTab({this.config, this.collectionNodeId, this.collectionName});
+  @override
+  List<Object?> get props => [config, collectionNodeId, collectionName];
+}
+
+class RemoveTab extends TabsEvent {
+  final int index;
+  const RemoveTab(this.index);
+  @override
+  List<Object?> get props => [index];
+}
+
+class SetActiveIndex extends TabsEvent {
+  final int index;
+  const SetActiveIndex(this.index);
+  @override
+  List<Object?> get props => [index];
+}
+
+class ReorderTabs extends TabsEvent {
+  final int oldIndex;
+  final int newIndex;
+  const ReorderTabs(this.oldIndex, this.newIndex);
+  @override
+  List<Object?> get props => [oldIndex, newIndex];
+}
+
+class UpdateTab extends TabsEvent {
+  final HttpRequestTabEntity tab;
+  const UpdateTab(this.tab);
+  @override
+  List<Object?> get props => [tab];
+}
+
+class CloseOtherTabs extends TabsEvent {
+  final int index;
+  const CloseOtherTabs(this.index);
+  @override
+  List<Object?> get props => [index];
+}
+
+class CloseTabsToTheRight extends TabsEvent {
+  final int index;
+  const CloseTabsToTheRight(this.index);
+  @override
+  List<Object?> get props => [index];
+}
+
+class DuplicateTab extends TabsEvent {
+  final int index;
+  const DuplicateTab(this.index);
+  @override
+  List<Object?> get props => [index];
+}
+
+class SendRequest extends TabsEvent {}
+
+class CancelRequest extends TabsEvent {
+  final int index;
+  const CancelRequest(this.index);
+  @override
+  List<Object?> get props => [index];
+}
