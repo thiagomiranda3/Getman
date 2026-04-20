@@ -14,7 +14,6 @@ import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/app_theme.dart';
-import 'package:getman/core/theme/neo_brutalist_theme.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
 import 'package:getman/core/utils/status_color.dart';
 
@@ -111,14 +110,14 @@ class _SideMenuHeader extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              BrutalBounce(
+              context.appDecoration.wrapInteractive(
                 child: IconButton(
                   icon: Icon(Icons.create_new_folder, color: theme.colorScheme.onSurface, size: layout.iconSize),
                   tooltip: 'NEW FOLDER',
                   onPressed: () => _showNewFolderDialog(context),
                 ),
               ),
-              BrutalBounce(
+              context.appDecoration.wrapInteractive(
                 child: IconButton(
                   icon: Icon(Icons.settings, color: theme.colorScheme.onSurface, size: layout.iconSize),
                   tooltip: 'SETTINGS',
@@ -360,7 +359,7 @@ class _HistoryListState extends State<_HistoryList> {
                     hintText: 'SEARCH HISTORY...',
                     hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
                     prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(context.appShape.panelRadius), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     isDense: true,
                   ),
@@ -392,8 +391,8 @@ class _HistoryListState extends State<_HistoryList> {
     if (filteredItems.isEmpty) {
       return Center(
         child: Text('NO RESULTS FOUND', style: TextStyle(
-          fontSize: 12, 
-          fontWeight: FontWeight.w900, 
+          fontSize: context.appLayout.fontSizeNormal,
+          fontWeight: FontWeight.w900,
           color: Theme.of(context).dividerColor.withValues(alpha: 0.5)
         )),
       );
@@ -564,7 +563,7 @@ class _CollectionsListState extends State<_CollectionsList> {
                   hintText: 'SEARCH COLLECTIONS...',
                   hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
                   prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(context.appShape.panelRadius), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   isDense: true,
                 ),
@@ -631,7 +630,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
           context.read<CollectionsBloc>().add(MoveNode(details.data, node.id));
         },
         builder: (context, candidateData, rejectedData) {
-          return BrutalBounce(
+          return context.appDecoration.wrapInteractive(
             child: InkWell(
               onTap: widget.onToggle,
               child: MouseRegion(
@@ -673,7 +672,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
         },
       );
     } else {
-      content = BrutalBounce(
+      content = context.appDecoration.wrapInteractive(
         child: InkWell(
           onTap: () {
             final config = node.config;
@@ -722,7 +721,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
             horizontal: layout.inputPadding,
             vertical: layout.inputPaddingVertical,
           ),
-          decoration: NeoBrutalistTheme.brutalBox(context, color: theme.primaryColor),
+          decoration: context.appDecoration.panelBox(context, color: theme.primaryColor),
           child: Text(
             node.name.toUpperCase(),
             style: TextStyle(
@@ -753,7 +752,7 @@ class _NodeContextMenu extends StatelessWidget {
       color: theme.colorScheme.surface,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
         side: BorderSide(color: theme.dividerColor, width: layout.borderThick),
       ),
       onSelected: (val) {
