@@ -51,6 +51,7 @@ class _BrutalBounceState extends State<BrutalBounce> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTapDown: (_) => _controller.forward(),
       onTapUp: (_) {
         _controller.reverse();
