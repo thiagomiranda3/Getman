@@ -457,6 +457,7 @@ typedef TabShapeBuilder = BoxDecoration Function(
   BuildContext context, {
   required bool active,
   required bool hovered,
+  required bool isFirst,
 });
 
 typedef InteractiveWrapper = Widget Function({

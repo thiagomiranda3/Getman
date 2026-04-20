@@ -30,6 +30,7 @@ BoxDecoration brutalistTabShape(
   BuildContext context, {
   required bool active,
   required bool hovered,
+  required bool isFirst,
 }) {
   final theme = Theme.of(context);
   final layout = context.appLayout;
@@ -45,6 +46,7 @@ BoxDecoration brutalistTabShape(
   return BoxDecoration(
     color: background,
     border: Border(
+      left: isFirst ? BorderSide(color: border, width: layout.borderThick) : BorderSide.none,
       right: BorderSide(color: border, width: layout.borderThick),
       bottom: active ? BorderSide.none : BorderSide(color: border, width: layout.borderThick),
       top: active ? BorderSide(color: border, width: layout.borderThick) : BorderSide.none,

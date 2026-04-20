@@ -391,7 +391,12 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
                         maxWidth: layout.isCompact ? 150 : 250,
                       ),
                       padding: EdgeInsets.symmetric(horizontal: layout.tabPaddingHorizontal),
-                      decoration: context.appDecoration.tabShape(context, active: widget.isActive, hovered: _isHovered),
+                      decoration: context.appDecoration.tabShape(
+                        context,
+                        active: widget.isActive,
+                        hovered: _isHovered,
+                        isFirst: widget.index == 0,
+                      ),
                       child: Row(
                         children: [
                           Expanded(
