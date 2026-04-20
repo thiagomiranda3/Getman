@@ -50,6 +50,8 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
     tabShape: brutalistTabShape,
     wrapInteractive: ({required child, onTap, scaleDown}) =>
         BrutalBounce(onTap: onTap, scaleDown: scaleDown ?? 0.95, child: child),
+    scaffoldBackground: brutalistScaffoldBackground,
+    doubleRule: brutalistDoubleRule,
   );
 
   final base = ThemeData(

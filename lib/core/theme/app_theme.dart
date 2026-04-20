@@ -466,15 +466,26 @@ typedef InteractiveWrapper = Widget Function({
   double? scaleDown,
 });
 
+typedef ScaffoldBackgroundWrapper = Widget Function(
+  BuildContext context, {
+  required Widget child,
+});
+
+typedef DoubleRuleBuilder = Widget Function(BuildContext context);
+
 class AppDecoration extends ThemeExtension<AppDecoration> {
   final PanelBoxBuilder panelBox;
   final TabShapeBuilder tabShape;
   final InteractiveWrapper wrapInteractive;
+  final ScaffoldBackgroundWrapper scaffoldBackground;
+  final DoubleRuleBuilder doubleRule;
 
   const AppDecoration({
     required this.panelBox,
     required this.tabShape,
     required this.wrapInteractive,
+    required this.scaffoldBackground,
+    required this.doubleRule,
   });
 
   @override
@@ -482,11 +493,15 @@ class AppDecoration extends ThemeExtension<AppDecoration> {
     PanelBoxBuilder? panelBox,
     TabShapeBuilder? tabShape,
     InteractiveWrapper? wrapInteractive,
+    ScaffoldBackgroundWrapper? scaffoldBackground,
+    DoubleRuleBuilder? doubleRule,
   }) {
     return AppDecoration(
       panelBox: panelBox ?? this.panelBox,
       tabShape: tabShape ?? this.tabShape,
       wrapInteractive: wrapInteractive ?? this.wrapInteractive,
+      scaffoldBackground: scaffoldBackground ?? this.scaffoldBackground,
+      doubleRule: doubleRule ?? this.doubleRule,
     );
   }
 

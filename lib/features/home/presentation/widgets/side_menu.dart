@@ -14,6 +14,7 @@ import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/theme_ids.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
 
 class SideMenu extends StatelessWidget {
@@ -257,6 +258,26 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                   ),
                   value: settings.isDarkMode,
                   onChanged: (val) => context.read<SettingsBloc>().add(UpdateDarkMode(val)),
+                ),
+                ListTile(
+                  leading: Icon(Icons.palette_outlined, size: layout.iconSize),
+                  title: Text(
+                    'THEME',
+                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
+                  ),
+                  trailing: DropdownButton<String>(
+                    value: settings.themeId,
+                    underline: const SizedBox.shrink(),
+                    items: const [
+                      DropdownMenuItem(value: kBrutalistThemeId, child: Text('BRUTALIST')),
+                      DropdownMenuItem(value: kEditorialThemeId, child: Text('EDITORIAL')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        context.read<SettingsBloc>().add(UpdateThemeId(value));
+                      }
+                    },
+                  ),
                 ),
                 SwitchListTile(
                   activeThumbColor: theme.colorScheme.secondary,

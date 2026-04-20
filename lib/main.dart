@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/di/injection_container.dart' as di;
+import 'core/theme/app_theme.dart';
 import 'core/theme/theme_registry.dart';
 import 'features/settings/presentation/bloc/settings_bloc.dart';
 import 'features/settings/presentation/bloc/settings_state.dart';
@@ -71,7 +72,10 @@ class MyApp extends StatelessWidget {
                 builder: (context, child) {
                   return Focus(
                     autofocus: true,
-                    child: child ?? const SizedBox.shrink(),
+                    child: context.appDecoration.scaffoldBackground(
+                      context,
+                      child: child ?? const SizedBox.shrink(),
+                    ),
                   );
                 },
               ),
