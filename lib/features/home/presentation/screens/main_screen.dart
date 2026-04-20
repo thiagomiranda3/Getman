@@ -316,7 +316,6 @@ class _TabWidget extends StatefulWidget {
 }
 
 class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
-  bool _isHovered = false;
   late AnimationController _sizeController;
   late Animation<double> _sizeAnimation;
   bool _isClosing = false;
@@ -377,8 +376,6 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
               child: ReorderableDragStartListener(
                 index: widget.index,
                 child: MouseRegion(
-                  onEnter: (_) => setState(() => _isHovered = true),
-                  onExit: (_) => setState(() => _isHovered = false),
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
                     onTap: widget.onTap,
@@ -391,17 +388,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
                         maxWidth: layout.isCompact ? 150 : 250,
                       ),
                       padding: EdgeInsets.symmetric(horizontal: layout.tabPaddingHorizontal),
-                      decoration: BoxDecoration(
-                        color: widget.isActive
-                            ? theme.primaryColor
-                            : (_isHovered ? theme.dividerColor.withValues(alpha: 0.2) : theme.scaffoldBackgroundColor),
-                        border: Border(
-                          top: BorderSide(color: theme.dividerColor, width: layout.borderThick),
-                          left: widget.index == 0 ? BorderSide(color: theme.dividerColor, width: layout.borderThick) : BorderSide.none,
-                          right: BorderSide(color: theme.dividerColor, width: layout.borderThick),
-                          bottom: widget.isActive ? BorderSide.none : BorderSide(color: theme.dividerColor, width: layout.borderThick),
-                        ),
-                      ),
+                      decoration: context.appDecoration.tabShape(context, active: widget.isActive),
                       child: Row(
                         children: [
                           Expanded(

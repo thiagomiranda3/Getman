@@ -36,9 +36,9 @@ BoxDecoration brutalistTabShape(
   return BoxDecoration(
     color: active ? theme.primaryColor : theme.cardColor,
     border: Border(
-      right: BorderSide(color: border, width: layout.borderThin),
-      bottom: active ? BorderSide.none : BorderSide(color: border, width: layout.borderThin),
-      top: active ? BorderSide(color: border, width: layout.borderHeavy) : BorderSide.none,
+      top: BorderSide(color: border, width: layout.borderThick),
+      right: BorderSide(color: border, width: layout.borderThick),
+      bottom: active ? BorderSide.none : BorderSide(color: border, width: layout.borderThick),
     ),
   );
 }
