@@ -21,7 +21,6 @@ import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/core/theme/app_theme.dart';
-import 'package:getman/core/theme/neo_brutalist_theme.dart';
 import 'package:getman/core/network/http_methods.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/core/utils/curl_utils.dart';
@@ -221,10 +220,10 @@ class _RequestViewState extends State<RequestView> {
           elevation: 0,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(context.appShape.panelRadius),
             side: BorderSide(color: theme.dividerColor, width: layout.borderThick),
           ),
-          content: Text('REQUEST UPDATED!', style: TextStyle(color: theme.colorScheme.onPrimary, fontSize: 12, fontWeight: FontWeight.w900)),
+          content: Text('REQUEST UPDATED!', style: TextStyle(color: theme.colorScheme.onPrimary, fontSize: context.appLayout.fontSizeNormal, fontWeight: FontWeight.w900)),
           duration: const Duration(seconds: 1),
         ),
       );
@@ -334,7 +333,7 @@ class _UrlBarState extends State<_UrlBar> {
 
             return Container(
               padding: const EdgeInsets.all(6),
-              decoration: NeoBrutalistTheme.brutalBox(context, offset: layout.cardOffset),
+              decoration: context.appDecoration.panelBox(context, offset: layout.cardOffset),
               child: Row(
                 children: [
                   Container(
@@ -357,7 +356,7 @@ class _UrlBarState extends State<_UrlBar> {
                               alignment: Alignment.center,
                               padding: EdgeInsets.symmetric(horizontal: layout.isCompact ? 8 : 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: NeoBrutalistTheme.getMethodColor(m),
+                                color: context.appPalette.methodColor(m),
                                 border: Border.all(color: theme.dividerColor, width: layout.borderThin),
                               ),
                               child: Text(m, style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: layout.fontSizeNormal)),
@@ -371,7 +370,7 @@ class _UrlBarState extends State<_UrlBar> {
                                 width: layout.isCompact ? 80 : 100,
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: NeoBrutalistTheme.getMethodColor(m),
+                                  color: context.appPalette.methodColor(m),
                                   border: Border.all(color: theme.dividerColor, width: layout.borderThin),
                                 ),
                                 child: Text(m, style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: layout.fontSizeNormal)),
@@ -405,7 +404,7 @@ class _UrlBarState extends State<_UrlBar> {
                     ),
                   ),
                   SizedBox(width: layout.isCompact ? 8 : 12),
-                  BrutalBounce(
+                  context.appDecoration.wrapInteractive(
                     child: IconButton(
                       icon: Icon(Icons.code, color: theme.colorScheme.secondary, size: layout.isCompact ? 24 : 28),
                       tooltip: 'Copy as cURL',
@@ -423,7 +422,7 @@ class _UrlBarState extends State<_UrlBar> {
                     ),
                   ),
                   SizedBox(width: layout.isCompact ? 4 : 8),
-                  BrutalBounce(
+                  context.appDecoration.wrapInteractive(
                     child: ElevatedButton(
                       onPressed: tab.isSending
                         ? () => context.read<TabsBloc>().add(CancelRequest(tab.tabId))
@@ -458,7 +457,7 @@ class _UrlBarState extends State<_UrlBar> {
                     ),
                   ),
                   SizedBox(width: layout.isCompact ? 8 : 12),
-                  BrutalBounce(
+                  context.appDecoration.wrapInteractive(
                     child: IconButton(
                       icon: Icon(tab.collectionNodeId != null ? Icons.save : Icons.save_as, color: theme.colorScheme.secondary, size: layout.isCompact ? 24 : 28),
                       tooltip: tab.collectionNodeId != null ? 'Update Request' : 'Save to Collection',
@@ -466,7 +465,7 @@ class _UrlBarState extends State<_UrlBar> {
                     ),
                   ),
                   SizedBox(width: layout.isCompact ? 4 : 8),
-                  BrutalBounce(
+                  context.appDecoration.wrapInteractive(
                     child: IconButton(
                       icon: Icon(
                         settings.isVerticalLayout ? Icons.view_column_rounded : Icons.view_agenda_rounded,
@@ -564,7 +563,7 @@ class _RequestConfigSection extends StatelessWidget {
               ),
               Expanded(
                 child: Container(
-                  decoration: NeoBrutalistTheme.brutalBox(context, offset: 0),
+                  decoration: context.appDecoration.panelBox(context, offset: 0),
                   child: TabBarView(
                     children: [
                       _KeyValueEditor(
@@ -611,7 +610,7 @@ class _RequestConfigSection extends StatelessWidget {
             wordWrap: true,
             findBuilder: (context, controller, readOnly) => _CodeFindPanel(controller: controller, readOnly: readOnly),
             style: CodeEditorStyle(
-              fontSize: 13,
+              fontSize: context.appLayout.fontSizeCode,
               fontFamily: GoogleFonts.jetBrainsMono().fontFamily,
               backgroundColor: Colors.transparent,
               cursorColor: theme.primaryColor,
@@ -637,7 +636,7 @@ class _RequestConfigSection extends StatelessWidget {
         Positioned(
           top: 8,
           right: 8,
-          child: BrutalBounce(
+          child: context.appDecoration.wrapInteractive(
             child: IconButton(
               icon: Icon(Icons.auto_fix_high, color: theme.colorScheme.secondary, size: layout.isCompact ? 20 : 24),
               tooltip: 'Beautify JSON',
@@ -768,7 +767,7 @@ class _ResponseSection extends StatelessWidget {
                     ),
                     Expanded(
                       child: Container(
-                        decoration: NeoBrutalistTheme.brutalBox(context, offset: 0),
+                        decoration: context.appDecoration.panelBox(context, offset: 0),
                         child: TabBarView(
                           children: [
                             _ResponseBodyView(tabId: tabId, responseController: responseController),
@@ -837,7 +836,7 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
           wordWrap: true,
           findBuilder: (context, controller, readOnly) => _CodeFindPanel(controller: controller, readOnly: readOnly),
           style: CodeEditorStyle(
-            fontSize: 13,
+            fontSize: context.appLayout.fontSizeCode,
             fontFamily: GoogleFonts.jetBrainsMono().fontFamily,
             backgroundColor: Colors.transparent,
             cursorColor: Theme.of(context).primaryColor,
@@ -925,7 +924,7 @@ class _ResponseMetadataItem extends StatelessWidget {
           decoration: BoxDecoration(
             color: animColor,
             border: Border.all(color: theme.dividerColor, width: layout.borderThin),
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(context.appShape.panelRadius),
           ),
           child: child,
         );
@@ -1105,7 +1104,7 @@ class _KeyValueRowState extends State<_KeyValueRow> {
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         decoration: BoxDecoration(
           color: _isHovered ? theme.hoverColor : Colors.transparent,
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(context.appShape.panelRadius),
           border: Border.all(color: _isHovered ? theme.dividerColor.withValues(alpha: 0.5) : Colors.transparent),
         ),
         child: Row(
@@ -1136,7 +1135,7 @@ class _KeyValueRowState extends State<_KeyValueRow> {
               ),
             ),
             SizedBox(width: widget.layout.isCompact ? 4 : 8),
-            BrutalBounce(
+            context.appDecoration.wrapInteractive(
               child: IconButton(
                 icon: Icon(Icons.delete_outline, size: widget.layout.isCompact ? 20 : 24, color: Colors.red),
                 onPressed: widget.onDelete,
