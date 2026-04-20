@@ -31,7 +31,7 @@ void main() {
       expect(mid.tabTitleMaxLength, AppLayout.compact.tabTitleMaxLength);
     });
 
-    test('lerp with a different type returns this', () {
+    test('lerp with null returns this', () {
       final result = AppLayout.normal.lerp(null, 0.5);
       expect(result, AppLayout.normal);
     });
