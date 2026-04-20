@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
-import 'package:getman/core/theme/neo_brutalist_theme.dart';
 
 class MethodBadge extends StatelessWidget {
   final String method;
@@ -11,7 +10,7 @@ class MethodBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = theme.extension<AppLayout>()!;
-    final color = NeoBrutalistTheme.getMethodColor(method);
+    final color = context.appPalette.methodColor(method);
 
     return Container(
       padding: EdgeInsets.symmetric(

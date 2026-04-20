@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_theme.dart';
+import 'themes/brutalist/brutalist_palette.dart';
 
 class NeoBrutalistTheme {
   // Neo-Brutalist Colors
@@ -44,13 +45,26 @@ class NeoBrutalistTheme {
     final Color currentPrimary = isDark ? primaryDark : primary;
     final Color currentSecondary = isDark ? secondaryDark : secondary;
     final AppLayout layout = isCompact ? AppLayout.compact : AppLayout.normal;
+    const AppShape shape = AppShape(panelRadius: 4, buttonRadius: 4, inputRadius: 4, dialogRadius: 8);
+    final AppPalette palette = AppPalette(
+      methodColors: BrutalistPalette.methodColors,
+      methodFallback: BrutalistPalette.methodFallback,
+      statusSuccess: Colors.green.shade700,
+      statusWarning: Colors.orange.shade700,
+      statusError: Colors.red.shade700,
+      statusAccentSuccess: Colors.greenAccent,
+      statusAccentWarning: Colors.orangeAccent,
+      statusAccentError: Colors.redAccent,
+      codeBackground: isDark ? BrutalistPalette.backgroundDark : Colors.white,
+      mutedHover: Colors.black.withValues(alpha: 0.05),
+    );
 
     final baseTextTheme = GoogleFonts.lexendTextTheme();
 
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
-      extensions: [layout],
+      extensions: [layout, palette, shape],
       primaryColor: currentPrimary,
       scaffoldBackgroundColor: background,
       canvasColor: surface,

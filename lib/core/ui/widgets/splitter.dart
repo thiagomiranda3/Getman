@@ -36,7 +36,7 @@ class Splitter extends StatelessWidget {
               height: isVertical ? layout.splitterLineSize : layout.splitterGrabSize,
               decoration: BoxDecoration(
                 color: theme.dividerColor.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(context.appShape.panelRadius / 2),
               ),
             ),
           ),
