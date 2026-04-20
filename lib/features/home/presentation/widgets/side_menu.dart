@@ -13,6 +13,7 @@ import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/neo_brutalist_theme.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
 import 'package:getman/core/utils/status_color.dart';
@@ -23,7 +24,7 @@ class SideMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = Theme.of(context).extension<LayoutExtension>()!;
+    final layout = Theme.of(context).extension<AppLayout>()!;
     
     return DefaultTabController(
       length: 2,
@@ -84,7 +85,7 @@ class _SideMenuHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = Theme.of(context).extension<LayoutExtension>()!;
+    final layout = Theme.of(context).extension<AppLayout>()!;
     
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: layout.inputPadding, vertical: layout.headerPaddingVertical),
@@ -195,7 +196,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
 
     return BlocBuilder<SettingsBloc, SettingsState>(
       buildWhen: (prev, next) => prev.settings != next.settings,
@@ -310,7 +311,7 @@ class _HistoryListState extends State<_HistoryList> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
 
     return BlocBuilder<HistoryBloc, HistoryState>(
       builder: (context, state) {
@@ -452,7 +453,7 @@ class _HistoryItemWidgetState extends State<_HistoryItemWidget> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -540,7 +541,7 @@ class _CollectionsListState extends State<_CollectionsList> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
     
     return BlocBuilder<CollectionsBloc, CollectionsState>(
       builder: (context, state) {
@@ -613,7 +614,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
     final node = widget.entry.node;
 
     Widget content;
@@ -745,7 +746,7 @@ class _NodeContextMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
 
     return PopupMenuButton<String>(
       icon: Icon(Icons.more_vert, size: layout.iconSize, color: theme.colorScheme.onSurface),

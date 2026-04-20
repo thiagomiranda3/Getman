@@ -14,6 +14,7 @@ import 'package:getman/features/tabs/presentation/widgets/request_view.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
+import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/neo_brutalist_theme.dart';
 import 'package:getman/core/navigation/intents.dart';
 import 'package:getman/features/home/presentation/widgets/side_menu.dart';
@@ -219,7 +220,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildTabBar(BuildContext context, int activeIndex, List<HttpRequestTabEntity> tabs) {
     final theme = Theme.of(context);
-    final layout = Theme.of(context).extension<LayoutExtension>()!;
+    final layout = Theme.of(context).extension<AppLayout>()!;
 
     return Container(
       height: layout.tabBarHeight,
@@ -261,7 +262,7 @@ class _MainScreenState extends State<MainScreen> {
 }
 
 class _AddTabButton extends StatefulWidget {
-  final LayoutExtension layout;
+  final AppLayout layout;
 
   const _AddTabButton({required this.layout});
 
@@ -354,7 +355,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
 
     return BlocBuilder<TabsBloc, TabsState>(
       builder: (context, state) {
@@ -447,7 +448,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
 
   void _showContextMenu(BuildContext context, Offset position, HttpRequestTabEntity tab) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
     final tabsBloc = context.read<TabsBloc>();
 
     showMenu(

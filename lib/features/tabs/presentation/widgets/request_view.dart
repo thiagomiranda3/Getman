@@ -20,6 +20,7 @@ import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/neo_brutalist_theme.dart';
 import 'package:getman/core/network/http_methods.dart';
 import 'package:getman/core/utils/json_utils.dart';
@@ -102,7 +103,7 @@ class _RequestViewState extends State<RequestView> {
     return BlocBuilder<SettingsBloc, SettingsState>(
       builder: (context, settingsState) {
         final settings = settingsState.settings;
-        final layout = Theme.of(context).extension<LayoutExtension>()!;
+        final layout = Theme.of(context).extension<AppLayout>()!;
 
         return BlocConsumer<TabsBloc, TabsState>(
           listenWhen: (prev, next) {
@@ -203,7 +204,7 @@ class _RequestViewState extends State<RequestView> {
     final collectionsBloc = context.read<CollectionsBloc>();
     final tabsBloc = context.read<TabsBloc>();
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
 
     final savedNode = tab.collectionNodeId == null
         ? null
@@ -328,7 +329,7 @@ class _UrlBarState extends State<_UrlBar> {
         return BlocBuilder<SettingsBloc, SettingsState>(
           builder: (context, settingsState) {
             final settings = settingsState.settings;
-            final layout = Theme.of(context).extension<LayoutExtension>()!;
+            final layout = Theme.of(context).extension<AppLayout>()!;
             final theme = Theme.of(context);
 
             return Container(
@@ -522,7 +523,7 @@ class _RequestConfigSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
 
     return BlocBuilder<TabsBloc, TabsState>(
       buildWhen: (prev, next) {
@@ -599,7 +600,7 @@ class _RequestConfigSection extends StatelessWidget {
   }
 
   Widget _buildBodyEditor(BuildContext context, ThemeData theme) {
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
 
     return Stack(
       children: [
@@ -669,7 +670,7 @@ class _ResponseSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
 
     return BlocBuilder<TabsBloc, TabsState>(
       buildWhen: (prev, next) {
@@ -869,7 +870,7 @@ class _ResponseHeadersView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final layout = Theme.of(context).extension<LayoutExtension>()!;
+    final layout = Theme.of(context).extension<AppLayout>()!;
     final theme = Theme.of(context);
 
     return BlocBuilder<TabsBloc, TabsState>(
@@ -905,7 +906,7 @@ class _ResponseMetadataItem extends StatelessWidget {
   final String label;
   final String value;
   final Color? color;
-  final LayoutExtension layout;
+  final AppLayout layout;
   const _ResponseMetadataItem({required this.label, required this.value, this.color, required this.layout});
 
   @override
@@ -1025,7 +1026,7 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final layout = Theme.of(context).extension<LayoutExtension>()!;
+    final layout = Theme.of(context).extension<AppLayout>()!;
 
     return ListView.builder(
       itemCount: _keyControllers.length,
@@ -1068,7 +1069,7 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
 class _KeyValueRow extends StatefulWidget {
   final TextEditingController keyController;
   final TextEditingController valController;
-  final LayoutExtension layout;
+  final AppLayout layout;
   final bool isLast;
   final Function(String) onKeyChanged;
   final Function(String) onValChanged;
@@ -1188,7 +1189,7 @@ class _CodeFindPanelState extends State<_CodeFindPanel> {
     }
 
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

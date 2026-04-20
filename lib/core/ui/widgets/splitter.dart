@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:getman/core/theme/neo_brutalist_theme.dart';
+import 'package:getman/core/theme/app_theme.dart';
 
 class Splitter extends StatelessWidget {
   final bool isVertical;
@@ -16,7 +16,7 @@ class Splitter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
     final splitterSize = layout.isCompact ? 12.0 : 16.0;
 
     return GestureDetector(
