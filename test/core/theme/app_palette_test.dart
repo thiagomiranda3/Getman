@@ -44,6 +44,24 @@ void main() {
       expect(palette.statusAccent(404), Colors.redAccent);
     });
 
+    test('statusColor/statusAccent handle band boundaries correctly', () {
+      // Just below 2xx → warning
+      expect(palette.statusColor(199), Colors.orange);
+      expect(palette.statusAccent(199), Colors.orangeAccent);
+      // First 2xx → success
+      expect(palette.statusColor(200), Colors.green);
+      expect(palette.statusAccent(200), Colors.greenAccent);
+      // Last 2xx → success
+      expect(palette.statusColor(299), Colors.green);
+      // First 3xx → warning
+      expect(palette.statusColor(300), Colors.orange);
+      // Last 3xx → warning
+      expect(palette.statusColor(399), Colors.orange);
+      // First 4xx → error
+      expect(palette.statusColor(400), Colors.red);
+      expect(palette.statusAccent(400), Colors.redAccent);
+    });
+
     test('copyWith preserves non-overridden fields', () {
       final copy = palette.copyWith(codeBackground: const Color(0xFF222222));
       expect(copy.codeBackground, const Color(0xFF222222));
