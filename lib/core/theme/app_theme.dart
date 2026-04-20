@@ -278,3 +278,88 @@ class AppLayout extends ThemeExtension<AppLayout> {
     splitterLineSize: 2.0,
   );
 }
+
+class AppPalette extends ThemeExtension<AppPalette> {
+  final Map<String, Color> methodColors;
+  final Color methodFallback;
+  final Color statusSuccess;
+  final Color statusWarning;
+  final Color statusError;
+  final Color statusAccentSuccess;
+  final Color statusAccentWarning;
+  final Color statusAccentError;
+  final Color codeBackground;
+  final Color mutedHover;
+
+  const AppPalette({
+    required this.methodColors,
+    required this.methodFallback,
+    required this.statusSuccess,
+    required this.statusWarning,
+    required this.statusError,
+    required this.statusAccentSuccess,
+    required this.statusAccentWarning,
+    required this.statusAccentError,
+    required this.codeBackground,
+    required this.mutedHover,
+  });
+
+  Color methodColor(String method) =>
+      methodColors[method.toUpperCase()] ?? methodFallback;
+
+  Color statusColor(int code) {
+    if (code >= 200 && code < 300) return statusSuccess;
+    if (code >= 400) return statusError;
+    return statusWarning;
+  }
+
+  Color statusAccent(int code) {
+    if (code >= 200 && code < 300) return statusAccentSuccess;
+    if (code >= 400) return statusAccentError;
+    return statusAccentWarning;
+  }
+
+  @override
+  AppPalette copyWith({
+    Map<String, Color>? methodColors,
+    Color? methodFallback,
+    Color? statusSuccess,
+    Color? statusWarning,
+    Color? statusError,
+    Color? statusAccentSuccess,
+    Color? statusAccentWarning,
+    Color? statusAccentError,
+    Color? codeBackground,
+    Color? mutedHover,
+  }) {
+    return AppPalette(
+      methodColors: methodColors ?? this.methodColors,
+      methodFallback: methodFallback ?? this.methodFallback,
+      statusSuccess: statusSuccess ?? this.statusSuccess,
+      statusWarning: statusWarning ?? this.statusWarning,
+      statusError: statusError ?? this.statusError,
+      statusAccentSuccess: statusAccentSuccess ?? this.statusAccentSuccess,
+      statusAccentWarning: statusAccentWarning ?? this.statusAccentWarning,
+      statusAccentError: statusAccentError ?? this.statusAccentError,
+      codeBackground: codeBackground ?? this.codeBackground,
+      mutedHover: mutedHover ?? this.mutedHover,
+    );
+  }
+
+  @override
+  AppPalette lerp(ThemeExtension<AppPalette>? other, double t) {
+    if (other is! AppPalette) return this;
+    return AppPalette(
+      methodColors: other.methodColors,
+      methodFallback: Color.lerp(methodFallback, other.methodFallback, t)!,
+      statusSuccess: Color.lerp(statusSuccess, other.statusSuccess, t)!,
+      statusWarning: Color.lerp(statusWarning, other.statusWarning, t)!,
+      statusError: Color.lerp(statusError, other.statusError, t)!,
+      statusAccentSuccess: Color.lerp(statusAccentSuccess, other.statusAccentSuccess, t)!,
+      statusAccentWarning: Color.lerp(statusAccentWarning, other.statusAccentWarning, t)!,
+      statusAccentError: Color.lerp(statusAccentError, other.statusAccentError, t)!,
+      codeBackground: Color.lerp(codeBackground, other.codeBackground, t)!,
+      mutedHover: Color.lerp(mutedHover, other.mutedHover, t)!,
+    );
+  }
+}
