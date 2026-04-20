@@ -1,3 +1,5 @@
+import '../../../../core/error/exceptions.dart';
+import '../../../../core/error/failures.dart';
 import '../../domain/entities/collection_node_entity.dart';
 import '../../domain/repositories/collections_repository.dart';
 import '../datasources/collections_local_data_source.dart';
@@ -10,13 +12,21 @@ class CollectionsRepositoryImpl implements CollectionsRepository {
 
   @override
   Future<List<CollectionNodeEntity>> getCollections() async {
-    final models = await localDataSource.getCollections();
-    return models.map((m) => m.toEntity()).toList();
+    try {
+      final models = await localDataSource.getCollections();
+      return models.map((m) => m.toEntity()).toList();
+    } on PersistenceException catch (e) {
+      throw PersistenceFailure(e.message);
+    }
   }
 
   @override
   Future<void> saveCollections(List<CollectionNodeEntity> collections) async {
-    final models = collections.map((e) => CollectionNode.fromEntity(e)).toList();
-    await localDataSource.saveCollections(models);
+    try {
+      final models = collections.map((e) => CollectionNode.fromEntity(e)).toList();
+      await localDataSource.saveCollections(models);
+    } on PersistenceException catch (e) {
+      throw PersistenceFailure(e.message);
+    }
   }
 }

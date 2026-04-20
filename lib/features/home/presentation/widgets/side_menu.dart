@@ -14,6 +14,7 @@ import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/history/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/neo_brutalist_theme.dart';
+import 'package:getman/core/ui/widgets/method_badge.dart';
 
 class SideMenu extends StatelessWidget {
   const SideMenu({super.key});
@@ -428,7 +429,7 @@ class _HistoryItemWidgetState extends State<_HistoryItemWidget> {
           ),
           subtitle: Row(
             children: [
-              _MethodBadge(method: widget.config.method, small: true),
+              MethodBadge(method: widget.config.method, small: true),
               if (widget.config.statusCode != null) ...[
                 const SizedBox(width: 8),
                 Text(widget.config.statusCode.toString(), style: TextStyle(
@@ -654,7 +655,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
               child: Row(
                 children: [
                   SizedBox(width: layout.smallIconSize), 
-                  _MethodBadge(method: node.config?.method ?? 'GET', small: true),
+                  MethodBadge(method: node.config?.method ?? 'GET', small: true),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold)),
@@ -724,7 +725,7 @@ class _NodeContextMenu extends StatelessWidget {
         PopupMenuItem(value: 'rename', child: Text('RENAME', style: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold))),
         if (node.isFolder)
            PopupMenuItem(value: 'add_subfolder', child: Text('ADD SUBFOLDER', style: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold))),
-        PopupMenuItem(value: 'delete', child: Text('DELETE', style: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold, color: Colors.red))),
+        PopupMenuItem(value: 'delete', child: Text('DELETE', style: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold, color: theme.colorScheme.error))),
       ],
     );
   }
@@ -772,34 +773,3 @@ class _NodeContextMenu extends StatelessWidget {
   }
 }
 
-class _MethodBadge extends StatelessWidget {
-  final String method;
-  final bool small;
-  const _MethodBadge({required this.method, this.small = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
-    final color = NeoBrutalistTheme.getMethodColor(method);
-    
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: small ? layout.badgePaddingHorizontal : 10, 
-        vertical: layout.badgePaddingVertical
-      ),
-      decoration: BoxDecoration(
-        color: color,
-        border: Border.all(color: theme.dividerColor, width: 2),
-      ),
-      child: Text(
-        method,
-        style: TextStyle(
-          color: Colors.black, 
-          fontWeight: FontWeight.w900, 
-          fontSize: small ? layout.fontSizeSmall : layout.fontSizeNormal
-        ),
-      ),
-    );
-  }
-}

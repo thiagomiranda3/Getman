@@ -18,3 +18,10 @@ class AddRequestToHistory extends HistoryEvent {
 }
 
 class ClearHistory extends HistoryEvent {}
+
+class HistoryUpdated extends HistoryEvent {
+  final List<HttpRequestConfigEntity> history;
+  const HistoryUpdated(this.history);
+  @override
+  List<Object?> get props => [history];
+}

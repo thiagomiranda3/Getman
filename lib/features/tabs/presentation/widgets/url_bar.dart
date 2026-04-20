@@ -170,10 +170,10 @@ class _UrlBarState extends State<UrlBar> {
                           }
                         : () => context.read<TabsBloc>().add(SendRequest()),
                       style: ElevatedButton.styleFrom(
-                         backgroundColor: tab.isSending ? Colors.red : null,
-                         foregroundColor: tab.isSending ? Colors.white : null,
+                         backgroundColor: tab.isSending ? theme.colorScheme.error : null,
+                         foregroundColor: tab.isSending ? theme.colorScheme.onError : null,
                          padding: EdgeInsets.symmetric(
-                           horizontal: layout.buttonPaddingHorizontal, 
+                           horizontal: layout.buttonPaddingHorizontal,
                            vertical: layout.buttonPaddingVertical
                          ),
                       ),
@@ -185,7 +185,7 @@ class _UrlBarState extends State<UrlBar> {
                               key: const ValueKey('cancel'),
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                                SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onError)),
                                 const SizedBox(width: 8),
                                 Text('CANCEL', style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w900)),
                               ],

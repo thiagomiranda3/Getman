@@ -18,3 +18,9 @@ class ClearHistoryUseCase {
   ClearHistoryUseCase(this.repository);
   Future<void> call() => repository.clearHistory();
 }
+
+class WatchHistoryUseCase {
+  final HistoryRepository repository;
+  WatchHistoryUseCase(this.repository);
+  Stream<List<HttpRequestConfigEntity>> call() => repository.watchHistory();
+}

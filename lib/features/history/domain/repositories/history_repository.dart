@@ -5,4 +5,5 @@ abstract class HistoryRepository {
   Future<void> saveHistory(List<HttpRequestConfigEntity> history);
   Future<void> addToHistory(HttpRequestConfigEntity config, int limit);
   Future<void> clearHistory();
+  Stream<List<HttpRequestConfigEntity>> watchHistory();
 }

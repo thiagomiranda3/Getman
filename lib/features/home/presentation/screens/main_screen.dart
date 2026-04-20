@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:collection/collection.dart';
+import 'package:getman/core/di/injection_container.dart';
+import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
+import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
@@ -26,6 +29,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   double? _localSideMenuWidth;
   final FocusNode _mainFocusNode = FocusNode();
+  final TabDirtyChecker _dirtyChecker = sl<TabDirtyChecker>();
 
   @override
   void initState() {
@@ -42,42 +46,21 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   bool _isTabDirty(BuildContext context, String tabId) {
-    final tabsState = context.read<TabsBloc>().state;
-    final tab = tabsState.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+    final tab = context.read<TabsBloc>().state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
     if (tab == null) return false;
-
-    if (tab.collectionNodeId == null) {
-      return tab.config.url.isNotEmpty || 
-             tab.config.body.isNotEmpty || 
-             tab.config.params.isNotEmpty || 
-             tab.config.headers.isNotEmpty;
-    }
-
-    final collectionsState = context.read<CollectionsBloc>().state;
-    
-    // Helper to find config in tree
-    dynamic findConfig(List<dynamic> nodes, String id) {
-      for (var node in nodes) {
-        if (node.id == id) return node.config;
-        final found = findConfig(node.children, id);
-        if (found != null) return found;
-      }
-      return null;
-    }
-
-    final savedConfig = findConfig(collectionsState.collections, tab.collectionNodeId!);
-    if (savedConfig == null) return true;
-    
-    return tab.config != savedConfig;
+    return _dirtyChecker(
+      tab: tab,
+      collections: context.read<CollectionsBloc>().state.collections,
+    );
   }
 
   void _confirmClose(BuildContext context, int index) {
     final tabsBloc = context.read<TabsBloc>();
     if (index < 0 || index >= tabsBloc.state.tabs.length) return;
-    
+
     final tab = tabsBloc.state.tabs[index];
     final isDirty = _isTabDirty(context, tab.tabId);
-    
+
     void performRemove() {
       tabsBloc.add(RemoveTab(index));
     }
@@ -85,20 +68,24 @@ class _MainScreenState extends State<MainScreen> {
     if (isDirty) {
       showDialog(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('UNSAVED CHANGES'),
-          content: const Text('YOU HAVE UNSAVED CHANGES. ARE YOU SURE YOU WANT TO CLOSE THIS TAB?'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CANCEL')),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                performRemove();
-              },
-              child: const Text('CLOSE ANYWAY', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
+        builder: (dialogContext) {
+          final theme = Theme.of(dialogContext);
+          return AlertDialog(
+            title: const Text('UNSAVED CHANGES'),
+            content: const Text('YOU HAVE UNSAVED CHANGES. ARE YOU SURE YOU WANT TO CLOSE THIS TAB?'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CANCEL')),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  performRemove();
+                },
+                child: Text('CLOSE ANYWAY',
+                    style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
       );
     } else {
       performRemove();
@@ -167,7 +154,7 @@ class _MainScreenState extends State<MainScreen> {
                                     child: child,
                                   );
                                 },
-                                child: tabsState.isLoading 
+                                child: tabsState.isLoading
                                   ? const Center(key: ValueKey('loading'), child: CircularProgressIndicator())
                                   : tabs.isEmpty
                                     ? Center(
@@ -227,7 +214,7 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  Widget _buildTabBar(BuildContext context, int activeIndex, List<dynamic> tabs) {
+  Widget _buildTabBar(BuildContext context, int activeIndex, List<HttpRequestTabEntity> tabs) {
     final theme = Theme.of(context);
     final layout = Theme.of(context).extension<LayoutExtension>()!;
 
@@ -257,6 +244,7 @@ class _MainScreenState extends State<MainScreen> {
                   tabId: tab.tabId,
                   index: index,
                   isActive: activeIndex == index,
+                  dirtyChecker: _dirtyChecker,
                   onTap: () => context.read<TabsBloc>().add(SetActiveIndex(index)),
                   onClose: () => _confirmClose(context, index),
                 );
@@ -309,6 +297,7 @@ class _TabWidget extends StatefulWidget {
   final String tabId;
   final int index;
   final bool isActive;
+  final TabDirtyChecker dirtyChecker;
   final VoidCallback onTap;
   final VoidCallback onClose;
 
@@ -317,6 +306,7 @@ class _TabWidget extends StatefulWidget {
     required this.tabId,
     required this.index,
     required this.isActive,
+    required this.dirtyChecker,
     required this.onTap,
     required this.onClose,
   });
@@ -371,12 +361,12 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
         final tab = state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
         if (tab == null) return const SizedBox.shrink();
 
-        return BlocBuilder<CollectionsBloc, CollectionsState>(
-          builder: (context, collState) {
-            final isDirty = _isTabDirtyInternal(tab, collState.collections);
+        return BlocSelector<CollectionsBloc, CollectionsState, bool>(
+          selector: (collState) => widget.dirtyChecker(tab: tab, collections: collState.collections),
+          builder: (context, isDirty) {
             final title = tab.collectionName ?? (tab.config.url.isEmpty ? 'NEW REQUEST' : tab.config.url);
             final displayTitle = (title.length > layout.tabTitleMaxLength
-                ? '${title.substring(0, layout.tabTitleMaxLength)}...' 
+                ? '${title.substring(0, layout.tabTitleMaxLength)}...'
                 : title).toUpperCase();
 
             return SizeTransition(
@@ -401,8 +391,8 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
                       ),
                       padding: EdgeInsets.symmetric(horizontal: layout.tabPaddingHorizontal),
                       decoration: BoxDecoration(
-                        color: widget.isActive 
-                            ? theme.primaryColor 
+                        color: widget.isActive
+                            ? theme.primaryColor
                             : (_isHovered ? theme.dividerColor.withValues(alpha: 0.2) : theme.scaffoldBackgroundColor),
                         border: Border(
                           top: BorderSide(color: theme.dividerColor, width: 3),
@@ -454,30 +444,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
     );
   }
 
-  bool _isTabDirtyInternal(dynamic tab, List<dynamic> collections) {
-     if (tab.collectionNodeId == null) {
-      return tab.config.url.isNotEmpty || 
-             tab.config.body.isNotEmpty || 
-             tab.config.params.isNotEmpty || 
-             tab.config.headers.isNotEmpty;
-    }
-
-    dynamic findConfig(List<dynamic> nodes, String id) {
-      for (var node in nodes) {
-        if (node.id == id) return node.config;
-        final found = findConfig(node.children, id);
-        if (found != null) return found;
-      }
-      return null;
-    }
-
-    final savedConfig = findConfig(collections, tab.collectionNodeId!);
-    if (savedConfig == null) return true;
-    
-    return tab.config != savedConfig;
-  }
-
-  void _showContextMenu(BuildContext context, Offset position, dynamic tab, int index) {
+  void _showContextMenu(BuildContext context, Offset position, HttpRequestTabEntity tab, int index) {
     final theme = Theme.of(context);
     final tabsBloc = context.read<TabsBloc>();
 

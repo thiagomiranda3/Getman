@@ -9,22 +9,32 @@ import 'package:getman/features/history/presentation/bloc/history_state.dart';
 
 class MockHistoryRepository extends Mock implements HistoryRepository {}
 
+class _FakeHttpRequestConfigEntity extends Fake implements HttpRequestConfigEntity {}
+
 void main() {
   late MockHistoryRepository mockRepository;
   late GetHistoryUseCase getHistoryUseCase;
   late AddToHistoryUseCase addToHistoryUseCase;
   late ClearHistoryUseCase clearHistoryUseCase;
+  late WatchHistoryUseCase watchHistoryUseCase;
   late HistoryBloc historyBloc;
+
+  setUpAll(() {
+    registerFallbackValue(_FakeHttpRequestConfigEntity());
+  });
 
   setUp(() {
     mockRepository = MockHistoryRepository();
+    when(() => mockRepository.watchHistory()).thenAnswer((_) => const Stream.empty());
     getHistoryUseCase = GetHistoryUseCase(mockRepository);
     addToHistoryUseCase = AddToHistoryUseCase(mockRepository);
     clearHistoryUseCase = ClearHistoryUseCase(mockRepository);
+    watchHistoryUseCase = WatchHistoryUseCase(mockRepository);
     historyBloc = HistoryBloc(
       getHistoryUseCase: getHistoryUseCase,
       addToHistoryUseCase: addToHistoryUseCase,
       clearHistoryUseCase: clearHistoryUseCase,
+      watchHistoryUseCase: watchHistoryUseCase,
     );
   });
 

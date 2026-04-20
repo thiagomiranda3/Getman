@@ -1,4 +1,6 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import '../../../../core/error/exceptions.dart';
+import '../../../../core/storage/hive_boxes.dart';
 import '../models/collection_node_model.dart';
 
 abstract class CollectionsLocalDataSource {
@@ -7,25 +9,25 @@ abstract class CollectionsLocalDataSource {
 }
 
 class CollectionsLocalDataSourceImpl implements CollectionsLocalDataSource {
-  static const String collectionsBoxName = 'collections';
-
-  Future<Box<CollectionNode>> _getBox() async {
-    if (Hive.isBoxOpen(collectionsBoxName)) {
-      return Hive.box<CollectionNode>(collectionsBoxName);
-    }
-    return await Hive.openBox<CollectionNode>(collectionsBoxName);
-  }
+  Box<CollectionNode> _box() => Hive.box<CollectionNode>(HiveBoxes.collections);
 
   @override
   Future<List<CollectionNode>> getCollections() async {
-    final box = await _getBox();
-    return box.values.toList();
+    try {
+      return _box().values.toList();
+    } catch (e) {
+      throw PersistenceException('Failed to read collections', cause: e);
+    }
   }
 
   @override
   Future<void> saveCollections(List<CollectionNode> collections) async {
-    final box = await _getBox();
-    await box.clear();
-    await box.addAll(collections);
+    try {
+      final box = _box();
+      await box.clear();
+      await box.addAll(collections);
+    } catch (e) {
+      throw PersistenceException('Failed to save collections', cause: e);
+    }
   }
 }
