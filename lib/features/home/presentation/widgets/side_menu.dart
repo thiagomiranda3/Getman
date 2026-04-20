@@ -271,6 +271,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                     items: const [
                       DropdownMenuItem(value: kBrutalistThemeId, child: Text('BRUTALIST')),
                       DropdownMenuItem(value: kEditorialThemeId, child: Text('EDITORIAL')),
+                      DropdownMenuItem(value: kRpgThemeId, child: Text('ARCANE QUEST')),
                     ],
                     onChanged: (value) {
                       if (value != null) {
