@@ -1,4 +1,6 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import '../../../../core/error/exceptions.dart';
+import '../../../../core/storage/hive_boxes.dart';
 import '../models/settings_model.dart';
 
 abstract class SettingsLocalDataSource {
@@ -7,17 +9,23 @@ abstract class SettingsLocalDataSource {
 }
 
 class SettingsLocalDataSourceImpl implements SettingsLocalDataSource {
-  static const String settingsBoxName = 'settings';
+  Box<SettingsModel> _box() => Hive.box<SettingsModel>(HiveBoxes.settings);
 
   @override
   Future<SettingsModel> getSettings() async {
-    final box = Hive.box<SettingsModel>(settingsBoxName);
-    return box.get('current', defaultValue: SettingsModel())!;
+    try {
+      return _box().get('current', defaultValue: SettingsModel())!;
+    } catch (e) {
+      throw PersistenceException('Failed to read settings', cause: e);
+    }
   }
 
   @override
   Future<void> saveSettings(SettingsModel settings) async {
-    final box = Hive.box<SettingsModel>(settingsBoxName);
-    await box.put('current', settings);
+    try {
+      await _box().put('current', settings);
+    } catch (e) {
+      throw PersistenceException('Failed to save settings', cause: e);
+    }
   }
 }

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:collection/collection.dart';
+import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
+import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
@@ -13,6 +15,7 @@ import 'package:getman/features/collections/presentation/bloc/collections_bloc.d
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
 import 'package:getman/core/theme/neo_brutalist_theme.dart';
+import 'package:getman/core/navigation/intents.dart';
 import 'package:getman/features/home/presentation/widgets/side_menu.dart';
 
 class MainScreen extends StatefulWidget {
@@ -24,65 +27,63 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   double? _localSideMenuWidth;
+  final FocusNode _mainFocusNode = FocusNode();
 
-  bool _isTabDirty(BuildContext context, String tabId) {
-    final tabsState = context.read<TabsBloc>().state;
-    final tab = tabsState.tabs.firstWhereOrNull((t) => t.tabId == tabId);
-    if (tab == null) return false;
-
-    if (tab.collectionNodeId == null) {
-      return tab.config.url.isNotEmpty || 
-             tab.config.body.isNotEmpty || 
-             tab.config.params.isNotEmpty || 
-             tab.config.headers.isNotEmpty;
-    }
-
-    final collectionsState = context.read<CollectionsBloc>().state;
-    
-    // Helper to find config in tree
-    dynamic findConfig(List<dynamic> nodes, String id) {
-      for (var node in nodes) {
-        if (node.id == id) return node.config;
-        final found = findConfig(node.children, id);
-        if (found != null) return found;
-      }
-      return null;
-    }
-
-    final savedConfig = findConfig(collectionsState.collections, tab.collectionNodeId!);
-    if (savedConfig == null) return true;
-    
-    return tab.config != savedConfig;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _mainFocusNode.requestFocus();
+    });
   }
 
-  void _confirmClose(BuildContext context, int index) {
+  @override
+  void dispose() {
+    _mainFocusNode.dispose();
+    super.dispose();
+  }
+
+  bool _isTabDirty(BuildContext context, String tabId) {
+    final tab = context.read<TabsBloc>().state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+    if (tab == null) return false;
+    return context.read<TabDirtyChecker>()(
+      tab: tab,
+      collections: context.read<CollectionsBloc>().state.collections,
+    );
+  }
+
+  void _confirmClose(BuildContext context, String tabId) {
     final tabsBloc = context.read<TabsBloc>();
-    if (index < 0 || index >= tabsBloc.state.tabs.length) return;
-    
-    final tab = tabsBloc.state.tabs[index];
-    final isDirty = _isTabDirty(context, tab.tabId);
-    
+    final tab = tabsBloc.state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+    if (tab == null) return;
+
+    final isDirty = _isTabDirty(context, tabId);
+
     void performRemove() {
-      tabsBloc.add(RemoveTab(index));
+      tabsBloc.add(RemoveTab(tabId));
     }
 
     if (isDirty) {
       showDialog(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('UNSAVED CHANGES'),
-          content: const Text('YOU HAVE UNSAVED CHANGES. ARE YOU SURE YOU WANT TO CLOSE THIS TAB?'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CANCEL')),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                performRemove();
-              },
-              child: const Text('CLOSE ANYWAY', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
+        builder: (dialogContext) {
+          final theme = Theme.of(dialogContext);
+          return AlertDialog(
+            title: const Text('UNSAVED CHANGES'),
+            content: const Text('YOU HAVE UNSAVED CHANGES. ARE YOU SURE YOU WANT TO CLOSE THIS TAB?'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CANCEL')),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  performRemove();
+                },
+                child: Text('CLOSE ANYWAY',
+                    style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
       );
     } else {
       performRemove();
@@ -102,96 +103,111 @@ class _MainScreenState extends State<MainScreen> {
             final activeIndex = tabsState.activeIndex;
             final tabs = tabsState.tabs;
 
-            return CallbackShortcuts(
-              bindings: {
-                const SingleActivator(LogicalKeyboardKey.keyN, control: true): () => context.read<TabsBloc>().add(const AddTab()),
-                const SingleActivator(LogicalKeyboardKey.keyN, meta: true): () => context.read<TabsBloc>().add(const AddTab()),
-                const SingleActivator(LogicalKeyboardKey.keyW, control: true): () => _confirmClose(context, activeIndex),
-                const SingleActivator(LogicalKeyboardKey.keyW, meta: true): () => _confirmClose(context, activeIndex),
+            return Actions(
+              actions: <Type, Action<Intent>>{
+                CloseTabIntent: CallbackAction<CloseTabIntent>(
+                  onInvoke: (_) {
+                    if (activeIndex < 0 || activeIndex >= tabs.length) return null;
+                    _confirmClose(context, tabs[activeIndex].tabId);
+                    return null;
+                  },
+                ),
+                SendRequestIntent: CallbackAction<SendRequestIntent>(
+                  onInvoke: (_) {
+                    if (activeIndex >= 0 && activeIndex < tabs.length && !tabs[activeIndex].isSending) {
+                      context.read<TabsBloc>().add(const SendRequest());
+                    }
+                    return null;
+                  },
+                ),
               },
-              child: Scaffold(
-                body: Row(
-                  children: [
-                    SizedBox(
-                      width: currentSideMenuWidth,
-                      child: const SideMenu(),
-                    ),
-                    Splitter(
-                      isVertical: false,
-                      onUpdate: (delta) {
-                        setState(() {
-                          _localSideMenuWidth = (currentSideMenuWidth + delta).clamp(200.0, 600.0);
-                        });
-                      },
-                      onEnd: () {
-                        if (_localSideMenuWidth != null) {
-                          context.read<SettingsBloc>().add(UpdateSideMenuWidth(_localSideMenuWidth!));
-                        }
-                      },
-                    ),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          _buildTabBar(context, activeIndex, tabs),
-                          Expanded(
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 200),
-                              transitionBuilder: (child, animation) {
-                                return FadeTransition(
-                                  opacity: animation,
-                                  child: child,
-                                );
-                              },
-                              child: tabsState.isLoading 
-                                ? const Center(key: ValueKey('loading'), child: CircularProgressIndicator())
-                                : tabs.isEmpty
-                                  ? Center(
-                                      key: const ValueKey('empty'),
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(Icons.bolt, size: 64, color: theme.dividerColor.withValues(alpha: 0.3)),
-                                          const SizedBox(height: 16),
-                                          Text(
-                                            'NO OPEN TABS',
-                                            style: TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.w900,
-                                              color: theme.dividerColor.withValues(alpha: 0.3),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            'PRESS CTRL+N TO CREATE A NEW REQUEST',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                              color: theme.dividerColor.withValues(alpha: 0.2),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 24),
-                                          BrutalBounce(
-                                            child: ElevatedButton(
-                                              onPressed: () => context.read<TabsBloc>().add(const AddTab()),
-                                              style: ElevatedButton.styleFrom(
-                                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                                              ),
-                                              child: const Text('NEW REQUEST'),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    )
-                                  : RequestView(
-                                      key: ValueKey('view_${tabs[activeIndex].tabId}'),
-                                      tabId: tabs[activeIndex].tabId,
-                                    ),
-                            ),
-                          ),
-                        ],
+              child: Focus(
+                focusNode: _mainFocusNode,
+                child: Scaffold(
+                  body: Row(
+                    children: [
+                      SizedBox(
+                        width: currentSideMenuWidth,
+                        child: const SideMenu(),
                       ),
-                    ),
-                  ],
+                      Splitter(
+                        isVertical: false,
+                        onUpdate: (delta) {
+                          setState(() {
+                            _localSideMenuWidth = (currentSideMenuWidth + delta).clamp(200.0, 600.0);
+                          });
+                        },
+                        onEnd: () {
+                          final committed = _localSideMenuWidth;
+                          if (committed == null) return;
+                          context.read<SettingsBloc>().add(UpdateSideMenuWidth(committed));
+                          setState(() => _localSideMenuWidth = null);
+                        },
+                      ),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            _buildTabBar(context, activeIndex, tabs),
+                            Expanded(
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 200),
+                                transitionBuilder: (child, animation) {
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: child,
+                                  );
+                                },
+                                child: tabsState.isLoading
+                                  ? const Center(key: ValueKey('loading'), child: CircularProgressIndicator())
+                                  : tabs.isEmpty
+                                    ? Center(
+                                        key: const ValueKey('empty'),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.bolt, size: 64, color: theme.dividerColor.withValues(alpha: 0.3)),
+                                            const SizedBox(height: 16),
+                                            Text(
+                                              'NO OPEN TABS',
+                                              style: TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.w900,
+                                                color: theme.dividerColor.withValues(alpha: 0.3),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              'PRESS CTRL+N TO CREATE A NEW REQUEST',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                color: theme.dividerColor.withValues(alpha: 0.2),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 24),
+                                            BrutalBounce(
+                                              child: ElevatedButton(
+                                                onPressed: () => context.read<TabsBloc>().add(const AddTab()),
+                                                style: ElevatedButton.styleFrom(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                                ),
+                                                child: const Text('NEW REQUEST'),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    : RequestView(
+                                        key: ValueKey('view_${tabs[activeIndex].tabId}'),
+                                        tabId: tabs[activeIndex].tabId,
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -201,7 +217,7 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  Widget _buildTabBar(BuildContext context, int activeIndex, List<dynamic> tabs) {
+  Widget _buildTabBar(BuildContext context, int activeIndex, List<HttpRequestTabEntity> tabs) {
     final theme = Theme.of(context);
     final layout = Theme.of(context).extension<LayoutExtension>()!;
 
@@ -209,7 +225,7 @@ class _MainScreenState extends State<MainScreen> {
       height: layout.tabBarHeight,
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor,
-        border: Border(bottom: BorderSide(color: theme.dividerColor, width: 3)),
+        border: Border(bottom: BorderSide(color: theme.dividerColor, width: layout.borderThick)),
       ),
       child: Row(
         children: [
@@ -232,7 +248,7 @@ class _MainScreenState extends State<MainScreen> {
                   index: index,
                   isActive: activeIndex == index,
                   onTap: () => context.read<TabsBloc>().add(SetActiveIndex(index)),
-                  onClose: () => _confirmClose(context, index),
+                  onClose: () => _confirmClose(context, tab.tabId),
                 );
               },
             ),
@@ -266,7 +282,7 @@ class _AddTabButtonState extends State<_AddTabButton> {
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
           color: _isHovered ? theme.primaryColor : theme.scaffoldBackgroundColor,
-          border: Border(left: BorderSide(color: theme.dividerColor, width: 3)),
+          border: Border(left: BorderSide(color: theme.dividerColor, width: widget.layout.borderThick)),
         ),
         child: BrutalBounce(
           child: IconButton(
@@ -345,12 +361,13 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
         final tab = state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
         if (tab == null) return const SizedBox.shrink();
 
-        return BlocBuilder<CollectionsBloc, CollectionsState>(
-          builder: (context, collState) {
-            final isDirty = _isTabDirtyInternal(tab, collState.collections);
+        final dirtyChecker = context.read<TabDirtyChecker>();
+        return BlocSelector<CollectionsBloc, CollectionsState, bool>(
+          selector: (collState) => dirtyChecker(tab: tab, collections: collState.collections),
+          builder: (context, isDirty) {
             final title = tab.collectionName ?? (tab.config.url.isEmpty ? 'NEW REQUEST' : tab.config.url);
             final displayTitle = (title.length > layout.tabTitleMaxLength
-                ? '${title.substring(0, layout.tabTitleMaxLength)}...' 
+                ? '${title.substring(0, layout.tabTitleMaxLength)}...'
                 : title).toUpperCase();
 
             return SizeTransition(
@@ -365,7 +382,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
                     onTap: widget.onTap,
-                    onSecondaryTapDown: (details) => _showContextMenu(context, details.globalPosition, tab, widget.index),
+                    onSecondaryTapDown: (details) => _showContextMenu(context, details.globalPosition, tab),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       height: layout.tabBarHeight,
@@ -375,14 +392,14 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
                       ),
                       padding: EdgeInsets.symmetric(horizontal: layout.tabPaddingHorizontal),
                       decoration: BoxDecoration(
-                        color: widget.isActive 
-                            ? theme.primaryColor 
+                        color: widget.isActive
+                            ? theme.primaryColor
                             : (_isHovered ? theme.dividerColor.withValues(alpha: 0.2) : theme.scaffoldBackgroundColor),
                         border: Border(
-                          top: BorderSide(color: theme.dividerColor, width: 3),
-                          left: widget.index == 0 ? BorderSide(color: theme.dividerColor, width: 3) : BorderSide.none,
-                          right: BorderSide(color: theme.dividerColor, width: 3),
-                          bottom: widget.isActive ? BorderSide.none : BorderSide(color: theme.dividerColor, width: 3),
+                          top: BorderSide(color: theme.dividerColor, width: layout.borderThick),
+                          left: widget.index == 0 ? BorderSide(color: theme.dividerColor, width: layout.borderThick) : BorderSide.none,
+                          right: BorderSide(color: theme.dividerColor, width: layout.borderThick),
+                          bottom: widget.isActive ? BorderSide.none : BorderSide(color: theme.dividerColor, width: layout.borderThick),
                         ),
                       ),
                       child: Row(
@@ -428,31 +445,9 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
     );
   }
 
-  bool _isTabDirtyInternal(dynamic tab, List<dynamic> collections) {
-     if (tab.collectionNodeId == null) {
-      return tab.config.url.isNotEmpty || 
-             tab.config.body.isNotEmpty || 
-             tab.config.params.isNotEmpty || 
-             tab.config.headers.isNotEmpty;
-    }
-
-    dynamic findConfig(List<dynamic> nodes, String id) {
-      for (var node in nodes) {
-        if (node.id == id) return node.config;
-        final found = findConfig(node.children, id);
-        if (found != null) return found;
-      }
-      return null;
-    }
-
-    final savedConfig = findConfig(collections, tab.collectionNodeId!);
-    if (savedConfig == null) return true;
-    
-    return tab.config != savedConfig;
-  }
-
-  void _showContextMenu(BuildContext context, Offset position, dynamic tab, int index) {
+  void _showContextMenu(BuildContext context, Offset position, HttpRequestTabEntity tab) {
     final theme = Theme.of(context);
+    final layout = theme.extension<LayoutExtension>()!;
     final tabsBloc = context.read<TabsBloc>();
 
     showMenu(
@@ -466,7 +461,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
       color: theme.scaffoldBackgroundColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(4),
-        side: BorderSide(color: theme.dividerColor, width: 3),
+        side: BorderSide(color: theme.dividerColor, width: layout.borderThick),
       ),
       elevation: 0,
       items: <PopupMenuEntry>[
@@ -475,16 +470,16 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
           child: _buildMenuItem(context, Icons.close, 'CLOSE'),
         ),
         PopupMenuItem(
-          onTap: () => tabsBloc.add(CloseOtherTabs(index)),
+          onTap: () => tabsBloc.add(CloseOtherTabs(tab.tabId)),
           child: _buildMenuItem(context, Icons.tab_unselected, 'CLOSE OTHERS'),
         ),
         PopupMenuItem(
-          onTap: () => tabsBloc.add(CloseTabsToTheRight(index)),
+          onTap: () => tabsBloc.add(CloseTabsToTheRight(tab.tabId)),
           child: _buildMenuItem(context, Icons.keyboard_double_arrow_right, 'CLOSE TO THE RIGHT'),
         ),
         const PopupMenuDivider(),
         PopupMenuItem(
-          onTap: () => tabsBloc.add(DuplicateTab(index)),
+          onTap: () => tabsBloc.add(DuplicateTab(tab.tabId)),
           child: _buildMenuItem(context, Icons.copy, 'DUPLICATE'),
         ),
         PopupMenuItem(

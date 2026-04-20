@@ -11,7 +11,8 @@ class JsonUtils {
     try {
       final decoded = json.decode(body);
       return const JsonEncoder.withIndent('    ').convert(decoded);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('JsonUtils.prettify: not valid JSON, returning raw body ($e)');
       return body;
     }
   }

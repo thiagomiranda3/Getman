@@ -1,4 +1,4 @@
-import '../entities/request_config_entity.dart';
+import '../../../../core/domain/entities/request_config_entity.dart';
 import '../repositories/history_repository.dart';
 
 class GetHistoryUseCase {
@@ -17,4 +17,10 @@ class ClearHistoryUseCase {
   final HistoryRepository repository;
   ClearHistoryUseCase(this.repository);
   Future<void> call() => repository.clearHistory();
+}
+
+class WatchHistoryUseCase {
+  final HistoryRepository repository;
+  WatchHistoryUseCase(this.repository);
+  Stream<List<HttpRequestConfigEntity>> call() => repository.watchHistory();
 }

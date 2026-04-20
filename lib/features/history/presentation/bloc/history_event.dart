@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../domain/entities/request_config_entity.dart';
+import '../../../../core/domain/entities/request_config_entity.dart';
 
 abstract class HistoryEvent extends Equatable {
   const HistoryEvent();
@@ -7,7 +7,9 @@ abstract class HistoryEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class LoadHistory extends HistoryEvent {}
+class LoadHistory extends HistoryEvent {
+  const LoadHistory();
+}
 
 class AddRequestToHistory extends HistoryEvent {
   final HttpRequestConfigEntity config;
@@ -17,4 +19,13 @@ class AddRequestToHistory extends HistoryEvent {
   List<Object?> get props => [config, limit];
 }
 
-class ClearHistory extends HistoryEvent {}
+class ClearHistory extends HistoryEvent {
+  const ClearHistory();
+}
+
+class HistoryUpdated extends HistoryEvent {
+  final List<HttpRequestConfigEntity> history;
+  const HistoryUpdated(this.history);
+  @override
+  List<Object?> get props => [history];
+}

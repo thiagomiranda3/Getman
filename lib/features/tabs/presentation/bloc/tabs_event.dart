@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../domain/entities/request_tab_entity.dart';
-import '../../../history/domain/entities/request_config_entity.dart';
+import '../../../../core/domain/entities/request_config_entity.dart';
 
 abstract class TabsEvent extends Equatable {
   const TabsEvent();
@@ -8,7 +8,9 @@ abstract class TabsEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class LoadTabs extends TabsEvent {}
+class LoadTabs extends TabsEvent {
+  const LoadTabs();
+}
 
 class AddTab extends TabsEvent {
   final HttpRequestConfigEntity? config;
@@ -20,10 +22,10 @@ class AddTab extends TabsEvent {
 }
 
 class RemoveTab extends TabsEvent {
-  final int index;
-  const RemoveTab(this.index);
+  final String tabId;
+  const RemoveTab(this.tabId);
   @override
-  List<Object?> get props => [index];
+  List<Object?> get props => [tabId];
 }
 
 class SetActiveIndex extends TabsEvent {
@@ -49,31 +51,33 @@ class UpdateTab extends TabsEvent {
 }
 
 class CloseOtherTabs extends TabsEvent {
-  final int index;
-  const CloseOtherTabs(this.index);
+  final String tabId;
+  const CloseOtherTabs(this.tabId);
   @override
-  List<Object?> get props => [index];
+  List<Object?> get props => [tabId];
 }
 
 class CloseTabsToTheRight extends TabsEvent {
-  final int index;
-  const CloseTabsToTheRight(this.index);
+  final String tabId;
+  const CloseTabsToTheRight(this.tabId);
   @override
-  List<Object?> get props => [index];
+  List<Object?> get props => [tabId];
 }
 
 class DuplicateTab extends TabsEvent {
-  final int index;
-  const DuplicateTab(this.index);
+  final String tabId;
+  const DuplicateTab(this.tabId);
   @override
-  List<Object?> get props => [index];
+  List<Object?> get props => [tabId];
 }
 
-class SendRequest extends TabsEvent {}
+class SendRequest extends TabsEvent {
+  const SendRequest();
+}
 
 class CancelRequest extends TabsEvent {
-  final int index;
-  const CancelRequest(this.index);
+  final String tabId;
+  const CancelRequest(this.tabId);
   @override
-  List<Object?> get props => [index];
+  List<Object?> get props => [tabId];
 }

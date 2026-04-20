@@ -37,14 +37,15 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
       name: event.name,
       isFolder: true,
     );
-    
-    List<CollectionNodeEntity> newCollections;
-    if (event.parentId == null) {
+
+    final parentId = event.parentId;
+    final List<CollectionNodeEntity> newCollections;
+    if (parentId == null || CollectionsTreeHelper.findNode(state.collections, parentId) == null) {
       newCollections = [...state.collections, newNode];
     } else {
-      newCollections = CollectionsTreeHelper.addToParent(state.collections, event.parentId!, newNode);
+      newCollections = CollectionsTreeHelper.addToParent(state.collections, parentId, newNode);
     }
-    
+
     final sorted = CollectionsTreeHelper.sort(newCollections);
     await saveCollectionsUseCase(sorted);
     emit(state.copyWith(collections: sorted));
@@ -58,16 +59,12 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
       config: event.config,
     );
 
-    List<CollectionNodeEntity> newCollections;
-    if (event.parentId == null) {
+    final parentId = event.parentId;
+    final List<CollectionNodeEntity> newCollections;
+    if (parentId == null || CollectionsTreeHelper.findNode(state.collections, parentId) == null) {
       newCollections = [...state.collections, newNode];
     } else {
-      final updated = CollectionsTreeHelper.addToParent(state.collections, event.parentId!, newNode);
-      if (updated == state.collections) {
-        newCollections = [...state.collections, newNode];
-      } else {
-        newCollections = updated;
-      }
+      newCollections = CollectionsTreeHelper.addToParent(state.collections, parentId, newNode);
     }
 
     final sorted = CollectionsTreeHelper.sort(newCollections);
@@ -76,12 +73,11 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
   }
 
   Future<void> _onUpdateNodeRequest(UpdateNodeRequest event, Emitter<CollectionsState> emit) async {
+    if (CollectionsTreeHelper.findNode(state.collections, event.id) == null) return;
     final newCollections = CollectionsTreeHelper.updateConfigInTree(state.collections, event.id, event.config);
-    if (newCollections != state.collections) {
-      final sorted = CollectionsTreeHelper.sort(newCollections);
-      await saveCollectionsUseCase(sorted);
-      emit(state.copyWith(collections: sorted));
-    }
+    final sorted = CollectionsTreeHelper.sort(newCollections);
+    await saveCollectionsUseCase(sorted);
+    emit(state.copyWith(collections: sorted));
   }
 
   Future<void> _onDeleteNode(DeleteNode event, Emitter<CollectionsState> emit) async {

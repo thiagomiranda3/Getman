@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:getman/features/history/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/history/domain/repositories/history_repository.dart';
 import 'package:getman/features/history/domain/usecases/history_usecases.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
@@ -9,22 +9,32 @@ import 'package:getman/features/history/presentation/bloc/history_state.dart';
 
 class MockHistoryRepository extends Mock implements HistoryRepository {}
 
+class _FakeHttpRequestConfigEntity extends Fake implements HttpRequestConfigEntity {}
+
 void main() {
   late MockHistoryRepository mockRepository;
   late GetHistoryUseCase getHistoryUseCase;
   late AddToHistoryUseCase addToHistoryUseCase;
   late ClearHistoryUseCase clearHistoryUseCase;
+  late WatchHistoryUseCase watchHistoryUseCase;
   late HistoryBloc historyBloc;
+
+  setUpAll(() {
+    registerFallbackValue(_FakeHttpRequestConfigEntity());
+  });
 
   setUp(() {
     mockRepository = MockHistoryRepository();
+    when(() => mockRepository.watchHistory()).thenAnswer((_) => const Stream.empty());
     getHistoryUseCase = GetHistoryUseCase(mockRepository);
     addToHistoryUseCase = AddToHistoryUseCase(mockRepository);
     clearHistoryUseCase = ClearHistoryUseCase(mockRepository);
+    watchHistoryUseCase = WatchHistoryUseCase(mockRepository);
     historyBloc = HistoryBloc(
       getHistoryUseCase: getHistoryUseCase,
       addToHistoryUseCase: addToHistoryUseCase,
       clearHistoryUseCase: clearHistoryUseCase,
+      watchHistoryUseCase: watchHistoryUseCase,
     );
   });
 
@@ -47,7 +57,7 @@ void main() {
     when(() => mockRepository.getHistory()).thenAnswer((_) async => [tConfig]);
 
     // Act
-    historyBloc.add(LoadHistory());
+    historyBloc.add(const LoadHistory());
 
     // Assert
     await expectLater(

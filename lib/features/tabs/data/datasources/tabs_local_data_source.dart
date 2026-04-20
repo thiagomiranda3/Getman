@@ -1,4 +1,7 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import '../../../../core/error/exceptions.dart';
+import '../../../../core/storage/hive_boxes.dart';
+import '../../../../core/storage/hive_helpers.dart';
 import '../models/request_tab_model.dart';
 
 abstract class TabsLocalDataSource {
@@ -7,25 +10,23 @@ abstract class TabsLocalDataSource {
 }
 
 class TabsLocalDataSourceImpl implements TabsLocalDataSource {
-  static const String tabsBoxName = 'tabs';
-
-  Future<Box<HttpRequestTabModel>> _getBox() async {
-    if (Hive.isBoxOpen(tabsBoxName)) {
-      return Hive.box<HttpRequestTabModel>(tabsBoxName);
-    }
-    return await Hive.openBox<HttpRequestTabModel>(tabsBoxName);
-  }
+  Box<HttpRequestTabModel> _box() => Hive.box<HttpRequestTabModel>(HiveBoxes.tabs);
 
   @override
   Future<List<HttpRequestTabModel>> getTabs() async {
-    final box = await _getBox();
-    return box.values.toList();
+    try {
+      return _box().values.toList();
+    } catch (e) {
+      throw PersistenceException('Failed to read tabs', cause: e);
+    }
   }
 
   @override
   Future<void> saveTabs(List<HttpRequestTabModel> tabs) async {
-    final box = await _getBox();
-    await box.clear();
-    await box.addAll(tabs);
+    try {
+      await replaceAllInBox(_box(), tabs);
+    } catch (e) {
+      throw PersistenceException('Failed to save tabs', cause: e);
+    }
   }
 }

@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../../history/domain/entities/request_config_entity.dart';
+import '../../../../core/domain/entities/request_config_entity.dart';
 
 abstract class CollectionsEvent extends Equatable {
   const CollectionsEvent();
@@ -7,7 +7,9 @@ abstract class CollectionsEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class LoadCollections extends CollectionsEvent {}
+class LoadCollections extends CollectionsEvent {
+  const LoadCollections();
+}
 
 class AddFolder extends CollectionsEvent {
   final String name;

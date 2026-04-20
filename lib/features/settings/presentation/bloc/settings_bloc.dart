@@ -5,15 +5,12 @@ import 'settings_event.dart';
 import 'settings_state.dart';
 
 class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
-  final GetSettingsUseCase getSettingsUseCase;
   final SaveSettingsUseCase saveSettingsUseCase;
 
   SettingsBloc({
-    required this.getSettingsUseCase,
     required this.saveSettingsUseCase,
     SettingsEntity? initialSettings,
   }) : super(SettingsState(settings: initialSettings ?? const SettingsEntity())) {
-    on<LoadSettings>(_onLoadSettings);
     on<UpdateDarkMode>(_onUpdateDarkMode);
     on<UpdateCompactMode>(_onUpdateCompactMode);
     on<UpdateVerticalLayout>(_onUpdateVerticalLayout);
@@ -21,11 +18,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     on<UpdateSaveResponseInHistory>(_onUpdateSaveResponseInHistory);
     on<UpdateSplitRatio>(_onUpdateSplitRatio);
     on<UpdateSideMenuWidth>(_onUpdateSideMenuWidth);
-  }
-
-  Future<void> _onLoadSettings(LoadSettings event, Emitter<SettingsState> emit) async {
-    final settings = await getSettingsUseCase();
-    emit(state.copyWith(settings: settings));
   }
 
   Future<void> _onUpdateDarkMode(UpdateDarkMode event, Emitter<SettingsState> emit) async {

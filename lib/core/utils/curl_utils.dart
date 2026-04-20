@@ -1,4 +1,4 @@
-import 'package:getman/features/history/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
 
 class CurlUtils {
   /// Parses a curl command into an [HttpRequestConfigEntity]
@@ -14,12 +14,12 @@ class CurlUtils {
       return null;
     }
 
-    String method = 'GET';
-    String url = '';
-    Map<String, String> headers = {};
-    String body = '';
+    var method = 'GET';
+    var url = '';
+    final headers = <String, String>{};
+    var body = '';
 
-    for (int i = 1; i < args.length; i++) {
+    for (var i = 1; i < args.length; i++) {
       final arg = args[i];
       
       if (arg == '-X' || arg == '--request') {
@@ -67,12 +67,9 @@ class CurlUtils {
     // 1. Single quoted strings: '...'
     // 2. Double quoted strings: "..."
     // 3. Unquoted words: [^\s]+
-    final regex = RegExp(r"'([^']*)'|""([^""]*)""|([^\s]+)");
+    final regex = RegExp(r"'([^']*)'|" '"' r'([^"]*)' '"' r"|([^\s]+)");
     
-    // Let's use a more reliable regex for double quotes
-    final betterRegex = RegExp(r"'([^']*)'|" + '"([^"]*)"' + r"|([^\s]+)");
-    
-    final matches = betterRegex.allMatches(command);
+    final matches = regex.allMatches(command);
     for (final match in matches) {
       if (match.group(1) != null) {
         args.add(match.group(1)!);

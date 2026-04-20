@@ -44,7 +44,7 @@ void main() {
     when(() => mockRepository.getCollections()).thenAnswer((_) async => [tNode]);
 
     // Act
-    collectionsBloc.add(LoadCollections());
+    collectionsBloc.add(const LoadCollections());
 
     // Assert
     await expectLater(

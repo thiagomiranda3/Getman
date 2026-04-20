@@ -12,8 +12,10 @@ import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
-import 'package:getman/features/history/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/neo_brutalist_theme.dart';
+import 'package:getman/core/ui/widgets/method_badge.dart';
+import 'package:getman/core/utils/status_color.dart';
 
 class SideMenu extends StatelessWidget {
   const SideMenu({super.key});
@@ -34,29 +36,24 @@ class SideMenu extends StatelessWidget {
             const _SideMenuHeader(),
             Container(
               decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: theme.dividerColor, width: 3),
-                  left: BorderSide(color: theme.dividerColor, width: 3),
-                  right: BorderSide(color: theme.dividerColor, width: 3),
-                  bottom: BorderSide(color: theme.dividerColor, width: 3),
-                ),
+                border: Border.all(color: theme.dividerColor, width: layout.borderThick),
               ),
               child: TabBar(
                 dividerColor: Colors.transparent,
                 indicator: BoxDecoration(
                   color: theme.primaryColor,
                   border: Border(
-                    top: BorderSide(color: theme.dividerColor, width: 3),
-                    left: BorderSide(color: theme.dividerColor, width: 3),
-                    right: BorderSide(color: theme.dividerColor, width: 3),
+                    top: BorderSide(color: theme.dividerColor, width: layout.borderThick),
+                    left: BorderSide(color: theme.dividerColor, width: layout.borderThick),
+                    right: BorderSide(color: theme.dividerColor, width: layout.borderThick),
                   ),
                 ),
                 labelColor: theme.colorScheme.onPrimary,
                 unselectedLabelColor: theme.colorScheme.onSurface,
                 labelStyle: TextStyle(
-                  fontSize: layout.fontSizeNormal, 
+                  fontSize: layout.fontSizeNormal,
                   fontWeight: FontWeight.w900,
-                  overflow: TextOverflow.fade
+                  overflow: TextOverflow.fade,
                 ),
                 padding: EdgeInsets.zero,
                 labelPadding: const EdgeInsets.symmetric(horizontal: 4),
@@ -90,7 +87,7 @@ class _SideMenuHeader extends StatelessWidget {
     final layout = Theme.of(context).extension<LayoutExtension>()!;
     
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: layout.headerPaddingVertical),
+      padding: EdgeInsets.symmetric(horizontal: layout.inputPadding, vertical: layout.headerPaddingVertical),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -162,77 +159,125 @@ class _SideMenuHeader extends StatelessWidget {
   }
 
   void _showSettingsDialog(BuildContext context) {
-    final theme = Theme.of(context);
     showDialog(
       context: context,
-      builder: (dialogContext) => BlocBuilder<SettingsBloc, SettingsState>(
-        builder: (context, state) {
-          final settings = state.settings;
-          return AlertDialog(
-            title: const Text('SETTINGS'),
-            content: SizedBox(
-              width: 400,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    title: const Text('HISTORY LIMIT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    trailing: SizedBox(
-                      width: 80,
-                      child: TextField(
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
-                        controller: TextEditingController(text: settings.historyLimit.toString())
-                          ..selection = TextSelection.fromPosition(TextPosition(offset: settings.historyLimit.toString().length)),
-                        onChanged: (val) {
-                          final limit = int.tryParse(val);
-                          if (limit != null) {
-                            context.read<SettingsBloc>().add(UpdateHistoryLimit(limit));
-                          }
-                        },
+      builder: (dialogContext) => BlocProvider.value(
+        value: context.read<SettingsBloc>(),
+        child: const _SettingsDialog(),
+      ),
+    );
+  }
+}
+
+class _SettingsDialog extends StatefulWidget {
+  const _SettingsDialog();
+
+  @override
+  State<_SettingsDialog> createState() => _SettingsDialogState();
+}
+
+class _SettingsDialogState extends State<_SettingsDialog> {
+  late final TextEditingController _historyLimitController;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = context.read<SettingsBloc>().state.settings.historyLimit;
+    _historyLimitController = TextEditingController(text: initial.toString());
+  }
+
+  @override
+  void dispose() {
+    _historyLimitController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final layout = theme.extension<LayoutExtension>()!;
+
+    return BlocBuilder<SettingsBloc, SettingsState>(
+      buildWhen: (prev, next) => prev.settings != next.settings,
+      builder: (context, state) {
+        final settings = state.settings;
+        return AlertDialog(
+          title: const Text('SETTINGS'),
+          content: SizedBox(
+            width: layout.dialogWidth,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  title: Text(
+                    'HISTORY LIMIT',
+                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                  ),
+                  trailing: SizedBox(
+                    width: 80,
+                    child: TextField(
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: layout.inputPadding,
+                          vertical: layout.inputPaddingVertical,
+                        ),
                       ),
+                      controller: _historyLimitController,
+                      onChanged: (val) {
+                        final limit = int.tryParse(val);
+                        if (limit != null) {
+                          context.read<SettingsBloc>().add(UpdateHistoryLimit(limit));
+                        }
+                      },
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  SwitchListTile(
-                    activeThumbColor: theme.colorScheme.secondary,
-                    activeTrackColor: theme.primaryColor,
-                    title: const Text('SAVE RESPONSE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    value: settings.saveResponseInHistory,
-                    onChanged: (val) {
-                      context.read<SettingsBloc>().add(UpdateSaveResponseInHistory(val));
-                    },
+                ),
+                SizedBox(height: layout.tabSpacing),
+                SwitchListTile(
+                  activeThumbColor: theme.colorScheme.secondary,
+                  activeTrackColor: theme.primaryColor,
+                  title: Text(
+                    'SAVE RESPONSE',
+                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
                   ),
-                  const Divider(),
-                  SwitchListTile(
-                    activeThumbColor: theme.colorScheme.secondary,
-                    activeTrackColor: theme.primaryColor,
-                    secondary: Icon(settings.isDarkMode ? Icons.dark_mode : Icons.light_mode, size: 20),
-                    title: const Text('DARK MODE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    value: settings.isDarkMode,
-                    onChanged: (val) {
-                      context.read<SettingsBloc>().add(UpdateDarkMode(val));
-                    },
+                  value: settings.saveResponseInHistory,
+                  onChanged: (val) => context.read<SettingsBloc>().add(UpdateSaveResponseInHistory(val)),
+                ),
+                const Divider(),
+                SwitchListTile(
+                  activeThumbColor: theme.colorScheme.secondary,
+                  activeTrackColor: theme.primaryColor,
+                  secondary: Icon(
+                    settings.isDarkMode ? Icons.dark_mode : Icons.light_mode,
+                    size: layout.iconSize,
                   ),
-                  SwitchListTile(
-                    activeThumbColor: theme.colorScheme.secondary,
-                    activeTrackColor: theme.primaryColor,
-                    secondary: const Icon(Icons.view_compact, size: 20),
-                    title: const Text('COMPACT MODE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    value: settings.isCompactMode,
-                    onChanged: (val) {
-                      context.read<SettingsBloc>().add(UpdateCompactMode(val));
-                    },
+                  title: Text(
+                    'DARK MODE',
+                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
                   ),
-                ],
-              ),
+                  value: settings.isDarkMode,
+                  onChanged: (val) => context.read<SettingsBloc>().add(UpdateDarkMode(val)),
+                ),
+                SwitchListTile(
+                  activeThumbColor: theme.colorScheme.secondary,
+                  activeTrackColor: theme.primaryColor,
+                  secondary: Icon(Icons.view_compact, size: layout.iconSize),
+                  title: Text(
+                    'COMPACT MODE',
+                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                  ),
+                  value: settings.isCompactMode,
+                  onChanged: (val) => context.read<SettingsBloc>().add(UpdateCompactMode(val)),
+                ),
+              ],
             ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CLOSE')),
-            ],
-          );
-        },
-      ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('CLOSE')),
+          ],
+        );
+      },
     );
   }
 }
@@ -314,7 +359,7 @@ class _HistoryListState extends State<_HistoryList> {
                     hintText: 'SEARCH HISTORY...',
                     hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
                     prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: theme.dividerColor, width: 2)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     isDense: true,
                   ),
@@ -428,11 +473,11 @@ class _HistoryItemWidgetState extends State<_HistoryItemWidget> {
           ),
           subtitle: Row(
             children: [
-              _MethodBadge(method: widget.config.method, small: true),
+              MethodBadge(method: widget.config.method, small: true),
               if (widget.config.statusCode != null) ...[
                 const SizedBox(width: 8),
                 Text(widget.config.statusCode.toString(), style: TextStyle(
-                  color: _getStatusColor(widget.config.statusCode!),
+                  color: StatusColor.forCode(widget.config.statusCode!),
                   fontWeight: FontWeight.w900,
                   fontSize: layout.fontSizeNormal,
                 )),
@@ -442,12 +487,6 @@ class _HistoryItemWidgetState extends State<_HistoryItemWidget> {
         ),
       ),
     );
-  }
-
-  Color _getStatusColor(int code) {
-    if (code >= 200 && code < 300) return Colors.green.shade700;
-    if (code >= 400) return Colors.red.shade700;
-    return Colors.orange.shade700;
   }
 }
 
@@ -483,7 +522,7 @@ class _CollectionsListState extends State<_CollectionsList> {
   List<CollectionNodeEntity> _filterNodes(List<CollectionNodeEntity> nodes, String query) {
     if (query.isEmpty) return nodes;
     final lowerQuery = query.toLowerCase();
-    List<CollectionNodeEntity> result = [];
+    final result = <CollectionNodeEntity>[];
     for (var node in nodes) {
       final matchesSelf = node.name.toLowerCase().contains(lowerQuery) || (node.config?.url.toLowerCase().contains(lowerQuery) ?? false);
       if (node.isFolder) {
@@ -524,7 +563,7 @@ class _CollectionsListState extends State<_CollectionsList> {
                   hintText: 'SEARCH COLLECTIONS...',
                   hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
                   prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: theme.dividerColor, width: 2)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   isDense: true,
                 ),
@@ -591,38 +630,40 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
           context.read<CollectionsBloc>().add(MoveNode(details.data, node.id));
         },
         builder: (context, candidateData, rejectedData) {
-          return InkWell(
-            onTap: widget.onToggle,
-            child: MouseRegion(
-              onEnter: (_) => setState(() => _isHovered = true),
-              onExit: (_) => setState(() => _isHovered = false),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                decoration: BoxDecoration(
-                  color: _isDragOver 
-                    ? theme.primaryColor.withValues(alpha: 0.3) 
-                    : (_isHovered ? theme.hoverColor : Colors.transparent),
-                  border: _isDragOver 
-                    ? Border.all(color: theme.primaryColor, width: 2) 
-                    : Border.all(color: Colors.transparent, width: 2),
-                ),
-                child: TreeIndentation(
-                  entry: widget.entry,
-                  child: Row(
-                    children: [
-                      Icon(
-                        widget.entry.isExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
-                        size: layout.smallIconSize,
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                      ),
-                      Icon(node.isFavorite ? Icons.star : Icons.folder,
-                          size: layout.iconSize, color: node.isFavorite ? theme.primaryColor : theme.colorScheme.secondary),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.w900)),
-                      ),
-                      _NodeContextMenu(node: node),
-                    ],
+          return BrutalBounce(
+            child: InkWell(
+              onTap: widget.onToggle,
+              child: MouseRegion(
+                onEnter: (_) => setState(() => _isHovered = true),
+                onExit: (_) => setState(() => _isHovered = false),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  decoration: BoxDecoration(
+                    color: _isDragOver
+                        ? theme.primaryColor.withValues(alpha: 0.3)
+                        : (_isHovered ? theme.hoverColor : Colors.transparent),
+                    border: _isDragOver
+                        ? Border.all(color: theme.primaryColor, width: layout.borderThin)
+                        : Border.all(color: Colors.transparent, width: layout.borderThin),
+                  ),
+                  child: TreeIndentation(
+                    entry: widget.entry,
+                    child: Row(
+                      children: [
+                        Icon(
+                          widget.entry.isExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
+                          size: layout.smallIconSize,
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                        Icon(node.isFavorite ? Icons.star : Icons.folder,
+                            size: layout.iconSize, color: node.isFavorite ? theme.primaryColor : theme.colorScheme.secondary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.w900)),
+                        ),
+                        _NodeContextMenu(node: node),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -631,36 +672,38 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
         },
       );
     } else {
-      content = InkWell(
-        onTap: () {
-          if (node.config != null) {
+      content = BrutalBounce(
+        child: InkWell(
+          onTap: () {
+            final config = node.config;
+            if (config == null) return;
             context.read<TabsBloc>().add(AddTab(
-                  config: node.config!.copyWith(),
+                  config: config.copyWith(),
                   collectionNodeId: node.id,
                   collectionName: node.name,
                 ));
-          }
-        },
-        child: MouseRegion(
-          onEnter: (_) => setState(() => _isHovered = true),
-          onExit: (_) => setState(() => _isHovered = false),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            decoration: BoxDecoration(
-              color: _isHovered ? theme.hoverColor : Colors.transparent,
-            ),
-            child: TreeIndentation(
-              entry: widget.entry,
-              child: Row(
-                children: [
-                  SizedBox(width: layout.smallIconSize), 
-                  _MethodBadge(method: node.config?.method ?? 'GET', small: true),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold)),
-                  ),
-                  _NodeContextMenu(node: node),
-                ],
+          },
+          child: MouseRegion(
+            onEnter: (_) => setState(() => _isHovered = true),
+            onExit: (_) => setState(() => _isHovered = false),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              decoration: BoxDecoration(
+                color: _isHovered ? theme.hoverColor : Colors.transparent,
+              ),
+              child: TreeIndentation(
+                entry: widget.entry,
+                child: Row(
+                  children: [
+                    SizedBox(width: layout.smallIconSize),
+                    MethodBadge(method: node.config?.method ?? 'GET', small: true),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold)),
+                    ),
+                    _NodeContextMenu(node: node),
+                  ],
+                ),
               ),
             ),
           ),
@@ -674,9 +717,19 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
         elevation: 0,
         color: Colors.transparent,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: EdgeInsets.symmetric(
+            horizontal: layout.inputPadding,
+            vertical: layout.inputPaddingVertical,
+          ),
           decoration: NeoBrutalistTheme.brutalBox(context, color: theme.primaryColor),
-          child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface)),
+          child: Text(
+            node.name.toUpperCase(),
+            style: TextStyle(
+              fontSize: layout.fontSizeNormal,
+              fontWeight: FontWeight.w900,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
         ),
       ),
       childWhenDragging: Opacity(opacity: 0.5, child: content),
@@ -700,7 +753,7 @@ class _NodeContextMenu extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(4),
-        side: BorderSide(color: theme.dividerColor, width: 3),
+        side: BorderSide(color: theme.dividerColor, width: layout.borderThick),
       ),
       onSelected: (val) {
         switch (val) {
@@ -724,7 +777,7 @@ class _NodeContextMenu extends StatelessWidget {
         PopupMenuItem(value: 'rename', child: Text('RENAME', style: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold))),
         if (node.isFolder)
            PopupMenuItem(value: 'add_subfolder', child: Text('ADD SUBFOLDER', style: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold))),
-        PopupMenuItem(value: 'delete', child: Text('DELETE', style: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold, color: Colors.red))),
+        PopupMenuItem(value: 'delete', child: Text('DELETE', style: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold, color: theme.colorScheme.error))),
       ],
     );
   }
@@ -772,34 +825,3 @@ class _NodeContextMenu extends StatelessWidget {
   }
 }
 
-class _MethodBadge extends StatelessWidget {
-  final String method;
-  final bool small;
-  const _MethodBadge({required this.method, this.small = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
-    final color = NeoBrutalistTheme.getMethodColor(method);
-    
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: small ? layout.badgePaddingHorizontal : 10, 
-        vertical: layout.badgePaddingVertical
-      ),
-      decoration: BoxDecoration(
-        color: color,
-        border: Border.all(color: theme.dividerColor, width: 2),
-      ),
-      child: Text(
-        method,
-        style: TextStyle(
-          color: Colors.black, 
-          fontWeight: FontWeight.w900, 
-          fontSize: small ? layout.fontSizeSmall : layout.fontSizeNormal
-        ),
-      ),
-    );
-  }
-}
