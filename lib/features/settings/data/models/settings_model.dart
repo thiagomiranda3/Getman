@@ -26,6 +26,9 @@ class SettingsModel extends HiveObject {
   @HiveField(6, defaultValue: 300.0)
   double sideMenuWidth;
 
+  @HiveField(7, defaultValue: 'brutalist')
+  String themeId;
+
   SettingsModel({
     this.historyLimit = 100,
     this.saveResponseInHistory = false,
@@ -34,6 +37,7 @@ class SettingsModel extends HiveObject {
     this.isVerticalLayout = false,
     this.splitRatio = 0.5,
     this.sideMenuWidth = 300.0,
+    this.themeId = 'brutalist',
   });
 
   SettingsModel copyWith({
@@ -44,6 +48,7 @@ class SettingsModel extends HiveObject {
     bool? isVerticalLayout,
     double? splitRatio,
     double? sideMenuWidth,
+    String? themeId,
   }) {
     return SettingsModel(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -53,6 +58,7 @@ class SettingsModel extends HiveObject {
       isVerticalLayout: isVerticalLayout ?? this.isVerticalLayout,
       splitRatio: splitRatio ?? this.splitRatio,
       sideMenuWidth: sideMenuWidth ?? this.sideMenuWidth,
+      themeId: themeId ?? this.themeId,
     );
   }
 
@@ -64,6 +70,7 @@ class SettingsModel extends HiveObject {
     'isVerticalLayout': isVerticalLayout,
     'splitRatio': splitRatio,
     'sideMenuWidth': sideMenuWidth,
+    'themeId': themeId,
   };
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) => SettingsModel(
@@ -74,6 +81,7 @@ class SettingsModel extends HiveObject {
     isVerticalLayout: json['isVerticalLayout'] ?? false,
     splitRatio: json['splitRatio'] ?? 0.5,
     sideMenuWidth: (json['sideMenuWidth'] ?? 300.0).toDouble(),
+    themeId: json['themeId'] ?? 'brutalist',
   );
 
   factory SettingsModel.fromEntity(SettingsEntity entity) => SettingsModel(
@@ -84,6 +92,7 @@ class SettingsModel extends HiveObject {
     isVerticalLayout: entity.isVerticalLayout,
     splitRatio: entity.splitRatio,
     sideMenuWidth: entity.sideMenuWidth,
+    themeId: entity.themeId,
   );
 
   SettingsEntity toEntity() => SettingsEntity(
@@ -94,5 +103,6 @@ class SettingsModel extends HiveObject {
     isVerticalLayout: isVerticalLayout,
     splitRatio: splitRatio,
     sideMenuWidth: sideMenuWidth,
+    themeId: themeId,
   );
 }

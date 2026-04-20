@@ -24,13 +24,14 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       isVerticalLayout: fields[4] == null ? false : fields[4] as bool,
       splitRatio: fields[5] == null ? 0.5 : fields[5] as double,
       sideMenuWidth: fields[6] == null ? 300.0 : fields[6] as double,
+      themeId: fields[7] == null ? 'brutalist' : fields[7] as String,
     );
   }
 
   @override
   void write(BinaryWriter writer, SettingsModel obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.historyLimit)
       ..writeByte(1)
@@ -44,7 +45,9 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       ..writeByte(5)
       ..write(obj.splitRatio)
       ..writeByte(6)
-      ..write(obj.sideMenuWidth);
+      ..write(obj.sideMenuWidth)
+      ..writeByte(7)
+      ..write(obj.themeId);
   }
 
   @override
