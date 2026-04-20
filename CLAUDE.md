@@ -31,9 +31,14 @@ lib/
     navigation/      # AppRouter, Intents (keyboard actions)
     network/         # NetworkService, HttpResponseEntity, HttpMethods, NetworkCancelHandle
     storage/         # HiveBoxes (box-name constants) + hive_helpers (replaceAllInBox)
-    theme/           # NeoBrutalistTheme, LayoutExtension, BrutalBounce
+    theme/
+      app_theme.dart          # 5 ThemeExtensions + BuildContext access extension
+      theme_ids.dart          # String constants for theme IDs
+      theme_registry.dart     # AppThemeBuilder typedef + appThemes map + resolveTheme()
+      themes/
+        brutalist/            # Brutalist theme implementation (palette, bounce, decorations, theme builder)
     ui/widgets/      # Cross-feature atoms: MethodBadge, Splitter
-    utils/           # JsonUtils, CurlUtils, StatusColor
+    utils/           # JsonUtils, CurlUtils
   features/
     <feature>/
       domain/        # Entities + abstract repositories + use cases (pure Dart, no Hive/Dio)
@@ -62,6 +67,8 @@ Mandatory rules:
 | 3 | `CollectionNode` | `collections` | Nested (children list stored as `HiveField(3)`) |
 
 **Never renumber an existing `typeId`.** Add new models with a fresh ID.
+
+As of the pluggable-themes refactor, `SettingsModel` also carries a `String themeId` at `HiveField(7)` (default `'brutalist'`). This drives which theme builder is active.
 
 After editing any `@HiveType` field, regenerate:
 ```
@@ -117,11 +124,12 @@ Entity ↔ Model boundary: every data-layer model implements `toEntity()` / `fro
 - `core/error/failures.dart` — `Failure` (Equatable, `implements Exception`) with `PersistenceFailure` and `NetworkFailure` (typed enum + statusCode). Repositories translate exceptions to failures at the `data/repositories/` boundary; BLoCs only ever handle `Failure` subtypes.
 
 ### 4.8 UI / Theming
-- `NeoBrutalistTheme.theme(Brightness, isCompact)` builds a `ThemeData` including a `LayoutExtension` for sizing.
-- **Never hardcode sizes or colors** — pull from `Theme.of(context).extension<LayoutExtension>()!` for sizing, from `theme.colorScheme`/`theme.dividerColor` for colors. Exceptions: method-specific colors via `NeoBrutalistTheme.getMethodColor()`, status-code colors via `StatusColor.forCode()` / `.forCodeAccent()`.
+- The active `ThemeData` is produced by `resolveTheme(settings.themeId)(brightness, isCompact)` from `lib/core/theme/theme_registry.dart`. Each theme builder (currently only `brutalistTheme` under `lib/core/theme/themes/brutalist/`) attaches five `ThemeExtension`s: `AppLayout` (sizes), `AppPalette` (method/status colors not in `ColorScheme`), `AppShape` (panel/button/input/dialog radii), `AppTypography` (`TextTheme`, code font family, weights), and `AppDecoration` (closures for `panelBox`, `tabShape`, `wrapInteractive`).
+- **Never hardcode sizes, colors, radii, weights, or interaction behavior in widgets.** Pull from the per-theme extensions via `BuildContext` accessors: `context.appLayout`, `context.appPalette`, `context.appShape`, `context.appTypography`, `context.appDecoration`. The accessors are `extension AppThemeAccess on BuildContext` in `lib/core/theme/app_theme.dart`.
+- Adding a new theme: drop a new `<name>_theme.dart` under `lib/core/theme/themes/<name>/`, export `ThemeData <name>Theme(Brightness, {bool isCompact})`, and register it in `theme_registry.dart`'s `appThemes` map with a new ID constant in `theme_ids.dart`. No widget edits are required — widgets consume the extensions uniformly.
+- Method-specific colors: `context.appPalette.methodColor(method)`. Status-code colors: `context.appPalette.statusColor(code)` / `.statusAccent(code)`. Neo-brutalist hard shadow / border: `context.appDecoration.panelBox(context, offset: N)`.
+- `context.appDecoration.wrapInteractive(child: ..., onTap: ..., scaleDown: ...)` wraps a tappable element in theme-defined interaction behavior (brutalist = scale-bounce via internal `BrutalBounce`; future themes can swap to a fade or no-op). Never reference `BrutalBounce` directly outside `lib/core/theme/themes/brutalist/`.
 - HTTP method list: `HttpMethods.all` in `core/network/http_methods.dart` — don't hardcode `['GET','POST',…]`.
-- `BrutalBounce` wraps tappable items to add the tap-scale bounce; use it for every button/icon-button that triggers an action.
-- `NeoBrutalistTheme.brutalBox(context, offset: N)` returns the shadowed border decoration.
 - Split panes: local `_localSplitRatio` / `_localSideMenuWidth` during drag, committed to BLoC in `onEnd`, then **reset to `null`** so the BLoC's value drives the widget again. If you add a new splitter, follow this pattern exactly.
 
 ### 4.9 Persistence summary
@@ -173,7 +181,7 @@ Verification bar: **`fvm flutter analyze` produces `No issues found!` AND `fvm f
 - **GetIt stays in DI**: widgets reach services via `BlocProvider`, `RepositoryProvider`, or constructor injection. Never `sl<T>()` from a widget.
 
 ### UI / Styling
-- **Theme adherence**: `LayoutExtension` for sizing, `brutalBox` / `BrutalBounce` for Neo-Brutalist components. No hardcoded colors or paddings.
+- **Theme adherence**: `context.appLayout` for sizing, `context.appDecoration.panelBox` / `context.appDecoration.wrapInteractive` for Neo-Brutalist components. No hardcoded colors, sizes, radii, or paddings.
 - **Atomic design**: reusable widgets → `lib/core/ui/widgets/`.
 
 ### Workflow
