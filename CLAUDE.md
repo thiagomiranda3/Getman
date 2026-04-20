@@ -26,10 +26,11 @@ Getman is a high-performance, aesthetically pleasing HTTP client built with Flut
 lib/
   core/
     di/              # GetIt bootstrap
+    domain/entities/ # Cross-feature shared entities (HttpRequestConfigEntity lives here)
     error/           # Failure / Exception hierarchy
     navigation/      # AppRouter, Intents (keyboard actions)
     network/         # NetworkService, HttpResponseEntity, HttpMethods, NetworkCancelHandle
-    storage/         # HiveBoxes (box-name constants)
+    storage/         # HiveBoxes (box-name constants) + hive_helpers (replaceAllInBox)
     theme/           # NeoBrutalistTheme, LayoutExtension, BrutalBounce
     ui/widgets/      # Cross-feature atoms: MethodBadge, Splitter
     utils/           # JsonUtils, CurlUtils, StatusColor
@@ -47,6 +48,7 @@ Mandatory rules:
 - **Domain layer has zero imports from `data/` or Flutter UI.** Only pure Dart + `equatable`.
 - **BLoCs depend on abstract `Repository` types**, never on `...Impl` or Hive/Dio directly.
 - **Generic, reusable atoms** go in `lib/core/ui/widgets/`. Feature-specific widgets stay inside that feature.
+- **Shared entities** used by more than one feature live in `lib/core/domain/entities/` (e.g. `HttpRequestConfigEntity` — referenced by `tabs`, `collections`, and `history`). Feature-owned entities stay inside that feature's `domain/entities/`.
 
 ---
 
@@ -85,8 +87,10 @@ Entity ↔ Model boundary: every data-layer model implements `toEntity()` / `fro
 - **Debounced save**: any mutating event calls `_scheduleSave()` with a 10-second timer; `close()` cancels the timer, cancels in-flight requests, flushes a final `_persist()`.
 - On `LoadTabs`, the BLoC sanitizes persisted tabs by resetting `isSending=false` — no real network call is alive after a restart.
 - `_onRemoveTab` cancels the tab's handle before dropping the tab.
-- `SendRequestUseCase` couples the network call with history persistence; history writes are best-effort (swallowed).
-- Cancellation flow: UI dispatches `CancelRequest(index)` → `_RequestManager.cancel()` → Dio throws `DioExceptionType.cancel` → mapped to `NetworkFailure(type: cancelled)` → BLoC clears `isSending` without emitting response data.
+- `SendRequestUseCase` couples the network call with history persistence. History writes are best-effort: failures are caught and logged via `debugPrint` (never fail the request), but they are **not silent** — a regression in persistence will show up in console logs.
+- **Identity-based events**: `RemoveTab`, `CancelRequest`, `CloseOtherTabs`, `CloseTabsToTheRight`, and `DuplicateTab` all carry `String tabId`, not `int index`. Handlers resolve the current position via `indexWhere`/`firstWhereOrNull` and bail on miss. Only `SetActiveIndex` and `ReorderTabs` are position-based (position *is* the operation). Do not reintroduce index-based identity events — they race against concurrent emissions.
+- Cancellation flow: UI dispatches `CancelRequest(tabId)` → `_RequestManager.cancel(tabId)` → Dio throws `DioExceptionType.cancel` → mapped to `NetworkFailure(type: cancelled)` → BLoC clears `isSending` without emitting response data.
+- The cURL paste shortcut: `_handleUrlChanged` in `request_view.dart` treats URL input starting with `curl ` as a full request spec, runs it through `CurlUtils.parse`, and pushes a single `UpdateTab` with the parsed method/url/headers/body. Body is then prettified off the UI thread via `JsonUtils.prettify` (runs in `compute`).
 
 ### 4.3 Collections feature
 - Tree is an immutable forest of `CollectionNodeEntity`. All mutations go through **pure** `CollectionsTreeHelper` functions (`addToParent`, `removeFromTree`, `renameInTree`, `toggleFavoriteInTree`, `updateConfigInTree`, `sort`, `findNode`). These never mutate input.
@@ -148,7 +152,7 @@ Verification bar: **`fvm flutter analyze` produces `No issues found!` AND `fvm f
 
 - **`HttpRequestConfig.==` / `hashCode` deliberately exclude `id`** so history dedup works on request signature. Do not "fix" this without a discussion.
 - `HiveObject` subclasses sometimes override `==` — Hive uses its own keys internally, so this is safe, but changes flow through every consumer (collections reference `HttpRequestConfig` too).
-- **BLoC tab lookups**: always `state.tabs.firstWhereOrNull((t) => t.tabId == id)`. Never index by position across state emissions — positions can shift.
+- **BLoC tab lookups**: always `state.tabs.firstWhereOrNull((t) => t.tabId == id)`. Never index by position across state emissions — positions can shift. This applies to event *payloads* too: identity-addressed `TabsEvent`s carry `tabId`, not `index` (see §4.2).
 - **`listenWhen` / `buildWhen` are not optional**: `RequestView` rebuilds are expensive; narrow selectors are how we keep the editor responsive.
 - **Text controllers vs editor controllers**: `_KeyValueEditor` uses `TextEditingController`; the body and response panels use `re_editor.CodeLineEditingController`. Don't mix.
 - **`_setControllerPreservingEnd`** (in `request_view.dart`) is the only safe way to push text into a `TextEditingController` without jumping the cursor during an echo-write.

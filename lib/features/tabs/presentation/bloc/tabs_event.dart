@@ -22,10 +22,10 @@ class AddTab extends TabsEvent {
 }
 
 class RemoveTab extends TabsEvent {
-  final int index;
-  const RemoveTab(this.index);
+  final String tabId;
+  const RemoveTab(this.tabId);
   @override
-  List<Object?> get props => [index];
+  List<Object?> get props => [tabId];
 }
 
 class SetActiveIndex extends TabsEvent {
@@ -51,24 +51,24 @@ class UpdateTab extends TabsEvent {
 }
 
 class CloseOtherTabs extends TabsEvent {
-  final int index;
-  const CloseOtherTabs(this.index);
+  final String tabId;
+  const CloseOtherTabs(this.tabId);
   @override
-  List<Object?> get props => [index];
+  List<Object?> get props => [tabId];
 }
 
 class CloseTabsToTheRight extends TabsEvent {
-  final int index;
-  const CloseTabsToTheRight(this.index);
+  final String tabId;
+  const CloseTabsToTheRight(this.tabId);
   @override
-  List<Object?> get props => [index];
+  List<Object?> get props => [tabId];
 }
 
 class DuplicateTab extends TabsEvent {
-  final int index;
-  const DuplicateTab(this.index);
+  final String tabId;
+  const DuplicateTab(this.tabId);
   @override
-  List<Object?> get props => [index];
+  List<Object?> get props => [tabId];
 }
 
 class SendRequest extends TabsEvent {
@@ -76,8 +76,8 @@ class SendRequest extends TabsEvent {
 }
 
 class CancelRequest extends TabsEvent {
-  final int index;
-  const CancelRequest(this.index);
+  final String tabId;
+  const CancelRequest(this.tabId);
   @override
-  List<Object?> get props => [index];
+  List<Object?> get props => [tabId];
 }

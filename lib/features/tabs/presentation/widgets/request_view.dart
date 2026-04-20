@@ -425,10 +425,7 @@ class _UrlBarState extends State<_UrlBar> {
                   BrutalBounce(
                     child: ElevatedButton(
                       onPressed: tab.isSending
-                        ? () {
-                            final index = state.tabs.indexWhere((t) => t.tabId == tab.tabId);
-                            if (index != -1) context.read<TabsBloc>().add(CancelRequest(index));
-                          }
+                        ? () => context.read<TabsBloc>().add(CancelRequest(tab.tabId))
                         : () => context.read<TabsBloc>().add(const SendRequest()),
                       style: ElevatedButton.styleFrom(
                          backgroundColor: tab.isSending ? Colors.red : null,
@@ -446,7 +443,11 @@ class _UrlBarState extends State<_UrlBar> {
                               key: const ValueKey('cancel'),
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                                SizedBox(
+                                  width: layout.smallIconSize,
+                                  height: layout.smallIconSize,
+                                  child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                ),
                                 const SizedBox(width: 8),
                                 Text('CANCEL', style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w900)),
                               ],
@@ -1134,9 +1135,11 @@ class _KeyValueRowState extends State<_KeyValueRow> {
               ),
             ),
             SizedBox(width: widget.layout.isCompact ? 4 : 8),
-            IconButton(
-              icon: Icon(Icons.delete_outline, size: widget.layout.isCompact ? 20 : 24, color: Colors.red),
-              onPressed: widget.onDelete,
+            BrutalBounce(
+              child: IconButton(
+                icon: Icon(Icons.delete_outline, size: widget.layout.isCompact ? 20 : 24, color: Colors.red),
+                onPressed: widget.onDelete,
+              ),
             ),
           ],
         ),

@@ -52,15 +52,15 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  void _confirmClose(BuildContext context, int index) {
+  void _confirmClose(BuildContext context, String tabId) {
     final tabsBloc = context.read<TabsBloc>();
-    if (index < 0 || index >= tabsBloc.state.tabs.length) return;
+    final tab = tabsBloc.state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+    if (tab == null) return;
 
-    final tab = tabsBloc.state.tabs[index];
-    final isDirty = _isTabDirty(context, tab.tabId);
+    final isDirty = _isTabDirty(context, tabId);
 
     void performRemove() {
-      tabsBloc.add(RemoveTab(index));
+      tabsBloc.add(RemoveTab(tabId));
     }
 
     if (isDirty) {
@@ -106,7 +106,11 @@ class _MainScreenState extends State<MainScreen> {
             return Actions(
               actions: <Type, Action<Intent>>{
                 CloseTabIntent: CallbackAction<CloseTabIntent>(
-                  onInvoke: (_) => _confirmClose(context, activeIndex),
+                  onInvoke: (_) {
+                    if (activeIndex < 0 || activeIndex >= tabs.length) return null;
+                    _confirmClose(context, tabs[activeIndex].tabId);
+                    return null;
+                  },
                 ),
                 SendRequestIntent: CallbackAction<SendRequestIntent>(
                   onInvoke: (_) {
@@ -244,7 +248,7 @@ class _MainScreenState extends State<MainScreen> {
                   index: index,
                   isActive: activeIndex == index,
                   onTap: () => context.read<TabsBloc>().add(SetActiveIndex(index)),
-                  onClose: () => _confirmClose(context, index),
+                  onClose: () => _confirmClose(context, tab.tabId),
                 );
               },
             ),
@@ -378,7 +382,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
                     onTap: widget.onTap,
-                    onSecondaryTapDown: (details) => _showContextMenu(context, details.globalPosition, tab, widget.index),
+                    onSecondaryTapDown: (details) => _showContextMenu(context, details.globalPosition, tab),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       height: layout.tabBarHeight,
@@ -441,7 +445,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
     );
   }
 
-  void _showContextMenu(BuildContext context, Offset position, HttpRequestTabEntity tab, int index) {
+  void _showContextMenu(BuildContext context, Offset position, HttpRequestTabEntity tab) {
     final theme = Theme.of(context);
     final layout = theme.extension<LayoutExtension>()!;
     final tabsBloc = context.read<TabsBloc>();
@@ -466,16 +470,16 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
           child: _buildMenuItem(context, Icons.close, 'CLOSE'),
         ),
         PopupMenuItem(
-          onTap: () => tabsBloc.add(CloseOtherTabs(index)),
+          onTap: () => tabsBloc.add(CloseOtherTabs(tab.tabId)),
           child: _buildMenuItem(context, Icons.tab_unselected, 'CLOSE OTHERS'),
         ),
         PopupMenuItem(
-          onTap: () => tabsBloc.add(CloseTabsToTheRight(index)),
+          onTap: () => tabsBloc.add(CloseTabsToTheRight(tab.tabId)),
           child: _buildMenuItem(context, Icons.keyboard_double_arrow_right, 'CLOSE TO THE RIGHT'),
         ),
         const PopupMenuDivider(),
         PopupMenuItem(
-          onTap: () => tabsBloc.add(DuplicateTab(index)),
+          onTap: () => tabsBloc.add(DuplicateTab(tab.tabId)),
           child: _buildMenuItem(context, Icons.copy, 'DUPLICATE'),
         ),
         PopupMenuItem(

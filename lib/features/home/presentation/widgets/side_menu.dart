@@ -630,38 +630,40 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
           context.read<CollectionsBloc>().add(MoveNode(details.data, node.id));
         },
         builder: (context, candidateData, rejectedData) {
-          return InkWell(
-            onTap: widget.onToggle,
-            child: MouseRegion(
-              onEnter: (_) => setState(() => _isHovered = true),
-              onExit: (_) => setState(() => _isHovered = false),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                decoration: BoxDecoration(
-                  color: _isDragOver 
-                    ? theme.primaryColor.withValues(alpha: 0.3) 
-                    : (_isHovered ? theme.hoverColor : Colors.transparent),
-                  border: _isDragOver 
-                    ? Border.all(color: theme.primaryColor, width: layout.borderThin) 
-                    : Border.all(color: Colors.transparent, width: layout.borderThin),
-                ),
-                child: TreeIndentation(
-                  entry: widget.entry,
-                  child: Row(
-                    children: [
-                      Icon(
-                        widget.entry.isExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
-                        size: layout.smallIconSize,
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                      ),
-                      Icon(node.isFavorite ? Icons.star : Icons.folder,
-                          size: layout.iconSize, color: node.isFavorite ? theme.primaryColor : theme.colorScheme.secondary),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.w900)),
-                      ),
-                      _NodeContextMenu(node: node),
-                    ],
+          return BrutalBounce(
+            child: InkWell(
+              onTap: widget.onToggle,
+              child: MouseRegion(
+                onEnter: (_) => setState(() => _isHovered = true),
+                onExit: (_) => setState(() => _isHovered = false),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  decoration: BoxDecoration(
+                    color: _isDragOver
+                        ? theme.primaryColor.withValues(alpha: 0.3)
+                        : (_isHovered ? theme.hoverColor : Colors.transparent),
+                    border: _isDragOver
+                        ? Border.all(color: theme.primaryColor, width: layout.borderThin)
+                        : Border.all(color: Colors.transparent, width: layout.borderThin),
+                  ),
+                  child: TreeIndentation(
+                    entry: widget.entry,
+                    child: Row(
+                      children: [
+                        Icon(
+                          widget.entry.isExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
+                          size: layout.smallIconSize,
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                        Icon(node.isFavorite ? Icons.star : Icons.folder,
+                            size: layout.iconSize, color: node.isFavorite ? theme.primaryColor : theme.colorScheme.secondary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.w900)),
+                        ),
+                        _NodeContextMenu(node: node),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -670,36 +672,38 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
         },
       );
     } else {
-      content = InkWell(
-        onTap: () {
-          final config = node.config;
-          if (config == null) return;
-          context.read<TabsBloc>().add(AddTab(
-                config: config.copyWith(),
-                collectionNodeId: node.id,
-                collectionName: node.name,
-              ));
-        },
-        child: MouseRegion(
-          onEnter: (_) => setState(() => _isHovered = true),
-          onExit: (_) => setState(() => _isHovered = false),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            decoration: BoxDecoration(
-              color: _isHovered ? theme.hoverColor : Colors.transparent,
-            ),
-            child: TreeIndentation(
-              entry: widget.entry,
-              child: Row(
-                children: [
-                  SizedBox(width: layout.smallIconSize), 
-                  MethodBadge(method: node.config?.method ?? 'GET', small: true),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold)),
-                  ),
-                  _NodeContextMenu(node: node),
-                ],
+      content = BrutalBounce(
+        child: InkWell(
+          onTap: () {
+            final config = node.config;
+            if (config == null) return;
+            context.read<TabsBloc>().add(AddTab(
+                  config: config.copyWith(),
+                  collectionNodeId: node.id,
+                  collectionName: node.name,
+                ));
+          },
+          child: MouseRegion(
+            onEnter: (_) => setState(() => _isHovered = true),
+            onExit: (_) => setState(() => _isHovered = false),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              decoration: BoxDecoration(
+                color: _isHovered ? theme.hoverColor : Colors.transparent,
+              ),
+              child: TreeIndentation(
+                entry: widget.entry,
+                child: Row(
+                  children: [
+                    SizedBox(width: layout.smallIconSize),
+                    MethodBadge(method: node.config?.method ?? 'GET', small: true),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold)),
+                    ),
+                    _NodeContextMenu(node: node),
+                  ],
+                ),
               ),
             ),
           ),

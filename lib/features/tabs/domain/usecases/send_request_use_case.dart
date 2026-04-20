@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/network/http_response.dart';
 import '../../../../core/network/network_service.dart';
@@ -50,8 +51,10 @@ class SendRequestUseCase {
         );
       }
       await addToHistoryUseCase(historyConfig, settings.historyLimit);
-    } catch (_) {
-      // History is best-effort; never fail the request because of persistence.
+    } catch (e, st) {
+      // History is best-effort; never fail the request because of persistence —
+      // but surface the failure so silent regressions are spotted.
+      debugPrint('SendRequestUseCase: failed to record history: $e\n$st');
     }
   }
 }

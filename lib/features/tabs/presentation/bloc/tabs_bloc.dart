@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
@@ -134,12 +135,12 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   }
 
   void _onRemoveTab(RemoveTab event, Emitter<TabsState> emit) {
-    if (event.index < 0 || event.index >= state.tabs.length) return;
-    final removed = state.tabs[event.index];
-    _requests.cancel(removed.tabId);
-    _requests.finish(removed.tabId);
+    final index = state.tabs.indexWhere((t) => t.tabId == event.tabId);
+    if (index == -1) return;
+    _requests.cancel(event.tabId);
+    _requests.finish(event.tabId);
 
-    final newTabs = [...state.tabs]..removeAt(event.index);
+    final newTabs = [...state.tabs]..removeAt(index);
     int newActiveIndex = state.activeIndex;
     if (newTabs.isEmpty) {
       newActiveIndex = -1;
@@ -189,7 +190,8 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
 
   void _onCloseOtherTabs(CloseOtherTabs event, Emitter<TabsState> emit) {
     if (state.tabs.length <= 1) return;
-    final tabToKeep = state.tabs[event.index];
+    final tabToKeep = state.tabs.firstWhereOrNull((t) => t.tabId == event.tabId);
+    if (tabToKeep == null) return;
     emit(state.copyWith(
       tabs: [tabToKeep],
       activeIndex: 0,
@@ -198,11 +200,12 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   }
 
   void _onCloseTabsToTheRight(CloseTabsToTheRight event, Emitter<TabsState> emit) {
-    if (event.index >= state.tabs.length - 1) return;
-    final newTabs = state.tabs.sublist(0, event.index + 1);
+    final index = state.tabs.indexWhere((t) => t.tabId == event.tabId);
+    if (index == -1 || index >= state.tabs.length - 1) return;
+    final newTabs = state.tabs.sublist(0, index + 1);
     int newActiveIndex = state.activeIndex;
-    if (newActiveIndex > event.index) {
-      newActiveIndex = event.index;
+    if (newActiveIndex > index) {
+      newActiveIndex = index;
     }
     emit(state.copyWith(
       tabs: newTabs,
@@ -212,7 +215,9 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   }
 
   void _onDuplicateTab(DuplicateTab event, Emitter<TabsState> emit) {
-    final tabToDuplicate = state.tabs[event.index];
+    final index = state.tabs.indexWhere((t) => t.tabId == event.tabId);
+    if (index == -1) return;
+    final tabToDuplicate = state.tabs[index];
     final duplicatedTab = HttpRequestTabEntity(
       tabId: uuid.v4(),
       config: tabToDuplicate.config.copyWith(),
@@ -221,16 +226,16 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     );
 
     final newTabs = [...state.tabs];
-    newTabs.insert(event.index + 1, duplicatedTab);
+    newTabs.insert(index + 1, duplicatedTab);
 
     int newActiveIndex = state.activeIndex;
-    if (newActiveIndex >= event.index + 1) {
+    if (newActiveIndex >= index + 1) {
       newActiveIndex += 1;
     }
 
     emit(state.copyWith(
       tabs: newTabs,
-      activeIndex: event.index + 1,
+      activeIndex: index + 1,
     ));
     _scheduleSave();
   }
@@ -244,7 +249,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final handle = _requests.start(activeTab.tabId);
 
     final sendingTab = activeTab.copyWith(isSending: true);
-    emit(state.copyWith(tabs: _replaceTab(state.tabs, activeIndex, sendingTab)));
+    emit(state.copyWith(tabs: _replaceTabById(state.tabs, sendingTab)));
 
     try {
       final response = await sendRequestUseCase(config: config, cancelHandle: handle);
@@ -277,20 +282,15 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     }
   }
 
-  List<HttpRequestTabEntity> _replaceTab(List<HttpRequestTabEntity> tabs, int index, HttpRequestTabEntity replacement) {
+  List<HttpRequestTabEntity> _replaceTabById(List<HttpRequestTabEntity> tabs, HttpRequestTabEntity replacement) {
+    final index = tabs.indexWhere((t) => t.tabId == replacement.tabId);
+    if (index == -1) return tabs;
     final copy = [...tabs];
     copy[index] = replacement;
     return copy;
   }
 
-  List<HttpRequestTabEntity> _replaceTabById(List<HttpRequestTabEntity> tabs, HttpRequestTabEntity replacement) {
-    final index = tabs.indexWhere((t) => t.tabId == replacement.tabId);
-    if (index == -1) return tabs;
-    return _replaceTab(tabs, index, replacement);
-  }
-
   void _onCancelRequest(CancelRequest event, Emitter<TabsState> emit) {
-    if (event.index < 0 || event.index >= state.tabs.length) return;
-    _requests.cancel(state.tabs[event.index].tabId);
+    _requests.cancel(event.tabId);
   }
 }
