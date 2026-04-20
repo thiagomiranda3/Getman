@@ -15,7 +15,6 @@ import 'package:getman/features/collections/presentation/bloc/collections_bloc.d
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
 import 'package:getman/core/theme/app_theme.dart';
-import 'package:getman/core/theme/neo_brutalist_theme.dart';
 import 'package:getman/core/navigation/intents.dart';
 import 'package:getman/features/home/presentation/widgets/side_menu.dart';
 
@@ -171,7 +170,7 @@ class _MainScreenState extends State<MainScreen> {
                                             Text(
                                               'NO OPEN TABS',
                                               style: TextStyle(
-                                                fontSize: 18,
+                                                fontSize: context.appLayout.fontSizeSubtitle,
                                                 fontWeight: FontWeight.w900,
                                                 color: theme.dividerColor.withValues(alpha: 0.3),
                                               ),
@@ -180,17 +179,17 @@ class _MainScreenState extends State<MainScreen> {
                                             Text(
                                               'PRESS CTRL+N TO CREATE A NEW REQUEST',
                                               style: TextStyle(
-                                                fontSize: 12,
+                                                fontSize: context.appLayout.fontSizeNormal,
                                                 fontWeight: FontWeight.bold,
                                                 color: theme.dividerColor.withValues(alpha: 0.2),
                                               ),
                                             ),
                                             const SizedBox(height: 24),
-                                            BrutalBounce(
+                                            context.appDecoration.wrapInteractive(
                                               child: ElevatedButton(
                                                 onPressed: () => context.read<TabsBloc>().add(const AddTab()),
                                                 style: ElevatedButton.styleFrom(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                                  padding: EdgeInsets.symmetric(horizontal: context.appLayout.buttonPaddingHorizontal, vertical: context.appLayout.buttonPaddingVertical),
                                                 ),
                                                 child: const Text('NEW REQUEST'),
                                               ),
@@ -285,7 +284,7 @@ class _AddTabButtonState extends State<_AddTabButton> {
           color: _isHovered ? theme.primaryColor : theme.scaffoldBackgroundColor,
           border: Border(left: BorderSide(color: theme.dividerColor, width: widget.layout.borderThick)),
         ),
-        child: BrutalBounce(
+        child: context.appDecoration.wrapInteractive(
           child: IconButton(
             icon: Icon(Icons.add, size: widget.layout.addIconSize, color: theme.colorScheme.onSurface),
             onPressed: () => context.read<TabsBloc>().add(const AddTab()),
@@ -461,7 +460,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
       ),
       color: theme.scaffoldBackgroundColor,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
         side: BorderSide(color: theme.dividerColor, width: layout.borderThick),
       ),
       elevation: 0,
@@ -499,7 +498,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
       children: [
         Icon(icon, size: 18, color: theme.colorScheme.onSurface),
         const SizedBox(width: 12),
-        Text(text, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+        Text(text, style: TextStyle(fontWeight: FontWeight.w900, fontSize: context.appLayout.fontSizeNormal)),
       ],
     );
   }
