@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:collection/collection.dart';
-import 'package:getman/core/di/injection_container.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
@@ -29,7 +28,6 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   double? _localSideMenuWidth;
   final FocusNode _mainFocusNode = FocusNode();
-  final TabDirtyChecker _dirtyChecker = sl<TabDirtyChecker>();
 
   @override
   void initState() {
@@ -48,7 +46,7 @@ class _MainScreenState extends State<MainScreen> {
   bool _isTabDirty(BuildContext context, String tabId) {
     final tab = context.read<TabsBloc>().state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
     if (tab == null) return false;
-    return _dirtyChecker(
+    return context.read<TabDirtyChecker>()(
       tab: tab,
       collections: context.read<CollectionsBloc>().state.collections,
     );
@@ -136,9 +134,10 @@ class _MainScreenState extends State<MainScreen> {
                           });
                         },
                         onEnd: () {
-                          if (_localSideMenuWidth != null) {
-                            context.read<SettingsBloc>().add(UpdateSideMenuWidth(_localSideMenuWidth!));
-                          }
+                          final committed = _localSideMenuWidth;
+                          if (committed == null) return;
+                          context.read<SettingsBloc>().add(UpdateSideMenuWidth(committed));
+                          setState(() => _localSideMenuWidth = null);
                         },
                       ),
                       Expanded(
@@ -244,7 +243,6 @@ class _MainScreenState extends State<MainScreen> {
                   tabId: tab.tabId,
                   index: index,
                   isActive: activeIndex == index,
-                  dirtyChecker: _dirtyChecker,
                   onTap: () => context.read<TabsBloc>().add(SetActiveIndex(index)),
                   onClose: () => _confirmClose(context, index),
                 );
@@ -297,7 +295,6 @@ class _TabWidget extends StatefulWidget {
   final String tabId;
   final int index;
   final bool isActive;
-  final TabDirtyChecker dirtyChecker;
   final VoidCallback onTap;
   final VoidCallback onClose;
 
@@ -306,7 +303,6 @@ class _TabWidget extends StatefulWidget {
     required this.tabId,
     required this.index,
     required this.isActive,
-    required this.dirtyChecker,
     required this.onTap,
     required this.onClose,
   });
@@ -361,8 +357,9 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
         final tab = state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
         if (tab == null) return const SizedBox.shrink();
 
+        final dirtyChecker = context.read<TabDirtyChecker>();
         return BlocSelector<CollectionsBloc, CollectionsState, bool>(
-          selector: (collState) => widget.dirtyChecker(tab: tab, collections: collState.collections),
+          selector: (collState) => dirtyChecker(tab: tab, collections: collState.collections),
           builder: (context, isDirty) {
             final title = tab.collectionName ?? (tab.config.url.isEmpty ? 'NEW REQUEST' : tab.config.url);
             final displayTitle = (title.length > layout.tabTitleMaxLength

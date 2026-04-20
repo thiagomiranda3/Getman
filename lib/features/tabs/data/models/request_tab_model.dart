@@ -71,30 +71,6 @@ class HttpRequestTabModel extends HiveObject {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'config': config.toJson(),
-    'responseBody': responseBody,
-    'responseHeaders': responseHeaders,
-    'statusCode': statusCode,
-    'durationMs': durationMs,
-    'collectionNodeId': collectionNodeId,
-    'collectionName': collectionName,
-    'tabId': tabId,
-  };
-
-  factory HttpRequestTabModel.fromJson(Map<String, dynamic> json) => HttpRequestTabModel(
-    config: HttpRequestConfig.fromJson(json['config']),
-    responseBody: json['responseBody'],
-    responseHeaders: json['responseHeaders'] != null 
-        ? Map<String, String>.from(json['responseHeaders']) 
-        : null,
-    statusCode: json['statusCode'],
-    durationMs: json['durationMs'],
-    collectionNodeId: json['collectionNodeId'],
-    collectionName: json['collectionName'],
-    tabId: json['tabId'],
-  );
-
   factory HttpRequestTabModel.fromEntity(HttpRequestTabEntity entity) => HttpRequestTabModel(
     config: HttpRequestConfig.fromEntity(entity.config),
     responseBody: entity.responseBody,

@@ -13,6 +13,7 @@ import 'features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:flutter/services.dart';
 import 'package:getman/core/navigation/intents.dart';
 import 'features/settings/domain/entities/settings_entity.dart';
+import 'features/home/domain/usecases/tab_dirty_checker.dart';
 import 'core/navigation/app_router.dart';
 
 void main() async {
@@ -27,7 +28,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
+    return MultiRepositoryProvider(
+      providers: [
+        RepositoryProvider<TabDirtyChecker>.value(value: di.sl<TabDirtyChecker>()),
+      ],
+      child: MultiBlocProvider(
       providers: [
         BlocProvider(create: (_) => di.sl<SettingsBloc>()),
         BlocProvider(create: (_) => di.sl<HistoryBloc>()..add(const LoadHistory())),
@@ -73,6 +78,7 @@ class MyApp extends StatelessWidget {
             ),
           );
         },
+      ),
       ),
     );
   }

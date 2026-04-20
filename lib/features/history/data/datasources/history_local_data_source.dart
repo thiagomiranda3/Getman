@@ -52,7 +52,7 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
 
       await box.add(config);
 
-      if (box.length > limit) {
+      while (box.length > limit && box.isNotEmpty) {
         await box.deleteAt(0);
       }
     } catch (e) {

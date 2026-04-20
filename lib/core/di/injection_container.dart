@@ -55,7 +55,6 @@ Future<SettingsEntity> init() async {
 
   // Features - Settings
   sl.registerLazySingleton(() => SettingsBloc(
-    getSettingsUseCase: sl(),
     saveSettingsUseCase: sl(),
     initialSettings: initialSettings,
   ));

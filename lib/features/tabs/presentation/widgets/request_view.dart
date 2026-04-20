@@ -21,8 +21,10 @@ import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/core/theme/neo_brutalist_theme.dart';
+import 'package:getman/core/network/http_methods.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/core/utils/curl_utils.dart';
+import 'package:getman/core/utils/status_color.dart';
 import 'package:getman/core/navigation/intents.dart';
 
 const double _splitMin = 0.1;
@@ -51,10 +53,6 @@ class _RequestViewState extends State<RequestView> {
   late final CodeLineEditingController _bodyController;
   late final CodeLineEditingController _responseController;
   double? _localSplitRatio;
-
-  final FocusNode _responseFocusNode = FocusNode();
-  final ScrollController _responseScrollController = ScrollController();
-  final ScrollController _requestScrollController = ScrollController();
 
   @override
   void initState() {
@@ -90,9 +88,6 @@ class _RequestViewState extends State<RequestView> {
     _bodyController.removeListener(_onBodyChanged);
     _bodyController.dispose();
     _responseController.dispose();
-    _responseFocusNode.dispose();
-    _responseScrollController.dispose();
-    _requestScrollController.dispose();
     super.dispose();
   }
 
@@ -133,8 +128,6 @@ class _RequestViewState extends State<RequestView> {
             final tab = tabsState.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
             if (tab == null) return const SizedBox.shrink();
 
-            final isActive = tabsState.tabs.asMap().entries.any((e) => e.key == tabsState.activeIndex && e.value.tabId == widget.tabId);
-
             return Actions(
               actions: <Type, Action<Intent>>{
                 SaveRequestIntent: CallbackAction<SaveRequestIntent>(
@@ -150,11 +143,7 @@ class _RequestViewState extends State<RequestView> {
               },
               child: Focus(
                 autofocus: true,
-                child: AnimatedOpacity(
-                  duration: const Duration(milliseconds: 300),
-                  opacity: isActive ? 1.0 : 0.0,
-                  curve: Curves.easeInOut,
-                  child: Padding(
+                child: Padding(
                     padding: EdgeInsets.all(layout.pagePadding),
                     child: Column(
                       children: [
@@ -183,9 +172,11 @@ class _RequestViewState extends State<RequestView> {
                                       });
                                     },
                                     onEnd: () {
-                                      if (_localSplitRatio != null) {
-                                        context.read<SettingsBloc>().add(UpdateSplitRatio(_localSplitRatio!));
-                                      }
+                                      final committed = _localSplitRatio;
+                                      if (committed == null) return;
+                                      context.read<SettingsBloc>().add(UpdateSplitRatio(committed));
+                                      // Release the local override so future Bloc updates drive the widget again.
+                                      setState(() => _localSplitRatio = null);
                                     },
                                   ),
                                   Flexible(
@@ -201,8 +192,7 @@ class _RequestViewState extends State<RequestView> {
                     ),
                   ),
                 ),
-              ),
-            );
+              );
           },
         );
       },
@@ -360,7 +350,7 @@ class _UrlBarState extends State<_UrlBar> {
                           fontSize: layout.fontSizeNormal,
                         ),
                         selectedItemBuilder: (context) {
-                          return ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map((m) {
+                          return HttpMethods.all.map((m) {
                             return Container(
                               alignment: Alignment.center,
                               padding: EdgeInsets.symmetric(horizontal: layout.isCompact ? 8 : 12, vertical: 6),
@@ -372,7 +362,7 @@ class _UrlBarState extends State<_UrlBar> {
                             );
                           }).toList();
                         },
-                        items: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
+                        items: HttpMethods.all
                             .map((m) => DropdownMenuItem(
                               value: m,
                               child: Container(
@@ -743,7 +733,7 @@ class _ResponseSection extends StatelessWidget {
                 runSpacing: 8,
                 children: [
                   if (tab.statusCode != null)
-                    _ResponseMetadataItem(label: 'STATUS', value: tab.statusCode.toString(), color: _getStatusColor(tab.statusCode!), layout: layout),
+                    _ResponseMetadataItem(label: 'STATUS', value: tab.statusCode.toString(), color: StatusColor.forCodeAccent(tab.statusCode!), layout: layout),
                   if (tab.durationMs != null)
                      _ResponseMetadataItem(label: 'TIME', value: '${tab.durationMs} ms', color: theme.colorScheme.secondary, layout: layout),
                 ],
@@ -793,11 +783,6 @@ class _ResponseSection extends StatelessWidget {
     );
   }
 
-  Color _getStatusColor(int code) {
-    if (code >= 200 && code < 300) return Colors.greenAccent;
-    if (code >= 400) return Colors.redAccent;
-    return Colors.orangeAccent;
-  }
 }
 
 class _ResponseBodyView extends StatefulWidget {

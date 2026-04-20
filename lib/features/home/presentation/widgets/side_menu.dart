@@ -15,6 +15,7 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 import 'package:getman/features/history/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/neo_brutalist_theme.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
+import 'package:getman/core/utils/status_color.dart';
 
 class SideMenu extends StatelessWidget {
   const SideMenu({super.key});
@@ -433,7 +434,7 @@ class _HistoryItemWidgetState extends State<_HistoryItemWidget> {
               if (widget.config.statusCode != null) ...[
                 const SizedBox(width: 8),
                 Text(widget.config.statusCode.toString(), style: TextStyle(
-                  color: _getStatusColor(widget.config.statusCode!),
+                  color: StatusColor.forCode(widget.config.statusCode!),
                   fontWeight: FontWeight.w900,
                   fontSize: layout.fontSizeNormal,
                 )),
@@ -443,12 +444,6 @@ class _HistoryItemWidgetState extends State<_HistoryItemWidget> {
         ),
       ),
     );
-  }
-
-  Color _getStatusColor(int code) {
-    if (code >= 200 && code < 300) return Colors.green.shade700;
-    if (code >= 400) return Colors.red.shade700;
-    return Colors.orange.shade700;
   }
 }
 

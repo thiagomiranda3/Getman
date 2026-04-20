@@ -28,6 +28,13 @@ class _RequestManager {
       handle.cancel('User cancelled request');
     }
   }
+
+  void cancelAll() {
+    for (final handle in _handles.values) {
+      if (!handle.isCancelled) handle.cancel('Bloc closed');
+    }
+    _handles.clear();
+  }
 }
 
 class TabsBloc extends Bloc<TabsEvent, TabsState> {
@@ -73,6 +80,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   @override
   Future<void> close() async {
     _debounceTimer?.cancel();
+    _requests.cancelAll();
     await _persist();
     return super.close();
   }
@@ -82,16 +90,19 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     try {
       final tabs = await repository.getTabs();
       if (tabs.isEmpty) {
+        final newTabId = uuid.v4();
         emit(state.copyWith(
           tabs: [HttpRequestTabEntity(
-            tabId: uuid.v4(),
-            config: const HttpRequestConfigEntity(id: 'initial', url: ''),
+            tabId: newTabId,
+            config: HttpRequestConfigEntity(id: newTabId, url: ''),
           )],
           activeIndex: 0,
           isLoading: false,
         ));
       } else {
-        emit(state.copyWith(tabs: tabs, activeIndex: 0, isLoading: false));
+        // Reset transient in-flight flags — there is no live request after a restart.
+        final sanitized = tabs.map((t) => t.isSending ? t.copyWith(isSending: false) : t).toList();
+        emit(state.copyWith(tabs: sanitized, activeIndex: 0, isLoading: false));
       }
     } on PersistenceFailure catch (f) {
       debugPrint('LoadTabs failed: ${f.message}');
@@ -123,6 +134,11 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   }
 
   void _onRemoveTab(RemoveTab event, Emitter<TabsState> emit) {
+    if (event.index < 0 || event.index >= state.tabs.length) return;
+    final removed = state.tabs[event.index];
+    _requests.cancel(removed.tabId);
+    _requests.finish(removed.tabId);
+
     final newTabs = [...state.tabs]..removeAt(event.index);
     int newActiveIndex = state.activeIndex;
     if (newTabs.isEmpty) {

@@ -491,24 +491,4 @@ class _BrutalBounceState extends State<BrutalBounce> with SingleTickerProviderSt
   }
 }
 
-class BrutalTabTransition extends StatelessWidget {
-  final Widget child;
-  final bool isActive;
-
-  const BrutalTabTransition({
-    super.key,
-    required this.child,
-    required this.isActive,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 200),
-      opacity: isActive ? 1.0 : 0.0,
-      curve: Curves.easeInOut,
-      child: child,
-    );
-  }
-}
 

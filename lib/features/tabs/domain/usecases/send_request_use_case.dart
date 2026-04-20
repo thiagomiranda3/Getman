@@ -22,14 +22,7 @@ class SendRequestUseCase {
     NetworkCancelHandle? cancelHandle,
   }) async {
     try {
-      final response = await tabsRepository.sendRequest(
-        url: config.url,
-        method: config.method,
-        data: config.body.isNotEmpty ? config.body : null,
-        queryParameters: config.params,
-        headers: config.headers,
-        cancelHandle: cancelHandle,
-      );
+      final response = await tabsRepository.sendRequest(config, cancelHandle: cancelHandle);
       await _record(config, response: response);
       return response;
     } on NetworkFailure catch (f) {

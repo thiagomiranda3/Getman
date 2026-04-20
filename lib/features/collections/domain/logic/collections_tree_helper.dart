@@ -1,3 +1,4 @@
+import '../../../history/domain/entities/request_config_entity.dart';
 import '../entities/collection_node_entity.dart';
 
 class CollectionsTreeHelper {
@@ -74,7 +75,7 @@ class CollectionsTreeHelper {
     }).toList();
   }
 
-  static List<CollectionNodeEntity> updateConfigInTree(List<CollectionNodeEntity> nodes, String id, dynamic config) {
+  static List<CollectionNodeEntity> updateConfigInTree(List<CollectionNodeEntity> nodes, String id, HttpRequestConfigEntity config) {
     return nodes.map((node) {
       if (node.id == id) {
         return node.copyWith(config: config);

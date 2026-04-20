@@ -7,8 +7,6 @@ abstract class SettingsEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class LoadSettings extends SettingsEvent {}
-
 class UpdateDarkMode extends SettingsEvent {
   final bool isDarkMode;
   const UpdateDarkMode(this.isDarkMode);
