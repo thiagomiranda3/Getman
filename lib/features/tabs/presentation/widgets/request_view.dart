@@ -7,7 +7,6 @@ import 'package:re_editor/re_editor.dart';
 import 'package:re_highlight/styles/atom-one-dark.dart';
 import 'package:re_highlight/styles/atom-one-light.dart';
 import 'package:re_highlight/languages/json.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
@@ -610,8 +609,8 @@ class _RequestConfigSection extends StatelessWidget {
             findBuilder: (context, controller, readOnly) => _CodeFindPanel(controller: controller, readOnly: readOnly),
             style: CodeEditorStyle(
               fontSize: context.appLayout.fontSizeCode,
-              fontFamily: GoogleFonts.jetBrainsMono().fontFamily,
-              backgroundColor: Colors.transparent,
+              fontFamily: context.appTypography.codeFontFamily,
+              backgroundColor: context.appPalette.codeBackground,
               cursorColor: theme.primaryColor,
               selectionColor: theme.primaryColor.withValues(alpha: 0.3),
               cursorLineColor: theme.primaryColor.withValues(alpha: 0.1),
@@ -836,8 +835,8 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
           findBuilder: (context, controller, readOnly) => _CodeFindPanel(controller: controller, readOnly: readOnly),
           style: CodeEditorStyle(
             fontSize: context.appLayout.fontSizeCode,
-            fontFamily: GoogleFonts.jetBrainsMono().fontFamily,
-            backgroundColor: Colors.transparent,
+            fontFamily: context.appTypography.codeFontFamily,
+            backgroundColor: context.appPalette.codeBackground,
             cursorColor: Theme.of(context).primaryColor,
             selectionColor: Theme.of(context).primaryColor.withValues(alpha: 0.3),
             cursorLineColor: Theme.of(context).primaryColor.withValues(alpha: 0.2),

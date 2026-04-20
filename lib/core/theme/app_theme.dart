@@ -289,7 +289,6 @@ class AppPalette extends ThemeExtension<AppPalette> {
   final Color statusAccentWarning;
   final Color statusAccentError;
   final Color codeBackground;
-  final Color mutedHover;
 
   const AppPalette({
     required this.methodColors,
@@ -301,7 +300,6 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.statusAccentWarning,
     required this.statusAccentError,
     required this.codeBackground,
-    required this.mutedHover,
   });
 
   Color methodColor(String method) =>
@@ -330,7 +328,6 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? statusAccentWarning,
     Color? statusAccentError,
     Color? codeBackground,
-    Color? mutedHover,
   }) {
     return AppPalette(
       methodColors: methodColors ?? this.methodColors,
@@ -342,7 +339,6 @@ class AppPalette extends ThemeExtension<AppPalette> {
       statusAccentWarning: statusAccentWarning ?? this.statusAccentWarning,
       statusAccentError: statusAccentError ?? this.statusAccentError,
       codeBackground: codeBackground ?? this.codeBackground,
-      mutedHover: mutedHover ?? this.mutedHover,
     );
   }
 
@@ -359,7 +355,6 @@ class AppPalette extends ThemeExtension<AppPalette> {
       statusAccentWarning: Color.lerp(statusAccentWarning, other.statusAccentWarning, t)!,
       statusAccentError: Color.lerp(statusAccentError, other.statusAccentError, t)!,
       codeBackground: Color.lerp(codeBackground, other.codeBackground, t)!,
-      mutedHover: Color.lerp(mutedHover, other.mutedHover, t)!,
     );
   }
 }

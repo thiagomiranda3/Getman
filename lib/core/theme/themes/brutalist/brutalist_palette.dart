@@ -19,8 +19,6 @@ class BrutalistPalette {
   static const Color secondary = Color(0xFF6D28D9);
   static const Color secondaryDark = Color(0xFF6330BD);
 
-  static const Color lightGray = Color(0xFFE5E7EB);
-
   static const Map<String, Color> methodColors = {
     'GET': Color(0xFF4ADE80),
     'POST': Color(0xFF60A5FA),

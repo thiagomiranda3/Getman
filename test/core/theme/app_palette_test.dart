@@ -17,7 +17,6 @@ void main() {
     statusAccentWarning: Colors.orangeAccent,
     statusAccentError: Colors.redAccent,
     codeBackground: Color(0xFF111111),
-    mutedHover: Color(0x1A000000),
   );
 
   group('AppPalette', () {
