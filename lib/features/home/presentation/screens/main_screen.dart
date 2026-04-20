@@ -319,6 +319,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
   late AnimationController _sizeController;
   late Animation<double> _sizeAnimation;
   bool _isClosing = false;
+  bool _isHovered = false;
 
   @override
   void initState() {
@@ -377,6 +378,8 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
                 index: widget.index,
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
+                  onEnter: (_) => setState(() => _isHovered = true),
+                  onExit: (_) => setState(() => _isHovered = false),
                   child: GestureDetector(
                     onTap: widget.onTap,
                     onSecondaryTapDown: (details) => _showContextMenu(context, details.globalPosition, tab),
@@ -388,7 +391,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
                         maxWidth: layout.isCompact ? 150 : 250,
                       ),
                       padding: EdgeInsets.symmetric(horizontal: layout.tabPaddingHorizontal),
-                      decoration: context.appDecoration.tabShape(context, active: widget.isActive),
+                      decoration: context.appDecoration.tabShape(context, active: widget.isActive, hovered: _isHovered),
                       child: Row(
                         children: [
                           Expanded(

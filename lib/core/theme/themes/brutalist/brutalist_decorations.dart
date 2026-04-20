@@ -29,16 +29,25 @@ BoxDecoration brutalistPanelBox(
 BoxDecoration brutalistTabShape(
   BuildContext context, {
   required bool active,
+  required bool hovered,
 }) {
   final theme = Theme.of(context);
   final layout = context.appLayout;
   final border = theme.dividerColor;
+  final Color background;
+  if (active) {
+    background = theme.primaryColor;
+  } else if (hovered) {
+    background = theme.dividerColor.withValues(alpha: 0.2);
+  } else {
+    background = theme.cardColor;
+  }
   return BoxDecoration(
-    color: active ? theme.primaryColor : theme.cardColor,
+    color: background,
     border: Border(
-      top: BorderSide(color: border, width: layout.borderThick),
       right: BorderSide(color: border, width: layout.borderThick),
       bottom: active ? BorderSide.none : BorderSide(color: border, width: layout.borderThick),
+      top: active ? BorderSide(color: border, width: layout.borderThick) : BorderSide.none,
     ),
   );
 }

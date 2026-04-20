@@ -4,7 +4,7 @@ import 'package:getman/core/theme/app_theme.dart';
 
 BoxDecoration _noopPanel(BuildContext ctx, {Color? color, double? borderWidth, double? offset, BorderRadius? borderRadius}) =>
     const BoxDecoration();
-BoxDecoration _noopTab(BuildContext ctx, {required bool active}) => const BoxDecoration();
+BoxDecoration _noopTab(BuildContext ctx, {required bool active, required bool hovered}) => const BoxDecoration();
 Widget _noopWrap({required Widget child, VoidCallback? onTap, double? scaleDown}) => child;
 
 void main() {
