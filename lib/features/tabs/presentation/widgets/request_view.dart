@@ -357,7 +357,7 @@ class _UrlBarState extends State<_UrlBar> {
                                 color: context.appPalette.methodColor(m),
                                 border: Border.all(color: theme.dividerColor, width: layout.borderThin),
                               ),
-                              child: Text(m, style: TextStyle(color: Colors.black, fontWeight: context.appTypography.displayWeight, fontSize: layout.fontSizeNormal)),
+                              child: Text(m, style: TextStyle(color: theme.colorScheme.onPrimary, fontWeight: context.appTypography.displayWeight, fontSize: layout.fontSizeNormal)),
                             );
                           }).toList();
                         },
@@ -371,7 +371,7 @@ class _UrlBarState extends State<_UrlBar> {
                                   color: context.appPalette.methodColor(m),
                                   border: Border.all(color: theme.dividerColor, width: layout.borderThin),
                                 ),
-                                child: Text(m, style: TextStyle(color: Colors.black, fontWeight: context.appTypography.displayWeight, fontSize: layout.fontSizeNormal)),
+                                child: Text(m, style: TextStyle(color: theme.colorScheme.onPrimary, fontWeight: context.appTypography.displayWeight, fontSize: layout.fontSizeNormal)),
                               ),
                             ))
                             .toList(),
@@ -426,8 +426,8 @@ class _UrlBarState extends State<_UrlBar> {
                         ? () => context.read<TabsBloc>().add(CancelRequest(tab.tabId))
                         : () => context.read<TabsBloc>().add(const SendRequest()),
                       style: ElevatedButton.styleFrom(
-                         backgroundColor: tab.isSending ? Colors.red : null,
-                         foregroundColor: tab.isSending ? Colors.white : null,
+                         backgroundColor: tab.isSending ? theme.colorScheme.error : null,
+                         foregroundColor: tab.isSending ? theme.colorScheme.onError : null,
                          padding: EdgeInsets.symmetric(
                            horizontal: layout.buttonPaddingHorizontal,
                            vertical: layout.buttonPaddingVertical,
@@ -444,7 +444,7 @@ class _UrlBarState extends State<_UrlBar> {
                                 SizedBox(
                                   width: layout.smallIconSize,
                                   height: layout.smallIconSize,
-                                  child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onError),
                                 ),
                                 const SizedBox(width: 8),
                                 Text('CANCEL', style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.displayWeight)),
@@ -1135,7 +1135,7 @@ class _KeyValueRowState extends State<_KeyValueRow> {
             SizedBox(width: widget.layout.isCompact ? 4 : 8),
             context.appDecoration.wrapInteractive(
               child: IconButton(
-                icon: Icon(Icons.delete_outline, size: widget.layout.isCompact ? 20 : 24, color: Colors.red),
+                icon: Icon(Icons.delete_outline, size: widget.layout.isCompact ? 20 : 24, color: Theme.of(context).colorScheme.error),
                 onPressed: widget.onDelete,
               ),
             ),
