@@ -15,7 +15,7 @@ BoxDecoration brutalistPanelBox(
   return BoxDecoration(
     color: color ?? theme.cardColor,
     borderRadius: borderRadius ?? BorderRadius.circular(shape.panelRadius),
-    border: Border.all(color: border, width: borderWidth ?? layout.borderThick),
+    border: Border.all(color: border, width: borderWidth ?? layout.borderThin),
     boxShadow: [
       BoxShadow(
         color: border,
@@ -33,7 +33,6 @@ BoxDecoration brutalistTabShape(
   required bool isFirst,
 }) {
   final theme = Theme.of(context);
-  final layout = context.appLayout;
   final border = theme.dividerColor;
   final Color background;
   if (active) {
@@ -43,13 +42,14 @@ BoxDecoration brutalistTabShape(
   } else {
     background = theme.cardColor;
   }
+  final BorderSide rule = BorderSide(color: border, width: 1);
   return BoxDecoration(
     color: background,
     border: Border(
-      left: isFirst ? BorderSide(color: border, width: layout.borderThick) : BorderSide.none,
-      right: BorderSide(color: border, width: layout.borderThick),
-      bottom: active ? BorderSide.none : BorderSide(color: border, width: layout.borderThick),
-      top: active ? BorderSide(color: border, width: layout.borderThick) : BorderSide.none,
+      left: isFirst ? rule : BorderSide.none,
+      right: rule,
+      bottom: active ? BorderSide.none : rule,
+      top: active ? rule : BorderSide.none,
     ),
   );
 }

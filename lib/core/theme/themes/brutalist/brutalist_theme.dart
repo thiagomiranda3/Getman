@@ -87,7 +87,7 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
       centerTitle: false,
       // Intentional change from reference's const 18: now responsive via AppLayout.fontSizeSubtitle (18/14).
       titleTextStyle: TextStyle(fontSize: layout.fontSizeSubtitle, color: text, fontWeight: FontWeight.w900),
-      shape: Border(bottom: BorderSide(color: border, width: layout.borderThick)),
+      shape: Border(bottom: BorderSide(color: border, width: layout.borderThin)),
     ),
     tabBarTheme: TabBarThemeData(
       dividerColor: Colors.transparent,
@@ -97,9 +97,9 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
       indicator: BoxDecoration(
         color: currentPrimary,
         border: Border(
-          top: BorderSide(color: border, width: layout.borderThick),
-          left: BorderSide(color: border, width: layout.borderThick),
-          right: BorderSide(color: border, width: layout.borderThick),
+          top: BorderSide(color: border, width: layout.borderThin),
+          left: BorderSide(color: border, width: layout.borderThin),
+          right: BorderSide(color: border, width: layout.borderThin),
         ),
       ),
       labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
@@ -111,7 +111,7 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(shape.buttonRadius),
-          side: BorderSide(color: border, width: layout.borderThick),
+          side: BorderSide(color: border, width: layout.borderThin),
         ),
         padding: EdgeInsets.symmetric(horizontal: layout.buttonPaddingHorizontal, vertical: layout.buttonPaddingVertical),
         // Intentionally responsive via AppLayout (was const 14 pre-refactor).
@@ -127,7 +127,7 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: text,
-        side: BorderSide(color: border, width: layout.borderThick),
+        side: BorderSide(color: border, width: layout.borderThin),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(shape.buttonRadius)),
         padding: EdgeInsets.symmetric(horizontal: layout.buttonPaddingHorizontal, vertical: layout.buttonPaddingVertical),
         // Intentionally responsive via AppLayout (was const 14 pre-refactor).
@@ -145,15 +145,15 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
       filled: true,
       fillColor: surface,
       border: OutlineInputBorder(
-        borderSide: BorderSide(color: border, width: layout.borderThick),
+        borderSide: BorderSide(color: border, width: layout.borderThin),
         borderRadius: BorderRadius.circular(shape.inputRadius),
       ),
       enabledBorder: OutlineInputBorder(
-        borderSide: BorderSide(color: border, width: layout.borderThick),
+        borderSide: BorderSide(color: border, width: layout.borderThin),
         borderRadius: BorderRadius.circular(shape.inputRadius),
       ),
       focusedBorder: OutlineInputBorder(
-        borderSide: BorderSide(color: currentSecondary, width: layout.borderThick),
+        borderSide: BorderSide(color: currentSecondary, width: layout.borderThin),
         borderRadius: BorderRadius.circular(shape.inputRadius),
       ),
       labelStyle: TextStyle(color: text, fontWeight: FontWeight.bold),
@@ -165,14 +165,14 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(shape.panelRadius),
-        side: BorderSide(color: border, width: layout.borderThick),
+        side: BorderSide(color: border, width: layout.borderThin),
       ),
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: background,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(shape.dialogRadius),
-        side: BorderSide(color: border, width: layout.borderHeavy),
+        side: BorderSide(color: border, width: layout.borderThin),
       ),
       // Intentionally responsive via AppLayout (was const 18 pre-refactor).
       titleTextStyle: TextStyle(color: text, fontSize: layout.fontSizeSubtitle, fontWeight: FontWeight.w900),
