@@ -31,6 +31,7 @@ import '../../features/tabs/data/datasources/tabs_local_data_source.dart';
 import '../../features/tabs/data/models/request_tab_model.dart';
 import '../../features/tabs/data/repositories/tabs_repository_impl.dart';
 import '../../features/tabs/domain/repositories/tabs_repository.dart';
+import '../../features/tabs/domain/usecases/send_request_use_case.dart';
 import '../../features/tabs/presentation/bloc/tabs_bloc.dart';
 
 import '../../features/home/domain/usecases/tab_dirty_checker.dart';
@@ -99,12 +100,19 @@ Future<SettingsEntity> init() async {
   // Features - Tabs
   sl.registerLazySingleton(() => TabsBloc(
     repository: sl(),
-    networkService: sl(),
+    sendRequestUseCase: sl(),
+  ));
+
+  sl.registerLazySingleton(() => SendRequestUseCase(
+    tabsRepository: sl(),
     addToHistoryUseCase: sl(),
     getSettingsUseCase: sl(),
   ));
 
-  sl.registerLazySingleton<TabsRepository>(() => TabsRepositoryImpl(sl()));
+  sl.registerLazySingleton<TabsRepository>(() => TabsRepositoryImpl(
+    localDataSource: sl(),
+    networkService: sl(),
+  ));
 
   sl.registerLazySingleton<TabsLocalDataSource>(() => TabsLocalDataSourceImpl());
 

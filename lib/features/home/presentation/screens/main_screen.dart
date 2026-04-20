@@ -113,7 +113,7 @@ class _MainScreenState extends State<MainScreen> {
                 SendRequestIntent: CallbackAction<SendRequestIntent>(
                   onInvoke: (_) {
                     if (activeIndex >= 0 && activeIndex < tabs.length && !tabs[activeIndex].isSending) {
-                      context.read<TabsBloc>().add(SendRequest());
+                      context.read<TabsBloc>().add(const SendRequest());
                     }
                     return null;
                   },

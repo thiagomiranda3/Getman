@@ -15,6 +15,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
@@ -23,6 +24,20 @@ import 'package:getman/core/theme/neo_brutalist_theme.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/core/utils/curl_utils.dart';
 import 'package:getman/core/navigation/intents.dart';
+
+const double _splitMin = 0.1;
+const double _splitMax = 0.9;
+const int _splitFlexUnits = 1000;
+
+int _ratioToFlex(double ratio) => (ratio.clamp(_splitMin, _splitMax) * _splitFlexUnits).toInt();
+
+void _setControllerPreservingEnd(TextEditingController controller, String text) {
+  if (controller.text == text) return;
+  controller.value = TextEditingValue(
+    text: text,
+    selection: TextSelection.collapsed(offset: text.length),
+  );
+}
 
 class RequestView extends StatefulWidget {
   final String tabId;
@@ -33,10 +48,10 @@ class RequestView extends StatefulWidget {
 }
 
 class _RequestViewState extends State<RequestView> {
-  CodeLineEditingController? _bodyController;
-  CodeLineEditingController? _responseController;
+  late final CodeLineEditingController _bodyController;
+  late final CodeLineEditingController _responseController;
   double? _localSplitRatio;
-  
+
   final FocusNode _responseFocusNode = FocusNode();
   final ScrollController _responseScrollController = ScrollController();
   final ScrollController _requestScrollController = ScrollController();
@@ -44,35 +59,47 @@ class _RequestViewState extends State<RequestView> {
   @override
   void initState() {
     super.initState();
-    final tabsBloc = context.read<TabsBloc>();
-    final tab = tabsBloc.state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
-    
-    _bodyController = CodeLineEditingController.fromText(tab?.config.body ?? '');
+    _bodyController = CodeLineEditingController();
     _responseController = CodeLineEditingController();
-    _bodyController!.addListener(_onBodyChanged);
+    _bodyController.addListener(_onBodyChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final tab = context.read<TabsBloc>().state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+    if (tab != null && _bodyController.text != tab.config.body) {
+      _bodyController.text = tab.config.body;
+    }
   }
 
   void _onBodyChanged() {
-     final tabsBloc = context.read<TabsBloc>();
-     final tab = tabsBloc.state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
-     if (tab == null) return;
-     final newText = _bodyController!.text;
-     if (tab.config.body == newText) return;
-     
-     tabsBloc.add(UpdateTab(
-       tab.copyWith(config: tab.config.copyWith(body: newText)),
-     ));
+    final tabsBloc = context.read<TabsBloc>();
+    final tab = tabsBloc.state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+    if (tab == null) return;
+    final newText = _bodyController.text;
+    if (tab.config.body == newText) return;
+
+    tabsBloc.add(UpdateTab(
+      tab.copyWith(config: tab.config.copyWith(body: newText)),
+    ));
   }
 
   @override
   void dispose() {
-    _bodyController?.removeListener(_onBodyChanged);
-    _bodyController?.dispose();
-    _responseController?.dispose();
+    _bodyController.removeListener(_onBodyChanged);
+    _bodyController.dispose();
+    _responseController.dispose();
     _responseFocusNode.dispose();
     _responseScrollController.dispose();
     _requestScrollController.dispose();
     super.dispose();
+  }
+
+  void _syncBodyFromTab(HttpRequestTabEntity tab) {
+    if (_bodyController.text != tab.config.body) {
+      _bodyController.text = tab.config.body;
+    }
   }
 
   @override
@@ -81,15 +108,31 @@ class _RequestViewState extends State<RequestView> {
       builder: (context, settingsState) {
         final settings = settingsState.settings;
         final layout = Theme.of(context).extension<LayoutExtension>()!;
-        
-        return BlocBuilder<TabsBloc, TabsState>(
+
+        return BlocConsumer<TabsBloc, TabsState>(
+          listenWhen: (prev, next) {
+            final p = prev.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+            final n = next.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+            return p?.config.body != n?.config.body;
+          },
+          listener: (context, state) {
+            final tab = state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+            if (tab != null) _syncBodyFromTab(tab);
+          },
+          buildWhen: (prev, next) {
+            if (prev.isLoading != next.isLoading) return true;
+            if (prev.activeIndex != next.activeIndex) return true;
+            final p = prev.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+            final n = next.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+            return p != n;
+          },
           builder: (context, tabsState) {
             if (tabsState.isLoading) {
               return const Center(child: CircularProgressIndicator());
             }
             final tab = tabsState.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
             if (tab == null) return const SizedBox.shrink();
-            
+
             final isActive = tabsState.tabs.asMap().entries.any((e) => e.key == tabsState.activeIndex && e.value.tabId == widget.tabId);
 
             return Actions(
@@ -99,10 +142,8 @@ class _RequestViewState extends State<RequestView> {
                 ),
                 BeautifyJsonIntent: CallbackAction<BeautifyJsonIntent>(
                   onInvoke: (_) async {
-                    if (_bodyController != null) {
-                      final prettified = await JsonUtils.prettify(_bodyController!.text);
-                      _bodyController!.text = prettified;
-                    }
+                    final prettified = await JsonUtils.prettify(_bodyController.text);
+                    _bodyController.text = prettified;
                     return null;
                   },
                 ),
@@ -124,22 +165,21 @@ class _RequestViewState extends State<RequestView> {
                             builder: (context, constraints) {
                               final totalSize = settings.isVerticalLayout ? constraints.maxHeight : constraints.maxWidth;
                               final currentRatio = _localSplitRatio ?? settings.splitRatio;
-                              
+
                               return Flex(
                                 direction: settings.isVerticalLayout ? Axis.vertical : Axis.horizontal,
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Flexible(
-                                    flex: (currentRatio * 1000).toInt(),
-                                    child: _RequestConfigSection(tabId: widget.tabId, bodyController: _bodyController!),
+                                    flex: _ratioToFlex(currentRatio),
+                                    child: _RequestConfigSection(tabId: widget.tabId, bodyController: _bodyController),
                                   ),
                                   Splitter(
                                     isVertical: settings.isVerticalLayout,
                                     onUpdate: (delta) {
                                       setState(() {
-                                        _localSplitRatio = (_localSplitRatio ?? settings.splitRatio) + (delta / totalSize);
-                                        if (_localSplitRatio! < 0.1) _localSplitRatio = 0.1;
-                                        if (_localSplitRatio! > 0.9) _localSplitRatio = 0.9;
+                                        final base = _localSplitRatio ?? settings.splitRatio;
+                                        _localSplitRatio = (base + delta / totalSize).clamp(_splitMin, _splitMax);
                                       });
                                     },
                                     onEnd: () {
@@ -149,8 +189,8 @@ class _RequestViewState extends State<RequestView> {
                                     },
                                   ),
                                   Flexible(
-                                    flex: ((1 - currentRatio) * 1000).toInt(),
-                                    child: _ResponseSection(tabId: widget.tabId, responseController: _responseController!),
+                                    flex: _ratioToFlex(1 - currentRatio),
+                                    child: _ResponseSection(tabId: widget.tabId, responseController: _responseController),
                                   ),
                                 ],
                               );
@@ -173,21 +213,12 @@ class _RequestViewState extends State<RequestView> {
     final collectionsBloc = context.read<CollectionsBloc>();
     final tabsBloc = context.read<TabsBloc>();
     final theme = Theme.of(context);
-    
-    bool nodeExists(List<dynamic> nodes, String id) {
-      for (var node in nodes) {
-        if (node.id == id) return true;
-        if (nodeExists(node.children, id)) return true;
-      }
-      return false;
-    }
 
-    bool exists = false;
-    if (tab.collectionNodeId != null) {
-      exists = nodeExists(collectionsBloc.state.collections, tab.collectionNodeId!);
-    }
+    final savedNode = tab.collectionNodeId == null
+        ? null
+        : CollectionsTreeHelper.findNode(collectionsBloc.state.collections, tab.collectionNodeId!);
 
-    if (tab.collectionNodeId != null && exists) {
+    if (savedNode != null) {
       collectionsBloc.add(UpdateNodeRequest(
         tab.collectionNodeId!,
         tab.config.copyWith(),
@@ -205,14 +236,16 @@ class _RequestViewState extends State<RequestView> {
           duration: const Duration(seconds: 1),
         ),
       );
-    } else {
-      if (tab.collectionNodeId != null && !exists) {
-        tabsBloc.add(UpdateTab(
-          tab.copyWith(collectionNodeId: null, collectionName: null)
-        ));
-      }
-      _showSaveDialog(context, tab);
+      return;
     }
+
+    if (tab.collectionNodeId != null) {
+      // Node was deleted while the tab was open — drop the stale link.
+      tabsBloc.add(UpdateTab(
+        tab.copyWith(collectionNodeId: null, collectionName: null),
+      ));
+    }
+    _showSaveDialog(context, tab);
   }
 
   void _showSaveDialog(BuildContext context, HttpRequestTabEntity tab) {
@@ -226,21 +259,20 @@ class _RequestViewState extends State<RequestView> {
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CANCEL')),
           TextButton(
             onPressed: () {
-               context.read<CollectionsBloc>().add(SaveRequestToCollection(
-                 controller.text, 
-                 tab.config.copyWith(),
-               ));
-               
-               context.read<TabsBloc>().add(UpdateTab(
-                 tab.copyWith(collectionName: controller.text)
-               ));
-               Navigator.pop(dialogContext);
+              context.read<CollectionsBloc>().add(SaveRequestToCollection(
+                controller.text,
+                tab.config.copyWith(),
+              ));
+              context.read<TabsBloc>().add(UpdateTab(
+                tab.copyWith(collectionName: controller.text),
+              ));
+              Navigator.pop(dialogContext);
             },
             child: const Text('SAVE'),
           ),
         ],
       ),
-    );
+    ).whenComplete(controller.dispose);
   }
 }
 
@@ -254,13 +286,21 @@ class _UrlBar extends StatefulWidget {
 }
 
 class _UrlBarState extends State<_UrlBar> {
-  late TextEditingController _urlController;
+  late final TextEditingController _urlController;
 
   @override
   void initState() {
     super.initState();
+    _urlController = TextEditingController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     final tab = context.read<TabsBloc>().state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
-    _urlController = TextEditingController(text: tab?.config.url ?? '');
+    if (tab != null && _urlController.text != tab.config.url) {
+      _urlController.text = tab.config.url;
+    }
   }
 
   @override
@@ -271,14 +311,28 @@ class _UrlBarState extends State<_UrlBar> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<TabsBloc, TabsState>(
+    return BlocConsumer<TabsBloc, TabsState>(
+      listenWhen: (prev, next) {
+        final p = prev.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+        final n = next.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+        return p?.config.url != n?.config.url;
+      },
+      listener: (context, state) {
+        final tab = state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+        if (tab == null) return;
+        _setControllerPreservingEnd(_urlController, tab.config.url);
+      },
+      buildWhen: (prev, next) {
+        final p = prev.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+        final n = next.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+        if (p == null || n == null) return true;
+        return p.config.method != n.config.method ||
+            p.isSending != n.isSending ||
+            p.collectionNodeId != n.collectionNodeId;
+      },
       builder: (context, state) {
         final tab = state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
         if (tab == null) return const SizedBox.shrink();
-
-        if (_urlController.text != tab.config.url) {
-           _urlController.text = tab.config.url;
-        }
 
         return BlocBuilder<SettingsBloc, SettingsState>(
           builder: (context, settingsState) {
@@ -301,8 +355,8 @@ class _UrlBarState extends State<_UrlBar> {
                         dropdownColor: theme.colorScheme.surface,
                         value: tab.config.method,
                         style: TextStyle(
-                          color: theme.colorScheme.onSurface, 
-                          fontWeight: FontWeight.w900, 
+                          color: theme.colorScheme.onSurface,
+                          fontWeight: FontWeight.w900,
                           fontSize: layout.fontSizeNormal,
                         ),
                         selectedItemBuilder: (context) {
@@ -320,7 +374,7 @@ class _UrlBarState extends State<_UrlBar> {
                         },
                         items: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
                             .map((m) => DropdownMenuItem(
-                              value: m, 
+                              value: m,
                               child: Container(
                                 width: layout.isCompact ? 80 : 100,
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -355,43 +409,7 @@ class _UrlBarState extends State<_UrlBar> {
                         isDense: true,
                         filled: false,
                       ),
-                      onChanged: (val) {
-                         if (tab.config.url == val) return;
-
-                         final tabsBloc = context.read<TabsBloc>();
-
-                         if (val.trim().toLowerCase().startsWith('curl ')) {
-                           final parsedConfig = CurlUtils.parse(val, id: tab.config.id);
-                           if (parsedConfig != null) {
-                             tabsBloc.add(UpdateTab(
-                               tab.copyWith(config: parsedConfig),
-                             ));
-                             
-                             _urlController.text = parsedConfig.url;
-
-                             final requestViewState = context.findAncestorStateOfType<_RequestViewState>();
-
-                             JsonUtils.prettify(parsedConfig.body).then((prettifiedBody) {
-                               final latestTab = tabsBloc.state.tabs.firstWhereOrNull((t) => t.tabId == tab.tabId);
-                               
-                               if (latestTab != null) {
-                                 tabsBloc.add(UpdateTab(
-                                   latestTab.copyWith(config: latestTab.config.copyWith(body: prettifiedBody)),
-                                 ));
-                               }
-                               
-                               if (mounted && requestViewState != null) {
-                                 requestViewState._bodyController?.text = prettifiedBody;
-                               }
-                             });
-                             return;
-                           }
-                         }
-
-                         tabsBloc.add(UpdateTab(
-                          tab.copyWith(config: tab.config.copyWith(url: val)),
-                        ));
-                      },
+                      onChanged: (val) => _handleUrlChanged(context, tab, val),
                     ),
                   ),
                   SizedBox(width: layout.isCompact ? 8 : 12),
@@ -415,24 +433,24 @@ class _UrlBarState extends State<_UrlBar> {
                   SizedBox(width: layout.isCompact ? 4 : 8),
                   BrutalBounce(
                     child: ElevatedButton(
-                      onPressed: tab.isSending 
+                      onPressed: tab.isSending
                         ? () {
                             final index = state.tabs.indexWhere((t) => t.tabId == tab.tabId);
                             if (index != -1) context.read<TabsBloc>().add(CancelRequest(index));
                           }
-                        : () => context.read<TabsBloc>().add(SendRequest()),
+                        : () => context.read<TabsBloc>().add(const SendRequest()),
                       style: ElevatedButton.styleFrom(
                          backgroundColor: tab.isSending ? Colors.red : null,
                          foregroundColor: tab.isSending ? Colors.white : null,
                          padding: EdgeInsets.symmetric(
-                           horizontal: layout.buttonPaddingHorizontal, 
-                           vertical: layout.buttonPaddingVertical
+                           horizontal: layout.buttonPaddingHorizontal,
+                           vertical: layout.buttonPaddingVertical,
                          ),
                       ),
                       child: AnimatedSwitcher(
                         duration: const Duration(milliseconds: 300),
                         transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: FadeTransition(opacity: animation, child: child)),
-                        child: tab.isSending 
+                        child: tab.isSending
                           ? Row(
                               key: const ValueKey('cancel'),
                               mainAxisSize: MainAxisSize.min,
@@ -458,9 +476,9 @@ class _UrlBarState extends State<_UrlBar> {
                   BrutalBounce(
                     child: IconButton(
                       icon: Icon(
-                        settings.isVerticalLayout ? Icons.view_column_rounded : Icons.view_agenda_rounded, 
-                        color: theme.colorScheme.onSurface, 
-                        size: layout.isCompact ? 24 : 28
+                        settings.isVerticalLayout ? Icons.view_column_rounded : Icons.view_agenda_rounded,
+                        color: theme.colorScheme.onSurface,
+                        size: layout.isCompact ? 24 : 28,
                       ),
                       tooltip: settings.isVerticalLayout ? 'Horizontal Layout' : 'Vertical Layout',
                       onPressed: () => context.read<SettingsBloc>().add(UpdateVerticalLayout(!settings.isVerticalLayout)),
@@ -473,6 +491,34 @@ class _UrlBarState extends State<_UrlBar> {
         );
       },
     );
+  }
+
+  void _handleUrlChanged(BuildContext context, HttpRequestTabEntity tab, String val) {
+    if (tab.config.url == val) return;
+    final tabsBloc = context.read<TabsBloc>();
+
+    if (val.trim().toLowerCase().startsWith('curl ')) {
+      final parsedConfig = CurlUtils.parse(val, id: tab.config.id);
+      if (parsedConfig != null) {
+        tabsBloc.add(UpdateTab(tab.copyWith(config: parsedConfig)));
+        // The BlocListener above will sync the URL field back to parsedConfig.url.
+        _prettifyAndUpdateBody(tabsBloc, tab.tabId, parsedConfig.body);
+        return;
+      }
+    }
+
+    tabsBloc.add(UpdateTab(tab.copyWith(config: tab.config.copyWith(url: val))));
+  }
+
+  Future<void> _prettifyAndUpdateBody(TabsBloc tabsBloc, String tabId, String rawBody) async {
+    final prettified = await JsonUtils.prettify(rawBody);
+    final latestTab = tabsBloc.state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+    if (latestTab == null) return;
+    if (latestTab.config.body == prettified) return;
+    tabsBloc.add(UpdateTab(
+      latestTab.copyWith(config: latestTab.config.copyWith(body: prettified)),
+    ));
+    // _RequestViewState's BlocListener picks up the body change and syncs the editor.
   }
 }
 
@@ -487,6 +533,13 @@ class _RequestConfigSection extends StatelessWidget {
     final layout = theme.extension<LayoutExtension>()!;
 
     return BlocBuilder<TabsBloc, TabsState>(
+      buildWhen: (prev, next) {
+        final p = prev.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+        final n = next.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+        if (p == null || n == null) return true;
+        return !_mapEquals(p.config.params, n.config.params) ||
+            !_mapEquals(p.config.headers, n.config.headers);
+      },
       builder: (context, state) {
         final tab = state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
         if (tab == null) return const SizedBox.shrink();
@@ -524,16 +577,20 @@ class _RequestConfigSection extends StatelessWidget {
                       _KeyValueEditor(
                         items: tab.config.params,
                         onChanged: (map) {
+                          final current = context.read<TabsBloc>().state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+                          if (current == null) return;
                           context.read<TabsBloc>().add(UpdateTab(
-                            tab.copyWith(config: tab.config.copyWith(params: map)),
+                            current.copyWith(config: current.config.copyWith(params: map)),
                           ));
                         },
                       ),
                       _KeyValueEditor(
                         items: tab.config.headers,
                         onChanged: (map) {
+                          final current = context.read<TabsBloc>().state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+                          if (current == null) return;
                           context.read<TabsBloc>().add(UpdateTab(
-                            tab.copyWith(config: tab.config.copyWith(headers: map)),
+                            current.copyWith(config: current.config.copyWith(headers: map)),
                           ));
                         },
                       ),
@@ -551,7 +608,7 @@ class _RequestConfigSection extends StatelessWidget {
 
   Widget _buildBodyEditor(BuildContext context, ThemeData theme) {
     final layout = theme.extension<LayoutExtension>()!;
-    
+
     return Stack(
       children: [
         Container(
@@ -603,6 +660,15 @@ class _RequestConfigSection extends StatelessWidget {
   }
 }
 
+bool _mapEquals(Map<String, String> a, Map<String, String> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (final k in a.keys) {
+    if (b[k] != a[k]) return false;
+  }
+  return true;
+}
+
 class _ResponseSection extends StatelessWidget {
   final String tabId;
   final CodeLineEditingController responseController;
@@ -614,6 +680,15 @@ class _ResponseSection extends StatelessWidget {
     final layout = theme.extension<LayoutExtension>()!;
 
     return BlocBuilder<TabsBloc, TabsState>(
+      buildWhen: (prev, next) {
+        final p = prev.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+        final n = next.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+        if (p == null || n == null) return true;
+        return p.isSending != n.isSending ||
+            p.statusCode != n.statusCode ||
+            p.durationMs != n.durationMs ||
+            p.responseHeaders != n.responseHeaders;
+      },
       builder: (context, state) {
         final tab = state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
         if (tab == null) return const SizedBox.shrink();
@@ -735,19 +810,21 @@ class _ResponseBodyView extends StatefulWidget {
 }
 
 class _ResponseBodyViewState extends State<_ResponseBodyView> {
+  int _pendingSyncId = 0;
+
   @override
   void initState() {
     super.initState();
-    _updateBody();
+    final tab = context.read<TabsBloc>().state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+    _syncBody(tab?.responseBody);
   }
 
-  Future<void> _updateBody() async {
-    final tabsBloc = context.read<TabsBloc>();
-    final tab = tabsBloc.state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
-    final prettified = await JsonUtils.prettify(tab?.responseBody);
-    if (mounted) {
-      widget.responseController.text = prettified;
-    }
+  Future<void> _syncBody(String? rawBody) async {
+    final syncId = ++_pendingSyncId;
+    final prettified = await JsonUtils.prettify(rawBody);
+    // Only apply if no newer sync was started and we're still mounted.
+    if (!mounted || syncId != _pendingSyncId) return;
+    widget.responseController.text = prettified;
   }
 
   @override
@@ -759,7 +836,8 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
         return prevTab?.responseBody != nextTab?.responseBody;
       },
       listener: (context, state) {
-        _updateBody();
+        final tab = state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+        _syncBody(tab?.responseBody);
       },
       child: Container(
         width: double.infinity,
@@ -807,11 +885,16 @@ class _ResponseHeadersView extends StatelessWidget {
     final theme = Theme.of(context);
 
     return BlocBuilder<TabsBloc, TabsState>(
+      buildWhen: (prev, next) {
+        final p = prev.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+        final n = next.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+        return p?.responseHeaders != n?.responseHeaders;
+      },
       builder: (context, state) {
         final tab = state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
         final headers = tab?.responseHeaders;
         if (headers == null) return const SizedBox();
-        
+
         final entries = headers.entries.toList();
 
         return ListView.builder(
@@ -841,7 +924,7 @@ class _ResponseMetadataItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final baseColor = color ?? theme.primaryColor;
-    
+
     return TweenAnimationBuilder<Color?>(
       key: ValueKey(value),
       duration: const Duration(milliseconds: 600),
@@ -882,21 +965,23 @@ class _KeyValueEditor extends StatefulWidget {
 class _KeyValueEditorState extends State<_KeyValueEditor> {
   late List<TextEditingController> _keyControllers;
   late List<TextEditingController> _valControllers;
+  Map<String, String>? _lastEmitted;
 
   @override
   void initState() {
     super.initState();
-    _initControllers();
+    _initControllers(widget.items);
   }
 
-  void _initControllers() {
+  void _initControllers(Map<String, String> items) {
     _keyControllers = [];
     _valControllers = [];
-    
-    for (var entry in widget.items.entries) {
+
+    for (final entry in items.entries) {
       _keyControllers.add(TextEditingController(text: entry.key));
       _valControllers.add(TextEditingController(text: entry.value));
     }
+    // Trailing empty row for adding new entries.
     _keyControllers.add(TextEditingController());
     _valControllers.add(TextEditingController());
   }
@@ -904,25 +989,24 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
   @override
   void didUpdateWidget(_KeyValueEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!_isSame(oldWidget.items, widget.items)) {
-       _disposeControllers();
-       _initControllers();
+    // If the incoming items are the echo of our own last emission, the
+    // current controllers are already correct — don't wipe them (which
+    // would drop focus and blow away the user's half-typed row).
+    if (_lastEmitted != null && _mapEquals(widget.items, _lastEmitted!)) {
+      return;
     }
-  }
-
-  bool _isSame(Map<String, String> a, Map<String, String> b) {
-    if (a.length != b.length) return false;
-    for (var key in a.keys) {
-      if (a[key] != b[key]) return false;
+    if (_mapEquals(widget.items, oldWidget.items)) {
+      return;
     }
-    return true;
+    _disposeControllers();
+    _initControllers(widget.items);
   }
 
   void _disposeControllers() {
-    for (var c in _keyControllers) {
+    for (final c in _keyControllers) {
       c.dispose();
     }
-    for (var c in _valControllers) {
+    for (final c in _valControllers) {
       c.dispose();
     }
   }
@@ -933,8 +1017,8 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
     super.dispose();
   }
 
-  void _update() {
-    final Map<String, String> map = {};
+  Map<String, String> _asMap() {
+    final map = <String, String>{};
     for (int i = 0; i < _keyControllers.length; i++) {
       final key = _keyControllers[i].text;
       final val = _valControllers[i].text;
@@ -942,6 +1026,12 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
         map[key] = val;
       }
     }
+    return map;
+  }
+
+  void _emit() {
+    final map = _asMap();
+    _lastEmitted = map;
     widget.onChanged(map);
   }
 
@@ -953,32 +1043,32 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
       itemCount: _keyControllers.length,
       itemBuilder: (context, index) {
         return _KeyValueRow(
-          key: ValueKey(index),
+          key: ValueKey(_keyControllers[index]),
           keyController: _keyControllers[index],
           valController: _valControllers[index],
           layout: layout,
           isLast: index == _keyControllers.length - 1,
           onKeyChanged: (val) {
             if (index == _keyControllers.length - 1 && val.isNotEmpty) {
-               setState(() {
+              setState(() {
                 _keyControllers.add(TextEditingController());
                 _valControllers.add(TextEditingController());
-               });
+              });
             }
-            _update();
+            _emit();
           },
-          onValChanged: (val) => _update(),
+          onValChanged: (val) => _emit(),
           onDelete: () {
             setState(() {
-               _keyControllers[index].dispose();
-               _valControllers[index].dispose();
-               _keyControllers.removeAt(index);
-               _valControllers.removeAt(index);
-               if (_keyControllers.isEmpty) {
-                 _keyControllers.add(TextEditingController());
-                 _valControllers.add(TextEditingController());
-               }
-               _update();
+              _keyControllers[index].dispose();
+              _valControllers[index].dispose();
+              _keyControllers.removeAt(index);
+              _valControllers.removeAt(index);
+              if (_keyControllers.isEmpty) {
+                _keyControllers.add(TextEditingController());
+                _valControllers.add(TextEditingController());
+              }
+              _emit();
             });
           },
         );
@@ -1035,9 +1125,9 @@ class _KeyValueRowState extends State<_KeyValueRow> {
               child: TextField(
                 style: TextStyle(fontSize: widget.layout.fontSizeNormal, fontWeight: FontWeight.bold),
                 decoration: InputDecoration(
-                  hintText: 'KEY', 
-                  isDense: true, 
-                  contentPadding: EdgeInsets.all(widget.layout.isCompact ? 8 : 12)
+                  hintText: 'KEY',
+                  isDense: true,
+                  contentPadding: EdgeInsets.all(widget.layout.isCompact ? 8 : 12),
                 ),
                 controller: widget.keyController,
                 onChanged: widget.onKeyChanged,
@@ -1048,9 +1138,9 @@ class _KeyValueRowState extends State<_KeyValueRow> {
               child: TextField(
                 style: TextStyle(fontSize: widget.layout.fontSizeNormal, fontWeight: FontWeight.bold),
                 decoration: InputDecoration(
-                  hintText: 'VALUE', 
-                  isDense: true, 
-                  contentPadding: EdgeInsets.all(widget.layout.isCompact ? 8 : 12)
+                  hintText: 'VALUE',
+                  isDense: true,
+                  contentPadding: EdgeInsets.all(widget.layout.isCompact ? 8 : 12),
                 ),
                 controller: widget.valController,
                 onChanged: widget.onValChanged,
@@ -1127,8 +1217,8 @@ class _CodeFindPanelState extends State<_CodeFindPanel> {
                 hintText: 'FIND...',
                 isDense: true,
                 prefixIcon: Icon(Icons.search, size: layout.iconSize),
-                suffixText: (widget.controller.value?.result?.matches.length ?? 0) > 0 
-                  ? '${(widget.controller.value?.result?.index ?? 0) + 1}/${widget.controller.value?.result?.matches.length}' 
+                suffixText: (widget.controller.value?.result?.matches.length ?? 0) > 0
+                  ? '${(widget.controller.value?.result?.index ?? 0) + 1}/${widget.controller.value?.result?.matches.length}'
                   : '0/0',
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),

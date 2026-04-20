@@ -7,7 +7,9 @@ abstract class HistoryEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class LoadHistory extends HistoryEvent {}
+class LoadHistory extends HistoryEvent {
+  const LoadHistory();
+}
 
 class AddRequestToHistory extends HistoryEvent {
   final HttpRequestConfigEntity config;
@@ -17,7 +19,9 @@ class AddRequestToHistory extends HistoryEvent {
   List<Object?> get props => [config, limit];
 }
 
-class ClearHistory extends HistoryEvent {}
+class ClearHistory extends HistoryEvent {
+  const ClearHistory();
+}
 
 class HistoryUpdated extends HistoryEvent {
   final List<HttpRequestConfigEntity> history;

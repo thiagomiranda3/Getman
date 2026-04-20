@@ -30,9 +30,9 @@ class MyApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider(create: (_) => di.sl<SettingsBloc>()),
-        BlocProvider(create: (_) => di.sl<HistoryBloc>()..add(LoadHistory())),
-        BlocProvider(create: (_) => di.sl<CollectionsBloc>()..add(LoadCollections())),
-        BlocProvider(create: (_) => di.sl<TabsBloc>()..add(LoadTabs())),
+        BlocProvider(create: (_) => di.sl<HistoryBloc>()..add(const LoadHistory())),
+        BlocProvider(create: (_) => di.sl<CollectionsBloc>()..add(const LoadCollections())),
+        BlocProvider(create: (_) => di.sl<TabsBloc>()..add(const LoadTabs())),
       ],
       child: BlocBuilder<SettingsBloc, SettingsState>(
         builder: (context, state) {

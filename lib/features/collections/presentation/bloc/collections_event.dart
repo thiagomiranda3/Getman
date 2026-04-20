@@ -7,7 +7,9 @@ abstract class CollectionsEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class LoadCollections extends CollectionsEvent {}
+class LoadCollections extends CollectionsEvent {
+  const LoadCollections();
+}
 
 class AddFolder extends CollectionsEvent {
   final String name;

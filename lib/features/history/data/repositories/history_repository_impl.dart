@@ -14,7 +14,8 @@ class HistoryRepositoryImpl implements HistoryRepository {
   Future<List<HttpRequestConfigEntity>> getHistory() async {
     try {
       final models = await localDataSource.getHistory();
-      return models.map((m) => m.toEntity()).toList();
+      // Newest first: the UI always wants this ordering.
+      return models.reversed.map((m) => m.toEntity()).toList();
     } on PersistenceException catch (e) {
       throw PersistenceFailure(e.message);
     }

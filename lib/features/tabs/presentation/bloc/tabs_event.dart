@@ -8,7 +8,9 @@ abstract class TabsEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class LoadTabs extends TabsEvent {}
+class LoadTabs extends TabsEvent {
+  const LoadTabs();
+}
 
 class AddTab extends TabsEvent {
   final HttpRequestConfigEntity? config;
@@ -69,7 +71,9 @@ class DuplicateTab extends TabsEvent {
   List<Object?> get props => [index];
 }
 
-class SendRequest extends TabsEvent {}
+class SendRequest extends TabsEvent {
+  const SendRequest();
+}
 
 class CancelRequest extends TabsEvent {
   final int index;

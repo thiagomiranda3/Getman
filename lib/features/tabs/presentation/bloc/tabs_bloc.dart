@@ -4,9 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 import '../../domain/entities/request_tab_entity.dart';
 import '../../domain/repositories/tabs_repository.dart';
+import '../../domain/usecases/send_request_use_case.dart';
 import '../../../history/domain/entities/request_config_entity.dart';
-import '../../../history/domain/usecases/history_usecases.dart';
-import '../../../settings/domain/usecases/settings_usecases.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/network/network_service.dart';
 import 'tabs_event.dart';
@@ -33,9 +32,7 @@ class _RequestManager {
 
 class TabsBloc extends Bloc<TabsEvent, TabsState> {
   final TabsRepository repository;
-  final NetworkService networkService;
-  final AddToHistoryUseCase addToHistoryUseCase;
-  final GetSettingsUseCase getSettingsUseCase;
+  final SendRequestUseCase sendRequestUseCase;
 
   final _RequestManager _requests = _RequestManager();
   Timer? _debounceTimer;
@@ -45,9 +42,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
 
   TabsBloc({
     required this.repository,
-    required this.networkService,
-    required this.addToHistoryUseCase,
-    required this.getSettingsUseCase,
+    required this.sendRequestUseCase,
   }) : super(const TabsState()) {
     on<LoadTabs>(_onLoadTabs);
     on<AddTab>(_onAddTab);
@@ -236,14 +231,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     emit(state.copyWith(tabs: _replaceTab(state.tabs, activeIndex, sendingTab)));
 
     try {
-      final response = await networkService.request(
-        url: config.url,
-        method: config.method,
-        data: config.body.isNotEmpty ? config.body : null,
-        queryParameters: config.params,
-        headers: config.headers,
-        cancelHandle: handle,
-      );
+      final response = await sendRequestUseCase(config: config, cancelHandle: handle);
       _requests.finish(activeTab.tabId);
 
       final updatedTab = sendingTab.copyWith(
@@ -254,8 +242,6 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         responseHeaders: response.headers,
       );
       emit(state.copyWith(tabs: _replaceTabById(state.tabs, updatedTab)));
-
-      await _recordHistory(config, updatedTab);
     } on NetworkFailure catch (f) {
       _requests.finish(activeTab.tabId);
 
@@ -272,25 +258,6 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         responseHeaders: const {},
       );
       emit(state.copyWith(tabs: _replaceTabById(state.tabs, updatedTab)));
-      await _recordHistory(config, updatedTab);
-    }
-  }
-
-  Future<void> _recordHistory(HttpRequestConfigEntity config, HttpRequestTabEntity tab) async {
-    try {
-      final settings = await getSettingsUseCase();
-      var historyConfig = config.copyWith();
-      if (settings.saveResponseInHistory) {
-        historyConfig = historyConfig.copyWith(
-          responseBody: tab.responseBody,
-          responseHeaders: tab.responseHeaders,
-          statusCode: tab.statusCode,
-          durationMs: tab.durationMs,
-        );
-      }
-      await addToHistoryUseCase(historyConfig, settings.historyLimit);
-    } catch (e) {
-      debugPrint('History record failed: $e');
     }
   }
 

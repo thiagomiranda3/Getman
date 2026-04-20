@@ -41,7 +41,7 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
     emit(state.copyWith(isLoading: true));
     try {
       final history = await getHistoryUseCase();
-      emit(state.copyWith(history: history.reversed.toList(), isLoading: false));
+      emit(state.copyWith(history: history, isLoading: false));
     } catch (e) {
       debugPrint('LoadHistory failed: $e');
       emit(state.copyWith(isLoading: false));
@@ -65,6 +65,6 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
   }
 
   void _onHistoryUpdated(HistoryUpdated event, Emitter<HistoryState> emit) {
-    emit(state.copyWith(history: event.history.reversed.toList(), isLoading: false));
+    emit(state.copyWith(history: event.history, isLoading: false));
   }
 }
