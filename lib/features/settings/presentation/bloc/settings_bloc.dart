@@ -18,6 +18,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     on<UpdateSaveResponseInHistory>(_onUpdateSaveResponseInHistory);
     on<UpdateSplitRatio>(_onUpdateSplitRatio);
     on<UpdateSideMenuWidth>(_onUpdateSideMenuWidth);
+    on<UpdateThemeId>(_onUpdateThemeId);
   }
 
   Future<void> _onUpdateDarkMode(UpdateDarkMode event, Emitter<SettingsState> emit) async {
@@ -58,6 +59,12 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   Future<void> _onUpdateSideMenuWidth(UpdateSideMenuWidth event, Emitter<SettingsState> emit) async {
     final newSettings = state.settings.copyWith(sideMenuWidth: event.width);
+    await saveSettingsUseCase(newSettings);
+    emit(state.copyWith(settings: newSettings));
+  }
+
+  Future<void> _onUpdateThemeId(UpdateThemeId event, Emitter<SettingsState> emit) async {
+    final newSettings = state.settings.copyWith(themeId: event.themeId);
     await saveSettingsUseCase(newSettings);
     emit(state.copyWith(settings: newSettings));
   }

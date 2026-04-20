@@ -55,3 +55,10 @@ class UpdateSideMenuWidth extends SettingsEvent {
   @override
   List<Object?> get props => [width];
 }
+
+class UpdateThemeId extends SettingsEvent {
+  final String themeId;
+  const UpdateThemeId(this.themeId);
+  @override
+  List<Object?> get props => [themeId];
+}
