@@ -79,7 +79,7 @@ class _MainScreenState extends State<MainScreen> {
                   performRemove();
                 },
                 child: Text('CLOSE ANYWAY',
-                    style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold)),
+                    style: TextStyle(color: theme.colorScheme.error, fontWeight: context.appTypography.titleWeight)),
               ),
             ],
           );
@@ -171,7 +171,7 @@ class _MainScreenState extends State<MainScreen> {
                                               'NO OPEN TABS',
                                               style: TextStyle(
                                                 fontSize: context.appLayout.fontSizeSubtitle,
-                                                fontWeight: FontWeight.w900,
+                                                fontWeight: context.appTypography.displayWeight,
                                                 color: theme.dividerColor.withValues(alpha: 0.3),
                                               ),
                                             ),
@@ -180,7 +180,7 @@ class _MainScreenState extends State<MainScreen> {
                                               'PRESS CTRL+N TO CREATE A NEW REQUEST',
                                               style: TextStyle(
                                                 fontSize: context.appLayout.fontSizeNormal,
-                                                fontWeight: FontWeight.bold,
+                                                fontWeight: context.appTypography.titleWeight,
                                                 color: theme.dividerColor.withValues(alpha: 0.2),
                                               ),
                                             ),
@@ -412,7 +412,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
                               style: TextStyle(
                                 fontSize: layout.tabFontSize,
                                 color: widget.isActive ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
-                                fontWeight: isDirty ? FontWeight.w900 : (widget.isActive ? FontWeight.w900 : FontWeight.w500),
+                                fontWeight: isDirty ? context.appTypography.displayWeight : (widget.isActive ? context.appTypography.displayWeight : context.appTypography.bodyWeight),
                               ),
                             ),
                           ),
@@ -423,7 +423,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
                                   style: TextStyle(
                                       color: theme.colorScheme.secondary,
                                       fontSize: layout.dirtyStarSize,
-                                      fontWeight: FontWeight.w900)),
+                                      fontWeight: context.appTypography.displayWeight)),
                             ),
                           SizedBox(width: layout.tabSpacing),
                           IconButton(
@@ -498,7 +498,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
       children: [
         Icon(icon, size: 18, color: theme.colorScheme.onSurface),
         const SizedBox(width: 12),
-        Text(text, style: TextStyle(fontWeight: FontWeight.w900, fontSize: context.appLayout.fontSizeNormal)),
+        Text(text, style: TextStyle(fontWeight: context.appTypography.displayWeight, fontSize: context.appLayout.fontSizeNormal)),
       ],
     );
   }

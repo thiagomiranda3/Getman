@@ -51,7 +51,7 @@ class SideMenu extends StatelessWidget {
                 unselectedLabelColor: theme.colorScheme.onSurface,
                 labelStyle: TextStyle(
                   fontSize: layout.fontSizeNormal,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: context.appTypography.displayWeight,
                   overflow: TextOverflow.fade,
                 ),
                 padding: EdgeInsets.zero,
@@ -97,9 +97,9 @@ class _SideMenuHeader extends StatelessWidget {
               child: Text(
                 'GETMAN', 
                 style: TextStyle(
-                  fontWeight: FontWeight.w900, 
-                  fontSize: layout.headerFontSize, 
-                  color: theme.colorScheme.onSurface, 
+                  fontWeight: context.appTypography.displayWeight,
+                  fontSize: layout.headerFontSize,
+                  color: theme.colorScheme.onSurface,
                   letterSpacing: -1
                 ),
               ),
@@ -210,7 +210,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                 ListTile(
                   title: Text(
                     'HISTORY LIMIT',
-                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
                   ),
                   trailing: SizedBox(
                     width: 80,
@@ -238,7 +238,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                   activeTrackColor: theme.primaryColor,
                   title: Text(
                     'SAVE RESPONSE',
-                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
                   ),
                   value: settings.saveResponseInHistory,
                   onChanged: (val) => context.read<SettingsBloc>().add(UpdateSaveResponseInHistory(val)),
@@ -253,7 +253,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                   ),
                   title: Text(
                     'DARK MODE',
-                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
                   ),
                   value: settings.isDarkMode,
                   onChanged: (val) => context.read<SettingsBloc>().add(UpdateDarkMode(val)),
@@ -264,7 +264,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                   secondary: Icon(Icons.view_compact, size: layout.iconSize),
                   title: Text(
                     'COMPACT MODE',
-                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
                   ),
                   value: settings.isCompactMode,
                   onChanged: (val) => context.read<SettingsBloc>().add(UpdateCompactMode(val)),
@@ -356,18 +356,18 @@ class _HistoryListState extends State<_HistoryList> {
                   controller: _searchController,
                   decoration: InputDecoration(
                     hintText: 'SEARCH HISTORY...',
-                    hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+                    hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: context.appTypography.displayWeight, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
                     prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(context.appShape.panelRadius), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     isDense: true,
                   ),
-                  style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
                 ),
               ),
               Expanded(
-                child: state.isLoading && _items.isEmpty 
-                  ? const Center(child: CircularProgressIndicator()) 
+                child: state.isLoading && _items.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
                   : _buildList(),
               ),
             ],
@@ -391,7 +391,7 @@ class _HistoryListState extends State<_HistoryList> {
       return Center(
         child: Text('NO RESULTS FOUND', style: TextStyle(
           fontSize: context.appLayout.fontSizeNormal,
-          fontWeight: FontWeight.w900,
+          fontWeight: context.appTypography.displayWeight,
           color: Theme.of(context).dividerColor.withValues(alpha: 0.5)
         )),
       );
@@ -468,7 +468,7 @@ class _HistoryItemWidgetState extends State<_HistoryItemWidget> {
           title: Text(widget.config.url.isEmpty ? '(NO URL)' : widget.config.url, 
             maxLines: 1, 
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
           ),
           subtitle: Row(
             children: [
@@ -477,7 +477,7 @@ class _HistoryItemWidgetState extends State<_HistoryItemWidget> {
                 const SizedBox(width: 8),
                 Text(widget.config.statusCode.toString(), style: TextStyle(
                   color: context.appPalette.statusColor(widget.config.statusCode!),
-                  fontWeight: FontWeight.w900,
+                  fontWeight: context.appTypography.displayWeight,
                   fontSize: layout.fontSizeNormal,
                 )),
               ],
@@ -560,13 +560,13 @@ class _CollectionsListState extends State<_CollectionsList> {
                 controller: _searchController,
                 decoration: InputDecoration(
                   hintText: 'SEARCH COLLECTIONS...',
-                  hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+                  hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: context.appTypography.displayWeight, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
                   prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(context.appShape.panelRadius), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   isDense: true,
                 ),
-                style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
               ),
             ),
             Expanded(
@@ -658,7 +658,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
                             size: layout.iconSize, color: node.isFavorite ? theme.primaryColor : theme.colorScheme.secondary),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.w900)),
+                          child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.displayWeight)),
                         ),
                         _NodeContextMenu(node: node),
                       ],
@@ -698,7 +698,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
                     MethodBadge(method: node.config?.method ?? 'GET', small: true),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold)),
+                      child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight)),
                     ),
                     _NodeContextMenu(node: node),
                   ],
@@ -725,7 +725,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
             node.name.toUpperCase(),
             style: TextStyle(
               fontSize: layout.fontSizeNormal,
-              fontWeight: FontWeight.w900,
+              fontWeight: context.appTypography.displayWeight,
               color: theme.colorScheme.onSurface,
             ),
           ),

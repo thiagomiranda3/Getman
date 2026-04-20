@@ -25,7 +25,7 @@ class MethodBadge extends StatelessWidget {
         method,
         style: TextStyle(
           color: Colors.black,
-          fontWeight: FontWeight.w900,
+          fontWeight: context.appTypography.displayWeight,
           fontSize: small ? layout.fontSizeSmall : layout.fontSizeNormal,
         ),
       ),

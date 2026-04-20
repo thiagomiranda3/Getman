@@ -221,7 +221,7 @@ class _RequestViewState extends State<RequestView> {
             borderRadius: BorderRadius.circular(context.appShape.panelRadius),
             side: BorderSide(color: theme.dividerColor, width: layout.borderThick),
           ),
-          content: Text('REQUEST UPDATED!', style: TextStyle(color: theme.colorScheme.onPrimary, fontSize: context.appLayout.fontSizeNormal, fontWeight: FontWeight.w900)),
+          content: Text('REQUEST UPDATED!', style: TextStyle(color: theme.colorScheme.onPrimary, fontSize: context.appLayout.fontSizeNormal, fontWeight: context.appTypography.displayWeight)),
           duration: const Duration(seconds: 1),
         ),
       );
@@ -345,7 +345,7 @@ class _UrlBarState extends State<_UrlBar> {
                         value: tab.config.method,
                         style: TextStyle(
                           color: theme.colorScheme.onSurface,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: context.appTypography.displayWeight,
                           fontSize: layout.fontSizeNormal,
                         ),
                         selectedItemBuilder: (context) {
@@ -357,7 +357,7 @@ class _UrlBarState extends State<_UrlBar> {
                                 color: context.appPalette.methodColor(m),
                                 border: Border.all(color: theme.dividerColor, width: layout.borderThin),
                               ),
-                              child: Text(m, style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: layout.fontSizeNormal)),
+                              child: Text(m, style: TextStyle(color: Colors.black, fontWeight: context.appTypography.displayWeight, fontSize: layout.fontSizeNormal)),
                             );
                           }).toList();
                         },
@@ -371,7 +371,7 @@ class _UrlBarState extends State<_UrlBar> {
                                   color: context.appPalette.methodColor(m),
                                   border: Border.all(color: theme.dividerColor, width: layout.borderThin),
                                 ),
-                                child: Text(m, style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: layout.fontSizeNormal)),
+                                child: Text(m, style: TextStyle(color: Colors.black, fontWeight: context.appTypography.displayWeight, fontSize: layout.fontSizeNormal)),
                               ),
                             ))
                             .toList(),
@@ -447,10 +447,10 @@ class _UrlBarState extends State<_UrlBar> {
                                   child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                 ),
                                 const SizedBox(width: 8),
-                                Text('CANCEL', style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w900)),
+                                Text('CANCEL', style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.displayWeight)),
                               ],
                             )
-                          : Text('SEND', key: const ValueKey('send'), style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w900)),
+                          : Text('SEND', key: const ValueKey('send'), style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.displayWeight)),
                       ),
                     ),
                   ),
@@ -552,7 +552,7 @@ class _RequestConfigSection extends StatelessWidget {
                 ),
                 labelColor: theme.colorScheme.onPrimary,
                 unselectedLabelColor: theme.colorScheme.onSurface,
-                labelStyle: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.w900),
+                labelStyle: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.displayWeight),
                 tabs: const [
                   Tab(text: 'PARAMS'),
                   Tab(text: 'HEADERS'),
@@ -719,7 +719,7 @@ class _ResponseSection extends StatelessWidget {
              children: [
                Icon(Icons.bolt, size: layout.isCompact ? 48 : 64, color: theme.colorScheme.secondary),
                SizedBox(height: layout.sectionSpacing),
-               Text('HIT SEND TO GET A RESPONSE', style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface)),
+               Text('HIT SEND TO GET A RESPONSE', style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.displayWeight, color: theme.colorScheme.onSurface)),
              ],
            ));
         }
@@ -757,7 +757,7 @@ class _ResponseSection extends StatelessWidget {
                       ),
                       labelColor: theme.colorScheme.onPrimary,
                       unselectedLabelColor: theme.colorScheme.onSurface,
-                      labelStyle: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.w900),
+                      labelStyle: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.displayWeight),
                       tabs: const [
                         Tab(text: 'BODY'),
                         Tab(text: 'HEADERS'),
@@ -889,7 +889,7 @@ class _ResponseHeadersView extends StatelessWidget {
             final e = entries[index];
             return ListTile(
               dense: true,
-              title: Text(e.key.toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: layout.fontSizeNormal, color: theme.primaryColor)),
+              title: Text(e.key.toUpperCase(), style: TextStyle(fontWeight: context.appTypography.titleWeight, fontSize: layout.fontSizeNormal, color: theme.primaryColor)),
               subtitle: Text(e.value, style: TextStyle(fontSize: layout.fontSizeNormal, color: theme.colorScheme.onSurface)),
             );
           },
@@ -930,8 +930,8 @@ class _ResponseMetadataItem extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('$label: ', style: TextStyle(color: Colors.white, fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold)),
-          Text(value, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: layout.fontSizeNormal)),
+          Text('$label: ', style: TextStyle(color: Colors.white, fontSize: layout.fontSizeSmall, fontWeight: context.appTypography.titleWeight)),
+          Text(value, style: TextStyle(color: Colors.white, fontWeight: context.appTypography.displayWeight, fontSize: layout.fontSizeNormal)),
         ],
       ),
     );
@@ -1109,7 +1109,7 @@ class _KeyValueRowState extends State<_KeyValueRow> {
           children: [
             Expanded(
               child: TextField(
-                style: TextStyle(fontSize: widget.layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: widget.layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
                 decoration: InputDecoration(
                   hintText: 'KEY',
                   isDense: true,
@@ -1122,7 +1122,7 @@ class _KeyValueRowState extends State<_KeyValueRow> {
             SizedBox(width: widget.layout.isCompact ? 8 : 12),
             Expanded(
               child: TextField(
-                style: TextStyle(fontSize: widget.layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: widget.layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
                 decoration: InputDecoration(
                   hintText: 'VALUE',
                   isDense: true,
