@@ -449,3 +449,58 @@ class AppTypography extends ThemeExtension<AppTypography> {
     );
   }
 }
+
+typedef PanelBoxBuilder = BoxDecoration Function(
+  BuildContext context, {
+  Color? color,
+  double? borderWidth,
+  double? offset,
+  BorderRadius? borderRadius,
+});
+
+typedef TabShapeBuilder = BoxDecoration Function(
+  BuildContext context, {
+  required bool active,
+});
+
+typedef InteractiveWrapper = Widget Function({
+  required Widget child,
+  VoidCallback? onTap,
+  double? scaleDown,
+});
+
+class AppDecoration extends ThemeExtension<AppDecoration> {
+  final PanelBoxBuilder panelBox;
+  final TabShapeBuilder tabShape;
+  final InteractiveWrapper wrapInteractive;
+
+  const AppDecoration({
+    required this.panelBox,
+    required this.tabShape,
+    required this.wrapInteractive,
+  });
+
+  @override
+  AppDecoration copyWith({
+    PanelBoxBuilder? panelBox,
+    TabShapeBuilder? tabShape,
+    InteractiveWrapper? wrapInteractive,
+  }) {
+    return AppDecoration(
+      panelBox: panelBox ?? this.panelBox,
+      tabShape: tabShape ?? this.tabShape,
+      wrapInteractive: wrapInteractive ?? this.wrapInteractive,
+    );
+  }
+
+  @override
+  AppDecoration lerp(ThemeExtension<AppDecoration>? other, double t) => this;
+}
+
+extension AppThemeAccess on BuildContext {
+  AppLayout get appLayout => Theme.of(this).extension<AppLayout>()!;
+  AppPalette get appPalette => Theme.of(this).extension<AppPalette>()!;
+  AppShape get appShape => Theme.of(this).extension<AppShape>()!;
+  AppTypography get appTypography => Theme.of(this).extension<AppTypography>()!;
+  AppDecoration get appDecoration => Theme.of(this).extension<AppDecoration>()!;
+}
