@@ -112,6 +112,7 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
           side: BorderSide(color: border, width: layout.borderThick),
         ),
         padding: EdgeInsets.symmetric(horizontal: layout.buttonPaddingHorizontal, vertical: layout.buttonPaddingVertical),
+        // Intentionally responsive via AppLayout (was const 14 pre-refactor).
         textStyle: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w900, color: BrutalistPalette.textLight),
       ).copyWith(
         overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
@@ -127,12 +128,14 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
         side: BorderSide(color: border, width: layout.borderThick),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(shape.buttonRadius)),
         padding: EdgeInsets.symmetric(horizontal: layout.buttonPaddingHorizontal, vertical: layout.buttonPaddingVertical),
+        // Intentionally responsive via AppLayout (was const 14 pre-refactor).
         textStyle: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w900),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: currentSecondary,
+        // Intentionally responsive via AppLayout (was const 14 pre-refactor).
         textStyle: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w900),
       ),
     ),
@@ -169,7 +172,9 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
         borderRadius: BorderRadius.circular(shape.dialogRadius),
         side: BorderSide(color: border, width: layout.borderHeavy),
       ),
+      // Intentionally responsive via AppLayout (was const 18 pre-refactor).
       titleTextStyle: TextStyle(color: text, fontSize: layout.fontSizeSubtitle, fontWeight: FontWeight.w900),
+      // Intentionally responsive via AppLayout (was const 14 pre-refactor).
       contentTextStyle: TextStyle(color: text, fontSize: layout.fontSizeTitle),
     ),
     listTileTheme: ListTileThemeData(
