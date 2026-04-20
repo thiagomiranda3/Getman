@@ -24,7 +24,6 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/network/http_methods.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/core/utils/curl_utils.dart';
-import 'package:getman/core/utils/status_color.dart';
 import 'package:getman/core/navigation/intents.dart';
 
 const double _splitMin = 0.1;
@@ -736,7 +735,7 @@ class _ResponseSection extends StatelessWidget {
                 runSpacing: 8,
                 children: [
                   if (tab.statusCode != null)
-                    _ResponseMetadataItem(label: 'STATUS', value: tab.statusCode.toString(), color: StatusColor.forCodeAccent(tab.statusCode!), layout: layout),
+                    _ResponseMetadataItem(label: 'STATUS', value: tab.statusCode.toString(), color: context.appPalette.statusAccent(tab.statusCode!), layout: layout),
                   if (tab.durationMs != null)
                      _ResponseMetadataItem(label: 'TIME', value: '${tab.durationMs} ms', color: theme.colorScheme.secondary, layout: layout),
                 ],

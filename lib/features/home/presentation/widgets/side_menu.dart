@@ -15,7 +15,6 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
-import 'package:getman/core/utils/status_color.dart';
 
 class SideMenu extends StatelessWidget {
   const SideMenu({super.key});
@@ -477,7 +476,7 @@ class _HistoryItemWidgetState extends State<_HistoryItemWidget> {
               if (widget.config.statusCode != null) ...[
                 const SizedBox(width: 8),
                 Text(widget.config.statusCode.toString(), style: TextStyle(
-                  color: StatusColor.forCode(widget.config.statusCode!),
+                  color: context.appPalette.statusColor(widget.config.statusCode!),
                   fontWeight: FontWeight.w900,
                   fontSize: layout.fontSizeNormal,
                 )),
