@@ -36,9 +36,14 @@ BoxDecoration editorialTabShape(
   } else {
     bottom = BorderSide(color: inkSoft.withValues(alpha: 0.4), width: 1);
   }
+  final BorderSide columnRule = BorderSide(color: ink, width: 1);
   return BoxDecoration(
     color: theme.scaffoldBackgroundColor,
-    border: Border(bottom: bottom),
+    border: Border(
+      left: isFirst ? columnRule : BorderSide.none,
+      right: columnRule,
+      bottom: bottom,
+    ),
   );
 }
 
@@ -46,14 +51,16 @@ Widget editorialScaffoldBackground(BuildContext context, {required Widget child}
   final theme = Theme.of(context);
   return Stack(
     children: [
+      child,
       Positioned.fill(
         child: IgnorePointer(
           child: CustomPaint(
-            painter: _DotGridPainter(color: theme.dividerColor.withValues(alpha: 0.06)),
+            painter: _DotGridPainter(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.07),
+            ),
           ),
         ),
       ),
-      child,
     ],
   );
 }

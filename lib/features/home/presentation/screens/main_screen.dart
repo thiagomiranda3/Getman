@@ -406,7 +406,9 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: layout.tabFontSize,
-                                color: widget.isActive ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
+                                color: widget.isActive
+                                    ? (theme.tabBarTheme.labelColor ?? theme.colorScheme.onSurface)
+                                    : (theme.tabBarTheme.unselectedLabelColor ?? theme.colorScheme.onSurface),
                                 fontWeight: isDirty ? context.appTypography.displayWeight : (widget.isActive ? context.appTypography.displayWeight : context.appTypography.bodyWeight),
                               ),
                             ),
