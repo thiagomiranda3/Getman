@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../domain/entities/request_config_entity.dart';
+import '../../../../core/domain/entities/request_config_entity.dart';
 
 abstract class HistoryEvent extends Equatable {
   const HistoryEvent();

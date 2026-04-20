@@ -15,6 +15,7 @@ class LayoutExtension extends ThemeExtension<LayoutExtension> {
   final double buttonPaddingHorizontal;
   final double buttonPaddingVertical;
   final double inputPadding;
+  final double inputPaddingVertical;
   final double cardOffset;
   final double headerPaddingVertical;
   final double headerFontSize;
@@ -29,6 +30,12 @@ class LayoutExtension extends ThemeExtension<LayoutExtension> {
   final bool isCompact;
   final double depthPaddingMultiplier;
   final double sideMenuWidth;
+  final double borderThin;
+  final double borderThick;
+  final double borderHeavy;
+  final double dialogWidth;
+  final double splitterGrabSize;
+  final double splitterLineSize;
 
   const LayoutExtension({
     required this.isCompact,
@@ -45,6 +52,7 @@ class LayoutExtension extends ThemeExtension<LayoutExtension> {
     required this.buttonPaddingHorizontal,
     required this.buttonPaddingVertical,
     required this.inputPadding,
+    required this.inputPaddingVertical,
     required this.cardOffset,
     required this.headerPaddingVertical,
     required this.headerFontSize,
@@ -58,6 +66,12 @@ class LayoutExtension extends ThemeExtension<LayoutExtension> {
     required this.dirtyStarSize,
     required this.depthPaddingMultiplier,
     required this.sideMenuWidth,
+    required this.borderThin,
+    required this.borderThick,
+    required this.borderHeavy,
+    required this.dialogWidth,
+    required this.splitterGrabSize,
+    required this.splitterLineSize,
   });
 
   @override
@@ -76,6 +90,7 @@ class LayoutExtension extends ThemeExtension<LayoutExtension> {
     double? buttonPaddingHorizontal,
     double? buttonPaddingVertical,
     double? inputPadding,
+    double? inputPaddingVertical,
     double? cardOffset,
     double? headerPaddingVertical,
     double? headerFontSize,
@@ -89,6 +104,12 @@ class LayoutExtension extends ThemeExtension<LayoutExtension> {
     double? dirtyStarSize,
     double? depthPaddingMultiplier,
     double? sideMenuWidth,
+    double? borderThin,
+    double? borderThick,
+    double? borderHeavy,
+    double? dialogWidth,
+    double? splitterGrabSize,
+    double? splitterLineSize,
   }) {
     return LayoutExtension(
       isCompact: isCompact ?? this.isCompact,
@@ -105,6 +126,7 @@ class LayoutExtension extends ThemeExtension<LayoutExtension> {
       buttonPaddingHorizontal: buttonPaddingHorizontal ?? this.buttonPaddingHorizontal,
       buttonPaddingVertical: buttonPaddingVertical ?? this.buttonPaddingVertical,
       inputPadding: inputPadding ?? this.inputPadding,
+      inputPaddingVertical: inputPaddingVertical ?? this.inputPaddingVertical,
       cardOffset: cardOffset ?? this.cardOffset,
       headerPaddingVertical: headerPaddingVertical ?? this.headerPaddingVertical,
       headerFontSize: headerFontSize ?? this.headerFontSize,
@@ -118,6 +140,12 @@ class LayoutExtension extends ThemeExtension<LayoutExtension> {
       dirtyStarSize: dirtyStarSize ?? this.dirtyStarSize,
       depthPaddingMultiplier: depthPaddingMultiplier ?? this.depthPaddingMultiplier,
       sideMenuWidth: sideMenuWidth ?? this.sideMenuWidth,
+      borderThin: borderThin ?? this.borderThin,
+      borderThick: borderThick ?? this.borderThick,
+      borderHeavy: borderHeavy ?? this.borderHeavy,
+      dialogWidth: dialogWidth ?? this.dialogWidth,
+      splitterGrabSize: splitterGrabSize ?? this.splitterGrabSize,
+      splitterLineSize: splitterLineSize ?? this.splitterLineSize,
     );
   }
 
@@ -139,6 +167,7 @@ class LayoutExtension extends ThemeExtension<LayoutExtension> {
       buttonPaddingHorizontal: (other.buttonPaddingHorizontal - buttonPaddingHorizontal) * t + buttonPaddingHorizontal,
       buttonPaddingVertical: (other.buttonPaddingVertical - buttonPaddingVertical) * t + buttonPaddingVertical,
       inputPadding: (other.inputPadding - inputPadding) * t + inputPadding,
+      inputPaddingVertical: (other.inputPaddingVertical - inputPaddingVertical) * t + inputPaddingVertical,
       cardOffset: (other.cardOffset - cardOffset) * t + cardOffset,
       headerPaddingVertical: (other.headerPaddingVertical - headerPaddingVertical) * t + headerPaddingVertical,
       headerFontSize: (other.headerFontSize - headerFontSize) * t + headerFontSize,
@@ -146,12 +175,18 @@ class LayoutExtension extends ThemeExtension<LayoutExtension> {
       tabCloseIconSize: (other.tabCloseIconSize - tabCloseIconSize) * t + tabCloseIconSize,
       tabPaddingHorizontal: (other.tabPaddingHorizontal - tabPaddingHorizontal) * t + tabPaddingHorizontal,
       tabFontSize: (other.tabFontSize - tabFontSize) * t + tabFontSize,
-      tabTitleMaxLength: other.tabTitleMaxLength, 
+      tabTitleMaxLength: other.tabTitleMaxLength,
       tabSpacing: (other.tabSpacing - tabSpacing) * t + tabSpacing,
       addIconSize: (other.addIconSize - addIconSize) * t + addIconSize,
       dirtyStarSize: (other.dirtyStarSize - dirtyStarSize) * t + dirtyStarSize,
       depthPaddingMultiplier: (other.depthPaddingMultiplier - depthPaddingMultiplier) * t + depthPaddingMultiplier,
       sideMenuWidth: (other.sideMenuWidth - sideMenuWidth) * t + sideMenuWidth,
+      borderThin: (other.borderThin - borderThin) * t + borderThin,
+      borderThick: (other.borderThick - borderThick) * t + borderThick,
+      borderHeavy: (other.borderHeavy - borderHeavy) * t + borderHeavy,
+      dialogWidth: (other.dialogWidth - dialogWidth) * t + dialogWidth,
+      splitterGrabSize: (other.splitterGrabSize - splitterGrabSize) * t + splitterGrabSize,
+      splitterLineSize: (other.splitterLineSize - splitterLineSize) * t + splitterLineSize,
     );
   }
 
@@ -170,6 +205,7 @@ class LayoutExtension extends ThemeExtension<LayoutExtension> {
     buttonPaddingHorizontal: 24.0,
     buttonPaddingVertical: 16.0,
     inputPadding: 16.0,
+    inputPaddingVertical: 8.0,
     cardOffset: 6.0,
     headerPaddingVertical: 20.0,
     headerFontSize: 24.0,
@@ -183,6 +219,12 @@ class LayoutExtension extends ThemeExtension<LayoutExtension> {
     dirtyStarSize: 16.0,
     depthPaddingMultiplier: 20.0,
     sideMenuWidth: 300.0,
+    borderThin: 2.0,
+    borderThick: 3.0,
+    borderHeavy: 4.0,
+    dialogWidth: 400.0,
+    splitterGrabSize: 40.0,
+    splitterLineSize: 3.0,
   );
 
   static const compact = LayoutExtension(
@@ -200,6 +242,7 @@ class LayoutExtension extends ThemeExtension<LayoutExtension> {
     buttonPaddingHorizontal: 16.0,
     buttonPaddingVertical: 12.0,
     inputPadding: 10.0,
+    inputPaddingVertical: 6.0,
     cardOffset: 3.0,
     headerPaddingVertical: 12.0,
     headerFontSize: 18.0,
@@ -213,6 +256,12 @@ class LayoutExtension extends ThemeExtension<LayoutExtension> {
     dirtyStarSize: 12.0,
     depthPaddingMultiplier: 12.0,
     sideMenuWidth: 240.0,
+    borderThin: 2.0,
+    borderThick: 3.0,
+    borderHeavy: 4.0,
+    dialogWidth: 320.0,
+    splitterGrabSize: 28.0,
+    splitterLineSize: 2.0,
   );
 }
 
@@ -257,22 +306,21 @@ class NeoBrutalistTheme {
     final Color border = isDark ? borderDark : borderLight;
     final Color currentPrimary = isDark ? primaryDark : primary;
     final Color currentSecondary = isDark ? secondaryDark : secondary;
-    
+    final LayoutExtension layout = isCompact ? LayoutExtension.compact : LayoutExtension.normal;
+
     final baseTextTheme = GoogleFonts.lexendTextTheme();
-    
+
     return ThemeData(
-      useMaterial3: true, 
+      useMaterial3: true,
       brightness: brightness,
-      extensions: [
-        isCompact ? LayoutExtension.compact : LayoutExtension.normal,
-      ],
+      extensions: [layout],
       primaryColor: currentPrimary,
       scaffoldBackgroundColor: background,
       canvasColor: surface,
       dividerColor: border,
       hoverColor: currentPrimary.withValues(alpha: 0.1),
       splashColor: currentPrimary.withValues(alpha: 0.2),
-      colorScheme: isDark 
+      colorScheme: isDark
         ? ColorScheme.dark(
             primary: currentPrimary,
             secondary: currentSecondary,
@@ -303,7 +351,7 @@ class NeoBrutalistTheme {
         elevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(fontSize: 18, color: text, fontWeight: FontWeight.w900),
-        shape: Border(bottom: BorderSide(color: border, width: 3)),
+        shape: Border(bottom: BorderSide(color: border, width: layout.borderThick)),
       ),
       tabBarTheme: TabBarThemeData(
         dividerColor: Colors.transparent,
@@ -313,9 +361,9 @@ class NeoBrutalistTheme {
         indicator: BoxDecoration(
           color: currentPrimary,
           border: Border(
-            top: BorderSide(color: border, width: 3),
-            left: BorderSide(color: border, width: 3),
-            right: BorderSide(color: border, width: 3),
+            top: BorderSide(color: border, width: layout.borderThick),
+            left: BorderSide(color: border, width: layout.borderThick),
+            right: BorderSide(color: border, width: layout.borderThick),
           ),
         ),
         labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
@@ -327,9 +375,9 @@ class NeoBrutalistTheme {
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(4),
-            side: BorderSide(color: border, width: 3),
+            side: BorderSide(color: border, width: layout.borderThick),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          padding: EdgeInsets.symmetric(horizontal: layout.buttonPaddingHorizontal, vertical: layout.buttonPaddingVertical),
           textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: textLight),
         ).copyWith(
           overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
@@ -342,9 +390,9 @@ class NeoBrutalistTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: text,
-          side: BorderSide(color: border, width: 3),
+          side: BorderSide(color: border, width: layout.borderThick),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          padding: EdgeInsets.symmetric(horizontal: layout.buttonPaddingHorizontal, vertical: layout.buttonPaddingVertical),
           textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
         ),
       ),
@@ -358,34 +406,34 @@ class NeoBrutalistTheme {
         filled: true,
         fillColor: surface,
         border: OutlineInputBorder(
-          borderSide: BorderSide(color: border, width: 3),
+          borderSide: BorderSide(color: border, width: layout.borderThick),
           borderRadius: BorderRadius.circular(4),
         ),
         enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: border, width: 3),
+          borderSide: BorderSide(color: border, width: layout.borderThick),
           borderRadius: BorderRadius.circular(4),
         ),
         focusedBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: currentSecondary, width: 3),
+          borderSide: BorderSide(color: currentSecondary, width: layout.borderThick),
           borderRadius: BorderRadius.circular(4),
         ),
         labelStyle: TextStyle(color: text, fontWeight: FontWeight.bold),
         hintStyle: TextStyle(color: text.withValues(alpha: 0.5)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: EdgeInsets.symmetric(horizontal: layout.inputPadding, vertical: layout.inputPadding),
       ),
       cardTheme: CardThemeData(
         color: surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(4),
-          side: BorderSide(color: border, width: 3),
+          side: BorderSide(color: border, width: layout.borderThick),
         ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: background,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: border, width: 4),
+          side: BorderSide(color: border, width: layout.borderHeavy),
         ),
         titleTextStyle: TextStyle(color: text, fontSize: 18, fontWeight: FontWeight.w900),
         contentTextStyle: TextStyle(color: text, fontSize: 14),
@@ -401,21 +449,22 @@ class NeoBrutalistTheme {
 
   static BoxDecoration brutalBox(
     BuildContext context, {
-    Color? color, 
-    double borderWidth = 3, 
-    double offset = 4,
+    Color? color,
+    double? borderWidth,
+    double? offset,
     BorderRadius? borderRadius,
   }) {
     final theme = Theme.of(context);
+    final layout = theme.extension<LayoutExtension>()!;
     final border = theme.dividerColor;
     return BoxDecoration(
       color: color ?? theme.cardColor,
       borderRadius: borderRadius ?? BorderRadius.circular(4),
-      border: Border.all(color: border, width: borderWidth),
+      border: Border.all(color: border, width: borderWidth ?? layout.borderThick),
       boxShadow: [
         BoxShadow(
           color: border,
-          offset: Offset(offset, offset),
+          offset: Offset(offset ?? layout.borderHeavy, offset ?? layout.borderHeavy),
           blurRadius: 0,
         ),
       ],
@@ -424,13 +473,14 @@ class NeoBrutalistTheme {
 
   static BoxDecoration brutalTab(BuildContext context, {bool active = false}) {
     final theme = Theme.of(context);
+    final layout = theme.extension<LayoutExtension>()!;
     final border = theme.dividerColor;
     return BoxDecoration(
       color: active ? theme.primaryColor : theme.cardColor,
       border: Border(
-        right: BorderSide(color: border, width: 2),
-        bottom: active ? BorderSide.none : BorderSide(color: border, width: 2),
-        top: active ? BorderSide(color: border, width: 4) : BorderSide.none,
+        right: BorderSide(color: border, width: layout.borderThin),
+        bottom: active ? BorderSide.none : BorderSide(color: border, width: layout.borderThin),
+        top: active ? BorderSide(color: border, width: layout.borderHeavy) : BorderSide.none,
       ),
     );
   }

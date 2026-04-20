@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../domain/entities/request_tab_entity.dart';
-import '../../../history/domain/entities/request_config_entity.dart';
+import '../../../../core/domain/entities/request_config_entity.dart';
 
 abstract class TabsEvent extends Equatable {
   const TabsEvent();

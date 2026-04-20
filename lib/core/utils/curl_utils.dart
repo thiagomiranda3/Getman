@@ -1,4 +1,4 @@
-import 'package:getman/features/history/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
 
 class CurlUtils {
   /// Parses a curl command into an [HttpRequestConfigEntity]
@@ -14,12 +14,12 @@ class CurlUtils {
       return null;
     }
 
-    String method = 'GET';
-    String url = '';
-    Map<String, String> headers = {};
-    String body = '';
+    var method = 'GET';
+    var url = '';
+    final headers = <String, String>{};
+    var body = '';
 
-    for (int i = 1; i < args.length; i++) {
+    for (var i = 1; i < args.length; i++) {
       final arg = args[i];
       
       if (arg == '-X' || arg == '--request') {

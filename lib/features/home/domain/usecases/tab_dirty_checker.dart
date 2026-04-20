@@ -1,5 +1,5 @@
 import '../../../collections/domain/entities/collection_node_entity.dart';
-import '../../../history/domain/entities/request_config_entity.dart';
+import '../../../../core/domain/entities/request_config_entity.dart';
 import '../../../tabs/domain/entities/request_tab_entity.dart';
 
 class TabDirtyChecker {

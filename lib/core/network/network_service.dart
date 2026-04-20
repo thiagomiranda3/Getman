@@ -81,7 +81,8 @@ class NetworkService {
     if (data is String) return data;
     try {
       return await compute(_jsonEncode, data);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('NetworkService._stringifyBody failed: $e');
       return data.toString();
     }
   }

@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../../history/domain/entities/request_config_entity.dart';
+import '../../../../core/domain/entities/request_config_entity.dart';
 
 class HttpRequestTabEntity extends Equatable {
   final HttpRequestConfigEntity config;

@@ -2,7 +2,7 @@ import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/network/http_response.dart';
 import '../../../../core/network/network_service.dart';
-import '../../../history/domain/entities/request_config_entity.dart';
+import '../../../../core/domain/entities/request_config_entity.dart';
 import '../../domain/entities/request_tab_entity.dart';
 import '../../domain/repositories/tabs_repository.dart';
 import '../datasources/tabs_local_data_source.dart';

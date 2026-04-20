@@ -221,7 +221,7 @@ class _MainScreenState extends State<MainScreen> {
       height: layout.tabBarHeight,
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor,
-        border: Border(bottom: BorderSide(color: theme.dividerColor, width: 3)),
+        border: Border(bottom: BorderSide(color: theme.dividerColor, width: layout.borderThick)),
       ),
       child: Row(
         children: [
@@ -278,7 +278,7 @@ class _AddTabButtonState extends State<_AddTabButton> {
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
           color: _isHovered ? theme.primaryColor : theme.scaffoldBackgroundColor,
-          border: Border(left: BorderSide(color: theme.dividerColor, width: 3)),
+          border: Border(left: BorderSide(color: theme.dividerColor, width: widget.layout.borderThick)),
         ),
         child: BrutalBounce(
           child: IconButton(
@@ -392,10 +392,10 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
                             ? theme.primaryColor
                             : (_isHovered ? theme.dividerColor.withValues(alpha: 0.2) : theme.scaffoldBackgroundColor),
                         border: Border(
-                          top: BorderSide(color: theme.dividerColor, width: 3),
-                          left: widget.index == 0 ? BorderSide(color: theme.dividerColor, width: 3) : BorderSide.none,
-                          right: BorderSide(color: theme.dividerColor, width: 3),
-                          bottom: widget.isActive ? BorderSide.none : BorderSide(color: theme.dividerColor, width: 3),
+                          top: BorderSide(color: theme.dividerColor, width: layout.borderThick),
+                          left: widget.index == 0 ? BorderSide(color: theme.dividerColor, width: layout.borderThick) : BorderSide.none,
+                          right: BorderSide(color: theme.dividerColor, width: layout.borderThick),
+                          bottom: widget.isActive ? BorderSide.none : BorderSide(color: theme.dividerColor, width: layout.borderThick),
                         ),
                       ),
                       child: Row(
@@ -443,6 +443,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
 
   void _showContextMenu(BuildContext context, Offset position, HttpRequestTabEntity tab, int index) {
     final theme = Theme.of(context);
+    final layout = theme.extension<LayoutExtension>()!;
     final tabsBloc = context.read<TabsBloc>();
 
     showMenu(
@@ -456,7 +457,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
       color: theme.scaffoldBackgroundColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(4),
-        side: BorderSide(color: theme.dividerColor, width: 3),
+        side: BorderSide(color: theme.dividerColor, width: layout.borderThick),
       ),
       elevation: 0,
       items: <PopupMenuEntry>[

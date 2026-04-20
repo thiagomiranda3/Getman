@@ -14,19 +14,19 @@ class MethodBadge extends StatelessWidget {
 
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: small ? layout.badgePaddingHorizontal : 10, 
-        vertical: layout.badgePaddingVertical
+        horizontal: layout.badgePaddingHorizontal,
+        vertical: layout.badgePaddingVertical,
       ),
       decoration: BoxDecoration(
         color: color,
-        border: Border.all(color: theme.dividerColor, width: 2),
+        border: Border.all(color: theme.dividerColor, width: layout.borderThin),
       ),
       child: Text(
         method,
         style: TextStyle(
-          color: Colors.black, 
-          fontWeight: FontWeight.w900, 
-          fontSize: small ? layout.fontSizeSmall : layout.fontSizeNormal
+          color: Colors.black,
+          fontWeight: FontWeight.w900,
+          fontSize: small ? layout.fontSizeSmall : layout.fontSizeNormal,
         ),
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/storage/hive_boxes.dart';
+import '../../../../core/storage/hive_helpers.dart';
 import '../models/request_tab_model.dart';
 
 abstract class TabsLocalDataSource {
@@ -23,9 +24,7 @@ class TabsLocalDataSourceImpl implements TabsLocalDataSource {
   @override
   Future<void> saveTabs(List<HttpRequestTabModel> tabs) async {
     try {
-      final box = _box();
-      await box.clear();
-      await box.addAll(tabs);
+      await replaceAllInBox(_box(), tabs);
     } catch (e) {
       throw PersistenceException('Failed to save tabs', cause: e);
     }

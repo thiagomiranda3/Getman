@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:getman/features/history/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/history/domain/repositories/history_repository.dart';
 import 'package:getman/features/history/domain/usecases/history_usecases.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
@@ -57,7 +57,7 @@ void main() {
     when(() => mockRepository.getHistory()).thenAnswer((_) async => [tConfig]);
 
     // Act
-    historyBloc.add(LoadHistory());
+    historyBloc.add(const LoadHistory());
 
     // Assert
     await expectLater(

@@ -203,6 +203,7 @@ class _RequestViewState extends State<RequestView> {
     final collectionsBloc = context.read<CollectionsBloc>();
     final tabsBloc = context.read<TabsBloc>();
     final theme = Theme.of(context);
+    final layout = theme.extension<LayoutExtension>()!;
 
     final savedNode = tab.collectionNodeId == null
         ? null
@@ -220,7 +221,7 @@ class _RequestViewState extends State<RequestView> {
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(4),
-            side: BorderSide(color: theme.dividerColor, width: 3),
+            side: BorderSide(color: theme.dividerColor, width: layout.borderThick),
           ),
           content: Text('REQUEST UPDATED!', style: TextStyle(color: theme.colorScheme.onPrimary, fontSize: 12, fontWeight: FontWeight.w900)),
           duration: const Duration(seconds: 1),
@@ -338,7 +339,7 @@ class _UrlBarState extends State<_UrlBar> {
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: layout.isCompact ? 8 : 12),
                     decoration: BoxDecoration(
-                      border: Border(right: BorderSide(color: theme.dividerColor, width: 3)),
+                      border: Border(right: BorderSide(color: theme.dividerColor, width: layout.borderThick)),
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
@@ -356,7 +357,7 @@ class _UrlBarState extends State<_UrlBar> {
                               padding: EdgeInsets.symmetric(horizontal: layout.isCompact ? 8 : 12, vertical: 6),
                               decoration: BoxDecoration(
                                 color: NeoBrutalistTheme.getMethodColor(m),
-                                border: Border.all(color: theme.dividerColor, width: 2),
+                                border: Border.all(color: theme.dividerColor, width: layout.borderThin),
                               ),
                               child: Text(m, style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: layout.fontSizeNormal)),
                             );
@@ -370,7 +371,7 @@ class _UrlBarState extends State<_UrlBar> {
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
                                   color: NeoBrutalistTheme.getMethodColor(m),
-                                  border: Border.all(color: theme.dividerColor, width: 2),
+                                  border: Border.all(color: theme.dividerColor, width: layout.borderThin),
                                 ),
                                 child: Text(m, style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: layout.fontSizeNormal)),
                               ),
@@ -545,9 +546,9 @@ class _RequestConfigSection extends StatelessWidget {
                 indicator: BoxDecoration(
                   color: theme.primaryColor,
                   border: Border(
-                    top: BorderSide(color: theme.dividerColor, width: 3),
-                    left: BorderSide(color: theme.dividerColor, width: 3),
-                    right: BorderSide(color: theme.dividerColor, width: 3),
+                    top: BorderSide(color: theme.dividerColor, width: layout.borderThick),
+                    left: BorderSide(color: theme.dividerColor, width: layout.borderThick),
+                    right: BorderSide(color: theme.dividerColor, width: layout.borderThick),
                   ),
                 ),
                 labelColor: theme.colorScheme.onPrimary,
@@ -684,32 +685,33 @@ class _ResponseSection extends StatelessWidget {
         if (tab == null) return const SizedBox.shrink();
 
         if (tab.isSending) {
-           return Shimmer.fromColors(
-             baseColor: theme.dividerColor.withValues(alpha: 0.1),
-             highlightColor: theme.dividerColor.withValues(alpha: 0.3),
-             child: Column(
-               crossAxisAlignment: CrossAxisAlignment.start,
-               children: [
-                 Row(
-                   children: [
-                     Container(width: 100, height: 32, decoration: BoxDecoration(color: Colors.white, border: Border.all(color: theme.dividerColor, width: 2))),
-                     const SizedBox(width: 12),
-                     Container(width: 100, height: 32, decoration: BoxDecoration(color: Colors.white, border: Border.all(color: theme.dividerColor, width: 2))),
-                   ],
-                 ),
-                 const SizedBox(height: 24),
-                 Expanded(
-                   child: ListView.builder(
-                     itemCount: 15,
-                     itemBuilder: (_, index) => Padding(
-                       padding: const EdgeInsets.symmetric(vertical: 6),
-                       child: Container(width: double.infinity, height: 20, color: Colors.white),
-                     ),
-                   ),
-                 ),
-               ],
-             ),
-           );
+          final shimmerFill = theme.colorScheme.onSurface.withValues(alpha: 0.08);
+          return Shimmer.fromColors(
+            baseColor: theme.dividerColor.withValues(alpha: 0.1),
+            highlightColor: theme.dividerColor.withValues(alpha: 0.3),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(width: 100, height: 32, decoration: BoxDecoration(color: shimmerFill, border: Border.all(color: theme.dividerColor, width: layout.borderThin))),
+                    const SizedBox(width: 12),
+                    Container(width: 100, height: 32, decoration: BoxDecoration(color: shimmerFill, border: Border.all(color: theme.dividerColor, width: layout.borderThin))),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: 15,
+                    itemBuilder: (_, index) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Container(width: double.infinity, height: 20, color: shimmerFill),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
         if (tab.statusCode == null && !tab.isSending) {
@@ -749,9 +751,9 @@ class _ResponseSection extends StatelessWidget {
                       indicator: BoxDecoration(
                         color: theme.primaryColor,
                         border: Border(
-                          top: BorderSide(color: theme.dividerColor, width: 3),
-                          left: BorderSide(color: theme.dividerColor, width: 3),
-                          right: BorderSide(color: theme.dividerColor, width: 3),
+                          top: BorderSide(color: theme.dividerColor, width: layout.borderThick),
+                          left: BorderSide(color: theme.dividerColor, width: layout.borderThick),
+                          right: BorderSide(color: theme.dividerColor, width: layout.borderThick),
                         ),
                       ),
                       labelColor: theme.colorScheme.onPrimary,
@@ -920,7 +922,7 @@ class _ResponseMetadataItem extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: 12, vertical: layout.isCompact ? 4 : 8),
           decoration: BoxDecoration(
             color: animColor,
-            border: Border.all(color: theme.dividerColor, width: 2),
+            border: Border.all(color: theme.dividerColor, width: layout.borderThin),
             borderRadius: BorderRadius.circular(4),
           ),
           child: child,
@@ -1189,7 +1191,7 @@ class _CodeFindPanelState extends State<_CodeFindPanel> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        border: Border(bottom: BorderSide(color: theme.dividerColor, width: 3)),
+        border: Border(bottom: BorderSide(color: theme.dividerColor, width: layout.borderThick)),
       ),
       child: Row(
         children: [

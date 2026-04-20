@@ -1,7 +1,7 @@
 import '../../../../core/error/failures.dart';
 import '../../../../core/network/http_response.dart';
 import '../../../../core/network/network_service.dart';
-import '../../../history/domain/entities/request_config_entity.dart';
+import '../../../../core/domain/entities/request_config_entity.dart';
 import '../../../history/domain/usecases/history_usecases.dart';
 import '../../../settings/domain/usecases/settings_usecases.dart';
 import '../repositories/tabs_repository.dart';

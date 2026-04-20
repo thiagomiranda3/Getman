@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../../history/domain/entities/request_config_entity.dart';
+import '../../../../core/domain/entities/request_config_entity.dart';
 
 abstract class CollectionsEvent extends Equatable {
   const CollectionsEvent();

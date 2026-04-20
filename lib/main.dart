@@ -43,17 +43,17 @@ class MyApp extends StatelessWidget {
         builder: (context, state) {
           final settings = state.settings;
           return Shortcuts(
-            shortcuts: <ShortcutActivator, Intent>{
-              const SingleActivator(LogicalKeyboardKey.keyN, control: true): const NewTabIntent(),
-              const SingleActivator(LogicalKeyboardKey.keyN, meta: true): const NewTabIntent(),
-              const SingleActivator(LogicalKeyboardKey.keyW, control: true): const CloseTabIntent(),
-              const SingleActivator(LogicalKeyboardKey.keyW, meta: true): const CloseTabIntent(),
-              const SingleActivator(LogicalKeyboardKey.keyS, control: true): const SaveRequestIntent(),
-              const SingleActivator(LogicalKeyboardKey.keyS, meta: true): const SaveRequestIntent(),
-              const SingleActivator(LogicalKeyboardKey.enter, control: true): const SendRequestIntent(),
-              const SingleActivator(LogicalKeyboardKey.enter, meta: true): const SendRequestIntent(),
-              const SingleActivator(LogicalKeyboardKey.keyB, control: true): const BeautifyJsonIntent(),
-              const SingleActivator(LogicalKeyboardKey.keyB, meta: true): const BeautifyJsonIntent(),
+            shortcuts: const <ShortcutActivator, Intent>{
+              SingleActivator(LogicalKeyboardKey.keyN, control: true): NewTabIntent(),
+              SingleActivator(LogicalKeyboardKey.keyN, meta: true): NewTabIntent(),
+              SingleActivator(LogicalKeyboardKey.keyW, control: true): CloseTabIntent(),
+              SingleActivator(LogicalKeyboardKey.keyW, meta: true): CloseTabIntent(),
+              SingleActivator(LogicalKeyboardKey.keyS, control: true): SaveRequestIntent(),
+              SingleActivator(LogicalKeyboardKey.keyS, meta: true): SaveRequestIntent(),
+              SingleActivator(LogicalKeyboardKey.enter, control: true): SendRequestIntent(),
+              SingleActivator(LogicalKeyboardKey.enter, meta: true): SendRequestIntent(),
+              SingleActivator(LogicalKeyboardKey.keyB, control: true): BeautifyJsonIntent(),
+              SingleActivator(LogicalKeyboardKey.keyB, meta: true): BeautifyJsonIntent(),
             },
             child: Actions(
               actions: <Type, Action<Intent>>{

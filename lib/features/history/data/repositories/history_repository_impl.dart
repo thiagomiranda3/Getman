@@ -1,6 +1,6 @@
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
-import '../../domain/entities/request_config_entity.dart';
+import '../../../../core/domain/entities/request_config_entity.dart';
 import '../../domain/repositories/history_repository.dart';
 import '../datasources/history_local_data_source.dart';
 import '../models/request_config_model.dart';

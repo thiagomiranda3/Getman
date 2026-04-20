@@ -1,6 +1,6 @@
 import '../../../../core/network/http_response.dart';
 import '../../../../core/network/network_service.dart';
-import '../../../history/domain/entities/request_config_entity.dart';
+import '../../../../core/domain/entities/request_config_entity.dart';
 import '../entities/request_tab_entity.dart';
 
 abstract class TabsRepository {

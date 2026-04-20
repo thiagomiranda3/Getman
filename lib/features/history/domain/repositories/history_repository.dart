@@ -1,4 +1,4 @@
-import '../entities/request_config_entity.dart';
+import '../../../../core/domain/entities/request_config_entity.dart';
 
 abstract class HistoryRepository {
   Future<List<HttpRequestConfigEntity>> getHistory();

@@ -1,6 +1,7 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/storage/hive_boxes.dart';
+import '../../../../core/storage/hive_helpers.dart';
 import '../models/request_config_model.dart';
 
 abstract class HistoryLocalDataSource {
@@ -26,9 +27,7 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
   @override
   Future<void> saveHistory(List<HttpRequestConfig> history) async {
     try {
-      final box = _box();
-      await box.clear();
-      await box.addAll(history);
+      await replaceAllInBox(_box(), history);
     } catch (e) {
       throw PersistenceException('Failed to save history', cause: e);
     }

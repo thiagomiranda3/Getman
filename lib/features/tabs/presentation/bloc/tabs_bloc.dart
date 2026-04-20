@@ -5,7 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../domain/entities/request_tab_entity.dart';
 import '../../domain/repositories/tabs_repository.dart';
 import '../../domain/usecases/send_request_use_case.dart';
-import '../../../history/domain/entities/request_config_entity.dart';
+import '../../../../core/domain/entities/request_config_entity.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/network/network_service.dart';
 import 'tabs_event.dart';
@@ -156,8 +156,8 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
 
   void _onReorderTabs(ReorderTabs event, Emitter<TabsState> emit) {
     final tabs = [...state.tabs];
-    int oldIndex = event.oldIndex;
-    int newIndex = event.newIndex;
+    final oldIndex = event.oldIndex;
+    var newIndex = event.newIndex;
     if (oldIndex < newIndex) {
       newIndex -= 1;
     }

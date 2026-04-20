@@ -1,7 +1,7 @@
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 import 'package:collection/collection.dart';
-import '../../domain/entities/request_config_entity.dart';
+import '../../../../core/domain/entities/request_config_entity.dart';
 
 part 'request_config_model.g.dart';
 
