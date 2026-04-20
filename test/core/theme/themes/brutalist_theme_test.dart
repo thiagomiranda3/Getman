@@ -51,45 +51,44 @@ void main() {
 
     testWidgets('wrapInteractive returns a widget that scales on tap-down', (tester) async {
       final theme = brutalistTheme(Brightness.light);
+      // Use a plain widget tree without Scaffold so there is no overlay theater
+      // that absorbs pointer events before they reach our target widget.
       await tester.pumpWidget(MaterialApp(
         theme: theme,
-        home: Scaffold(
-          body: Builder(
-            builder: (ctx) => Center(
-              child: ctx.appDecoration.wrapInteractive(
-                child: const SizedBox(width: 40, height: 40, key: ValueKey('target')),
-                onTap: () {},
-              ),
+        home: Builder(
+          builder: (ctx) => Align(
+            alignment: Alignment.topLeft,
+            child: ctx.appDecoration.wrapInteractive(
+              child: const SizedBox(width: 40, height: 40, key: ValueKey('target')),
+              onTap: () {},
             ),
           ),
         ),
       ));
       await tester.pumpAndSettle(); // settle route animation before gestures
 
-      final target = find.byKey(const ValueKey('target'));
-      expect(target, findsOneWidget);
+      expect(find.byKey(const ValueKey('target')), findsOneWidget);
 
-      // Scope the ScaleTransition search to the Center subtree to avoid
+      // Scope the ScaleTransition search to the Align subtree to avoid
       // matching the MaterialApp page-route ScaleTransition as well.
-      final scaleInCenter = find.descendant(
-        of: find.byType(Center),
+      final scaleInAlign = find.descendant(
+        of: find.byType(Align),
         matching: find.byType(ScaleTransition),
       );
-      expect(scaleInCenter, findsOneWidget);
+      expect(scaleInAlign, findsOneWidget);
 
-      // tester.press dispatches a proper pointer-down via hit-testing.
-      // A bare pump() after press lets the gesture recognizer process onTapDown
-      // before we start measuring the animation progress at +50ms.
-      // warnIfMissed:false silences the hit-test warning caused by the Scaffold
-      // overlay absorbing the pointer at the center of the screen.
-      final gesture = await tester.press(target, warnIfMissed: false);
+      // Press on the BrutalBounce GestureDetector (HitTestBehavior.opaque), which
+      // is the actual hit-test recipient. Pressing the inner SizedBox would trigger
+      // a warnIfMissed warning because opaque behavior absorbs the hit at the
+      // GestureDetector level before the test framework walks to the SizedBox leaf.
+      final gesture = await tester.press(find.byType(GestureDetector));
       await tester.pump(); // let gesture recognizer fire onTapDown
       await tester.pump(const Duration(milliseconds: 50));
-      final scaleBefore = tester.widget<ScaleTransition>(scaleInCenter).scale.value;
+      final scaleBefore = tester.widget<ScaleTransition>(scaleInAlign).scale.value;
       expect(scaleBefore, lessThan(1.0));
       await gesture.up();
       await tester.pumpAndSettle();
-      final scaleAfter = tester.widget<ScaleTransition>(scaleInCenter).scale.value;
+      final scaleAfter = tester.widget<ScaleTransition>(scaleInAlign).scale.value;
       expect(scaleAfter, 1.0);
     });
   });

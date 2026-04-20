@@ -17,11 +17,12 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
   final AppLayout layout = isCompact ? AppLayout.compact : AppLayout.normal;
   const AppShape shape = AppShape(panelRadius: 4, buttonRadius: 4, inputRadius: 4, dialogRadius: 8);
 
-  final baseTextTheme = GoogleFonts.lexendTextTheme().apply(bodyColor: text, displayColor: text).copyWith(
-    bodyMedium: GoogleFonts.lexendTextTheme().bodyMedium?.copyWith(fontSize: 14, fontWeight: FontWeight.w500, color: text),
-    bodySmall: GoogleFonts.lexendTextTheme().bodySmall?.copyWith(fontSize: 12, color: text),
-    titleMedium: GoogleFonts.lexendTextTheme().titleMedium?.copyWith(fontSize: 16, fontWeight: FontWeight.bold, color: text),
-    titleLarge: GoogleFonts.lexendTextTheme().titleLarge?.copyWith(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5, color: text),
+  final lexend = GoogleFonts.lexendTextTheme();
+  final baseTextTheme = lexend.apply(bodyColor: text, displayColor: text).copyWith(
+    bodyMedium: lexend.bodyMedium?.copyWith(fontSize: 14, fontWeight: FontWeight.w500, color: text),
+    bodySmall: lexend.bodySmall?.copyWith(fontSize: 12, color: text),
+    titleMedium: lexend.titleMedium?.copyWith(fontSize: 16, fontWeight: FontWeight.bold, color: text),
+    titleLarge: lexend.titleLarge?.copyWith(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5, color: text),
   );
 
   final typography = AppTypography(
@@ -83,6 +84,7 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
       backgroundColor: surface,
       elevation: 0,
       centerTitle: false,
+      // Intentional change from reference's const 18: now responsive via AppLayout.fontSizeSubtitle (18/14).
       titleTextStyle: TextStyle(fontSize: layout.fontSizeSubtitle, color: text, fontWeight: FontWeight.w900),
       shape: Border(bottom: BorderSide(color: border, width: layout.borderThick)),
     ),
@@ -99,7 +101,7 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
           right: BorderSide(color: border, width: layout.borderThick),
         ),
       ),
-      labelStyle: TextStyle(fontWeight: FontWeight.w900, fontSize: layout.fontSizeNormal),
+      labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
