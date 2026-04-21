@@ -14,7 +14,7 @@ import 'package:getman/features/tabs/presentation/widgets/request_view.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
-import 'package:getman/core/theme/neo_brutalist_theme.dart';
+import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/navigation/intents.dart';
 import 'package:getman/features/home/presentation/widgets/side_menu.dart';
 
@@ -79,7 +79,7 @@ class _MainScreenState extends State<MainScreen> {
                   performRemove();
                 },
                 child: Text('CLOSE ANYWAY',
-                    style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold)),
+                    style: TextStyle(color: theme.colorScheme.error, fontWeight: context.appTypography.titleWeight)),
               ),
             ],
           );
@@ -170,8 +170,8 @@ class _MainScreenState extends State<MainScreen> {
                                             Text(
                                               'NO OPEN TABS',
                                               style: TextStyle(
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.w900,
+                                                fontSize: context.appLayout.fontSizeSubtitle,
+                                                fontWeight: context.appTypography.displayWeight,
                                                 color: theme.dividerColor.withValues(alpha: 0.3),
                                               ),
                                             ),
@@ -179,17 +179,17 @@ class _MainScreenState extends State<MainScreen> {
                                             Text(
                                               'PRESS CTRL+N TO CREATE A NEW REQUEST',
                                               style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold,
+                                                fontSize: context.appLayout.fontSizeNormal,
+                                                fontWeight: context.appTypography.titleWeight,
                                                 color: theme.dividerColor.withValues(alpha: 0.2),
                                               ),
                                             ),
                                             const SizedBox(height: 24),
-                                            BrutalBounce(
+                                            context.appDecoration.wrapInteractive(
                                               child: ElevatedButton(
                                                 onPressed: () => context.read<TabsBloc>().add(const AddTab()),
                                                 style: ElevatedButton.styleFrom(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                                  padding: EdgeInsets.symmetric(horizontal: context.appLayout.buttonPaddingHorizontal, vertical: context.appLayout.buttonPaddingVertical),
                                                 ),
                                                 child: const Text('NEW REQUEST'),
                                               ),
@@ -219,7 +219,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildTabBar(BuildContext context, int activeIndex, List<HttpRequestTabEntity> tabs) {
     final theme = Theme.of(context);
-    final layout = Theme.of(context).extension<LayoutExtension>()!;
+    final layout = Theme.of(context).extension<AppLayout>()!;
 
     return Container(
       height: layout.tabBarHeight,
@@ -261,7 +261,7 @@ class _MainScreenState extends State<MainScreen> {
 }
 
 class _AddTabButton extends StatefulWidget {
-  final LayoutExtension layout;
+  final AppLayout layout;
 
   const _AddTabButton({required this.layout});
 
@@ -284,7 +284,7 @@ class _AddTabButtonState extends State<_AddTabButton> {
           color: _isHovered ? theme.primaryColor : theme.scaffoldBackgroundColor,
           border: Border(left: BorderSide(color: theme.dividerColor, width: widget.layout.borderThick)),
         ),
-        child: BrutalBounce(
+        child: context.appDecoration.wrapInteractive(
           child: IconButton(
             icon: Icon(Icons.add, size: widget.layout.addIconSize, color: theme.colorScheme.onSurface),
             onPressed: () => context.read<TabsBloc>().add(const AddTab()),
@@ -316,10 +316,10 @@ class _TabWidget extends StatefulWidget {
 }
 
 class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
-  bool _isHovered = false;
   late AnimationController _sizeController;
   late Animation<double> _sizeAnimation;
   bool _isClosing = false;
+  bool _isHovered = false;
 
   @override
   void initState() {
@@ -354,7 +354,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
 
     return BlocBuilder<TabsBloc, TabsState>(
       builder: (context, state) {
@@ -377,9 +377,9 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
               child: ReorderableDragStartListener(
                 index: widget.index,
                 child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
                   onEnter: (_) => setState(() => _isHovered = true),
                   onExit: (_) => setState(() => _isHovered = false),
-                  cursor: SystemMouseCursors.click,
                   child: GestureDetector(
                     onTap: widget.onTap,
                     onSecondaryTapDown: (details) => _showContextMenu(context, details.globalPosition, tab),
@@ -391,16 +391,11 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
                         maxWidth: layout.isCompact ? 150 : 250,
                       ),
                       padding: EdgeInsets.symmetric(horizontal: layout.tabPaddingHorizontal),
-                      decoration: BoxDecoration(
-                        color: widget.isActive
-                            ? theme.primaryColor
-                            : (_isHovered ? theme.dividerColor.withValues(alpha: 0.2) : theme.scaffoldBackgroundColor),
-                        border: Border(
-                          top: BorderSide(color: theme.dividerColor, width: layout.borderThick),
-                          left: widget.index == 0 ? BorderSide(color: theme.dividerColor, width: layout.borderThick) : BorderSide.none,
-                          right: BorderSide(color: theme.dividerColor, width: layout.borderThick),
-                          bottom: widget.isActive ? BorderSide.none : BorderSide(color: theme.dividerColor, width: layout.borderThick),
-                        ),
+                      decoration: context.appDecoration.tabShape(
+                        context,
+                        active: widget.isActive,
+                        hovered: _isHovered,
+                        isFirst: widget.index == 0,
                       ),
                       child: Row(
                         children: [
@@ -411,8 +406,10 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: layout.tabFontSize,
-                                color: widget.isActive ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
-                                fontWeight: isDirty ? FontWeight.w900 : (widget.isActive ? FontWeight.w900 : FontWeight.w500),
+                                color: widget.isActive
+                                    ? (theme.tabBarTheme.labelColor ?? theme.colorScheme.onSurface)
+                                    : (theme.tabBarTheme.unselectedLabelColor ?? theme.colorScheme.onSurface),
+                                fontWeight: isDirty ? context.appTypography.displayWeight : (widget.isActive ? context.appTypography.displayWeight : context.appTypography.bodyWeight),
                               ),
                             ),
                           ),
@@ -423,7 +420,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
                                   style: TextStyle(
                                       color: theme.colorScheme.secondary,
                                       fontSize: layout.dirtyStarSize,
-                                      fontWeight: FontWeight.w900)),
+                                      fontWeight: context.appTypography.displayWeight)),
                             ),
                           SizedBox(width: layout.tabSpacing),
                           IconButton(
@@ -447,7 +444,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
 
   void _showContextMenu(BuildContext context, Offset position, HttpRequestTabEntity tab) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
     final tabsBloc = context.read<TabsBloc>();
 
     showMenu(
@@ -460,7 +457,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
       ),
       color: theme.scaffoldBackgroundColor,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
         side: BorderSide(color: theme.dividerColor, width: layout.borderThick),
       ),
       elevation: 0,
@@ -498,7 +495,7 @@ class _TabWidgetState extends State<_TabWidget> with TickerProviderStateMixin {
       children: [
         Icon(icon, size: 18, color: theme.colorScheme.onSurface),
         const SizedBox(width: 12),
-        Text(text, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+        Text(text, style: TextStyle(fontWeight: context.appTypography.displayWeight, fontSize: context.appLayout.fontSizeNormal)),
       ],
     );
   }

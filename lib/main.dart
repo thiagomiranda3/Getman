@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/di/injection_container.dart' as di;
-import 'core/theme/neo_brutalist_theme.dart';
+import 'core/theme/app_theme.dart';
+import 'core/theme/theme_registry.dart';
 import 'features/settings/presentation/bloc/settings_bloc.dart';
 import 'features/settings/presentation/bloc/settings_state.dart';
 import 'features/history/presentation/bloc/history_bloc.dart';
@@ -64,14 +65,17 @@ class MyApp extends StatelessWidget {
               child: MaterialApp.router(
                 title: 'GETMAN',
                 debugShowCheckedModeBanner: false,
-                theme: NeoBrutalistTheme.theme(Brightness.light, isCompact: settings.isCompactMode),
-                darkTheme: NeoBrutalistTheme.theme(Brightness.dark, isCompact: settings.isCompactMode),
+                theme: resolveTheme(settings.themeId)(Brightness.light, isCompact: settings.isCompactMode),
+                darkTheme: resolveTheme(settings.themeId)(Brightness.dark, isCompact: settings.isCompactMode),
                 themeMode: settings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
                 routerConfig: di.sl<AppRouter>().router,
                 builder: (context, child) {
                   return Focus(
                     autofocus: true,
-                    child: child ?? const SizedBox.shrink(),
+                    child: context.appDecoration.scaffoldBackground(
+                      context,
+                      child: child ?? const SizedBox.shrink(),
+                    ),
                   );
                 },
               ),

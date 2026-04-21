@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:getman/core/theme/neo_brutalist_theme.dart';
+import 'package:getman/core/theme/app_theme.dart';
 
 class MethodBadge extends StatelessWidget {
   final String method;
@@ -9,8 +9,8 @@ class MethodBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
-    final color = NeoBrutalistTheme.getMethodColor(method);
+    final layout = theme.extension<AppLayout>()!;
+    final color = context.appPalette.methodColor(method);
 
     return Container(
       padding: EdgeInsets.symmetric(
@@ -24,8 +24,8 @@ class MethodBadge extends StatelessWidget {
       child: Text(
         method,
         style: TextStyle(
-          color: Colors.black,
-          fontWeight: FontWeight.w900,
+          color: theme.colorScheme.onPrimary,
+          fontWeight: context.appTypography.displayWeight,
           fontSize: small ? layout.fontSizeSmall : layout.fontSizeNormal,
         ),
       ),

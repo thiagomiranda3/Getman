@@ -13,9 +13,9 @@ import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
-import 'package:getman/core/theme/neo_brutalist_theme.dart';
+import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/theme_ids.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
-import 'package:getman/core/utils/status_color.dart';
 
 class SideMenu extends StatelessWidget {
   const SideMenu({super.key});
@@ -23,7 +23,7 @@ class SideMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = Theme.of(context).extension<LayoutExtension>()!;
+    final layout = Theme.of(context).extension<AppLayout>()!;
     
     return DefaultTabController(
       length: 2,
@@ -52,7 +52,7 @@ class SideMenu extends StatelessWidget {
                 unselectedLabelColor: theme.colorScheme.onSurface,
                 labelStyle: TextStyle(
                   fontSize: layout.fontSizeNormal,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: context.appTypography.displayWeight,
                   overflow: TextOverflow.fade,
                 ),
                 padding: EdgeInsets.zero,
@@ -84,7 +84,7 @@ class _SideMenuHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = Theme.of(context).extension<LayoutExtension>()!;
+    final layout = Theme.of(context).extension<AppLayout>()!;
     
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: layout.inputPadding, vertical: layout.headerPaddingVertical),
@@ -98,9 +98,9 @@ class _SideMenuHeader extends StatelessWidget {
               child: Text(
                 'GETMAN', 
                 style: TextStyle(
-                  fontWeight: FontWeight.w900, 
-                  fontSize: layout.headerFontSize, 
-                  color: theme.colorScheme.onSurface, 
+                  fontWeight: context.appTypography.displayWeight,
+                  fontSize: layout.headerFontSize,
+                  color: theme.colorScheme.onSurface,
                   letterSpacing: -1
                 ),
               ),
@@ -110,14 +110,14 @@ class _SideMenuHeader extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              BrutalBounce(
+              context.appDecoration.wrapInteractive(
                 child: IconButton(
                   icon: Icon(Icons.create_new_folder, color: theme.colorScheme.onSurface, size: layout.iconSize),
                   tooltip: 'NEW FOLDER',
                   onPressed: () => _showNewFolderDialog(context),
                 ),
               ),
-              BrutalBounce(
+              context.appDecoration.wrapInteractive(
                 child: IconButton(
                   icon: Icon(Icons.settings, color: theme.colorScheme.onSurface, size: layout.iconSize),
                   tooltip: 'SETTINGS',
@@ -195,7 +195,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
 
     return BlocBuilder<SettingsBloc, SettingsState>(
       buildWhen: (prev, next) => prev.settings != next.settings,
@@ -211,7 +211,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                 ListTile(
                   title: Text(
                     'HISTORY LIMIT',
-                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
                   ),
                   trailing: SizedBox(
                     width: 80,
@@ -239,7 +239,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                   activeTrackColor: theme.primaryColor,
                   title: Text(
                     'SAVE RESPONSE',
-                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
                   ),
                   value: settings.saveResponseInHistory,
                   onChanged: (val) => context.read<SettingsBloc>().add(UpdateSaveResponseInHistory(val)),
@@ -254,10 +254,31 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                   ),
                   title: Text(
                     'DARK MODE',
-                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
                   ),
                   value: settings.isDarkMode,
                   onChanged: (val) => context.read<SettingsBloc>().add(UpdateDarkMode(val)),
+                ),
+                ListTile(
+                  leading: Icon(Icons.palette_outlined, size: layout.iconSize),
+                  title: Text(
+                    'THEME',
+                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
+                  ),
+                  trailing: DropdownButton<String>(
+                    value: settings.themeId,
+                    underline: const SizedBox.shrink(),
+                    items: const [
+                      DropdownMenuItem(value: kBrutalistThemeId, child: Text('BRUTALIST')),
+                      DropdownMenuItem(value: kEditorialThemeId, child: Text('EDITORIAL')),
+                      DropdownMenuItem(value: kRpgThemeId, child: Text('ARCANE QUEST')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        context.read<SettingsBloc>().add(UpdateThemeId(value));
+                      }
+                    },
+                  ),
                 ),
                 SwitchListTile(
                   activeThumbColor: theme.colorScheme.secondary,
@@ -265,7 +286,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                   secondary: Icon(Icons.view_compact, size: layout.iconSize),
                   title: Text(
                     'COMPACT MODE',
-                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
                   ),
                   value: settings.isCompactMode,
                   onChanged: (val) => context.read<SettingsBloc>().add(UpdateCompactMode(val)),
@@ -310,7 +331,7 @@ class _HistoryListState extends State<_HistoryList> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
 
     return BlocBuilder<HistoryBloc, HistoryState>(
       builder: (context, state) {
@@ -357,18 +378,18 @@ class _HistoryListState extends State<_HistoryList> {
                   controller: _searchController,
                   decoration: InputDecoration(
                     hintText: 'SEARCH HISTORY...',
-                    hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+                    hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: context.appTypography.displayWeight, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
                     prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(context.appShape.panelRadius), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     isDense: true,
                   ),
-                  style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
                 ),
               ),
               Expanded(
-                child: state.isLoading && _items.isEmpty 
-                  ? const Center(child: CircularProgressIndicator()) 
+                child: state.isLoading && _items.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
                   : _buildList(),
               ),
             ],
@@ -391,8 +412,8 @@ class _HistoryListState extends State<_HistoryList> {
     if (filteredItems.isEmpty) {
       return Center(
         child: Text('NO RESULTS FOUND', style: TextStyle(
-          fontSize: 12, 
-          fontWeight: FontWeight.w900, 
+          fontSize: context.appLayout.fontSizeNormal,
+          fontWeight: context.appTypography.displayWeight,
           color: Theme.of(context).dividerColor.withValues(alpha: 0.5)
         )),
       );
@@ -452,7 +473,7 @@ class _HistoryItemWidgetState extends State<_HistoryItemWidget> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -469,7 +490,7 @@ class _HistoryItemWidgetState extends State<_HistoryItemWidget> {
           title: Text(widget.config.url.isEmpty ? '(NO URL)' : widget.config.url, 
             maxLines: 1, 
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
           ),
           subtitle: Row(
             children: [
@@ -477,8 +498,8 @@ class _HistoryItemWidgetState extends State<_HistoryItemWidget> {
               if (widget.config.statusCode != null) ...[
                 const SizedBox(width: 8),
                 Text(widget.config.statusCode.toString(), style: TextStyle(
-                  color: StatusColor.forCode(widget.config.statusCode!),
-                  fontWeight: FontWeight.w900,
+                  color: context.appPalette.statusColor(widget.config.statusCode!),
+                  fontWeight: context.appTypography.displayWeight,
                   fontSize: layout.fontSizeNormal,
                 )),
               ],
@@ -540,7 +561,7 @@ class _CollectionsListState extends State<_CollectionsList> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
     
     return BlocBuilder<CollectionsBloc, CollectionsState>(
       builder: (context, state) {
@@ -561,13 +582,13 @@ class _CollectionsListState extends State<_CollectionsList> {
                 controller: _searchController,
                 decoration: InputDecoration(
                   hintText: 'SEARCH COLLECTIONS...',
-                  hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.w900, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+                  hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: context.appTypography.displayWeight, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
                   prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(context.appShape.panelRadius), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   isDense: true,
                 ),
-                style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
               ),
             ),
             Expanded(
@@ -613,7 +634,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
     final node = widget.entry.node;
 
     Widget content;
@@ -630,7 +651,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
           context.read<CollectionsBloc>().add(MoveNode(details.data, node.id));
         },
         builder: (context, candidateData, rejectedData) {
-          return BrutalBounce(
+          return context.appDecoration.wrapInteractive(
             child: InkWell(
               onTap: widget.onToggle,
               child: MouseRegion(
@@ -659,7 +680,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
                             size: layout.iconSize, color: node.isFavorite ? theme.primaryColor : theme.colorScheme.secondary),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.w900)),
+                          child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.displayWeight)),
                         ),
                         _NodeContextMenu(node: node),
                       ],
@@ -672,7 +693,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
         },
       );
     } else {
-      content = BrutalBounce(
+      content = context.appDecoration.wrapInteractive(
         child: InkWell(
           onTap: () {
             final config = node.config;
@@ -699,7 +720,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
                     MethodBadge(method: node.config?.method ?? 'GET', small: true),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: FontWeight.bold)),
+                      child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight)),
                     ),
                     _NodeContextMenu(node: node),
                   ],
@@ -721,12 +742,12 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
             horizontal: layout.inputPadding,
             vertical: layout.inputPaddingVertical,
           ),
-          decoration: NeoBrutalistTheme.brutalBox(context, color: theme.primaryColor),
+          decoration: context.appDecoration.panelBox(context, color: theme.primaryColor),
           child: Text(
             node.name.toUpperCase(),
             style: TextStyle(
               fontSize: layout.fontSizeNormal,
-              fontWeight: FontWeight.w900,
+              fontWeight: context.appTypography.displayWeight,
               color: theme.colorScheme.onSurface,
             ),
           ),
@@ -745,14 +766,14 @@ class _NodeContextMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<LayoutExtension>()!;
+    final layout = theme.extension<AppLayout>()!;
 
     return PopupMenuButton<String>(
       icon: Icon(Icons.more_vert, size: layout.iconSize, color: theme.colorScheme.onSurface),
       color: theme.colorScheme.surface,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
         side: BorderSide(color: theme.dividerColor, width: layout.borderThick),
       ),
       onSelected: (val) {

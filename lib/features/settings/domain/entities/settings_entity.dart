@@ -8,6 +8,7 @@ class SettingsEntity extends Equatable {
   final bool isVerticalLayout;
   final double splitRatio;
   final double sideMenuWidth;
+  final String themeId;
 
   const SettingsEntity({
     this.historyLimit = 100,
@@ -17,6 +18,7 @@ class SettingsEntity extends Equatable {
     this.isVerticalLayout = false,
     this.splitRatio = 0.5,
     this.sideMenuWidth = 300.0,
+    this.themeId = 'brutalist',
   });
 
   SettingsEntity copyWith({
@@ -27,6 +29,7 @@ class SettingsEntity extends Equatable {
     bool? isVerticalLayout,
     double? splitRatio,
     double? sideMenuWidth,
+    String? themeId,
   }) {
     return SettingsEntity(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -36,6 +39,7 @@ class SettingsEntity extends Equatable {
       isVerticalLayout: isVerticalLayout ?? this.isVerticalLayout,
       splitRatio: splitRatio ?? this.splitRatio,
       sideMenuWidth: sideMenuWidth ?? this.sideMenuWidth,
+      themeId: themeId ?? this.themeId,
     );
   }
 
@@ -48,5 +52,6 @@ class SettingsEntity extends Equatable {
     isVerticalLayout,
     splitRatio,
     sideMenuWidth,
+    themeId,
   ];
 }
