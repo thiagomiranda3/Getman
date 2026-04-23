@@ -126,139 +126,169 @@ class _UrlBarState extends State<UrlBar> {
               return Container(
                 padding: const EdgeInsets.all(6),
                 decoration: context.appDecoration.panelBox(context, offset: layout.cardOffset),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: layout.isCompact ? 8 : 12),
-                      decoration: BoxDecoration(
-                        border: Border(right: BorderSide(color: theme.dividerColor, width: layout.borderThick)),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          dropdownColor: theme.colorScheme.surface,
-                          value: tab.config.method,
-                          style: TextStyle(
-                            color: theme.colorScheme.onSurface,
-                            fontWeight: context.appTypography.displayWeight,
-                            fontSize: layout.fontSizeNormal,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    // Below this threshold, collapse cURL / Save / Layout-toggle
+                    // into a single overflow menu so Method + URL + SEND always fit.
+                    final isNarrow = constraints.maxWidth < 560;
+                    final iconSize = isNarrow ? 22.0 : (layout.isCompact ? 24.0 : 28.0);
+                    final gap = isNarrow ? 4.0 : (layout.isCompact ? 8.0 : 12.0);
+                    final smallGap = isNarrow ? 2.0 : (layout.isCompact ? 4.0 : 8.0);
+
+                    return Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: isNarrow ? 6 : (layout.isCompact ? 8 : 12)),
+                          decoration: BoxDecoration(
+                            border: Border(right: BorderSide(color: theme.dividerColor, width: layout.borderThick)),
                           ),
-                          selectedItemBuilder: (context) {
-                            return HttpMethods.all.map((m) => Center(child: MethodBadge(method: m))).toList();
-                          },
-                          items: HttpMethods.all
-                              .map((m) => DropdownMenuItem(
-                                value: m,
-                                child: SizedBox(
-                                  width: layout.isCompact ? 80 : 100,
-                                  child: Center(child: MethodBadge(method: m)),
-                                ),
-                              ))
-                              .toList(),
-                          onChanged: (val) {
-                            if (val != null && tab.config.method != val) {
-                              context.read<TabsBloc>().add(UpdateTab(
-                                tab.copyWith(config: tab.config.copyWith(method: val)),
-                              ));
-                            }
-                          },
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: layout.isCompact ? 8 : 12),
-                    Expanded(
-                      child: TextField(
-                        controller: _urlController,
-                        style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
-                        decoration: const InputDecoration(
-                          hintText: 'Enter URL or paste cURL...',
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          isDense: true,
-                          filled: false,
-                        ),
-                        onChanged: (val) => _handleUrlChanged(context, tab, val),
-                      ),
-                    ),
-                    SizedBox(width: layout.isCompact ? 8 : 12),
-                    context.appDecoration.wrapInteractive(
-                      child: IconButton(
-                        icon: Icon(Icons.code, color: theme.colorScheme.secondary, size: layout.isCompact ? 24 : 28),
-                        tooltip: 'Copy as cURL',
-                        onPressed: () {
-                          final curl = CurlUtils.generate(tab.config);
-                          Clipboard.setData(ClipboardData(text: curl));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('cURL command copied to clipboard'),
-                              behavior: SnackBarBehavior.floating,
-                              backgroundColor: theme.colorScheme.secondary,
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              dropdownColor: theme.colorScheme.surface,
+                              value: tab.config.method,
+                              style: TextStyle(
+                                color: theme.colorScheme.onSurface,
+                                fontWeight: context.appTypography.displayWeight,
+                                fontSize: layout.fontSizeNormal,
+                              ),
+                              selectedItemBuilder: (context) {
+                                return HttpMethods.all.map((m) => Center(child: MethodBadge(method: m))).toList();
+                              },
+                              items: HttpMethods.all
+                                  .map((m) => DropdownMenuItem(
+                                    value: m,
+                                    child: SizedBox(
+                                      width: isNarrow ? 64 : (layout.isCompact ? 80 : 100),
+                                      child: Center(child: MethodBadge(method: m)),
+                                    ),
+                                  ))
+                                  .toList(),
+                              onChanged: (val) {
+                                if (val != null && tab.config.method != val) {
+                                  context.read<TabsBloc>().add(UpdateTab(
+                                    tab.copyWith(config: tab.config.copyWith(method: val)),
+                                  ));
+                                }
+                              },
                             ),
-                          );
-                        },
-                      ),
-                    ),
-                    SizedBox(width: layout.isCompact ? 4 : 8),
-                    context.appDecoration.wrapInteractive(
-                      child: ElevatedButton(
-                        onPressed: tab.isSending
-                          ? () => context.read<TabsBloc>().add(CancelRequest(tab.tabId))
-                          : () => context.read<TabsBloc>().add(SendRequest(envVars: _activeVariables(context))),
-                        style: ElevatedButton.styleFrom(
-                           backgroundColor: tab.isSending ? theme.colorScheme.error : null,
-                           foregroundColor: tab.isSending ? theme.colorScheme.onError : null,
-                           padding: EdgeInsets.symmetric(
-                             horizontal: layout.buttonPaddingHorizontal,
-                             vertical: layout.buttonPaddingVertical,
-                           ),
+                          ),
                         ),
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 300),
-                          transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: FadeTransition(opacity: animation, child: child)),
-                          child: tab.isSending
-                            ? Row(
-                                key: const ValueKey('cancel'),
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizedBox(
-                                    width: layout.smallIconSize,
-                                    height: layout.smallIconSize,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onError),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text('CANCEL', style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.displayWeight)),
-                                ],
-                              )
-                            : Text('SEND', key: const ValueKey('send'), style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.displayWeight)),
+                        SizedBox(width: gap),
+                        Expanded(
+                          child: TextField(
+                            controller: _urlController,
+                            style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
+                            decoration: const InputDecoration(
+                              hintText: 'Enter URL or paste cURL...',
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              isDense: true,
+                              filled: false,
+                            ),
+                            onChanged: (val) => _handleUrlChanged(context, tab, val),
+                          ),
                         ),
-                      ),
-                    ),
-                    SizedBox(width: layout.isCompact ? 8 : 12),
-                    context.appDecoration.wrapInteractive(
-                      child: IconButton(
-                        icon: Icon(tab.collectionNodeId != null ? Icons.save : Icons.save_as, color: theme.colorScheme.secondary, size: layout.isCompact ? 24 : 28),
-                        tooltip: tab.collectionNodeId != null ? 'Update Request' : 'Save to Collection',
-                        onPressed: widget.onSave,
-                      ),
-                    ),
-                    SizedBox(width: layout.isCompact ? 4 : 8),
-                    context.appDecoration.wrapInteractive(
-                      child: IconButton(
-                        icon: Icon(
-                          settings.isVerticalLayout ? Icons.view_column_rounded : Icons.view_agenda_rounded,
-                          color: theme.colorScheme.onSurface,
-                          size: layout.isCompact ? 24 : 28,
+                        SizedBox(width: gap),
+                        if (!isNarrow) ...[
+                          context.appDecoration.wrapInteractive(
+                            child: IconButton(
+                              icon: Icon(Icons.code, color: theme.colorScheme.secondary, size: iconSize),
+                              tooltip: 'Copy as cURL',
+                              onPressed: () => _copyAsCurl(context, tab),
+                            ),
+                          ),
+                          SizedBox(width: smallGap),
+                        ],
+                        context.appDecoration.wrapInteractive(
+                          child: ElevatedButton(
+                            onPressed: tab.isSending
+                              ? () => context.read<TabsBloc>().add(CancelRequest(tab.tabId))
+                              : () => context.read<TabsBloc>().add(SendRequest(envVars: _activeVariables(context))),
+                            style: ElevatedButton.styleFrom(
+                               backgroundColor: tab.isSending ? theme.colorScheme.error : null,
+                               foregroundColor: tab.isSending ? theme.colorScheme.onError : null,
+                               padding: EdgeInsets.symmetric(
+                                 horizontal: isNarrow ? 12 : layout.buttonPaddingHorizontal,
+                                 vertical: isNarrow ? 10 : layout.buttonPaddingVertical,
+                               ),
+                               minimumSize: Size.zero,
+                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 300),
+                              transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: FadeTransition(opacity: animation, child: child)),
+                              child: tab.isSending
+                                ? Row(
+                                    key: const ValueKey('cancel'),
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: layout.smallIconSize,
+                                        height: layout.smallIconSize,
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onError),
+                                      ),
+                                      SizedBox(width: isNarrow ? 4 : 8),
+                                      Text(isNarrow ? 'STOP' : 'CANCEL', style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.displayWeight)),
+                                    ],
+                                  )
+                                : Text('SEND', key: const ValueKey('send'), style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.displayWeight)),
+                            ),
+                          ),
                         ),
-                        tooltip: settings.isVerticalLayout ? 'Horizontal Layout' : 'Vertical Layout',
-                        onPressed: () => context.read<SettingsBloc>().add(UpdateVerticalLayout(!settings.isVerticalLayout)),
-                      ),
-                    ),
-                  ],
+                        if (isNarrow) ...[
+                          SizedBox(width: smallGap),
+                          _OverflowMenu(
+                            iconSize: iconSize,
+                            isSaved: tab.collectionNodeId != null,
+                            isVerticalLayout: settings.isVerticalLayout,
+                            onCopyCurl: () => _copyAsCurl(context, tab),
+                            onSave: widget.onSave,
+                            onToggleLayout: () => context.read<SettingsBloc>().add(UpdateVerticalLayout(!settings.isVerticalLayout)),
+                          ),
+                        ] else ...[
+                          SizedBox(width: gap),
+                          context.appDecoration.wrapInteractive(
+                            child: IconButton(
+                              icon: Icon(tab.collectionNodeId != null ? Icons.save : Icons.save_as, color: theme.colorScheme.secondary, size: iconSize),
+                              tooltip: tab.collectionNodeId != null ? 'Update Request' : 'Save to Collection',
+                              onPressed: widget.onSave,
+                            ),
+                          ),
+                          SizedBox(width: smallGap),
+                          context.appDecoration.wrapInteractive(
+                            child: IconButton(
+                              icon: Icon(
+                                settings.isVerticalLayout ? Icons.view_column_rounded : Icons.view_agenda_rounded,
+                                color: theme.colorScheme.onSurface,
+                                size: iconSize,
+                              ),
+                              tooltip: settings.isVerticalLayout ? 'Horizontal Layout' : 'Vertical Layout',
+                              onPressed: () => context.read<SettingsBloc>().add(UpdateVerticalLayout(!settings.isVerticalLayout)),
+                            ),
+                          ),
+                        ],
+                      ],
+                    );
+                  },
                 ),
               );
             },
           );
         },
+      ),
+    );
+  }
+
+  void _copyAsCurl(BuildContext context, HttpRequestTabEntity tab) {
+    final theme = Theme.of(context);
+    final curl = CurlUtils.generate(tab.config);
+    Clipboard.setData(ClipboardData(text: curl));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('cURL command copied to clipboard'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: theme.colorScheme.secondary,
       ),
     );
   }
@@ -287,5 +317,100 @@ class _UrlBarState extends State<UrlBar> {
     tabsBloc.add(UpdateTab(
       latestTab.copyWith(config: latestTab.config.copyWith(body: prettified)),
     ));
+  }
+}
+
+enum _OverflowAction { copyCurl, save, toggleLayout }
+
+class _OverflowMenu extends StatelessWidget {
+  final double iconSize;
+  final bool isSaved;
+  final bool isVerticalLayout;
+  final VoidCallback onCopyCurl;
+  final VoidCallback onSave;
+  final VoidCallback onToggleLayout;
+
+  const _OverflowMenu({
+    required this.iconSize,
+    required this.isSaved,
+    required this.isVerticalLayout,
+    required this.onCopyCurl,
+    required this.onSave,
+    required this.onToggleLayout,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final layout = context.appLayout;
+
+    return PopupMenuButton<_OverflowAction>(
+      tooltip: 'More actions',
+      position: PopupMenuPosition.under,
+      color: theme.scaffoldBackgroundColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+        side: BorderSide(color: theme.dividerColor, width: layout.borderThick),
+      ),
+      elevation: 0,
+      icon: Icon(Icons.more_vert, color: theme.colorScheme.onSurface, size: iconSize),
+      onSelected: (action) {
+        switch (action) {
+          case _OverflowAction.copyCurl:
+            onCopyCurl();
+            break;
+          case _OverflowAction.save:
+            onSave();
+            break;
+          case _OverflowAction.toggleLayout:
+            onToggleLayout();
+            break;
+        }
+      },
+      itemBuilder: (popupContext) => [
+        PopupMenuItem(
+          value: _OverflowAction.save,
+          child: _menuRow(
+            context,
+            isSaved ? Icons.save : Icons.save_as,
+            isSaved ? 'UPDATE REQUEST' : 'SAVE TO COLLECTION',
+            theme.colorScheme.secondary,
+          ),
+        ),
+        PopupMenuItem(
+          value: _OverflowAction.copyCurl,
+          child: _menuRow(context, Icons.code, 'COPY AS cURL', theme.colorScheme.secondary),
+        ),
+        PopupMenuItem(
+          value: _OverflowAction.toggleLayout,
+          child: _menuRow(
+            context,
+            isVerticalLayout ? Icons.view_column_rounded : Icons.view_agenda_rounded,
+            isVerticalLayout ? 'HORIZONTAL LAYOUT' : 'VERTICAL LAYOUT',
+            theme.colorScheme.onSurface,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _menuRow(BuildContext context, IconData icon, String label, Color iconColor) {
+    final theme = Theme.of(context);
+    final layout = context.appLayout;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: layout.smallIconSize, color: iconColor),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: TextStyle(
+            fontWeight: context.appTypography.displayWeight,
+            fontSize: layout.fontSizeNormal,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+      ],
+    );
   }
 }

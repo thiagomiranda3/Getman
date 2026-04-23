@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/navigation/intents.dart';
@@ -30,6 +31,8 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   double? _localSideMenuWidth;
   final FocusNode _mainFocusNode = FocusNode();
+  final ScrollController _tabScrollController = ScrollController();
+  int _lastActiveIndex = -1;
 
   @override
   void initState() {
@@ -42,7 +45,54 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void dispose() {
     _mainFocusNode.dispose();
+    _tabScrollController.dispose();
     super.dispose();
+  }
+
+  void _ensureActiveTabVisible(int activeIndex, int tabsLength, AppLayout layout) {
+    if (activeIndex < 0 || activeIndex >= tabsLength) return;
+    if (activeIndex == _lastActiveIndex) return;
+    _lastActiveIndex = activeIndex;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_tabScrollController.hasClients) return;
+      final position = _tabScrollController.position;
+      // Tab widths are variable (min 80/120, max 150/250). An average lets us
+      // animate approximately into view without per-tab measurement.
+      final avgTabWidth = layout.isCompact ? 115.0 : 185.0;
+      final targetStart = activeIndex * avgTabWidth;
+      final targetEnd = targetStart + avgTabWidth;
+      final viewStart = position.pixels;
+      final viewEnd = viewStart + position.viewportDimension;
+
+      double? dest;
+      if (targetStart < viewStart) {
+        dest = targetStart;
+      } else if (targetEnd > viewEnd) {
+        dest = targetEnd - position.viewportDimension;
+      }
+      if (dest == null) return;
+      _tabScrollController.animateTo(
+        dest.clamp(position.minScrollExtent, position.maxScrollExtent),
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  void _handleTabBarPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return;
+    if (!_tabScrollController.hasClients) return;
+    // Mouse-wheel delta is usually purely vertical on desktop; trackpads
+    // already emit horizontal components. Combine both so a plain wheel
+    // also scrolls the horizontal tab strip.
+    final delta = event.scrollDelta.dx.abs() > event.scrollDelta.dy.abs()
+        ? event.scrollDelta.dx
+        : event.scrollDelta.dy;
+    if (delta == 0) return;
+    final position = _tabScrollController.position;
+    final target = (position.pixels + delta).clamp(position.minScrollExtent, position.maxScrollExtent);
+    _tabScrollController.jumpTo(target);
   }
 
   bool _isTabDirty(BuildContext context, String tabId) {
@@ -222,6 +272,8 @@ class _MainScreenState extends State<MainScreen> {
     final theme = Theme.of(context);
     final layout = context.appLayout;
 
+    _ensureActiveTabVisible(activeIndex, tabs.length, layout);
+
     return Container(
       height: layout.tabBarHeight,
       decoration: BoxDecoration(
@@ -231,27 +283,37 @@ class _MainScreenState extends State<MainScreen> {
       child: Row(
         children: [
           Expanded(
-            child: ReorderableListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: tabs.length,
-              buildDefaultDragHandles: false,
-              onReorder: (oldIndex, newIndex) => context.read<TabsBloc>().add(ReorderTabs(oldIndex, newIndex)),
-              proxyDecorator: (child, index, animation) => Material(
-                color: theme.scaffoldBackgroundColor,
-                elevation: 4,
-                child: child,
+            child: Listener(
+              onPointerSignal: _handleTabBarPointerSignal,
+              child: Scrollbar(
+                controller: _tabScrollController,
+                thumbVisibility: true,
+                thickness: 4,
+                radius: const Radius.circular(2),
+                child: ReorderableListView.builder(
+                  scrollController: _tabScrollController,
+                  scrollDirection: Axis.horizontal,
+                  itemCount: tabs.length,
+                  buildDefaultDragHandles: false,
+                  onReorder: (oldIndex, newIndex) => context.read<TabsBloc>().add(ReorderTabs(oldIndex, newIndex)),
+                  proxyDecorator: (child, index, animation) => Material(
+                    color: theme.scaffoldBackgroundColor,
+                    elevation: 4,
+                    child: child,
+                  ),
+                  itemBuilder: (context, index) {
+                    final tab = tabs[index];
+                    return TabWidget(
+                      key: ValueKey('tab_${tab.tabId}'),
+                      tabId: tab.tabId,
+                      index: index,
+                      isActive: activeIndex == index,
+                      onTap: () => context.read<TabsBloc>().add(SetActiveIndex(index)),
+                      onClose: () => _requestCloseConfirmation(context, tab.tabId),
+                    );
+                  },
+                ),
               ),
-              itemBuilder: (context, index) {
-                final tab = tabs[index];
-                return TabWidget(
-                  key: ValueKey('tab_${tab.tabId}'),
-                  tabId: tab.tabId,
-                  index: index,
-                  isActive: activeIndex == index,
-                  onTap: () => context.read<TabsBloc>().add(SetActiveIndex(index)),
-                  onClose: () => _requestCloseConfirmation(context, tab.tabId),
-                );
-              },
             ),
           ),
           AddTabButton(layout: layout),
