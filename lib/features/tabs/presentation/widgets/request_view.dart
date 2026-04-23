@@ -8,6 +8,7 @@ import 'package:re_highlight/styles/atom-one-dark.dart';
 import 'package:re_highlight/styles/atom-one-light.dart';
 import 'package:re_highlight/languages/json.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:getman/core/ui/widgets/method_badge.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
@@ -89,12 +90,6 @@ class _RequestViewState extends State<RequestView> {
     super.dispose();
   }
 
-  void _syncBodyFromTab(HttpRequestTabEntity tab) {
-    if (_bodyController.text != tab.config.body) {
-      _bodyController.text = tab.config.body;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<SettingsBloc, SettingsState>(
@@ -110,14 +105,15 @@ class _RequestViewState extends State<RequestView> {
           },
           listener: (context, state) {
             final tab = state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
-            if (tab != null) _syncBodyFromTab(tab);
+            if (tab != null && _bodyController.text != tab.config.body) {
+              _bodyController.text = tab.config.body;
+            }
           },
           buildWhen: (prev, next) {
             if (prev.isLoading != next.isLoading) return true;
-            if (prev.activeIndex != next.activeIndex) return true;
-            final p = prev.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
-            final n = next.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
-            return p != n;
+            final prevExists = prev.tabs.any((t) => t.tabId == widget.tabId);
+            final nextExists = next.tabs.any((t) => t.tabId == widget.tabId);
+            return prevExists != nextExists;
           },
           builder: (context, tabsState) {
             if (tabsState.isLoading) {
@@ -129,7 +125,7 @@ class _RequestViewState extends State<RequestView> {
             return Actions(
               actions: <Type, Action<Intent>>{
                 SaveRequestIntent: CallbackAction<SaveRequestIntent>(
-                  onInvoke: (_) => _handleSave(context, tab),
+                  onInvoke: (_) => _handleSave(context),
                 ),
                 BeautifyJsonIntent: CallbackAction<BeautifyJsonIntent>(
                   onInvoke: (_) async {
@@ -145,7 +141,7 @@ class _RequestViewState extends State<RequestView> {
                     padding: EdgeInsets.all(layout.pagePadding),
                     child: Column(
                       children: [
-                        _UrlBar(tabId: widget.tabId, onSave: () => _handleSave(context, tab)),
+                        _UrlBar(tabId: widget.tabId, onSave: () => _handleSave(context)),
                         SizedBox(height: layout.sectionSpacing),
                         Expanded(
                           child: LayoutBuilder(
@@ -173,7 +169,6 @@ class _RequestViewState extends State<RequestView> {
                                       final committed = _localSplitRatio;
                                       if (committed == null) return;
                                       context.read<SettingsBloc>().add(UpdateSplitRatio(committed));
-                                      // Release the local override so future Bloc updates drive the widget again.
                                       setState(() => _localSplitRatio = null);
                                     },
                                   ),
@@ -197,9 +192,12 @@ class _RequestViewState extends State<RequestView> {
     );
   }
 
-  void _handleSave(BuildContext context, HttpRequestTabEntity tab) {
-    final collectionsBloc = context.read<CollectionsBloc>();
+  void _handleSave(BuildContext context) {
     final tabsBloc = context.read<TabsBloc>();
+    final tab = tabsBloc.state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+    if (tab == null) return;
+
+    final collectionsBloc = context.read<CollectionsBloc>();
     final theme = Theme.of(context);
     final layout = theme.extension<AppLayout>()!;
 
@@ -287,8 +285,8 @@ class _UrlBarState extends State<_UrlBar> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final tab = context.read<TabsBloc>().state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
-    if (tab != null && _urlController.text != tab.config.url) {
-      _urlController.text = tab.config.url;
+    if (tab != null) {
+      _setControllerPreservingEnd(_urlController, tab.config.url);
     }
   }
 
@@ -349,29 +347,14 @@ class _UrlBarState extends State<_UrlBar> {
                           fontSize: layout.fontSizeNormal,
                         ),
                         selectedItemBuilder: (context) {
-                          return HttpMethods.all.map((m) {
-                            return Container(
-                              alignment: Alignment.center,
-                              padding: EdgeInsets.symmetric(horizontal: layout.isCompact ? 8 : 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: context.appPalette.methodColor(m),
-                                border: Border.all(color: theme.dividerColor, width: layout.borderThin),
-                              ),
-                              child: Text(m, style: TextStyle(color: theme.colorScheme.onPrimary, fontWeight: context.appTypography.displayWeight, fontSize: layout.fontSizeNormal)),
-                            );
-                          }).toList();
+                          return HttpMethods.all.map((m) => Center(child: MethodBadge(method: m))).toList();
                         },
                         items: HttpMethods.all
                             .map((m) => DropdownMenuItem(
                               value: m,
-                              child: Container(
+                              child: SizedBox(
                                 width: layout.isCompact ? 80 : 100,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: context.appPalette.methodColor(m),
-                                  border: Border.all(color: theme.dividerColor, width: layout.borderThin),
-                                ),
-                                child: Text(m, style: TextStyle(color: theme.colorScheme.onPrimary, fontWeight: context.appTypography.displayWeight, fontSize: layout.fontSizeNormal)),
+                                child: Center(child: MethodBadge(method: m)),
                               ),
                             ))
                             .toList(),
@@ -527,8 +510,8 @@ class _RequestConfigSection extends StatelessWidget {
         final p = prev.tabs.firstWhereOrNull((t) => t.tabId == tabId);
         final n = next.tabs.firstWhereOrNull((t) => t.tabId == tabId);
         if (p == null || n == null) return true;
-        return !_mapEquals(p.config.params, n.config.params) ||
-            !_mapEquals(p.config.headers, n.config.headers);
+        return !_headerMapEquality.equals(p.config.params, n.config.params) ||
+            !_headerMapEquality.equals(p.config.headers, n.config.headers);
       },
       builder: (context, state) {
         final tab = state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
@@ -650,14 +633,7 @@ class _RequestConfigSection extends StatelessWidget {
   }
 }
 
-bool _mapEquals(Map<String, String> a, Map<String, String> b) {
-  if (identical(a, b)) return true;
-  if (a.length != b.length) return false;
-  for (final k in a.keys) {
-    if (b[k] != a[k]) return false;
-  }
-  return true;
-}
+const _headerMapEquality = MapEquality<String, String>();
 
 class _ResponseSection extends StatelessWidget {
   final String tabId;
@@ -676,8 +652,7 @@ class _ResponseSection extends StatelessWidget {
         if (p == null || n == null) return true;
         return p.isSending != n.isSending ||
             p.statusCode != n.statusCode ||
-            p.durationMs != n.durationMs ||
-            p.responseHeaders != n.responseHeaders;
+            p.durationMs != n.durationMs;
       },
       builder: (context, state) {
         final tab = state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
@@ -713,7 +688,7 @@ class _ResponseSection extends StatelessWidget {
           );
         }
 
-        if (tab.statusCode == null && !tab.isSending) {
+        if (tab.statusCode == null) {
            return Center(child: Column(
              mainAxisAlignment: MainAxisAlignment.center,
              children: [
@@ -874,7 +849,7 @@ class _ResponseHeadersView extends StatelessWidget {
       buildWhen: (prev, next) {
         final p = prev.tabs.firstWhereOrNull((t) => t.tabId == tabId);
         final n = next.tabs.firstWhereOrNull((t) => t.tabId == tabId);
-        return p?.responseHeaders != n?.responseHeaders;
+        return !_headerMapEquality.equals(p?.responseHeaders, n?.responseHeaders);
       },
       builder: (context, state) {
         final tab = state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
@@ -967,7 +942,6 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
       _keyControllers.add(TextEditingController(text: entry.key));
       _valControllers.add(TextEditingController(text: entry.value));
     }
-    // Trailing empty row for adding new entries.
     _keyControllers.add(TextEditingController());
     _valControllers.add(TextEditingController());
   }
@@ -978,14 +952,15 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
     // If the incoming items are the echo of our own last emission, the
     // current controllers are already correct — don't wipe them (which
     // would drop focus and blow away the user's half-typed row).
-    if (_lastEmitted != null && _mapEquals(widget.items, _lastEmitted!)) {
+    if (_lastEmitted != null && _headerMapEquality.equals(widget.items, _lastEmitted)) {
       return;
     }
-    if (_mapEquals(widget.items, oldWidget.items)) {
+    if (_headerMapEquality.equals(widget.items, oldWidget.items)) {
       return;
     }
     _disposeControllers();
     _initControllers(widget.items);
+    _lastEmitted = null;
   }
 
   void _disposeControllers() {
