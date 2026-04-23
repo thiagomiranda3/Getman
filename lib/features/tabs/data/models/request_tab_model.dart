@@ -1,6 +1,5 @@
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
-import 'package:collection/collection.dart';
 import '../../../../features/history/data/models/request_config_model.dart';
 import '../../domain/entities/request_tab_entity.dart';
 
@@ -47,30 +46,6 @@ class HttpRequestTabModel extends HiveObject {
     String? tabId,
   }) : tabId = tabId ?? const Uuid().v4();
 
-  HttpRequestTabModel copyWith({
-    HttpRequestConfig? config,
-    String? responseBody,
-    Map<String, String>? responseHeaders,
-    int? statusCode,
-    int? durationMs,
-    bool? isSending,
-    String? collectionNodeId,
-    String? collectionName,
-    String? tabId,
-  }) {
-    return HttpRequestTabModel(
-      config: config ?? this.config,
-      responseBody: responseBody ?? this.responseBody,
-      responseHeaders: responseHeaders ?? this.responseHeaders,
-      statusCode: statusCode ?? this.statusCode,
-      durationMs: durationMs ?? this.durationMs,
-      isSending: isSending ?? this.isSending,
-      collectionNodeId: collectionNodeId ?? this.collectionNodeId,
-      collectionName: collectionName ?? this.collectionName,
-      tabId: tabId ?? this.tabId,
-    );
-  }
-
   factory HttpRequestTabModel.fromEntity(HttpRequestTabEntity entity) => HttpRequestTabModel(
     config: HttpRequestConfig.fromEntity(entity.config),
     responseBody: entity.responseBody,
@@ -94,33 +69,4 @@ class HttpRequestTabModel extends HiveObject {
     collectionName: collectionName,
     tabId: tabId,
   );
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    if (other is! HttpRequestTabModel) return false;
-
-    return other.tabId == tabId &&
-        other.config == config &&
-        other.responseBody == responseBody &&
-        const MapEquality<String, String>().equals(other.responseHeaders, responseHeaders) &&
-        other.statusCode == statusCode &&
-        other.durationMs == durationMs &&
-        other.isSending == isSending &&
-        other.collectionNodeId == collectionNodeId &&
-        other.collectionName == collectionName;
-  }
-
-  @override
-  int get hashCode {
-    return tabId.hashCode ^
-        config.hashCode ^
-        responseBody.hashCode ^
-        const MapEquality<String, String>().hash(responseHeaders ?? {}) ^
-        statusCode.hashCode ^
-        durationMs.hashCode ^
-        isSending.hashCode ^
-        collectionNodeId.hashCode ^
-        collectionName.hashCode;
-  }
 }

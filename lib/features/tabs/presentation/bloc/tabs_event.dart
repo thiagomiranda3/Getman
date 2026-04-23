@@ -72,7 +72,10 @@ class DuplicateTab extends TabsEvent {
 }
 
 class SendRequest extends TabsEvent {
-  const SendRequest();
+  final Map<String, String> envVars;
+  const SendRequest({this.envVars = const {}});
+  @override
+  List<Object?> get props => [envVars];
 }
 
 class CancelRequest extends TabsEvent {

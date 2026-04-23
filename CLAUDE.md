@@ -47,7 +47,7 @@ lib/
   main.dart          # Bootstrap, global shortcuts, MultiBlocProvider, MaterialApp.router
 ```
 
-Features today: `tabs`, `collections`, `history`, `settings`, `home`.
+Features today: `tabs`, `collections`, `history`, `settings`, `home`, `environments`.
 
 Mandatory rules:
 - **Domain layer has zero imports from `data/` or Flutter UI.** Only pure Dart + `equatable`.
@@ -65,10 +65,13 @@ Mandatory rules:
 | 1 | `HttpRequestConfig` | `history` | Shared between history and collection nodes |
 | 2 | `HttpRequestTabModel` | `tabs` | Tab state including response cache |
 | 3 | `CollectionNode` | `collections` | Nested (children list stored as `HiveField(3)`) |
+| 4 | `EnvironmentModel` | `environments` | Flat list; `variables` is `Map<String, String>` at `HiveField(2)` |
 
 **Never renumber an existing `typeId`.** Add new models with a fresh ID.
 
 As of the pluggable-themes refactor, `SettingsModel` also carries a `String themeId` at `HiveField(7)` (default `'brutalist'`). This drives which theme builder is active.
+
+`SettingsModel` also carries `String? activeEnvironmentId` at `HiveField(8)` (nullable, no default — `null` means "No Environment"). This is the id of the environment whose variables get substituted into `{{var}}` placeholders at send time. `SettingsEntity.copyWith` uses a sentinel (`_unchanged` `Object` constant) so the caller can explicitly clear the id back to `null`.
 
 After editing any `@HiveType` field, regenerate:
 ```
@@ -137,6 +140,16 @@ Entity ↔ Model boundary: every data-layer model implements `toEntity()` / `fro
 - HTTP method list: `HttpMethods.all` in `core/network/http_methods.dart` — don't hardcode `['GET','POST',…]`.
 - Split panes: local `_localSplitRatio` / `_localSideMenuWidth` during drag, committed to BLoC in `onEnd`, then **reset to `null`** so the BLoC's value drives the widget again. If you add a new splitter, follow this pattern exactly.
 
+### 4.10 Environments feature
+- Flat list of `EnvironmentEntity(id, name, variables: Map<String, String>)` — no folders/tree. Stored in the `environments` Hive box as `EnvironmentModel` (typeId 4).
+- The currently-active environment id is **not** owned by `EnvironmentsBloc`; it lives on `SettingsEntity.activeEnvironmentId` (per-user preference, persisted with settings). `null` means "No Environment" — a synthetic always-available option in the selector UI.
+- **Variable syntax:** `{{name}}` — the resolver in `lib/core/utils/environment_resolver.dart` accepts `[A-Za-z0-9_\-\.]+` identifiers with optional whitespace inside the braces (`{{ name }}` is valid). Unknown variable names are **left verbatim**, not blanked — silent empty substitution is worse than a visibly broken URL.
+- **Substitution scope:** `TabsRepositoryImpl.sendRequest` resolves against URL, query-param values, header values, and body (not header/param *keys*) before dispatching via `networkService.request`. **History records the templated (unresolved) config** — the user should be able to re-send a history entry under a different environment, matching Postman/Insomnia.
+- **Resolution plumbing:** the `SendRequest` event carries `Map<String, String> envVars`. Dispatchers that need real substitution — the SEND button in `UrlBar`, the `SendRequestIntent` shortcut in `MainScreen` — compute it via `ActiveEnvironmentHelper.variablesFor(environments, activeEnvironmentId)` read from `EnvironmentsBloc` + `SettingsBloc`.
+- **URL highlighting:** `VariableHighlightController` (in `lib/core/ui/widgets/`, a `TextEditingController` subclass) overrides `buildTextSpan` to color each `{{var}}` token. `UrlBar` owns this controller and pushes variable + color updates via `updateVariables` / `updateColors`; both methods `notifyListeners()` only when the underlying value actually changed (via `MapEquality` / `==`) so we don't thrash rebuilds.
+- **Palette:** `AppPalette.variableResolved` / `variableUnresolved`. Never hardcode green/red `Color` literals for variable tokens.
+- **Deleting the active environment** is handled at the widget layer in `EnvironmentsDialog._deleteEnvironment`: if the just-deleted id matches `SettingsEntity.activeEnvironmentId`, dispatch `UpdateActiveEnvironmentId(null)` on `SettingsBloc` after the delete. BLoC-to-BLoC coupling is intentionally avoided — the coordinator is the widget with both blocs in scope.
+
 ### 4.9 Persistence summary
 
 | Feature | When it writes |
@@ -145,6 +158,7 @@ Entity ↔ Model boundary: every data-layer model implements `toEntity()` / `fro
 | Collections | immediately after every mutation (saves the whole tree) |
 | History | via Hive `Box.watch()`; writes on each `add/delete/clear` |
 | Tabs | debounced 10 s after any change + flush on `close()` |
+| Environments | immediately after every mutation (saves the whole list via `replaceAllInBox`) |
 
 ---
 
@@ -174,6 +188,9 @@ Verification bar: **`fvm flutter analyze` produces `No issues found!` AND `fvm f
 - **Debug logs use `debugPrint`** — `print` is disallowed by the default lint profile.
 - **`flutter_fancy_tree_view` is discontinued** — keep code changes compatible with eventual migration to `two_dimensional_scrollables`.
 - Settings `splitRatio` is clamped to `[_splitMin, _splitMax]` (0.1..0.9) in `request_view.dart`. The `flex:` math uses `_splitFlexUnits=1000` — if you touch this, preserve the clamping so panes can't go to zero.
+- **`SendRequest` carries `envVars`.** Always dispatch from a context that can `context.read<EnvironmentsBloc>()` + `context.read<SettingsBloc>()` and resolve via `ActiveEnvironmentHelper.variablesFor(...)`. A bare `SendRequest()` will send with empty envvars — any `{{var}}` in the config will go to the network verbatim.
+- **Never resolve env vars in `SendRequestUseCase._record`.** History must keep the templated config so re-sending under a different environment works.
+- **`VariableHighlightController` diffing matters.** `updateVariables` / `updateColors` only notify listeners when the value actually changed (`MapEquality` / `==`). Bypassing this causes the URL bar to rebuild on every bloc emission.
 
 ---
 

@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../../../core/domain/entities/request_config_entity.dart';
+import '../../domain/entities/collection_node_entity.dart';
 
 abstract class CollectionsEvent extends Equatable {
   const CollectionsEvent();
@@ -64,4 +65,11 @@ class MoveNode extends CollectionsEvent {
   const MoveNode(this.nodeId, this.newParentId);
   @override
   List<Object?> get props => [nodeId, newParentId];
+}
+
+class ImportCollections extends CollectionsEvent {
+  final List<CollectionNodeEntity> rootNodes;
+  const ImportCollections(this.rootNodes);
+  @override
+  List<Object?> get props => [rootNodes];
 }

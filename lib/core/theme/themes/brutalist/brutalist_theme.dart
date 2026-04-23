@@ -43,6 +43,8 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
     statusAccentWarning: Colors.orangeAccent,
     statusAccentError: Colors.redAccent,
     codeBackground: isDark ? BrutalistPalette.backgroundDark : Colors.white,
+    variableResolved: isDark ? BrutalistPalette.variableResolvedDark : BrutalistPalette.variableResolved,
+    variableUnresolved: isDark ? BrutalistPalette.variableUnresolvedDark : BrutalistPalette.variableUnresolved,
   );
 
   final decoration = AppDecoration(

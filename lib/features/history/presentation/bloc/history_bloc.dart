@@ -25,8 +25,12 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
     on<ClearHistory>(_onClearHistory);
     on<HistoryUpdated>(_onHistoryUpdated);
 
+    // Guard against the stream emitting during/after close() — otherwise
+    // `add(HistoryUpdated)` on a closed bloc throws StateError.
     _subscription = watchHistoryUseCase().listen(
-      (history) => add(HistoryUpdated(history)),
+      (history) {
+        if (!isClosed) add(HistoryUpdated(history));
+      },
       onError: (e) => debugPrint('History watch error: $e'),
     );
   }

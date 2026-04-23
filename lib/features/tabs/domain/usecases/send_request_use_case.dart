@@ -20,10 +20,15 @@ class SendRequestUseCase {
 
   Future<HttpResponseEntity> call({
     required HttpRequestConfigEntity config,
+    Map<String, String> envVars = const {},
     NetworkCancelHandle? cancelHandle,
   }) async {
     try {
-      final response = await tabsRepository.sendRequest(config, cancelHandle: cancelHandle);
+      final response = await tabsRepository.sendRequest(
+        config,
+        envVars: envVars,
+        cancelHandle: cancelHandle,
+      );
       await _record(config, response: response);
       return response;
     } on NetworkFailure catch (f) {
@@ -41,15 +46,14 @@ class SendRequestUseCase {
   }) async {
     try {
       final settings = await getSettingsUseCase();
-      var historyConfig = config.copyWith();
-      if (settings.saveResponseInHistory) {
-        historyConfig = historyConfig.copyWith(
-          responseBody: response?.body ?? failure?.message,
-          responseHeaders: response?.headers ?? const {},
-          statusCode: response?.statusCode ?? failure?.statusCode ?? 0,
-          durationMs: response?.durationMs ?? 0,
-        );
-      }
+      final historyConfig = settings.saveResponseInHistory
+          ? config.copyWith(
+              responseBody: response?.body ?? failure?.message,
+              responseHeaders: response?.headers ?? const {},
+              statusCode: response?.statusCode ?? failure?.statusCode ?? 0,
+              durationMs: response?.durationMs ?? 0,
+            )
+          : config;
       await addToHistoryUseCase(historyConfig, settings.historyLimit);
     } catch (e, st) {
       // History is best-effort; never fail the request because of persistence —

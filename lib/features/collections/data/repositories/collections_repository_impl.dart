@@ -1,5 +1,4 @@
-import '../../../../core/error/exceptions.dart';
-import '../../../../core/error/failures.dart';
+import '../../../../core/error/guard.dart';
 import '../../domain/entities/collection_node_entity.dart';
 import '../../domain/repositories/collections_repository.dart';
 import '../datasources/collections_local_data_source.dart';
@@ -11,22 +10,15 @@ class CollectionsRepositoryImpl implements CollectionsRepository {
   CollectionsRepositoryImpl(this.localDataSource);
 
   @override
-  Future<List<CollectionNodeEntity>> getCollections() async {
-    try {
-      final models = await localDataSource.getCollections();
-      return models.map((m) => m.toEntity()).toList();
-    } on PersistenceException catch (e) {
-      throw PersistenceFailure(e.message);
-    }
-  }
+  Future<List<CollectionNodeEntity>> getCollections() => guardPersistence(() async {
+    final models = await localDataSource.getCollections();
+    return models.map((m) => m.toEntity()).toList();
+  });
 
   @override
-  Future<void> saveCollections(List<CollectionNodeEntity> collections) async {
-    try {
-      final models = collections.map((e) => CollectionNode.fromEntity(e)).toList();
-      await localDataSource.saveCollections(models);
-    } on PersistenceException catch (e) {
-      throw PersistenceFailure(e.message);
-    }
-  }
+  Future<void> saveCollections(List<CollectionNodeEntity> collections) =>
+      guardPersistence(() async {
+    final models = collections.map((e) => CollectionNode.fromEntity(e)).toList();
+    await localDataSource.saveCollections(models);
+  });
 }
