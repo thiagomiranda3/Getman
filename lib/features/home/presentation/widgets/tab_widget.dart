@@ -15,7 +15,7 @@ class TabWidget extends StatefulWidget {
   final int index;
   final bool isActive;
   final VoidCallback onTap;
-  final VoidCallback onClose;
+  final Future<bool> Function() onClose;
 
   const TabWidget({
     super.key,
@@ -56,14 +56,14 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  void _handleClose() {
+  Future<void> _handleClose() async {
     if (_isClosing) return;
+    final confirmed = await widget.onClose();
+    if (!confirmed || !mounted) return;
     setState(() => _isClosing = true);
-    _sizeController.reverse().then((_) {
-      if (mounted) {
-        widget.onClose();
-      }
-    });
+    await _sizeController.reverse();
+    if (!mounted) return;
+    context.read<TabsBloc>().add(RemoveTab(widget.tabId));
   }
 
   @override

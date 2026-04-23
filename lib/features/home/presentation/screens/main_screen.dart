@@ -51,42 +51,37 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  void _confirmClose(BuildContext context, String tabId) {
+  Future<bool> _requestCloseConfirmation(BuildContext context, String tabId) async {
+    final tab = context.read<TabsBloc>().state.tabs.byId(tabId);
+    if (tab == null) return false;
+    if (!_isTabDirty(context, tabId)) return true;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        return AlertDialog(
+          title: const Text('UNSAVED CHANGES'),
+          content: const Text('YOU HAVE UNSAVED CHANGES. ARE YOU SURE YOU WANT TO CLOSE THIS TAB?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('CANCEL')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text('CLOSE ANYWAY',
+                  style: TextStyle(color: theme.colorScheme.error, fontWeight: context.appTypography.titleWeight)),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
+  Future<void> _confirmAndClose(BuildContext context, String tabId) async {
     final tabsBloc = context.read<TabsBloc>();
-    final tab = tabsBloc.state.tabs.byId(tabId);
-    if (tab == null) return;
-
-    final isDirty = _isTabDirty(context, tabId);
-
-    void performRemove() {
-      tabsBloc.add(RemoveTab(tabId));
-    }
-
-    if (isDirty) {
-      showDialog(
-        context: context,
-        builder: (dialogContext) {
-          final theme = Theme.of(dialogContext);
-          return AlertDialog(
-            title: const Text('UNSAVED CHANGES'),
-            content: const Text('YOU HAVE UNSAVED CHANGES. ARE YOU SURE YOU WANT TO CLOSE THIS TAB?'),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CANCEL')),
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(dialogContext);
-                  performRemove();
-                },
-                child: Text('CLOSE ANYWAY',
-                    style: TextStyle(color: theme.colorScheme.error, fontWeight: context.appTypography.titleWeight)),
-              ),
-            ],
-          );
-        },
-      );
-    } else {
-      performRemove();
-    }
+    final confirmed = await _requestCloseConfirmation(context, tabId);
+    if (!confirmed || !mounted) return;
+    tabsBloc.add(RemoveTab(tabId));
   }
 
   @override
@@ -107,7 +102,7 @@ class _MainScreenState extends State<MainScreen> {
                 CloseTabIntent: CallbackAction<CloseTabIntent>(
                   onInvoke: (_) {
                     if (activeIndex < 0 || activeIndex >= tabs.length) return null;
-                    _confirmClose(context, tabs[activeIndex].tabId);
+                    _confirmAndClose(context, tabs[activeIndex].tabId);
                     return null;
                   },
                 ),
@@ -247,7 +242,7 @@ class _MainScreenState extends State<MainScreen> {
                   index: index,
                   isActive: activeIndex == index,
                   onTap: () => context.read<TabsBloc>().add(SetActiveIndex(index)),
-                  onClose: () => _confirmClose(context, tab.tabId),
+                  onClose: () => _requestCloseConfirmation(context, tab.tabId),
                 );
               },
             ),
