@@ -69,7 +69,7 @@ class RequestConfigSection extends StatelessWidget {
                   decoration: context.appDecoration.panelBox(context, offset: 0),
                   child: TabBarView(
                     children: [
-                      _QueryParamsEditor(
+                      QueryParamsEditor(
                         items: tab.config.params,
                         onChanged: (list) {
                           final current = context.read<TabsBloc>().state.tabs.byId(tabId);
@@ -79,7 +79,7 @@ class RequestConfigSection extends StatelessWidget {
                           ));
                         },
                       ),
-                      _HeadersEditor(
+                      HeadersEditor(
                         items: tab.config.headers,
                         onChanged: (map) {
                           final current = context.read<TabsBloc>().state.tabs.byId(tabId);
@@ -127,18 +127,18 @@ class RequestConfigSection extends StatelessWidget {
 }
 
 /// Editor for ordered `List<QueryParamEntity>`. Duplicates allowed, order
-/// preserved. Mirrors the echo-suppression pattern of `_HeadersEditor`.
-class _QueryParamsEditor extends StatefulWidget {
+/// preserved. Mirrors the echo-suppression pattern of `HeadersEditor`.
+class QueryParamsEditor extends StatefulWidget {
   final List<QueryParamEntity> items;
   final Function(List<QueryParamEntity>) onChanged;
 
-  const _QueryParamsEditor({required this.items, required this.onChanged});
+  const QueryParamsEditor({super.key, required this.items, required this.onChanged});
 
   @override
-  State<_QueryParamsEditor> createState() => _QueryParamsEditorState();
+  State<QueryParamsEditor> createState() => _QueryParamsEditorState();
 }
 
-class _QueryParamsEditorState extends State<_QueryParamsEditor> {
+class _QueryParamsEditorState extends State<QueryParamsEditor> {
   late List<TextEditingController> _keyControllers;
   late List<TextEditingController> _valControllers;
   List<QueryParamEntity>? _lastEmitted;
@@ -162,7 +162,7 @@ class _QueryParamsEditorState extends State<_QueryParamsEditor> {
   }
 
   @override
-  void didUpdateWidget(_QueryParamsEditor oldWidget) {
+  void didUpdateWidget(QueryParamsEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (_lastEmitted != null &&
         _queryParamListEquality.equals(widget.items, _lastEmitted)) {
@@ -253,17 +253,17 @@ class _QueryParamsEditorState extends State<_QueryParamsEditor> {
 
 /// Editor for headers, still keyed as `Map<String, String>`. Duplicates are
 /// not a real concern for headers in this UI — last-write-wins is fine.
-class _HeadersEditor extends StatefulWidget {
+class HeadersEditor extends StatefulWidget {
   final Map<String, String> items;
   final Function(Map<String, String>) onChanged;
 
-  const _HeadersEditor({required this.items, required this.onChanged});
+  const HeadersEditor({super.key, required this.items, required this.onChanged});
 
   @override
-  State<_HeadersEditor> createState() => _HeadersEditorState();
+  State<HeadersEditor> createState() => _HeadersEditorState();
 }
 
-class _HeadersEditorState extends State<_HeadersEditor> {
+class _HeadersEditorState extends State<HeadersEditor> {
   late List<TextEditingController> _keyControllers;
   late List<TextEditingController> _valControllers;
   Map<String, String>? _lastEmitted;
@@ -287,7 +287,7 @@ class _HeadersEditorState extends State<_HeadersEditor> {
   }
 
   @override
-  void didUpdateWidget(_HeadersEditor oldWidget) {
+  void didUpdateWidget(HeadersEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (_lastEmitted != null && headerMapEquality.equals(widget.items, _lastEmitted)) {
       return;

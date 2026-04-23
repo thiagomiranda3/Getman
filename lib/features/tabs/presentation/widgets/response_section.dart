@@ -13,7 +13,16 @@ import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart'
 class ResponseSection extends StatelessWidget {
   final String tabId;
   final CodeLineEditingController responseController;
-  const ResponseSection({super.key, required this.tabId, required this.responseController});
+  /// When false, the status/duration metadata row is omitted. Used by
+  /// [UnifiedRequestPanel] which renders the metadata above the shared tab
+  /// strip so it stays visible on every tab.
+  final bool showMetadata;
+  const ResponseSection({
+    super.key,
+    required this.tabId,
+    required this.responseController,
+    this.showMetadata = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -77,19 +86,20 @@ class ResponseSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: EdgeInsets.only(bottom: layout.isCompact ? 8.0 : 12.0),
-              child: Wrap(
-                spacing: 12,
-                runSpacing: 8,
-                children: [
-                  if (tab.statusCode != null)
-                    _ResponseMetadataItem(label: 'STATUS', value: tab.statusCode.toString(), color: context.appPalette.statusAccent(tab.statusCode!), layout: layout),
-                  if (tab.durationMs != null)
-                     _ResponseMetadataItem(label: 'TIME', value: '${tab.durationMs} ms', color: theme.colorScheme.secondary, layout: layout),
-                ],
+            if (showMetadata)
+              Padding(
+                padding: EdgeInsets.only(bottom: layout.isCompact ? 8.0 : 12.0),
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    if (tab.statusCode != null)
+                      _ResponseMetadataItem(label: 'STATUS', value: tab.statusCode.toString(), color: context.appPalette.statusAccent(tab.statusCode!), layout: layout),
+                    if (tab.durationMs != null)
+                       _ResponseMetadataItem(label: 'TIME', value: '${tab.durationMs} ms', color: theme.colorScheme.secondary, layout: layout),
+                  ],
+                ),
               ),
-            ),
             Expanded(
               child: DefaultTabController(
                 length: 2,
