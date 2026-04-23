@@ -62,3 +62,10 @@ class UpdateThemeId extends SettingsEvent {
   @override
   List<Object?> get props => [themeId];
 }
+
+class UpdateActiveEnvironmentId extends SettingsEvent {
+  final String? id;
+  const UpdateActiveEnvironmentId(this.id);
+  @override
+  List<Object?> get props => [id];
+}

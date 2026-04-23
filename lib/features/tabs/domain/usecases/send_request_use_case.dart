@@ -20,10 +20,15 @@ class SendRequestUseCase {
 
   Future<HttpResponseEntity> call({
     required HttpRequestConfigEntity config,
+    Map<String, String> envVars = const {},
     NetworkCancelHandle? cancelHandle,
   }) async {
     try {
-      final response = await tabsRepository.sendRequest(config, cancelHandle: cancelHandle);
+      final response = await tabsRepository.sendRequest(
+        config,
+        envVars: envVars,
+        cancelHandle: cancelHandle,
+      );
       await _record(config, response: response);
       return response;
     } on NetworkFailure catch (f) {

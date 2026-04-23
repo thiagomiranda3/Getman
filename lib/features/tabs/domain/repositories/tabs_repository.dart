@@ -8,6 +8,7 @@ abstract class TabsRepository {
   Future<void> saveTabs(List<HttpRequestTabEntity> tabs);
   Future<HttpResponseEntity> sendRequest(
     HttpRequestConfigEntity config, {
+    Map<String, String> envVars = const {},
     NetworkCancelHandle? cancelHandle,
   });
 }

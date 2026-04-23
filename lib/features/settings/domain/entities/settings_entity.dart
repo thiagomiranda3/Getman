@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
 import '../../../../core/theme/theme_ids.dart';
 
+const Object _unchanged = Object();
+
 class SettingsEntity extends Equatable {
   final int historyLimit;
   final bool saveResponseInHistory;
@@ -10,6 +12,7 @@ class SettingsEntity extends Equatable {
   final double splitRatio;
   final double sideMenuWidth;
   final String themeId;
+  final String? activeEnvironmentId;
 
   const SettingsEntity({
     this.historyLimit = 100,
@@ -20,6 +23,7 @@ class SettingsEntity extends Equatable {
     this.splitRatio = 0.5,
     this.sideMenuWidth = 300.0,
     this.themeId = kBrutalistThemeId,
+    this.activeEnvironmentId,
   });
 
   SettingsEntity copyWith({
@@ -31,6 +35,7 @@ class SettingsEntity extends Equatable {
     double? splitRatio,
     double? sideMenuWidth,
     String? themeId,
+    Object? activeEnvironmentId = _unchanged,
   }) {
     return SettingsEntity(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -41,6 +46,9 @@ class SettingsEntity extends Equatable {
       splitRatio: splitRatio ?? this.splitRatio,
       sideMenuWidth: sideMenuWidth ?? this.sideMenuWidth,
       themeId: themeId ?? this.themeId,
+      activeEnvironmentId: identical(activeEnvironmentId, _unchanged)
+          ? this.activeEnvironmentId
+          : activeEnvironmentId as String?,
     );
   }
 
@@ -54,5 +62,6 @@ class SettingsEntity extends Equatable {
     splitRatio,
     sideMenuWidth,
     themeId,
+    activeEnvironmentId,
   ];
 }

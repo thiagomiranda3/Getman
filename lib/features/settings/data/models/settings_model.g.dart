@@ -25,13 +25,14 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       splitRatio: fields[5] == null ? 0.5 : fields[5] as double,
       sideMenuWidth: fields[6] == null ? 300.0 : fields[6] as double,
       themeId: fields[7] == null ? 'brutalist' : fields[7] as String,
+      activeEnvironmentId: fields[8] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, SettingsModel obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.historyLimit)
       ..writeByte(1)
@@ -47,7 +48,9 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       ..writeByte(6)
       ..write(obj.sideMenuWidth)
       ..writeByte(7)
-      ..write(obj.themeId);
+      ..write(obj.themeId)
+      ..writeByte(8)
+      ..write(obj.activeEnvironmentId);
   }
 
   @override

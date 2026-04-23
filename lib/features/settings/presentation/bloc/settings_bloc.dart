@@ -27,6 +27,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     on<UpdateSplitRatio>((e, emit) => _apply(emit, (s) => s.copyWith(splitRatio: e.ratio)));
     on<UpdateSideMenuWidth>((e, emit) => _apply(emit, (s) => s.copyWith(sideMenuWidth: e.width)));
     on<UpdateThemeId>((e, emit) => _apply(emit, (s) => s.copyWith(themeId: e.themeId)));
+    on<UpdateActiveEnvironmentId>((e, emit) => _apply(emit, (s) => s.copyWith(activeEnvironmentId: e.id)));
   }
 
   Future<void> _apply(

@@ -99,6 +99,8 @@ ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
     statusAccentWarning: RpgPalette.statusAccentWarning,
     statusAccentError: RpgPalette.statusAccentError,
     codeBackground: isDark ? RpgPalette.codeBackgroundDark : RpgPalette.codeBackgroundLight,
+    variableResolved: RpgPalette.statusSuccess,
+    variableUnresolved: RpgPalette.statusError,
   );
 
   final decoration = AppDecoration(

@@ -256,7 +256,11 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     emit(state.copyWith(tabs: _replaceTabById(state.tabs, activeTab.copyWith(isSending: true))));
 
     try {
-      final response = await sendRequestUseCase(config: config, cancelHandle: handle);
+      final response = await sendRequestUseCase(
+        config: config,
+        envVars: event.envVars,
+        cancelHandle: handle,
+      );
       _requests.finish(tabId);
       _applyToTab(emit, tabId, (live) => live.copyWith(
         isSending: false,

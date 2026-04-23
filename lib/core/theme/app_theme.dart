@@ -289,6 +289,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
   final Color statusAccentWarning;
   final Color statusAccentError;
   final Color codeBackground;
+  final Color variableResolved;
+  final Color variableUnresolved;
 
   const AppPalette({
     required this.methodColors,
@@ -300,6 +302,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.statusAccentWarning,
     required this.statusAccentError,
     required this.codeBackground,
+    required this.variableResolved,
+    required this.variableUnresolved,
   });
 
   Color methodColor(String method) =>
@@ -328,6 +332,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? statusAccentWarning,
     Color? statusAccentError,
     Color? codeBackground,
+    Color? variableResolved,
+    Color? variableUnresolved,
   }) {
     return AppPalette(
       methodColors: methodColors ?? this.methodColors,
@@ -339,6 +345,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
       statusAccentWarning: statusAccentWarning ?? this.statusAccentWarning,
       statusAccentError: statusAccentError ?? this.statusAccentError,
       codeBackground: codeBackground ?? this.codeBackground,
+      variableResolved: variableResolved ?? this.variableResolved,
+      variableUnresolved: variableUnresolved ?? this.variableUnresolved,
     );
   }
 
@@ -355,6 +363,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
       statusAccentWarning: Color.lerp(statusAccentWarning, other.statusAccentWarning, t)!,
       statusAccentError: Color.lerp(statusAccentError, other.statusAccentError, t)!,
       codeBackground: Color.lerp(codeBackground, other.codeBackground, t)!,
+      variableResolved: Color.lerp(variableResolved, other.variableResolved, t)!,
+      variableUnresolved: Color.lerp(variableUnresolved, other.variableUnresolved, t)!,
     );
   }
 }

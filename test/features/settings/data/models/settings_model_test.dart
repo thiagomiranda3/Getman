@@ -28,4 +28,40 @@ void main() {
       expect(copy.historyLimit, 50);
     });
   });
+
+  group('SettingsModel activeEnvironmentId', () {
+    test('default is null', () {
+      expect(const SettingsEntity().activeEnvironmentId, isNull);
+      expect(SettingsModel().activeEnvironmentId, isNull);
+    });
+
+    test('entity roundtrip preserves a set id', () {
+      const entity = SettingsEntity(activeEnvironmentId: 'env-42');
+      final back = SettingsModel.fromEntity(entity).toEntity();
+      expect(back.activeEnvironmentId, 'env-42');
+    });
+
+    test('entity roundtrip preserves null', () {
+      const entity = SettingsEntity(activeEnvironmentId: null);
+      final back = SettingsModel.fromEntity(entity).toEntity();
+      expect(back.activeEnvironmentId, isNull);
+    });
+
+    test('json roundtrip preserves id', () {
+      final model = SettingsModel(activeEnvironmentId: 'x');
+      expect(SettingsModel.fromJson(model.toJson()).activeEnvironmentId, 'x');
+    });
+
+    test('SettingsEntity.copyWith can clear to null explicitly', () {
+      const entity = SettingsEntity(activeEnvironmentId: 'x');
+      final cleared = entity.copyWith(activeEnvironmentId: null);
+      expect(cleared.activeEnvironmentId, isNull);
+    });
+
+    test('SettingsEntity.copyWith without arg preserves previous id', () {
+      const entity = SettingsEntity(activeEnvironmentId: 'x');
+      final preserved = entity.copyWith(themeId: 'other');
+      expect(preserved.activeEnvironmentId, 'x');
+    });
+  });
 }

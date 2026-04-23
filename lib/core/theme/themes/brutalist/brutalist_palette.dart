@@ -28,4 +28,9 @@ class BrutalistPalette {
   };
 
   static const Color methodFallback = Colors.grey;
+
+  static const Color variableResolved = Color(0xFF16A34A);
+  static const Color variableUnresolved = Color(0xFFDC2626);
+  static const Color variableResolvedDark = Color(0xFF4ADE80);
+  static const Color variableUnresolvedDark = Color(0xFFF87171);
 }

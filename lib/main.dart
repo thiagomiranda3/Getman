@@ -11,6 +11,8 @@ import 'features/collections/presentation/bloc/collections_bloc.dart';
 import 'features/collections/presentation/bloc/collections_event.dart';
 import 'features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'features/tabs/presentation/bloc/tabs_event.dart';
+import 'features/environments/presentation/bloc/environments_bloc.dart';
+import 'features/environments/presentation/bloc/environments_event.dart';
 import 'package:flutter/services.dart';
 import 'package:getman/core/navigation/intents.dart';
 import 'features/settings/domain/entities/settings_entity.dart';
@@ -39,6 +41,7 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (_) => di.sl<HistoryBloc>()..add(const LoadHistory())),
         BlocProvider(create: (_) => di.sl<CollectionsBloc>()..add(const LoadCollections())),
         BlocProvider(create: (_) => di.sl<TabsBloc>()..add(const LoadTabs())),
+        BlocProvider(create: (_) => di.sl<EnvironmentsBloc>()..add(const LoadEnvironments())),
       ],
       child: BlocBuilder<SettingsBloc, SettingsState>(
         builder: (context, state) {

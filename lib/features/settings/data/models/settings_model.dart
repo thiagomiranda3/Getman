@@ -4,6 +4,8 @@ import '../../domain/entities/settings_entity.dart';
 
 part 'settings_model.g.dart';
 
+const Object _unchanged = Object();
+
 @HiveType(typeId: 0)
 class SettingsModel extends HiveObject {
   @HiveField(0, defaultValue: 100)
@@ -30,6 +32,9 @@ class SettingsModel extends HiveObject {
   @HiveField(7, defaultValue: kBrutalistThemeId)
   String themeId;
 
+  @HiveField(8)
+  String? activeEnvironmentId;
+
   SettingsModel({
     this.historyLimit = 100,
     this.saveResponseInHistory = false,
@@ -39,6 +44,7 @@ class SettingsModel extends HiveObject {
     this.splitRatio = 0.5,
     this.sideMenuWidth = 300.0,
     this.themeId = kBrutalistThemeId,
+    this.activeEnvironmentId,
   });
 
   SettingsModel copyWith({
@@ -50,6 +56,7 @@ class SettingsModel extends HiveObject {
     double? splitRatio,
     double? sideMenuWidth,
     String? themeId,
+    Object? activeEnvironmentId = _unchanged,
   }) {
     return SettingsModel(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -60,6 +67,9 @@ class SettingsModel extends HiveObject {
       splitRatio: splitRatio ?? this.splitRatio,
       sideMenuWidth: sideMenuWidth ?? this.sideMenuWidth,
       themeId: themeId ?? this.themeId,
+      activeEnvironmentId: identical(activeEnvironmentId, _unchanged)
+          ? this.activeEnvironmentId
+          : activeEnvironmentId as String?,
     );
   }
 
@@ -72,6 +82,7 @@ class SettingsModel extends HiveObject {
     'splitRatio': splitRatio,
     'sideMenuWidth': sideMenuWidth,
     'themeId': themeId,
+    'activeEnvironmentId': activeEnvironmentId,
   };
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) => SettingsModel(
@@ -83,6 +94,7 @@ class SettingsModel extends HiveObject {
     splitRatio: json['splitRatio'] ?? 0.5,
     sideMenuWidth: (json['sideMenuWidth'] ?? 300.0).toDouble(),
     themeId: json['themeId'] ?? kBrutalistThemeId,
+    activeEnvironmentId: json['activeEnvironmentId'] as String?,
   );
 
   factory SettingsModel.fromEntity(SettingsEntity entity) => SettingsModel(
@@ -94,6 +106,7 @@ class SettingsModel extends HiveObject {
     splitRatio: entity.splitRatio,
     sideMenuWidth: entity.sideMenuWidth,
     themeId: entity.themeId,
+    activeEnvironmentId: entity.activeEnvironmentId,
   );
 
   SettingsEntity toEntity() => SettingsEntity(
@@ -105,5 +118,6 @@ class SettingsModel extends HiveObject {
     splitRatio: splitRatio,
     sideMenuWidth: sideMenuWidth,
     themeId: themeId,
+    activeEnvironmentId: activeEnvironmentId,
   );
 }

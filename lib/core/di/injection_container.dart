@@ -34,6 +34,13 @@ import '../../features/tabs/domain/repositories/tabs_repository.dart';
 import '../../features/tabs/domain/usecases/send_request_use_case.dart';
 import '../../features/tabs/presentation/bloc/tabs_bloc.dart';
 
+import '../../features/environments/data/datasources/environments_local_data_source.dart';
+import '../../features/environments/data/models/environment_model.dart';
+import '../../features/environments/data/repositories/environments_repository_impl.dart';
+import '../../features/environments/domain/repositories/environments_repository.dart';
+import '../../features/environments/domain/usecases/environments_usecases.dart';
+import '../../features/environments/presentation/bloc/environments_bloc.dart';
+
 import '../../features/home/domain/usecases/tab_dirty_checker.dart';
 
 final sl = GetIt.instance;
@@ -45,11 +52,13 @@ Future<SettingsEntity> init() async {
   Hive.registerAdapter(HttpRequestConfigAdapter());
   Hive.registerAdapter(HttpRequestTabModelAdapter());
   Hive.registerAdapter(CollectionNodeAdapter());
+  Hive.registerAdapter(EnvironmentModelAdapter());
 
   final settingsBox = await Hive.openBox<SettingsModel>(HiveBoxes.settings);
   await Hive.openBox<HttpRequestConfig>(HiveBoxes.history);
   await Hive.openBox<HttpRequestTabModel>(HiveBoxes.tabs);
   await Hive.openBox<CollectionNode>(HiveBoxes.collections);
+  await Hive.openBox<EnvironmentModel>(HiveBoxes.environments);
 
   final initialSettings = settingsBox.get('current')?.toEntity() ?? const SettingsEntity();
 
@@ -95,6 +104,19 @@ Future<SettingsEntity> init() async {
   sl.registerLazySingleton<CollectionsRepository>(() => CollectionsRepositoryImpl(sl()));
 
   sl.registerLazySingleton<CollectionsLocalDataSource>(() => CollectionsLocalDataSourceImpl());
+
+  // Features - Environments
+  sl.registerLazySingleton(() => EnvironmentsBloc(
+    getEnvironmentsUseCase: sl(),
+    saveEnvironmentsUseCase: sl(),
+  ));
+
+  sl.registerLazySingleton(() => GetEnvironmentsUseCase(sl()));
+  sl.registerLazySingleton(() => SaveEnvironmentsUseCase(sl()));
+
+  sl.registerLazySingleton<EnvironmentsRepository>(() => EnvironmentsRepositoryImpl(sl()));
+
+  sl.registerLazySingleton<EnvironmentsLocalDataSource>(() => EnvironmentsLocalDataSourceImpl());
 
   // Features - Tabs
   sl.registerLazySingleton(() => TabsBloc(
