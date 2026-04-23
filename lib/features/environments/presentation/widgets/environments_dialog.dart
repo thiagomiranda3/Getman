@@ -6,7 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
+import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 import 'package:getman/core/utils/postman/postman_environment_mapper.dart';
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
@@ -22,8 +24,8 @@ class EnvironmentsDialog extends StatefulWidget {
   static Future<void> show(BuildContext context) {
     final envsBloc = context.read<EnvironmentsBloc>();
     final settingsBloc = context.read<SettingsBloc>();
-    return showDialog<void>(
-      context: context,
+    return showResponsiveDialog<void>(
+      context,
       builder: (dialogContext) => MultiBlocProvider(
         providers: [
           BlocProvider.value(value: envsBloc),
@@ -43,134 +45,205 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final layout = context.appLayout;
-    final theme = Theme.of(context);
-
     return BlocBuilder<EnvironmentsBloc, EnvironmentsState>(
       buildWhen: (p, n) => p.environments != n.environments,
       builder: (context, state) {
         final environments = state.environments;
+        // Reconcile selection with the live list.
         if (_selectedId != null && environments.every((e) => e.id != _selectedId)) {
           _selectedId = null;
         }
-        _selectedId ??= environments.isNotEmpty ? environments.first.id : null;
-        final selected = environments.firstWhere(
-          (e) => e.id == _selectedId,
-          orElse: () => EnvironmentEntity(id: '__none__', name: ''),
-        );
+        final isFullscreen = context.isDialogFullscreen;
+        // Wide: auto-select first so the editor pane shows something.
+        // Narrow: start at the list page; don't auto-push to detail.
+        if (!isFullscreen) {
+          _selectedId ??= environments.isNotEmpty ? environments.first.id : null;
+        }
+        final selected = _selectedId == null
+            ? null
+            : environments.firstWhere(
+                (e) => e.id == _selectedId,
+                orElse: () => EnvironmentEntity(id: '__none__', name: ''),
+              );
 
-        return AlertDialog(
-          title: const Text('ENVIRONMENTS'),
-          content: SizedBox(
-            width: layout.dialogWidth * 2.2,
-            height: 420,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  width: 220,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'LIST',
-                              style: TextStyle(
-                                fontSize: layout.fontSizeNormal,
-                                fontWeight: context.appTypography.titleWeight,
-                                color: theme.colorScheme.onSurface,
-                              ),
-                            ),
-                          ),
-                          context.appDecoration.wrapInteractive(
-                            child: IconButton(
-                              icon: Icon(Icons.file_upload, size: layout.iconSize),
-                              tooltip: 'IMPORT FROM POSTMAN',
-                              onPressed: () => _importEnvironments(context),
-                            ),
-                          ),
-                          context.appDecoration.wrapInteractive(
-                            child: IconButton(
-                              icon: Icon(Icons.file_download, size: layout.iconSize),
-                              tooltip: 'EXPORT ALL ENVIRONMENTS',
-                              onPressed: environments.isEmpty
-                                  ? null
-                                  : () => _exportAllEnvironments(context, environments),
-                            ),
-                          ),
-                          context.appDecoration.wrapInteractive(
-                            child: IconButton(
-                              icon: Icon(Icons.add, size: layout.iconSize),
-                              tooltip: 'NEW ENVIRONMENT',
-                              onPressed: () => _createEnvironment(context),
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: layout.tabSpacing),
-                      Expanded(
-                        child: Container(
-                          decoration: context.appDecoration.panelBox(context, offset: 0),
-                          child: environments.isEmpty
-                              ? Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.all(layout.pagePadding),
-                                    child: Text(
-                                      'No environments yet.\nClick + to create one.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: layout.fontSizeNormal,
-                                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                                      ),
-                                    ),
-                                  ),
-                                )
-                              : ListView.builder(
-                                  itemCount: environments.length,
-                                  itemBuilder: (context, index) {
-                                    final env = environments[index];
-                                    final isSelected = env.id == _selectedId;
-                                    return _EnvironmentListTile(
-                                      environment: env,
-                                      isSelected: isSelected,
-                                      onTap: () => setState(() => _selectedId = env.id),
-                                      onDelete: () => _deleteEnvironment(context, env),
-                                      onExport: () => _exportEnvironment(context, env),
-                                    );
-                                  },
-                                ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(width: layout.sectionSpacing),
-                Expanded(
-                  child: environments.isEmpty || selected.id == '__none__'
-                      ? Center(
-                          child: Text(
-                            'Select or create an environment',
-                            style: TextStyle(
-                              fontSize: layout.fontSizeNormal,
-                              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                            ),
-                          ),
-                        )
-                      : _EnvironmentEditor(
-                          key: ValueKey(selected.id),
-                          environment: selected,
-                        ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('CLOSE')),
-          ],
-        );
+        if (isFullscreen) {
+          return _buildNarrow(context, environments, selected);
+        }
+        return _buildWide(context, environments, selected);
       },
+    );
+  }
+
+  Widget _buildWide(
+    BuildContext context,
+    List<EnvironmentEntity> environments,
+    EnvironmentEntity? selected,
+  ) {
+    final theme = Theme.of(context);
+    final layout = context.appLayout;
+    return AlertDialog(
+      title: const Text('ENVIRONMENTS'),
+      content: SizedBox(
+        width: layout.dialogWidth * 2.2,
+        height: 420,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: 220,
+              child: _listPane(context, environments, onItemTap: (env) => setState(() => _selectedId = env.id)),
+            ),
+            SizedBox(width: layout.sectionSpacing),
+            Expanded(
+              child: selected == null || selected.id == '__none__'
+                  ? Center(
+                      child: Text(
+                        'Select or create an environment',
+                        style: TextStyle(
+                          fontSize: layout.fontSizeNormal,
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    )
+                  : _EnvironmentEditor(key: ValueKey(selected.id), environment: selected),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('CLOSE')),
+      ],
+    );
+  }
+
+  Widget _buildNarrow(
+    BuildContext context,
+    List<EnvironmentEntity> environments,
+    EnvironmentEntity? selected,
+  ) {
+    final showDetail = selected != null && selected.id != '__none__';
+    final theme = Theme.of(context);
+
+    // Intercept system back when a detail page is open so it pops to the list
+    // rather than dismissing the whole dialog.
+    return PopScope(
+      canPop: !showDetail,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (showDetail) setState(() => _selectedId = null);
+      },
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: AppBar(
+          leading: IconButton(
+            icon: Icon(showDetail ? Icons.arrow_back : Icons.close),
+            onPressed: () {
+              if (showDetail) {
+                setState(() => _selectedId = null);
+              } else {
+                Navigator.of(context).maybePop();
+              }
+            },
+          ),
+          title: Text(showDetail ? selected.name.toUpperCase() : 'ENVIRONMENTS'),
+        ),
+        body: SafeArea(
+          child: showDetail
+              ? Padding(
+                  padding: EdgeInsets.all(context.appLayout.pagePadding),
+                  child: _EnvironmentEditor(key: ValueKey(selected.id), environment: selected),
+                )
+              : Padding(
+                  padding: EdgeInsets.all(context.appLayout.pagePadding),
+                  child: _listPane(context, environments, onItemTap: (env) => setState(() => _selectedId = env.id)),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _listPane(
+    BuildContext context,
+    List<EnvironmentEntity> environments, {
+    required ValueChanged<EnvironmentEntity> onItemTap,
+  }) {
+    final theme = Theme.of(context);
+    final layout = context.appLayout;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'LIST',
+                style: TextStyle(
+                  fontSize: layout.fontSizeNormal,
+                  fontWeight: context.appTypography.titleWeight,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ),
+            context.appDecoration.wrapInteractive(
+              child: IconButton(
+                icon: Icon(Icons.file_upload, size: layout.iconSize),
+                tooltip: 'IMPORT FROM POSTMAN',
+                onPressed: () => _importEnvironments(context),
+              ),
+            ),
+            context.appDecoration.wrapInteractive(
+              child: IconButton(
+                icon: Icon(Icons.file_download, size: layout.iconSize),
+                tooltip: 'EXPORT ALL ENVIRONMENTS',
+                onPressed: environments.isEmpty
+                    ? null
+                    : () => _exportAllEnvironments(context, environments),
+              ),
+            ),
+            context.appDecoration.wrapInteractive(
+              child: IconButton(
+                icon: Icon(Icons.add, size: layout.iconSize),
+                tooltip: 'NEW ENVIRONMENT',
+                onPressed: () => _createEnvironment(context),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: layout.tabSpacing),
+        Expanded(
+          child: Container(
+            decoration: context.appDecoration.panelBox(context, offset: 0),
+            child: environments.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(layout.pagePadding),
+                      child: Text(
+                        'No environments yet.\nClick + to create one.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: layout.fontSizeNormal,
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: environments.length,
+                    itemBuilder: (context, index) {
+                      final env = environments[index];
+                      final isSelected = env.id == _selectedId;
+                      return _EnvironmentListTile(
+                        environment: env,
+                        isSelected: isSelected,
+                        onTap: () => onItemTap(env),
+                        onDelete: () => _deleteEnvironment(context, env),
+                        onExport: () => _exportEnvironment(context, env),
+                      );
+                    },
+                  ),
+          ),
+        ),
+      ],
     );
   }
 
