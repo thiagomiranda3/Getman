@@ -578,36 +578,50 @@ class _EnvironmentEditorState extends State<_EnvironmentEditor> {
               : ListView.builder(
                   itemCount: _keyControllers.length,
                   itemBuilder: (context, index) {
+                    final keyField = TextField(
+                      controller: _keyControllers[index],
+                      decoration: const InputDecoration(hintText: 'key'),
+                      onChanged: (_) => _emit(),
+                    );
+                    final valueField = TextField(
+                      controller: _valueControllers[index],
+                      decoration: const InputDecoration(hintText: 'value'),
+                      onChanged: (_) => _emit(),
+                    );
+                    final deleteButton = IconButton(
+                      iconSize: layout.smallIconSize,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
+                      tooltip: 'Remove',
+                      onPressed: () => _removeRow(index),
+                    );
                     return Padding(
                       padding: EdgeInsets.only(bottom: layout.tabSpacing),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _keyControllers[index],
-                              decoration: const InputDecoration(hintText: 'key'),
-                              onChanged: (_) => _emit(),
+                      child: context.isPhone
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(child: keyField),
+                                    deleteButton,
+                                  ],
+                                ),
+                                SizedBox(height: layout.tabSpacing),
+                                valueField,
+                              ],
+                            )
+                          : Row(
+                              children: [
+                                Expanded(child: keyField),
+                                SizedBox(width: layout.tabSpacing),
+                                Expanded(child: valueField),
+                                SizedBox(width: layout.tabSpacing),
+                                deleteButton,
+                              ],
                             ),
-                          ),
-                          SizedBox(width: layout.tabSpacing),
-                          Expanded(
-                            child: TextField(
-                              controller: _valueControllers[index],
-                              decoration: const InputDecoration(hintText: 'value'),
-                              onChanged: (_) => _emit(),
-                            ),
-                          ),
-                          SizedBox(width: layout.tabSpacing),
-                          IconButton(
-                            iconSize: layout.smallIconSize,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
-                            tooltip: 'Remove',
-                            onPressed: () => _removeRow(index),
-                          ),
-                        ],
-                      ),
                     );
                   },
                 ),

@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/utils/equality.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
@@ -405,54 +406,78 @@ class _KeyValueRowState extends State<_KeyValueRow> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isPhone = context.isPhone;
+    final fieldPadding = EdgeInsets.all(widget.layout.isCompact ? 8 : 12);
+    final textStyle = TextStyle(fontSize: widget.layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight);
+
+    final keyField = TextField(
+      style: textStyle,
+      decoration: InputDecoration(
+        hintText: 'KEY',
+        isDense: true,
+        contentPadding: fieldPadding,
+      ),
+      controller: widget.keyController,
+      onChanged: widget.onKeyChanged,
+    );
+    final valueField = TextField(
+      style: textStyle,
+      decoration: InputDecoration(
+        hintText: 'VALUE',
+        isDense: true,
+        contentPadding: fieldPadding,
+      ),
+      controller: widget.valController,
+      onChanged: widget.onValChanged,
+    );
+    final deleteButton = context.appDecoration.wrapInteractive(
+      child: IconButton(
+        icon: Icon(Icons.delete_outline, size: widget.layout.isCompact ? 20 : 24, color: Theme.of(context).colorScheme.error),
+        onPressed: widget.onDelete,
+      ),
+    );
+
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         margin: EdgeInsets.only(bottom: widget.layout.isCompact ? 8.0 : 12.0),
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        padding: EdgeInsets.symmetric(horizontal: isPhone ? 8 : 4, vertical: isPhone ? 8 : 2),
         decoration: BoxDecoration(
-          color: _isHovered ? theme.hoverColor : Colors.transparent,
+          color: _isHovered ? theme.hoverColor : (isPhone ? theme.colorScheme.surface : Colors.transparent),
           borderRadius: BorderRadius.circular(context.appShape.panelRadius),
-          border: Border.all(color: _isHovered ? theme.dividerColor.withValues(alpha: 0.5) : Colors.transparent),
+          border: Border.all(
+            color: isPhone
+                ? theme.dividerColor.withValues(alpha: 0.6)
+                : (_isHovered ? theme.dividerColor.withValues(alpha: 0.5) : Colors.transparent),
+            width: widget.layout.borderThin,
+          ),
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                style: TextStyle(fontSize: widget.layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
-                decoration: InputDecoration(
-                  hintText: 'KEY',
-                  isDense: true,
-                  contentPadding: EdgeInsets.all(widget.layout.isCompact ? 8 : 12),
-                ),
-                controller: widget.keyController,
-                onChanged: widget.onKeyChanged,
+        child: isPhone
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: keyField),
+                      deleteButton,
+                    ],
+                  ),
+                  SizedBox(height: widget.layout.tabSpacing),
+                  valueField,
+                ],
+              )
+            : Row(
+                children: [
+                  Expanded(child: keyField),
+                  SizedBox(width: widget.layout.isCompact ? 8 : 12),
+                  Expanded(child: valueField),
+                  SizedBox(width: widget.layout.isCompact ? 4 : 8),
+                  deleteButton,
+                ],
               ),
-            ),
-            SizedBox(width: widget.layout.isCompact ? 8 : 12),
-            Expanded(
-              child: TextField(
-                style: TextStyle(fontSize: widget.layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
-                decoration: InputDecoration(
-                  hintText: 'VALUE',
-                  isDense: true,
-                  contentPadding: EdgeInsets.all(widget.layout.isCompact ? 8 : 12),
-                ),
-                controller: widget.valController,
-                onChanged: widget.onValChanged,
-              ),
-            ),
-            SizedBox(width: widget.layout.isCompact ? 4 : 8),
-            context.appDecoration.wrapInteractive(
-              child: IconButton(
-                icon: Icon(Icons.delete_outline, size: widget.layout.isCompact ? 20 : 24, color: Theme.of(context).colorScheme.error),
-                onPressed: widget.onDelete,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
