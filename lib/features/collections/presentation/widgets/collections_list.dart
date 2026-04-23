@@ -24,19 +24,32 @@ class _CollectionsListState extends State<CollectionsList> {
   @override
   void initState() {
     super.initState();
-    final collections = context.read<CollectionsBloc>().state.collections;
     _treeController = TreeController<CollectionNodeEntity>(
-      roots: collections,
+      roots: const [],
       childrenProvider: (node) => node.children,
     );
-    _searchController.addListener(() => setState(() {}));
+    _rebuildTree();
+    _searchController.addListener(_rebuildTree);
   }
 
   @override
   void dispose() {
+    _searchController.removeListener(_rebuildTree);
     _treeController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Recompute the tree roots from the current collections state + search
+  /// query, and expand everything while searching. Called outside of `build`
+  /// to avoid mutating the controller during paint.
+  void _rebuildTree() {
+    final collections = context.read<CollectionsBloc>().state.collections;
+    final query = _searchController.text;
+    _treeController.roots = _filterNodes(collections, query);
+    if (query.isNotEmpty) {
+      _treeController.expandAll();
+    }
   }
 
   List<CollectionNodeEntity> _filterNodes(List<CollectionNodeEntity> nodes, String query) {
@@ -60,55 +73,46 @@ class _CollectionsListState extends State<CollectionsList> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<AppLayout>()!;
+    final layout = context.appLayout;
 
-    return BlocBuilder<CollectionsBloc, CollectionsState>(
-      builder: (context, state) {
-        final collections = state.collections;
-        final query = _searchController.text;
-
-        final filteredRoots = _filterNodes(collections, query);
-        _treeController.roots = filteredRoots;
-        if (query.isNotEmpty) {
-           _treeController.expandAll();
-        }
-
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'SEARCH COLLECTIONS...',
-                  hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: context.appTypography.displayWeight, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
-                  prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(context.appShape.panelRadius), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  isDense: true,
-                ),
-                style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
+    return BlocListener<CollectionsBloc, CollectionsState>(
+      listenWhen: (prev, next) => prev.collections != next.collections,
+      listener: (_, _) => _rebuildTree(),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'SEARCH COLLECTIONS...',
+                hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: context.appTypography.displayWeight, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+                prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(context.appShape.panelRadius), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                isDense: true,
               ),
+              style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
             ),
-            Expanded(
-              child: DragTarget<String>(
-                onAcceptWithDetails: (details) => context.read<CollectionsBloc>().add(MoveNode(details.data, null)),
-                builder: (context, candidateData, rejectedData) {
-                  return AnimatedTreeView<CollectionNodeEntity>(
-                    treeController: _treeController,
-                    nodeBuilder: (context, entry) {
-                      return _CollectionNodeWidget(
-                        entry: entry,
-                        onToggle: () => _treeController.toggleExpansion(entry.node),
-                      );
-                    },
-                  );
-                },
-              ),
+          ),
+          Expanded(
+            child: DragTarget<String>(
+              onAcceptWithDetails: (details) => context.read<CollectionsBloc>().add(MoveNode(details.data, null)),
+              builder: (context, candidateData, rejectedData) {
+                return AnimatedTreeView<CollectionNodeEntity>(
+                  treeController: _treeController,
+                  nodeBuilder: (context, entry) {
+                    return _CollectionNodeWidget(
+                      entry: entry,
+                      onToggle: () => _treeController.toggleExpansion(entry.node),
+                    );
+                  },
+                );
+              },
             ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
 }

@@ -107,11 +107,20 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
     final nodeToMove = CollectionsTreeHelper.findNode(state.collections, event.nodeId);
     if (nodeToMove == null) return;
 
+    // Reject moves into the node's own subtree — otherwise removeFromTree
+    // strips the destination alongside the source and addToParent silently
+    // falls through, orphaning the whole subtree.
+    final newParentId = event.newParentId;
+    if (newParentId != null &&
+        CollectionsTreeHelper.isDescendantOrSelf(state.collections, event.nodeId, newParentId)) {
+      return;
+    }
+
     var newCollections = CollectionsTreeHelper.removeFromTree(state.collections, event.nodeId);
-    if (event.newParentId == null) {
+    if (newParentId == null) {
       newCollections = [...newCollections, nodeToMove];
     } else {
-      newCollections = CollectionsTreeHelper.addToParent(newCollections, event.newParentId!, nodeToMove);
+      newCollections = CollectionsTreeHelper.addToParent(newCollections, newParentId, nodeToMove);
     }
 
     final sorted = CollectionsTreeHelper.sort(newCollections);

@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/utils/json_utils.dart';
+import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
@@ -19,18 +20,18 @@ class RequestConfigSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<AppLayout>()!;
+    final layout = context.appLayout;
 
     return BlocBuilder<TabsBloc, TabsState>(
       buildWhen: (prev, next) {
-        final p = prev.tabs.firstWhereOrNull((t) => t.tabId == tabId);
-        final n = next.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+        final p = prev.tabs.byId(tabId);
+        final n = next.tabs.byId(tabId);
         if (p == null || n == null) return true;
         return !_headerMapEquality.equals(p.config.params, n.config.params) ||
             !_headerMapEquality.equals(p.config.headers, n.config.headers);
       },
       builder: (context, state) {
-        final tab = state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+        final tab = state.tabs.byId(tabId);
         if (tab == null) return const SizedBox.shrink();
 
         return DefaultTabController(
@@ -66,7 +67,7 @@ class RequestConfigSection extends StatelessWidget {
                       _KeyValueEditor(
                         items: tab.config.params,
                         onChanged: (map) {
-                          final current = context.read<TabsBloc>().state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+                          final current = context.read<TabsBloc>().state.tabs.byId(tabId);
                           if (current == null) return;
                           context.read<TabsBloc>().add(UpdateTab(
                             current.copyWith(config: current.config.copyWith(params: map)),
@@ -76,7 +77,7 @@ class RequestConfigSection extends StatelessWidget {
                       _KeyValueEditor(
                         items: tab.config.headers,
                         onChanged: (map) {
-                          final current = context.read<TabsBloc>().state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+                          final current = context.read<TabsBloc>().state.tabs.byId(tabId);
                           if (current == null) return;
                           context.read<TabsBloc>().add(UpdateTab(
                             current.copyWith(config: current.config.copyWith(headers: map)),
@@ -96,7 +97,7 @@ class RequestConfigSection extends StatelessWidget {
   }
 
   Widget _buildBodyEditor(BuildContext context, ThemeData theme) {
-    final layout = theme.extension<AppLayout>()!;
+    final layout = context.appLayout;
 
     return Stack(
       children: [
@@ -205,7 +206,7 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final layout = Theme.of(context).extension<AppLayout>()!;
+    final layout = context.appLayout;
 
     return ListView.builder(
       itemCount: _keyControllers.length,

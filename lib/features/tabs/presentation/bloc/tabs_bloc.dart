@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
@@ -23,11 +22,17 @@ class _RequestManager {
 
   void finish(String tabId) => _handles.remove(tabId);
 
-  void cancel(String tabId) {
+  void cancel(String tabId, {String reason = 'User cancelled request'}) {
     final handle = _handles[tabId];
     if (handle != null && !handle.isCancelled) {
-      handle.cancel('User cancelled request');
+      handle.cancel(reason);
     }
+  }
+
+  /// Cancel the in-flight request (if any) and drop the handle.
+  void cancelAndFinish(String tabId) {
+    cancel(tabId);
+    finish(tabId);
   }
 
   void cancelAll() {
@@ -137,8 +142,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   void _onRemoveTab(RemoveTab event, Emitter<TabsState> emit) {
     final index = state.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index == -1) return;
-    _requests.cancel(event.tabId);
-    _requests.finish(event.tabId);
+    _requests.cancelAndFinish(event.tabId);
 
     final newTabs = [...state.tabs]..removeAt(index);
     int newActiveIndex = state.activeIndex;
@@ -190,7 +194,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
 
   void _onCloseOtherTabs(CloseOtherTabs event, Emitter<TabsState> emit) {
     if (state.tabs.length <= 1) return;
-    final tabToKeep = state.tabs.firstWhereOrNull((t) => t.tabId == event.tabId);
+    final tabToKeep = state.tabs.byId(event.tabId);
     if (tabToKeep == null) return;
     emit(state.copyWith(
       tabs: [tabToKeep],
@@ -245,41 +249,50 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     if (activeIndex < 0 || activeIndex >= state.tabs.length) return;
 
     final activeTab = state.tabs[activeIndex];
+    final tabId = activeTab.tabId;
     final config = activeTab.config;
-    final handle = _requests.start(activeTab.tabId);
+    final handle = _requests.start(tabId);
 
-    final sendingTab = activeTab.copyWith(isSending: true);
-    emit(state.copyWith(tabs: _replaceTabById(state.tabs, sendingTab)));
+    emit(state.copyWith(tabs: _replaceTabById(state.tabs, activeTab.copyWith(isSending: true))));
 
     try {
       final response = await sendRequestUseCase(config: config, cancelHandle: handle);
-      _requests.finish(activeTab.tabId);
-
-      final updatedTab = sendingTab.copyWith(
+      _requests.finish(tabId);
+      _applyToTab(emit, tabId, (live) => live.copyWith(
         isSending: false,
         statusCode: response.statusCode,
         durationMs: response.durationMs,
         responseBody: response.body,
         responseHeaders: response.headers,
-      );
-      emit(state.copyWith(tabs: _replaceTabById(state.tabs, updatedTab)));
+      ));
     } on NetworkFailure catch (f) {
-      _requests.finish(activeTab.tabId);
+      _requests.finish(tabId);
 
       if (f.type == NetworkFailureType.cancelled) {
-        emit(state.copyWith(tabs: _replaceTabById(state.tabs, activeTab.copyWith(isSending: false))));
+        _applyToTab(emit, tabId, (live) => live.copyWith(isSending: false));
         return;
       }
 
-      final updatedTab = activeTab.copyWith(
+      _applyToTab(emit, tabId, (live) => live.copyWith(
         isSending: false,
         statusCode: f.statusCode ?? 0,
         durationMs: 0,
         responseBody: f.message,
-        responseHeaders: const {},
-      );
-      emit(state.copyWith(tabs: _replaceTabById(state.tabs, updatedTab)));
+        responseHeaders: const <String, String>{},
+      ));
     }
+  }
+
+  /// Resolve [tabId] against the latest state and emit a new state with the
+  /// transformed tab. No-op if the tab has been closed while the request ran.
+  void _applyToTab(
+    Emitter<TabsState> emit,
+    String tabId,
+    HttpRequestTabEntity Function(HttpRequestTabEntity live) transform,
+  ) {
+    final live = state.tabs.byId(tabId);
+    if (live == null) return;
+    emit(state.copyWith(tabs: _replaceTabById(state.tabs, transform(live))));
   }
 
   List<HttpRequestTabEntity> _replaceTabById(List<HttpRequestTabEntity> tabs, HttpRequestTabEntity replacement) {

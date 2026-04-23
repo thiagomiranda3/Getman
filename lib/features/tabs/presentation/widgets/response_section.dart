@@ -5,6 +5,7 @@ import 'package:re_editor/re_editor.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/utils/json_utils.dart';
+import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart';
@@ -19,19 +20,19 @@ class ResponseSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<AppLayout>()!;
+    final layout = context.appLayout;
 
     return BlocBuilder<TabsBloc, TabsState>(
       buildWhen: (prev, next) {
-        final p = prev.tabs.firstWhereOrNull((t) => t.tabId == tabId);
-        final n = next.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+        final p = prev.tabs.byId(tabId);
+        final n = next.tabs.byId(tabId);
         if (p == null || n == null) return true;
         return p.isSending != n.isSending ||
             p.statusCode != n.statusCode ||
             p.durationMs != n.durationMs;
       },
       builder: (context, state) {
-        final tab = state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+        final tab = state.tabs.byId(tabId);
         if (tab == null) return const SizedBox.shrink();
 
         if (tab.isSending) {
@@ -151,7 +152,7 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
   @override
   void initState() {
     super.initState();
-    final tab = context.read<TabsBloc>().state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+    final tab = context.read<TabsBloc>().state.tabs.byId(widget.tabId);
     _syncBody(tab?.responseBody);
   }
 
@@ -167,12 +168,12 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
   Widget build(BuildContext context) {
     return BlocListener<TabsBloc, TabsState>(
       listenWhen: (prev, next) {
-        final prevTab = prev.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
-        final nextTab = next.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+        final prevTab = prev.tabs.byId(widget.tabId);
+        final nextTab = next.tabs.byId(widget.tabId);
         return prevTab?.responseBody != nextTab?.responseBody;
       },
       listener: (context, state) {
-        final tab = state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+        final tab = state.tabs.byId(widget.tabId);
         _syncBody(tab?.responseBody);
       },
       child: SizedBox(
@@ -189,17 +190,17 @@ class _ResponseHeadersView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final layout = Theme.of(context).extension<AppLayout>()!;
+    final layout = context.appLayout;
     final theme = Theme.of(context);
 
     return BlocBuilder<TabsBloc, TabsState>(
       buildWhen: (prev, next) {
-        final p = prev.tabs.firstWhereOrNull((t) => t.tabId == tabId);
-        final n = next.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+        final p = prev.tabs.byId(tabId);
+        final n = next.tabs.byId(tabId);
         return !_headerMapEquality.equals(p?.responseHeaders, n?.responseHeaders);
       },
       builder: (context, state) {
-        final tab = state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+        final tab = state.tabs.byId(tabId);
         final headers = tab?.responseHeaders;
         if (headers == null) return const SizedBox();
 

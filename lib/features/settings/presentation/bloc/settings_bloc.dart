@@ -11,61 +11,22 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     required this.saveSettingsUseCase,
     SettingsEntity? initialSettings,
   }) : super(SettingsState(settings: initialSettings ?? const SettingsEntity())) {
-    on<UpdateDarkMode>(_onUpdateDarkMode);
-    on<UpdateCompactMode>(_onUpdateCompactMode);
-    on<UpdateVerticalLayout>(_onUpdateVerticalLayout);
-    on<UpdateHistoryLimit>(_onUpdateHistoryLimit);
-    on<UpdateSaveResponseInHistory>(_onUpdateSaveResponseInHistory);
-    on<UpdateSplitRatio>(_onUpdateSplitRatio);
-    on<UpdateSideMenuWidth>(_onUpdateSideMenuWidth);
-    on<UpdateThemeId>(_onUpdateThemeId);
+    on<UpdateDarkMode>((e, emit) => _apply(emit, (s) => s.copyWith(isDarkMode: e.isDarkMode)));
+    on<UpdateCompactMode>((e, emit) => _apply(emit, (s) => s.copyWith(isCompactMode: e.isCompactMode)));
+    on<UpdateVerticalLayout>((e, emit) => _apply(emit, (s) => s.copyWith(isVerticalLayout: e.isVerticalLayout)));
+    on<UpdateHistoryLimit>((e, emit) => _apply(emit, (s) => s.copyWith(historyLimit: e.historyLimit)));
+    on<UpdateSaveResponseInHistory>((e, emit) => _apply(emit, (s) => s.copyWith(saveResponseInHistory: e.save)));
+    on<UpdateSplitRatio>((e, emit) => _apply(emit, (s) => s.copyWith(splitRatio: e.ratio)));
+    on<UpdateSideMenuWidth>((e, emit) => _apply(emit, (s) => s.copyWith(sideMenuWidth: e.width)));
+    on<UpdateThemeId>((e, emit) => _apply(emit, (s) => s.copyWith(themeId: e.themeId)));
   }
 
-  Future<void> _onUpdateDarkMode(UpdateDarkMode event, Emitter<SettingsState> emit) async {
-    final newSettings = state.settings.copyWith(isDarkMode: event.isDarkMode);
-    await saveSettingsUseCase(newSettings);
-    emit(state.copyWith(settings: newSettings));
-  }
-
-  Future<void> _onUpdateCompactMode(UpdateCompactMode event, Emitter<SettingsState> emit) async {
-    final newSettings = state.settings.copyWith(isCompactMode: event.isCompactMode);
-    await saveSettingsUseCase(newSettings);
-    emit(state.copyWith(settings: newSettings));
-  }
-
-  Future<void> _onUpdateVerticalLayout(UpdateVerticalLayout event, Emitter<SettingsState> emit) async {
-    final newSettings = state.settings.copyWith(isVerticalLayout: event.isVerticalLayout);
-    await saveSettingsUseCase(newSettings);
-    emit(state.copyWith(settings: newSettings));
-  }
-
-  Future<void> _onUpdateHistoryLimit(UpdateHistoryLimit event, Emitter<SettingsState> emit) async {
-    final newSettings = state.settings.copyWith(historyLimit: event.historyLimit);
-    await saveSettingsUseCase(newSettings);
-    emit(state.copyWith(settings: newSettings));
-  }
-
-  Future<void> _onUpdateSaveResponseInHistory(UpdateSaveResponseInHistory event, Emitter<SettingsState> emit) async {
-    final newSettings = state.settings.copyWith(saveResponseInHistory: event.save);
-    await saveSettingsUseCase(newSettings);
-    emit(state.copyWith(settings: newSettings));
-  }
-
-  Future<void> _onUpdateSplitRatio(UpdateSplitRatio event, Emitter<SettingsState> emit) async {
-    final newSettings = state.settings.copyWith(splitRatio: event.ratio);
-    await saveSettingsUseCase(newSettings);
-    emit(state.copyWith(settings: newSettings));
-  }
-
-  Future<void> _onUpdateSideMenuWidth(UpdateSideMenuWidth event, Emitter<SettingsState> emit) async {
-    final newSettings = state.settings.copyWith(sideMenuWidth: event.width);
-    await saveSettingsUseCase(newSettings);
-    emit(state.copyWith(settings: newSettings));
-  }
-
-  Future<void> _onUpdateThemeId(UpdateThemeId event, Emitter<SettingsState> emit) async {
-    final newSettings = state.settings.copyWith(themeId: event.themeId);
-    await saveSettingsUseCase(newSettings);
-    emit(state.copyWith(settings: newSettings));
+  Future<void> _apply(
+    Emitter<SettingsState> emit,
+    SettingsEntity Function(SettingsEntity current) update,
+  ) async {
+    final next = update(state.settings);
+    await saveSettingsUseCase(next);
+    emit(state.copyWith(settings: next));
   }
 }

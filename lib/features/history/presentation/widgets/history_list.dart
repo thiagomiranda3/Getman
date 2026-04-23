@@ -16,14 +16,11 @@ class HistoryList extends StatefulWidget {
 }
 
 class _HistoryListState extends State<HistoryList> {
-  final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
-  late List<HttpRequestConfigEntity> _items;
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _items = List.from(context.read<HistoryBloc>().state.history);
     _searchController.addListener(() => setState(() {}));
   }
 
@@ -36,129 +33,68 @@ class _HistoryListState extends State<HistoryList> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<AppLayout>()!;
+    final layout = context.appLayout;
 
     return BlocBuilder<HistoryBloc, HistoryState>(
       builder: (context, state) {
-        return BlocListener<HistoryBloc, HistoryState>(
-          listener: (context, state) {
-            final next = state.history;
-            if (_items.isEmpty && next.isNotEmpty) {
-              setState(() {
-                _items = List.from(next);
-              });
-              return;
-            }
-
-            if (next.length > _items.length) {
-              final diff = next.length - _items.length;
-              for (int i = 0; i < diff; i++) {
-                _items.insert(i, next[i]);
-                _listKey.currentState?.insertItem(i, duration: const Duration(milliseconds: 400));
-              }
-            } else if (next.length < _items.length) {
-              if (next.isEmpty) {
-                for (int i = _items.length - 1; i >= 0; i--) {
-                  final removedItem = _items[i];
-                  _listKey.currentState?.removeItem(
-                    i,
-                    (context, animation) => _buildHistoryItem(removedItem, animation, isRemoved: true),
-                    duration: const Duration(milliseconds: 300)
-                  );
-                }
-                _items.clear();
-                setState(() {});
-              } else {
-                setState(() {
-                  _items = List.from(next);
-                });
-              }
-            }
-          },
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'SEARCH HISTORY...',
-                    hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: context.appTypography.displayWeight, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
-                    prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(context.appShape.panelRadius), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    isDense: true,
-                  ),
-                  style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'SEARCH HISTORY...',
+                  hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: context.appTypography.displayWeight, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+                  prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(context.appShape.panelRadius), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  isDense: true,
                 ),
+                style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
               ),
-              Expanded(
-                child: state.isLoading && _items.isEmpty
+            ),
+            Expanded(
+              child: state.isLoading && state.history.isEmpty
                   ? const Center(child: CircularProgressIndicator())
-                  : _buildList(),
-              ),
-            ],
-          ),
+                  : _buildList(context, state.history),
+            ),
+          ],
         );
       },
     );
   }
 
-  Widget _buildList() {
+  Widget _buildList(BuildContext context, List<HttpRequestConfigEntity> history) {
     final query = _searchController.text.toLowerCase();
-    final filteredItems = query.isEmpty
-      ? _items
-      : _items.where((item) =>
-          item.url.toLowerCase().contains(query) ||
-          (item.statusCode?.toString().contains(query) ?? false) ||
-          item.method.toLowerCase().contains(query)
-        ).toList();
+    final items = query.isEmpty
+        ? history
+        : history.where((item) =>
+            item.url.toLowerCase().contains(query) ||
+            (item.statusCode?.toString().contains(query) ?? false) ||
+            item.method.toLowerCase().contains(query)
+          ).toList();
 
-    if (filteredItems.isEmpty) {
+    if (items.isEmpty) {
       return Center(
         child: Text('NO RESULTS FOUND', style: TextStyle(
           fontSize: context.appLayout.fontSizeNormal,
           fontWeight: context.appTypography.displayWeight,
-          color: Theme.of(context).dividerColor.withValues(alpha: 0.5)
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
         )),
       );
     }
 
-    if (query.isNotEmpty) {
-       return ListView.builder(
-         itemCount: filteredItems.length,
-         itemBuilder: (context, index) {
-            return _HistoryItemWidget(
-              config: filteredItems[index],
-              onTap: () {
-                context.read<TabsBloc>().add(AddTab(config: filteredItems[index].copyWith()));
-              },
-            );
-         },
-       );
-    }
-
-    return AnimatedList(
-      key: _listKey,
-      initialItemCount: _items.length,
-      itemBuilder: (context, index, animation) {
-        return _buildHistoryItem(_items[index], animation);
-      },
-    );
-  }
-
-  Widget _buildHistoryItem(HttpRequestConfigEntity config, Animation<double> animation, {bool isRemoved = false}) {
-    return SizeTransition(
-      sizeFactor: animation,
-      child: FadeTransition(
-        opacity: animation,
-        child: _HistoryItemWidget(
+    return ListView.builder(
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final config = items[index];
+        return _HistoryItemWidget(
+          key: ValueKey(config.id),
           config: config,
-          onTap: isRemoved ? () {} : () {
-            context.read<TabsBloc>().add(AddTab(config: config.copyWith()));
-          },
-        ),
-      ),
+          onTap: () => context.read<TabsBloc>().add(AddTab(config: config.copyWith())),
+        );
+      },
     );
   }
 }
@@ -166,7 +102,7 @@ class _HistoryListState extends State<HistoryList> {
 class _HistoryItemWidget extends StatefulWidget {
   final HttpRequestConfigEntity config;
   final VoidCallback onTap;
-  const _HistoryItemWidget({required this.config, required this.onTap});
+  const _HistoryItemWidget({super.key, required this.config, required this.onTap});
 
   @override
   State<_HistoryItemWidget> createState() => _HistoryItemWidgetState();
@@ -178,7 +114,7 @@ class _HistoryItemWidgetState extends State<_HistoryItemWidget> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<AppLayout>()!;
+    final layout = context.appLayout;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),

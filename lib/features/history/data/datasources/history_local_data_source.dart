@@ -37,14 +37,9 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
   Future<void> addToHistory(HttpRequestConfig config, int limit) async {
     try {
       final box = _box();
-      final history = box.values.toList();
-
-      final existingIndex = history.indexWhere((item) =>
-        item.method == config.method &&
-        item.url == config.url &&
-        item.body == config.body
-      );
-
+      // HttpRequestConfig.== treats same-signature requests as equal (see
+      // request_config_model.dart), which is the contract this dedup relies on.
+      final existingIndex = box.values.toList().indexOf(config);
       if (existingIndex != -1) {
         await box.deleteAt(existingIndex);
       }

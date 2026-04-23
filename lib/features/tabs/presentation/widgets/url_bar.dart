@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -44,7 +43,7 @@ class _UrlBarState extends State<UrlBar> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final tab = context.read<TabsBloc>().state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+    final tab = context.read<TabsBloc>().state.tabs.byId(widget.tabId);
     if (tab != null) {
       _setControllerPreservingEnd(_urlController, tab.config.url);
     }
@@ -60,31 +59,31 @@ class _UrlBarState extends State<UrlBar> {
   Widget build(BuildContext context) {
     return BlocConsumer<TabsBloc, TabsState>(
       listenWhen: (prev, next) {
-        final p = prev.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
-        final n = next.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+        final p = prev.tabs.byId(widget.tabId);
+        final n = next.tabs.byId(widget.tabId);
         return p?.config.url != n?.config.url;
       },
       listener: (context, state) {
-        final tab = state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+        final tab = state.tabs.byId(widget.tabId);
         if (tab == null) return;
         _setControllerPreservingEnd(_urlController, tab.config.url);
       },
       buildWhen: (prev, next) {
-        final p = prev.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
-        final n = next.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+        final p = prev.tabs.byId(widget.tabId);
+        final n = next.tabs.byId(widget.tabId);
         if (p == null || n == null) return true;
         return p.config.method != n.config.method ||
             p.isSending != n.isSending ||
             p.collectionNodeId != n.collectionNodeId;
       },
       builder: (context, state) {
-        final tab = state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+        final tab = state.tabs.byId(widget.tabId);
         if (tab == null) return const SizedBox.shrink();
 
         return BlocBuilder<SettingsBloc, SettingsState>(
           builder: (context, settingsState) {
             final settings = settingsState.settings;
-            final layout = Theme.of(context).extension<AppLayout>()!;
+            final layout = context.appLayout;
             final theme = Theme.of(context);
 
             return Container(
@@ -244,7 +243,7 @@ class _UrlBarState extends State<UrlBar> {
 
   Future<void> _prettifyAndUpdateBody(TabsBloc tabsBloc, String tabId, String rawBody) async {
     final prettified = await JsonUtils.prettify(rawBody);
-    final latestTab = tabsBloc.state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+    final latestTab = tabsBloc.state.tabs.byId(tabId);
     if (latestTab == null) return;
     if (latestTab.config.body == prettified) return;
     tabsBloc.add(UpdateTab(

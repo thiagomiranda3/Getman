@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -70,11 +69,11 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<AppLayout>()!;
+    final layout = context.appLayout;
 
     return BlocBuilder<TabsBloc, TabsState>(
       builder: (context, state) {
-        final tab = state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+        final tab = state.tabs.byId(widget.tabId);
         if (tab == null) return const SizedBox.shrink();
 
         final dirtyChecker = context.read<TabDirtyChecker>();
@@ -160,7 +159,7 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
 
   void _showContextMenu(BuildContext context, Offset position, HttpRequestTabEntity tab) {
     final theme = Theme.of(context);
-    final layout = theme.extension<AppLayout>()!;
+    final layout = context.appLayout;
     final tabsBloc = context.read<TabsBloc>();
 
     showMenu(

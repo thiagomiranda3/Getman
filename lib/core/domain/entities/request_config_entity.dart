@@ -1,5 +1,8 @@
 import 'package:equatable/equatable.dart';
 
+// Sentinel used by copyWith to distinguish "not provided" from "explicitly null".
+const Object _unset = Object();
+
 class HttpRequestConfigEntity extends Equatable {
   final String id;
   final String method;
@@ -37,10 +40,10 @@ class HttpRequestConfigEntity extends Equatable {
     Map<String, String>? params,
     String? body,
     Map<String, String>? auth,
-    String? responseBody,
-    Map<String, String>? responseHeaders,
-    int? statusCode,
-    int? durationMs,
+    Object? responseBody = _unset,
+    Object? responseHeaders = _unset,
+    Object? statusCode = _unset,
+    Object? durationMs = _unset,
   }) {
     return HttpRequestConfigEntity(
       id: id,
@@ -50,10 +53,12 @@ class HttpRequestConfigEntity extends Equatable {
       params: params ?? Map.from(this.params),
       body: body ?? this.body,
       auth: auth ?? Map.from(this.auth),
-      responseBody: responseBody ?? this.responseBody,
-      responseHeaders: responseHeaders ?? this.responseHeaders,
-      statusCode: statusCode ?? this.statusCode,
-      durationMs: durationMs ?? this.durationMs,
+      responseBody: identical(responseBody, _unset) ? this.responseBody : responseBody as String?,
+      responseHeaders: identical(responseHeaders, _unset)
+          ? this.responseHeaders
+          : responseHeaders as Map<String, String>?,
+      statusCode: identical(statusCode, _unset) ? this.statusCode : statusCode as int?,
+      durationMs: identical(durationMs, _unset) ? this.durationMs : durationMs as int?,
     );
   }
 

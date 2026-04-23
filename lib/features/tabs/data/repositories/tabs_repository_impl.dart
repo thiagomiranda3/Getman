@@ -1,8 +1,7 @@
-import '../../../../core/error/exceptions.dart';
-import '../../../../core/error/failures.dart';
+import '../../../../core/domain/entities/request_config_entity.dart';
+import '../../../../core/error/guard.dart';
 import '../../../../core/network/http_response.dart';
 import '../../../../core/network/network_service.dart';
-import '../../../../core/domain/entities/request_config_entity.dart';
 import '../../domain/entities/request_tab_entity.dart';
 import '../../domain/repositories/tabs_repository.dart';
 import '../datasources/tabs_local_data_source.dart';
@@ -18,24 +17,16 @@ class TabsRepositoryImpl implements TabsRepository {
   });
 
   @override
-  Future<List<HttpRequestTabEntity>> getTabs() async {
-    try {
-      final models = await localDataSource.getTabs();
-      return models.map((m) => m.toEntity()).toList();
-    } on PersistenceException catch (e) {
-      throw PersistenceFailure(e.message);
-    }
-  }
+  Future<List<HttpRequestTabEntity>> getTabs() => guardPersistence(() async {
+    final models = await localDataSource.getTabs();
+    return models.map((m) => m.toEntity()).toList();
+  });
 
   @override
-  Future<void> saveTabs(List<HttpRequestTabEntity> tabs) async {
-    try {
-      final models = tabs.map((e) => HttpRequestTabModel.fromEntity(e)).toList();
-      await localDataSource.saveTabs(models);
-    } on PersistenceException catch (e) {
-      throw PersistenceFailure(e.message);
-    }
-  }
+  Future<void> saveTabs(List<HttpRequestTabEntity> tabs) => guardPersistence(() async {
+    final models = tabs.map((e) => HttpRequestTabModel.fromEntity(e)).toList();
+    await localDataSource.saveTabs(models);
+  });
 
   @override
   Future<HttpResponseEntity> sendRequest(

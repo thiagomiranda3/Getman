@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:collection/collection.dart';
 import 'package:getman/core/navigation/intents.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
@@ -44,7 +43,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   bool _isTabDirty(BuildContext context, String tabId) {
-    final tab = context.read<TabsBloc>().state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+    final tab = context.read<TabsBloc>().state.tabs.byId(tabId);
     if (tab == null) return false;
     return context.read<TabDirtyChecker>()(
       tab: tab,
@@ -54,7 +53,7 @@ class _MainScreenState extends State<MainScreen> {
 
   void _confirmClose(BuildContext context, String tabId) {
     final tabsBloc = context.read<TabsBloc>();
-    final tab = tabsBloc.state.tabs.firstWhereOrNull((t) => t.tabId == tabId);
+    final tab = tabsBloc.state.tabs.byId(tabId);
     if (tab == null) return;
 
     final isDirty = _isTabDirty(context, tabId);
@@ -219,7 +218,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildTabBar(BuildContext context, int activeIndex, List<HttpRequestTabEntity> tabs) {
     final theme = Theme.of(context);
-    final layout = Theme.of(context).extension<AppLayout>()!;
+    final layout = context.appLayout;
 
     return Container(
       height: layout.tabBarHeight,

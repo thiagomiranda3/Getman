@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import '../../../../core/theme/theme_ids.dart';
 import '../../domain/entities/settings_entity.dart';
 
 part 'settings_model.g.dart';
@@ -26,7 +27,7 @@ class SettingsModel extends HiveObject {
   @HiveField(6, defaultValue: 300.0)
   double sideMenuWidth;
 
-  @HiveField(7, defaultValue: 'brutalist')
+  @HiveField(7, defaultValue: kBrutalistThemeId)
   String themeId;
 
   SettingsModel({
@@ -37,7 +38,7 @@ class SettingsModel extends HiveObject {
     this.isVerticalLayout = false,
     this.splitRatio = 0.5,
     this.sideMenuWidth = 300.0,
-    this.themeId = 'brutalist',
+    this.themeId = kBrutalistThemeId,
   });
 
   SettingsModel copyWith({
@@ -81,7 +82,7 @@ class SettingsModel extends HiveObject {
     isVerticalLayout: json['isVerticalLayout'] ?? false,
     splitRatio: json['splitRatio'] ?? 0.5,
     sideMenuWidth: (json['sideMenuWidth'] ?? 300.0).toDouble(),
-    themeId: json['themeId'] ?? 'brutalist',
+    themeId: json['themeId'] ?? kBrutalistThemeId,
   );
 
   factory SettingsModel.fromEntity(SettingsEntity entity) => SettingsModel(

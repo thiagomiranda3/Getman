@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:re_editor/re_editor.dart';
@@ -50,7 +49,7 @@ class _RequestViewState extends State<RequestView> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final tab = context.read<TabsBloc>().state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+    final tab = context.read<TabsBloc>().state.tabs.byId(widget.tabId);
     if (tab != null && _bodyController.text != tab.config.body) {
       _bodyController.text = tab.config.body;
     }
@@ -58,7 +57,7 @@ class _RequestViewState extends State<RequestView> {
 
   void _onBodyChanged() {
     final tabsBloc = context.read<TabsBloc>();
-    final tab = tabsBloc.state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+    final tab = tabsBloc.state.tabs.byId(widget.tabId);
     if (tab == null) return;
     final newText = _bodyController.text;
     if (tab.config.body == newText) return;
@@ -81,16 +80,16 @@ class _RequestViewState extends State<RequestView> {
     return BlocBuilder<SettingsBloc, SettingsState>(
       builder: (context, settingsState) {
         final settings = settingsState.settings;
-        final layout = Theme.of(context).extension<AppLayout>()!;
+        final layout = context.appLayout;
 
         return BlocConsumer<TabsBloc, TabsState>(
           listenWhen: (prev, next) {
-            final p = prev.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
-            final n = next.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+            final p = prev.tabs.byId(widget.tabId);
+            final n = next.tabs.byId(widget.tabId);
             return p?.config.body != n?.config.body;
           },
           listener: (context, state) {
-            final tab = state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+            final tab = state.tabs.byId(widget.tabId);
             if (tab != null && _bodyController.text != tab.config.body) {
               _bodyController.text = tab.config.body;
             }
@@ -105,7 +104,7 @@ class _RequestViewState extends State<RequestView> {
             if (tabsState.isLoading) {
               return const Center(child: CircularProgressIndicator());
             }
-            final tab = tabsState.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+            final tab = tabsState.tabs.byId(widget.tabId);
             if (tab == null) return const SizedBox.shrink();
 
             return Actions(
@@ -180,12 +179,12 @@ class _RequestViewState extends State<RequestView> {
 
   void _handleSave(BuildContext context) {
     final tabsBloc = context.read<TabsBloc>();
-    final tab = tabsBloc.state.tabs.firstWhereOrNull((t) => t.tabId == widget.tabId);
+    final tab = tabsBloc.state.tabs.byId(widget.tabId);
     if (tab == null) return;
 
     final collectionsBloc = context.read<CollectionsBloc>();
     final theme = Theme.of(context);
-    final layout = theme.extension<AppLayout>()!;
+    final layout = context.appLayout;
 
     final savedNode = tab.collectionNodeId == null
         ? null
@@ -213,7 +212,8 @@ class _RequestViewState extends State<RequestView> {
     }
 
     if (tab.collectionNodeId != null) {
-      // Node was deleted while the tab was open — drop the stale link.
+      // Node was deleted while the tab was open — drop the stale link
+      // (copyWith's sentinel pattern lets `null` actually clear the fields).
       tabsBloc.add(UpdateTab(
         tab.copyWith(collectionNodeId: null, collectionName: null),
       ));

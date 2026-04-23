@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../../../../core/theme/theme_ids.dart';
 
 class SettingsEntity extends Equatable {
   final int historyLimit;
@@ -18,7 +19,7 @@ class SettingsEntity extends Equatable {
     this.isVerticalLayout = false,
     this.splitRatio = 0.5,
     this.sideMenuWidth = 300.0,
-    this.themeId = 'brutalist',
+    this.themeId = kBrutalistThemeId,
   });
 
   SettingsEntity copyWith({

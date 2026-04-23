@@ -58,6 +58,27 @@ class CollectionsTreeHelper {
     return null;
   }
 
+  /// True if [candidateId] is [ancestorId] or appears anywhere inside its subtree.
+  /// Used by MoveNode to reject drops that would orphan a subtree (a folder
+  /// cannot become its own descendant).
+  static bool isDescendantOrSelf(
+    List<CollectionNodeEntity> nodes,
+    String ancestorId,
+    String candidateId,
+  ) {
+    final ancestor = findNode(nodes, ancestorId);
+    if (ancestor == null) return false;
+    return _containsId(ancestor, candidateId);
+  }
+
+  static bool _containsId(CollectionNodeEntity node, String id) {
+    if (node.id == id) return true;
+    for (final child in node.children) {
+      if (_containsId(child, id)) return true;
+    }
+    return false;
+  }
+
   static List<CollectionNodeEntity> _updateNodeById(
     List<CollectionNodeEntity> nodes,
     String id,

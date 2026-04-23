@@ -1,6 +1,5 @@
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
-import 'package:collection/collection.dart';
 import '../../../../core/domain/entities/request_config_entity.dart';
 
 part 'request_config_model.g.dart';
@@ -88,36 +87,6 @@ class HttpRequestConfig extends HiveObject {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'method': method,
-    'url': url,
-    'headers': headers,
-    'params': params,
-    'body': body,
-    'auth': auth,
-    'responseBody': responseBody,
-    'responseHeaders': responseHeaders,
-    'statusCode': statusCode,
-    'durationMs': durationMs,
-  };
-
-  factory HttpRequestConfig.fromJson(Map<String, dynamic> json) => HttpRequestConfig(
-    id: json['id'],
-    method: json['method'] ?? 'GET',
-    url: json['url'] ?? '',
-    headers: Map<String, String>.from(json['headers'] ?? {}),
-    params: Map<String, String>.from(json['params'] ?? {}),
-    body: json['body'] ?? '',
-    auth: Map<String, String>.from(json['auth'] ?? {}),
-    responseBody: json['responseBody'],
-    responseHeaders: json['responseHeaders'] != null 
-        ? Map<String, String>.from(json['responseHeaders']) 
-        : null,
-    statusCode: json['statusCode'],
-    durationMs: json['durationMs'],
-  );
-
   factory HttpRequestConfig.fromEntity(HttpRequestConfigEntity entity) => HttpRequestConfig(
     id: entity.id,
     method: entity.method,
@@ -146,36 +115,19 @@ class HttpRequestConfig extends HiveObject {
     durationMs: durationMs,
   );
 
+  // Equality deliberately considers only the request signature — method, url,
+  // and body — ignoring `id` and response fields. This is the contract history
+  // dedup relies on: identical requests with different generated UUIDs (or
+  // differing captured responses) collapse to a single entry. See CLAUDE.md §6.
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    if (other is! HttpRequestConfig) return false;
-
-    const mapEquality = MapEquality<String, String>();
-    return other.method == method &&
+    return other is HttpRequestConfig &&
+        other.method == method &&
         other.url == url &&
-        mapEquality.equals(other.headers, headers) &&
-        mapEquality.equals(other.params, params) &&
-        other.body == body &&
-        mapEquality.equals(other.auth, auth) &&
-        other.responseBody == responseBody &&
-        mapEquality.equals(other.responseHeaders, responseHeaders) &&
-        other.statusCode == statusCode &&
-        other.durationMs == durationMs;
+        other.body == body;
   }
 
   @override
-  int get hashCode {
-    const mapEquality = MapEquality<String, String>();
-    return method.hashCode ^
-        url.hashCode ^
-        mapEquality.hash(headers) ^
-        mapEquality.hash(params) ^
-        body.hashCode ^
-        mapEquality.hash(auth) ^
-        responseBody.hashCode ^
-        mapEquality.hash(responseHeaders ?? {}) ^
-        statusCode.hashCode ^
-        durationMs.hashCode;
-  }
+  int get hashCode => Object.hash(method, url, body);
 }

@@ -14,7 +14,7 @@ class SideMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = Theme.of(context).extension<AppLayout>()!;
+    final layout = context.appLayout;
 
     return DefaultTabController(
       length: 2,
@@ -75,7 +75,7 @@ class _SideMenuHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = Theme.of(context).extension<AppLayout>()!;
+    final layout = context.appLayout;
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: layout.inputPadding, vertical: layout.headerPaddingVertical),
