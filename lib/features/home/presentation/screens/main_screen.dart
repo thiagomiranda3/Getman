@@ -21,6 +21,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/screens/request_view.dart';
+import 'package:getman/features/tabs/presentation/widgets/tab_switcher_sheet.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -304,38 +305,40 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
           Expanded(
-            child: Listener(
-              onPointerSignal: _handleTabBarPointerSignal,
-              child: Scrollbar(
-                controller: _tabScrollController,
-                thumbVisibility: true,
-                thickness: 4,
-                radius: const Radius.circular(2),
-                child: ReorderableListView.builder(
-                  scrollController: _tabScrollController,
-                  scrollDirection: Axis.horizontal,
-                  itemCount: tabs.length,
-                  buildDefaultDragHandles: false,
-                  onReorder: (oldIndex, newIndex) => context.read<TabsBloc>().add(ReorderTabs(oldIndex, newIndex)),
-                  proxyDecorator: (child, index, animation) => Material(
-                    color: theme.scaffoldBackgroundColor,
-                    elevation: 4,
-                    child: child,
+            child: context.useTabSwitcher
+                ? _TabChip(activeIndex: activeIndex, tabs: tabs, onRequestClose: _requestCloseConfirmation)
+                : Listener(
+                    onPointerSignal: _handleTabBarPointerSignal,
+                    child: Scrollbar(
+                      controller: _tabScrollController,
+                      thumbVisibility: true,
+                      thickness: 4,
+                      radius: const Radius.circular(2),
+                      child: ReorderableListView.builder(
+                        scrollController: _tabScrollController,
+                        scrollDirection: Axis.horizontal,
+                        itemCount: tabs.length,
+                        buildDefaultDragHandles: false,
+                        onReorder: (oldIndex, newIndex) => context.read<TabsBloc>().add(ReorderTabs(oldIndex, newIndex)),
+                        proxyDecorator: (child, index, animation) => Material(
+                          color: theme.scaffoldBackgroundColor,
+                          elevation: 4,
+                          child: child,
+                        ),
+                        itemBuilder: (context, index) {
+                          final tab = tabs[index];
+                          return TabWidget(
+                            key: ValueKey('tab_${tab.tabId}'),
+                            tabId: tab.tabId,
+                            index: index,
+                            isActive: activeIndex == index,
+                            onTap: () => context.read<TabsBloc>().add(SetActiveIndex(index)),
+                            onClose: () => _requestCloseConfirmation(context, tab.tabId),
+                          );
+                        },
+                      ),
+                    ),
                   ),
-                  itemBuilder: (context, index) {
-                    final tab = tabs[index];
-                    return TabWidget(
-                      key: ValueKey('tab_${tab.tabId}'),
-                      tabId: tab.tabId,
-                      index: index,
-                      isActive: activeIndex == index,
-                      onTap: () => context.read<TabsBloc>().add(SetActiveIndex(index)),
-                      onClose: () => _requestCloseConfirmation(context, tab.tabId),
-                    );
-                  },
-                ),
-              ),
-            ),
           ),
           AddTabButton(layout: layout),
           Padding(
@@ -343,6 +346,69 @@ class _MainScreenState extends State<MainScreen> {
             child: const EnvironmentSelector(),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TabChip extends StatelessWidget {
+  final int activeIndex;
+  final List<HttpRequestTabEntity> tabs;
+  final Future<bool> Function(BuildContext, String) onRequestClose;
+
+  const _TabChip({required this.activeIndex, required this.tabs, required this.onRequestClose});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final layout = context.appLayout;
+    final active = (activeIndex >= 0 && activeIndex < tabs.length) ? tabs[activeIndex] : null;
+    final title = active == null
+        ? 'NO TABS'
+        : (active.collectionName ?? (active.config.url.isEmpty ? 'NEW REQUEST' : active.config.url));
+
+    return InkWell(
+      onTap: tabs.isEmpty
+          ? null
+          : () => TabSwitcherSheet.show(
+                context,
+                onRequestClose: (tabId) => onRequestClose(context, tabId),
+              ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: theme.primaryColor,
+                border: Border.all(color: theme.dividerColor, width: layout.borderThin),
+                borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+              ),
+              child: Text(
+                tabs.isEmpty ? '0' : '${activeIndex + 1}/${tabs.length} ▾',
+                style: TextStyle(
+                  color: theme.colorScheme.onPrimary,
+                  fontSize: layout.fontSizeNormal,
+                  fontWeight: context.appTypography.displayWeight,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: layout.fontSizeNormal,
+                  fontWeight: context.appTypography.titleWeight,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
