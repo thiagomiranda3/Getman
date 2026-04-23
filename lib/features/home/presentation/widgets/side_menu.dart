@@ -6,7 +6,6 @@ import 'package:getman/features/collections/presentation/bloc/collections_bloc.d
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/collections_list.dart';
 import 'package:getman/features/history/presentation/widgets/history_list.dart';
-import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/widgets/settings_dialog.dart';
 
 class SideMenu extends StatelessWidget {
@@ -135,12 +134,6 @@ class _SideMenuHeader extends StatelessWidget {
   }
 
   void _showSettingsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => BlocProvider.value(
-        value: context.read<SettingsBloc>(),
-        child: const SettingsDialog(),
-      ),
-    );
+    SettingsDialog.show(context);
   }
 }

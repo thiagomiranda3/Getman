@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/navigation/intents.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
+import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/environments/domain/logic/active_environment_helper.dart';
@@ -111,11 +112,11 @@ class _MainScreenState extends State<MainScreen> {
     if (tab == null) return false;
     if (!_isTabDirty(context, tabId)) return true;
 
-    final result = await showDialog<bool>(
-      context: context,
+    final result = await showResponsiveDialog<bool>(
+      context,
       builder: (dialogContext) {
         final theme = Theme.of(dialogContext);
-        return AlertDialog(
+        return ResponsiveDialogScaffold(
           title: const Text('UNSAVED CHANGES'),
           content: const Text('YOU HAVE UNSAVED CHANGES. ARE YOU SURE YOU WANT TO CLOSE THIS TAB?'),
           actions: [
@@ -123,7 +124,7 @@ class _MainScreenState extends State<MainScreen> {
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, true),
               child: Text('CLOSE ANYWAY',
-                  style: TextStyle(color: theme.colorScheme.error, fontWeight: context.appTypography.titleWeight)),
+                  style: TextStyle(color: theme.colorScheme.error, fontWeight: dialogContext.appTypography.titleWeight)),
             ),
           ],
         );

@@ -1,13 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/theme/theme_registry.dart';
+import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 
 class SettingsDialog extends StatefulWidget {
   const SettingsDialog({super.key});
+
+  static Future<void> show(BuildContext context) {
+    final bloc = context.read<SettingsBloc>();
+    return showResponsiveDialog<void>(
+      context,
+      builder: (_) => BlocProvider.value(value: bloc, child: const SettingsDialog()),
+    );
+  }
 
   @override
   State<SettingsDialog> createState() => _SettingsDialogState();
@@ -38,10 +48,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
       buildWhen: (prev, next) => prev.settings != next.settings,
       builder: (context, state) {
         final settings = state.settings;
-        return AlertDialog(
+        return ResponsiveDialogScaffold(
           title: const Text('SETTINGS'),
           content: SizedBox(
-            width: layout.dialogWidth,
+            width: context.isDialogFullscreen ? double.infinity : layout.dialogWidth,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
