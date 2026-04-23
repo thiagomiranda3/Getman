@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/utils/equality.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
@@ -69,7 +70,7 @@ class RequestConfigSection extends StatelessWidget {
                   decoration: context.appDecoration.panelBox(context, offset: 0),
                   child: TabBarView(
                     children: [
-                      _QueryParamsEditor(
+                      QueryParamsEditor(
                         items: tab.config.params,
                         onChanged: (list) {
                           final current = context.read<TabsBloc>().state.tabs.byId(tabId);
@@ -79,7 +80,7 @@ class RequestConfigSection extends StatelessWidget {
                           ));
                         },
                       ),
-                      _HeadersEditor(
+                      HeadersEditor(
                         items: tab.config.headers,
                         onChanged: (map) {
                           final current = context.read<TabsBloc>().state.tabs.byId(tabId);
@@ -127,18 +128,18 @@ class RequestConfigSection extends StatelessWidget {
 }
 
 /// Editor for ordered `List<QueryParamEntity>`. Duplicates allowed, order
-/// preserved. Mirrors the echo-suppression pattern of `_HeadersEditor`.
-class _QueryParamsEditor extends StatefulWidget {
+/// preserved. Mirrors the echo-suppression pattern of `HeadersEditor`.
+class QueryParamsEditor extends StatefulWidget {
   final List<QueryParamEntity> items;
   final Function(List<QueryParamEntity>) onChanged;
 
-  const _QueryParamsEditor({required this.items, required this.onChanged});
+  const QueryParamsEditor({super.key, required this.items, required this.onChanged});
 
   @override
-  State<_QueryParamsEditor> createState() => _QueryParamsEditorState();
+  State<QueryParamsEditor> createState() => _QueryParamsEditorState();
 }
 
-class _QueryParamsEditorState extends State<_QueryParamsEditor> {
+class _QueryParamsEditorState extends State<QueryParamsEditor> {
   late List<TextEditingController> _keyControllers;
   late List<TextEditingController> _valControllers;
   List<QueryParamEntity>? _lastEmitted;
@@ -162,7 +163,7 @@ class _QueryParamsEditorState extends State<_QueryParamsEditor> {
   }
 
   @override
-  void didUpdateWidget(_QueryParamsEditor oldWidget) {
+  void didUpdateWidget(QueryParamsEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (_lastEmitted != null &&
         _queryParamListEquality.equals(widget.items, _lastEmitted)) {
@@ -253,17 +254,17 @@ class _QueryParamsEditorState extends State<_QueryParamsEditor> {
 
 /// Editor for headers, still keyed as `Map<String, String>`. Duplicates are
 /// not a real concern for headers in this UI — last-write-wins is fine.
-class _HeadersEditor extends StatefulWidget {
+class HeadersEditor extends StatefulWidget {
   final Map<String, String> items;
   final Function(Map<String, String>) onChanged;
 
-  const _HeadersEditor({required this.items, required this.onChanged});
+  const HeadersEditor({super.key, required this.items, required this.onChanged});
 
   @override
-  State<_HeadersEditor> createState() => _HeadersEditorState();
+  State<HeadersEditor> createState() => _HeadersEditorState();
 }
 
-class _HeadersEditorState extends State<_HeadersEditor> {
+class _HeadersEditorState extends State<HeadersEditor> {
   late List<TextEditingController> _keyControllers;
   late List<TextEditingController> _valControllers;
   Map<String, String>? _lastEmitted;
@@ -287,7 +288,7 @@ class _HeadersEditorState extends State<_HeadersEditor> {
   }
 
   @override
-  void didUpdateWidget(_HeadersEditor oldWidget) {
+  void didUpdateWidget(HeadersEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (_lastEmitted != null && headerMapEquality.equals(widget.items, _lastEmitted)) {
       return;
@@ -405,54 +406,84 @@ class _KeyValueRowState extends State<_KeyValueRow> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isPhone = context.isPhone;
+    final fieldPadding = EdgeInsets.all(widget.layout.isCompact ? 8 : 12);
+    final textStyle = TextStyle(fontSize: widget.layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight);
+
+    final keyField = TextField(
+      style: textStyle,
+      decoration: InputDecoration(
+        hintText: 'KEY',
+        isDense: true,
+        contentPadding: fieldPadding,
+      ),
+      controller: widget.keyController,
+      autocorrect: false,
+      enableSuggestions: false,
+      textCapitalization: TextCapitalization.none,
+      onChanged: widget.onKeyChanged,
+    );
+    final valueField = TextField(
+      style: textStyle,
+      decoration: InputDecoration(
+        hintText: 'VALUE',
+        isDense: true,
+        contentPadding: fieldPadding,
+      ),
+      controller: widget.valController,
+      autocorrect: false,
+      enableSuggestions: false,
+      textCapitalization: TextCapitalization.none,
+      onChanged: widget.onValChanged,
+    );
+    final deleteButton = context.appDecoration.wrapInteractive(
+      child: IconButton(
+        icon: Icon(Icons.delete_outline, size: widget.layout.isCompact ? 20 : 24, color: Theme.of(context).colorScheme.error),
+        onPressed: widget.onDelete,
+      ),
+    );
+
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         margin: EdgeInsets.only(bottom: widget.layout.isCompact ? 8.0 : 12.0),
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        padding: EdgeInsets.symmetric(horizontal: isPhone ? 8 : 4, vertical: isPhone ? 8 : 2),
         decoration: BoxDecoration(
-          color: _isHovered ? theme.hoverColor : Colors.transparent,
+          color: _isHovered ? theme.hoverColor : (isPhone ? theme.colorScheme.surface : Colors.transparent),
           borderRadius: BorderRadius.circular(context.appShape.panelRadius),
-          border: Border.all(color: _isHovered ? theme.dividerColor.withValues(alpha: 0.5) : Colors.transparent),
+          border: Border.all(
+            color: isPhone
+                ? theme.dividerColor.withValues(alpha: 0.6)
+                : (_isHovered ? theme.dividerColor.withValues(alpha: 0.5) : Colors.transparent),
+            width: widget.layout.borderThin,
+          ),
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                style: TextStyle(fontSize: widget.layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
-                decoration: InputDecoration(
-                  hintText: 'KEY',
-                  isDense: true,
-                  contentPadding: EdgeInsets.all(widget.layout.isCompact ? 8 : 12),
-                ),
-                controller: widget.keyController,
-                onChanged: widget.onKeyChanged,
+        child: isPhone
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: keyField),
+                      deleteButton,
+                    ],
+                  ),
+                  SizedBox(height: widget.layout.tabSpacing),
+                  valueField,
+                ],
+              )
+            : Row(
+                children: [
+                  Expanded(child: keyField),
+                  SizedBox(width: widget.layout.isCompact ? 8 : 12),
+                  Expanded(child: valueField),
+                  SizedBox(width: widget.layout.isCompact ? 4 : 8),
+                  deleteButton,
+                ],
               ),
-            ),
-            SizedBox(width: widget.layout.isCompact ? 8 : 12),
-            Expanded(
-              child: TextField(
-                style: TextStyle(fontSize: widget.layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
-                decoration: InputDecoration(
-                  hintText: 'VALUE',
-                  isDense: true,
-                  contentPadding: EdgeInsets.all(widget.layout.isCompact ? 8 : 12),
-                ),
-                controller: widget.valController,
-                onChanged: widget.onValChanged,
-              ),
-            ),
-            SizedBox(width: widget.layout.isCompact ? 4 : 8),
-            context.appDecoration.wrapInteractive(
-              child: IconButton(
-                icon: Icon(Icons.delete_outline, size: widget.layout.isCompact ? 20 : 24, color: Theme.of(context).colorScheme.error),
-                onPressed: widget.onDelete,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

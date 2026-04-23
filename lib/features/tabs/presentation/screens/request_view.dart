@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:getman/core/navigation/intents.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
 import 'package:getman/core/utils/json_utils.dart';
@@ -18,6 +19,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_config_section.dart';
 import 'package:getman/features/tabs/presentation/widgets/response_section.dart';
+import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.dart';
 import 'package:getman/features/tabs/presentation/widgets/url_bar.dart';
 
 const double _splitMin = 0.1;
@@ -130,42 +132,48 @@ class _RequestViewState extends State<RequestView> {
                         UrlBar(tabId: widget.tabId, onSave: () => _handleSave(context)),
                         SizedBox(height: layout.sectionSpacing),
                         Expanded(
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              final totalSize = settings.isVerticalLayout ? constraints.maxHeight : constraints.maxWidth;
-                              final currentRatio = _localSplitRatio ?? settings.splitRatio;
+                          child: context.useUnifiedRequestTabs
+                              ? UnifiedRequestPanel(
+                                  tabId: widget.tabId,
+                                  bodyController: _bodyController,
+                                  responseController: _responseController,
+                                )
+                              : LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final totalSize = settings.isVerticalLayout ? constraints.maxHeight : constraints.maxWidth;
+                                    final currentRatio = _localSplitRatio ?? settings.splitRatio;
 
-                              return Flex(
-                                direction: settings.isVerticalLayout ? Axis.vertical : Axis.horizontal,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Flexible(
-                                    flex: _ratioToFlex(currentRatio),
-                                    child: RequestConfigSection(tabId: widget.tabId, bodyController: _bodyController),
-                                  ),
-                                  Splitter(
-                                    isVertical: settings.isVerticalLayout,
-                                    onUpdate: (delta) {
-                                      setState(() {
-                                        final base = _localSplitRatio ?? settings.splitRatio;
-                                        _localSplitRatio = (base + delta / totalSize).clamp(_splitMin, _splitMax);
-                                      });
-                                    },
-                                    onEnd: () {
-                                      final committed = _localSplitRatio;
-                                      if (committed == null) return;
-                                      context.read<SettingsBloc>().add(UpdateSplitRatio(committed));
-                                      setState(() => _localSplitRatio = null);
-                                    },
-                                  ),
-                                  Flexible(
-                                    flex: _ratioToFlex(1 - currentRatio),
-                                    child: ResponseSection(tabId: widget.tabId, responseController: _responseController),
-                                  ),
-                                ],
-                              );
-                            }
-                          ),
+                                    return Flex(
+                                      direction: settings.isVerticalLayout ? Axis.vertical : Axis.horizontal,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Flexible(
+                                          flex: _ratioToFlex(currentRatio),
+                                          child: RequestConfigSection(tabId: widget.tabId, bodyController: _bodyController),
+                                        ),
+                                        Splitter(
+                                          isVertical: settings.isVerticalLayout,
+                                          onUpdate: (delta) {
+                                            setState(() {
+                                              final base = _localSplitRatio ?? settings.splitRatio;
+                                              _localSplitRatio = (base + delta / totalSize).clamp(_splitMin, _splitMax);
+                                            });
+                                          },
+                                          onEnd: () {
+                                            final committed = _localSplitRatio;
+                                            if (committed == null) return;
+                                            context.read<SettingsBloc>().add(UpdateSplitRatio(committed));
+                                            setState(() => _localSplitRatio = null);
+                                          },
+                                        ),
+                                        Flexible(
+                                          flex: _ratioToFlex(1 - currentRatio),
+                                          child: ResponseSection(tabId: widget.tabId, responseController: _responseController),
+                                        ),
+                                      ],
+                                    );
+                                  }
+                                ),
                         ),
                       ],
                     ),

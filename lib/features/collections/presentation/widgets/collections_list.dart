@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_fancy_tree_view/flutter_fancy_tree_view.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/utils/postman/postman_collection_mapper.dart';
@@ -14,6 +15,7 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
+import 'package:getman/features/collections/presentation/widgets/node_action_sheet.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 
@@ -176,20 +178,28 @@ class _CollectionsListState extends State<CollectionsList> {
             ),
           ),
           Expanded(
-            child: DragTarget<String>(
-              onAcceptWithDetails: (details) => context.read<CollectionsBloc>().add(MoveNode(details.data, null)),
-              builder: (context, candidateData, rejectedData) {
-                return AnimatedTreeView<CollectionNodeEntity>(
-                  treeController: _treeController,
-                  nodeBuilder: (context, entry) {
-                    return _CollectionNodeWidget(
+            child: context.isPhone
+                ? AnimatedTreeView<CollectionNodeEntity>(
+                    treeController: _treeController,
+                    nodeBuilder: (context, entry) => _CollectionNodeWidget(
                       entry: entry,
                       onToggle: () => _treeController.toggleExpansion(entry.node),
-                    );
-                  },
-                );
-              },
-            ),
+                    ),
+                  )
+                : DragTarget<String>(
+                    onAcceptWithDetails: (details) => context.read<CollectionsBloc>().add(MoveNode(details.data, null)),
+                    builder: (context, candidateData, rejectedData) {
+                      return AnimatedTreeView<CollectionNodeEntity>(
+                        treeController: _treeController,
+                        nodeBuilder: (context, entry) {
+                          return _CollectionNodeWidget(
+                            entry: entry,
+                            onToggle: () => _treeController.toggleExpansion(entry.node),
+                          );
+                        },
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -219,62 +229,69 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
     final theme = Theme.of(context);
     final layout = theme.extension<AppLayout>()!;
     final node = widget.entry.node;
+    final isPhone = context.isPhone;
+    final rowMinHeight = isPhone ? context.touchTargetMin : 0.0;
+    final onLongPress = isPhone ? () => NodeActionSheet.show(context, node) : null;
 
     Widget content;
     if (node.isFolder) {
-      content = DragTarget<String>(
-        onWillAcceptWithDetails: (details) {
-          if (details.data == node.id) return false;
-          setState(() => _isDragOver = true);
-          return true;
-        },
-        onLeave: (_) => setState(() => _isDragOver = false),
-        onAcceptWithDetails: (details) {
-          setState(() => _isDragOver = false);
-          context.read<CollectionsBloc>().add(MoveNode(details.data, node.id));
-        },
-        builder: (context, candidateData, rejectedData) {
-          return context.appDecoration.wrapInteractive(
-            child: InkWell(
-              onTap: widget.onToggle,
-              child: MouseRegion(
-                onEnter: (_) => setState(() => _isHovered = true),
-                onExit: (_) => setState(() => _isHovered = false),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  decoration: BoxDecoration(
-                    color: _isDragOver
-                        ? theme.primaryColor.withValues(alpha: 0.3)
-                        : (_isHovered ? theme.hoverColor : Colors.transparent),
-                    border: _isDragOver
-                        ? Border.all(color: theme.primaryColor, width: layout.borderThin)
-                        : Border.all(color: Colors.transparent, width: layout.borderThin),
-                  ),
-                  child: TreeIndentation(
-                    entry: widget.entry,
-                    child: Row(
-                      children: [
-                        Icon(
-                          widget.entry.isExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
-                          size: layout.smallIconSize,
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                        ),
-                        Icon(node.isFavorite ? Icons.star : Icons.folder,
-                            size: layout.iconSize, color: node.isFavorite ? theme.primaryColor : theme.colorScheme.secondary),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.displayWeight)),
-                        ),
-                        _NodeContextMenu(node: node),
-                      ],
+      final folderInner = context.appDecoration.wrapInteractive(
+        child: InkWell(
+          onTap: widget.onToggle,
+          onLongPress: onLongPress,
+          child: MouseRegion(
+            onEnter: (_) => setState(() => _isHovered = true),
+            onExit: (_) => setState(() => _isHovered = false),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              constraints: BoxConstraints(minHeight: rowMinHeight),
+              decoration: BoxDecoration(
+                color: _isDragOver
+                    ? theme.primaryColor.withValues(alpha: 0.3)
+                    : (_isHovered ? theme.hoverColor : Colors.transparent),
+                border: _isDragOver
+                    ? Border.all(color: theme.primaryColor, width: layout.borderThin)
+                    : Border.all(color: Colors.transparent, width: layout.borderThin),
+              ),
+              child: TreeIndentation(
+                entry: widget.entry,
+                child: Row(
+                  children: [
+                    Icon(
+                      widget.entry.isExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
+                      size: layout.smallIconSize,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
-                  ),
+                    Icon(node.isFavorite ? Icons.star : Icons.folder,
+                        size: layout.iconSize, color: node.isFavorite ? theme.primaryColor : theme.colorScheme.secondary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(node.name.toUpperCase(), style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.displayWeight)),
+                    ),
+                    _NodeContextMenu(node: node),
+                  ],
                 ),
               ),
             ),
-          );
-        },
+          ),
+        ),
       );
+
+      content = isPhone
+          ? folderInner
+          : DragTarget<String>(
+              onWillAcceptWithDetails: (details) {
+                if (details.data == node.id) return false;
+                setState(() => _isDragOver = true);
+                return true;
+              },
+              onLeave: (_) => setState(() => _isDragOver = false),
+              onAcceptWithDetails: (details) {
+                setState(() => _isDragOver = false);
+                context.read<CollectionsBloc>().add(MoveNode(details.data, node.id));
+              },
+              builder: (context, candidateData, rejectedData) => folderInner,
+            );
     } else {
       content = context.appDecoration.wrapInteractive(
         child: InkWell(
@@ -286,12 +303,15 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
                   collectionNodeId: node.id,
                   collectionName: node.name,
                 ));
+            Scaffold.maybeOf(context)?.closeDrawer();
           },
+          onLongPress: onLongPress,
           child: MouseRegion(
             onEnter: (_) => setState(() => _isHovered = true),
             onExit: (_) => setState(() => _isHovered = false),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
+              constraints: BoxConstraints(minHeight: rowMinHeight),
               decoration: BoxDecoration(
                 color: _isHovered ? theme.hoverColor : Colors.transparent,
               ),
@@ -314,6 +334,8 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
         ),
       );
     }
+
+    if (isPhone) return content;
 
     return Draggable<String>(
       data: node.id,

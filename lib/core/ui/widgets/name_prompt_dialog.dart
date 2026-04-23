@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 
 /// Single-line name prompt used across collections / tabs for rename,
 /// new-folder, save-to-collection, etc. Caller receives the final text via
@@ -32,8 +33,8 @@ class NamePromptDialog extends StatefulWidget {
     String confirmLabel = 'SAVE',
     String cancelLabel = 'CANCEL',
   }) {
-    return showDialog<void>(
-      context: context,
+    return showResponsiveDialog<void>(
+      context,
       builder: (_) => NamePromptDialog(
         title: title,
         initialText: initialText,
@@ -73,7 +74,7 @@ class _NamePromptDialogState extends State<NamePromptDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return ResponsiveDialogScaffold(
       title: Text(widget.title),
       content: TextField(
         controller: _controller,
