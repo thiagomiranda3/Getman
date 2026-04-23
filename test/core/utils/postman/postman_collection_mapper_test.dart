@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/utils/postman/postman_collection_mapper.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
@@ -23,9 +24,8 @@ void main() {
         config: HttpRequestConfigEntity(
           id: 'cfg',
           method: 'GET',
-          url: 'https://api.example.com/users',
+          url: 'https://api.example.com/users?page=1',
           headers: {'X-Token': 'abc', 'Accept': 'application/json'},
-          params: {'page': '1'},
           body: '',
         ),
       );
@@ -41,11 +41,30 @@ void main() {
       expect(item['name'], 'Get Users');
       final request = item['request'] as Map<String, dynamic>;
       expect(request['method'], 'GET');
-      expect(request['url']['raw'], 'https://api.example.com/users');
+      expect(request['url']['raw'], 'https://api.example.com/users?page=1');
       final query = request['url']['query'] as List;
       expect(query.first, {'key': 'page', 'value': '1'});
       final headers = request['header'] as List;
       expect(headers.any((h) => h['key'] == 'X-Token' && h['value'] == 'abc'), isTrue);
+    });
+
+    test('preserves duplicate query keys on export', () {
+      const leaf = CollectionNodeEntity(
+        id: 'leaf',
+        name: 'Dup',
+        isFolder: false,
+        config: HttpRequestConfigEntity(
+          id: 'cfg',
+          url: 'https://x.y?a=1&a=2',
+        ),
+      );
+      final decoded = jsonDecode(PostmanCollectionMapper.toJson(leaf)) as Map<String, dynamic>;
+      final item = (decoded['item'] as List).first as Map<String, dynamic>;
+      final query = item['request']['url']['query'] as List;
+      expect(query, [
+        {'key': 'a', 'value': '1'},
+        {'key': 'a', 'value': '2'},
+      ]);
     });
 
     test('emits raw body with json language hint when Content-Type is json', () {
@@ -127,7 +146,10 @@ void main() {
       expect(leaf.config!.method, 'GET');
       expect(leaf.config!.url, 'https://example.com/a?x=1');
       expect(leaf.config!.headers['X-Test'], 'y');
-      expect(leaf.config!.params['x'], '1');
+      expect(
+        leaf.config!.params,
+        [const QueryParamEntity(key: 'x', value: '1')],
+      );
     });
 
     test('accepts url as plain string', () {
@@ -171,7 +193,37 @@ void main() {
 ''';
       final config = PostmanCollectionMapper.fromJson(source).children.first.config!;
       expect(config.headers, {'A': '1'});
-      expect(config.params, {'k1': 'v1'});
+      expect(config.url, 'https://x.y?k1=v1');
+      expect(
+        config.params,
+        [const QueryParamEntity(key: 'k1', value: 'v1')],
+      );
+    });
+
+    test('structured url.query takes precedence over url.raw query', () {
+      const source = '''
+{
+  "info": {"name": "S", "schema": "v2.1.0"},
+  "item": [
+    {
+      "name": "R",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "https://x.y?old=1",
+          "query": [{"key": "new", "value": "2"}]
+        }
+      }
+    }
+  ]
+}
+''';
+      final config = PostmanCollectionMapper.fromJson(source).children.first.config!;
+      expect(config.url, 'https://x.y?new=2');
+      expect(
+        config.params,
+        [const QueryParamEntity(key: 'new', value: '2')],
+      );
     });
 
     test('throws FormatException on malformed JSON', () {
@@ -204,9 +256,8 @@ void main() {
         config: HttpRequestConfigEntity(
           id: 'cfg',
           method: 'POST',
-          url: 'https://api.example.com/things',
+          url: 'https://api.example.com/things?dry=true',
           headers: {'Content-Type': 'application/json', 'X-Key': 'k'},
-          params: {'dry': 'true'},
           body: '{"a":1}',
         ),
       );
@@ -235,10 +286,13 @@ void main() {
       final leaf = folder.children.first;
       expect(leaf.name, 'Create Thing');
       expect(leaf.config!.method, 'POST');
-      expect(leaf.config!.url, 'https://api.example.com/things');
+      expect(leaf.config!.url, 'https://api.example.com/things?dry=true');
       expect(leaf.config!.headers['Content-Type'], 'application/json');
       expect(leaf.config!.headers['X-Key'], 'k');
-      expect(leaf.config!.params['dry'], 'true');
+      expect(
+        leaf.config!.params,
+        [const QueryParamEntity(key: 'dry', value: 'true')],
+      );
       expect(leaf.config!.body, '{"a":1}');
     });
   });
