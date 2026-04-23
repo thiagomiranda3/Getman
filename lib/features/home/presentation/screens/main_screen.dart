@@ -16,7 +16,7 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
-import 'package:getman/features/tabs/presentation/widgets/request_view.dart';
+import 'package:getman/features/tabs/presentation/screens/request_view.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
