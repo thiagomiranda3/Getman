@@ -418,6 +418,9 @@ class _KeyValueRowState extends State<_KeyValueRow> {
         contentPadding: fieldPadding,
       ),
       controller: widget.keyController,
+      autocorrect: false,
+      enableSuggestions: false,
+      textCapitalization: TextCapitalization.none,
       onChanged: widget.onKeyChanged,
     );
     final valueField = TextField(
@@ -428,6 +431,9 @@ class _KeyValueRowState extends State<_KeyValueRow> {
         contentPadding: fieldPadding,
       ),
       controller: widget.valController,
+      autocorrect: false,
+      enableSuggestions: false,
+      textCapitalization: TextCapitalization.none,
       onChanged: widget.onValChanged,
     );
     final deleteButton = context.appDecoration.wrapInteractive(

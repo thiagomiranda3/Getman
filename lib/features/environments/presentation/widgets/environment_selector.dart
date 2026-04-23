@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
@@ -52,14 +53,20 @@ class _SelectorButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
+    // Drop the active-env label on the narrowest viewports so the hamburger
+    // + tab chip + + button + env selector all fit on a phone tab bar.
+    final iconOnly = context.useTabSwitcher;
     return PopupMenuButton<String>(
-      tooltip: 'Environment',
+      tooltip: 'Environment · ${_activeLabel()}',
       position: PopupMenuPosition.under,
       color: theme.colorScheme.surface,
       onSelected: (value) => _onSelected(context, value),
       itemBuilder: (popupContext) => _menuItems(popupContext),
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: layout.inputPadding, vertical: layout.inputPaddingVertical),
+        padding: EdgeInsets.symmetric(
+          horizontal: iconOnly ? 8 : layout.inputPadding,
+          vertical: layout.inputPaddingVertical,
+        ),
         decoration: BoxDecoration(
           border: Border.all(color: theme.dividerColor, width: layout.borderThin),
           borderRadius: BorderRadius.circular(context.appShape.buttonRadius),
@@ -67,21 +74,23 @@ class _SelectorButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.public, size: layout.smallIconSize, color: theme.colorScheme.onSurface),
-            const SizedBox(width: 6),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 120),
-              child: Text(
-                _activeLabel(),
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: layout.fontSizeSmall,
-                  fontWeight: context.appTypography.titleWeight,
-                  color: theme.colorScheme.onSurface,
+            Icon(Icons.public, size: layout.iconSize, color: theme.colorScheme.onSurface),
+            if (!iconOnly) ...[
+              const SizedBox(width: 6),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 120),
+                child: Text(
+                  _activeLabel(),
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: layout.fontSizeSmall,
+                    fontWeight: context.appTypography.titleWeight,
+                    color: theme.colorScheme.onSurface,
+                  ),
                 ),
               ),
-            ),
-            Icon(Icons.arrow_drop_down, size: layout.smallIconSize, color: theme.colorScheme.onSurface),
+              Icon(Icons.arrow_drop_down, size: layout.smallIconSize, color: theme.colorScheme.onSurface),
+            ],
           ],
         ),
       ),

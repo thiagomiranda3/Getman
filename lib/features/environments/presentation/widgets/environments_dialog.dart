@@ -581,11 +581,17 @@ class _EnvironmentEditorState extends State<_EnvironmentEditor> {
                     final keyField = TextField(
                       controller: _keyControllers[index],
                       decoration: const InputDecoration(hintText: 'key'),
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      textCapitalization: TextCapitalization.none,
                       onChanged: (_) => _emit(),
                     );
                     final valueField = TextField(
                       controller: _valueControllers[index],
                       decoration: const InputDecoration(hintText: 'value'),
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      textCapitalization: TextCapitalization.none,
                       onChanged: (_) => _emit(),
                     );
                     final deleteButton = IconButton(
