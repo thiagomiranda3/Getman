@@ -5,7 +5,6 @@ import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/collections_list.dart';
-import 'package:getman/features/environments/presentation/widgets/environment_selector.dart';
 import 'package:getman/features/history/presentation/widgets/history_list.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/widgets/settings_dialog.dart';
@@ -100,27 +99,24 @@ class _SideMenuHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Flexible(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Flexible(child: EnvironmentSelector()),
-                context.appDecoration.wrapInteractive(
-                  child: IconButton(
-                    icon: Icon(Icons.create_new_folder, color: theme.colorScheme.onSurface, size: layout.iconSize),
-                    tooltip: 'NEW FOLDER',
-                    onPressed: () => _showNewFolderDialog(context),
-                  ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              context.appDecoration.wrapInteractive(
+                child: IconButton(
+                  icon: Icon(Icons.create_new_folder, color: theme.colorScheme.onSurface, size: layout.iconSize),
+                  tooltip: 'NEW FOLDER',
+                  onPressed: () => _showNewFolderDialog(context),
                 ),
-                context.appDecoration.wrapInteractive(
-                  child: IconButton(
-                    icon: Icon(Icons.settings, color: theme.colorScheme.onSurface, size: layout.iconSize),
-                    tooltip: 'SETTINGS',
-                    onPressed: () => _showSettingsDialog(context),
-                  ),
+              ),
+              context.appDecoration.wrapInteractive(
+                child: IconButton(
+                  icon: Icon(Icons.settings, color: theme.colorScheme.onSurface, size: layout.iconSize),
+                  tooltip: 'SETTINGS',
+                  onPressed: () => _showSettingsDialog(context),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),

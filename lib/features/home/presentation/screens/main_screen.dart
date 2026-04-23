@@ -6,6 +6,7 @@ import 'package:getman/core/ui/widgets/splitter.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/environments/domain/logic/active_environment_helper.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
+import 'package:getman/features/environments/presentation/widgets/environment_selector.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/home/presentation/widgets/add_tab_button.dart';
 import 'package:getman/features/home/presentation/widgets/side_menu.dart';
@@ -254,6 +255,10 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ),
           AddTabButton(layout: layout),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: layout.tabSpacing),
+            child: const EnvironmentSelector(),
+          ),
         ],
       ),
     );
