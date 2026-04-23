@@ -13,11 +13,13 @@ class EnvironmentsBloc extends Bloc<EnvironmentsEvent, EnvironmentsState> {
   EnvironmentsBloc({
     required this.getEnvironmentsUseCase,
     required this.saveEnvironmentsUseCase,
-  }) : super(const EnvironmentsState()) {
+    List<EnvironmentEntity> initialEnvironments = const [],
+  }) : super(EnvironmentsState(environments: initialEnvironments)) {
     on<LoadEnvironments>(_onLoad);
     on<AddEnvironment>(_onAdd);
     on<UpdateEnvironment>(_onUpdate);
     on<DeleteEnvironment>(_onDelete);
+    on<ImportEnvironments>(_onImport);
   }
 
   Future<void> _commit(
@@ -54,5 +56,10 @@ class EnvironmentsBloc extends Bloc<EnvironmentsEvent, EnvironmentsState> {
   Future<void> _onDelete(DeleteEnvironment event, Emitter<EnvironmentsState> emit) {
     final next = state.environments.where((e) => e.id != event.id).toList();
     return _commit(emit, next);
+  }
+
+  Future<void> _onImport(ImportEnvironments event, Emitter<EnvironmentsState> emit) {
+    if (event.environments.isEmpty) return Future.value();
+    return _commit(emit, [...state.environments, ...event.environments]);
   }
 }

@@ -1,7 +1,13 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
+import 'package:getman/core/utils/postman/postman_environment_mapper.dart';
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
@@ -80,6 +86,22 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
                           ),
                           context.appDecoration.wrapInteractive(
                             child: IconButton(
+                              icon: Icon(Icons.file_upload, size: layout.iconSize),
+                              tooltip: 'IMPORT FROM POSTMAN',
+                              onPressed: () => _importEnvironments(context),
+                            ),
+                          ),
+                          context.appDecoration.wrapInteractive(
+                            child: IconButton(
+                              icon: Icon(Icons.file_download, size: layout.iconSize),
+                              tooltip: 'EXPORT ALL ENVIRONMENTS',
+                              onPressed: environments.isEmpty
+                                  ? null
+                                  : () => _exportAllEnvironments(context, environments),
+                            ),
+                          ),
+                          context.appDecoration.wrapInteractive(
+                            child: IconButton(
                               icon: Icon(Icons.add, size: layout.iconSize),
                               tooltip: 'NEW ENVIRONMENT',
                               onPressed: () => _createEnvironment(context),
@@ -115,6 +137,7 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
                                       isSelected: isSelected,
                                       onTap: () => setState(() => _selectedId = env.id),
                                       onDelete: () => _deleteEnvironment(context, env),
+                                      onExport: () => _exportEnvironment(context, env),
                                     );
                                   },
                                 ),
@@ -179,6 +202,116 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
       setState(() => _selectedId = null);
     }
   }
+
+  Future<void> _importEnvironments(BuildContext context) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final bloc = context.read<EnvironmentsBloc>();
+    final FilePickerResult? result;
+    try {
+      result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        withData: true,
+      );
+    } catch (e) {
+      debugPrint('File picker failed: $e');
+      messenger?.showSnackBar(SnackBar(content: Text('Import failed: $e')));
+      return;
+    }
+    if (result == null || result.files.isEmpty) return;
+
+    final imported = <EnvironmentEntity>[];
+    final failures = <String>[];
+    for (final file in result.files) {
+      try {
+        final content = await _readFileContent(file);
+        if (content == null) {
+          failures.add('${file.name}: unable to read file');
+          continue;
+        }
+        imported.addAll(PostmanEnvironmentMapper.fromJson(content));
+      } catch (e) {
+        failures.add('${file.name}: $e');
+      }
+    }
+
+    if (imported.isNotEmpty) {
+      bloc.add(ImportEnvironments(imported));
+      setState(() => _selectedId = imported.first.id);
+    }
+    if (failures.isNotEmpty) {
+      messenger?.showSnackBar(SnackBar(
+        content: Text(
+          imported.isEmpty
+              ? 'Import failed: ${failures.join('; ')}'
+              : 'Imported ${imported.length} environment(s). Skipped: ${failures.join('; ')}',
+        ),
+      ));
+    } else if (imported.isNotEmpty) {
+      messenger?.showSnackBar(SnackBar(
+        content: Text('Imported ${imported.length} environment(s).'),
+      ));
+    }
+  }
+
+  Future<void> _exportEnvironment(BuildContext context, EnvironmentEntity env) async {
+    await _saveJsonFile(
+      context: context,
+      jsonString: PostmanEnvironmentMapper.toJson(env),
+      fileName: '${_slugFilename(env.name)}.postman_environment.json',
+      dialogTitle: 'EXPORT ENVIRONMENT',
+    );
+  }
+
+  Future<void> _exportAllEnvironments(BuildContext context, List<EnvironmentEntity> envs) async {
+    await _saveJsonFile(
+      context: context,
+      jsonString: PostmanEnvironmentMapper.toJsonAll(envs),
+      fileName: 'environments.postman_environments.json',
+      dialogTitle: 'EXPORT ALL ENVIRONMENTS',
+    );
+  }
+
+  Future<void> _saveJsonFile({
+    required BuildContext context,
+    required String jsonString,
+    required String fileName,
+    required String dialogTitle,
+  }) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    try {
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: dialogTitle,
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        bytes: utf8.encode(jsonString),
+      );
+      if (path == null) return;
+      if (!kIsWeb) {
+        await File(path).writeAsString(jsonString);
+      }
+      messenger?.showSnackBar(SnackBar(content: Text('Exported to $path')));
+    } catch (e) {
+      debugPrint('Export failed: $e');
+      messenger?.showSnackBar(SnackBar(content: Text('Export failed: $e')));
+    }
+  }
+
+  Future<String?> _readFileContent(PlatformFile file) async {
+    final bytes = file.bytes;
+    if (bytes != null) return utf8.decode(bytes);
+    final path = file.path;
+    if (path != null) return File(path).readAsString();
+    return null;
+  }
+}
+
+String _slugFilename(String name) {
+  final trimmed = name.trim().toLowerCase();
+  final slug = trimmed.replaceAll(RegExp(r'[^a-z0-9]+'), '_').replaceAll(RegExp(r'^_+|_+$'), '');
+  return slug.isEmpty ? 'untitled' : slug;
 }
 
 class _EnvironmentListTile extends StatelessWidget {
@@ -186,12 +319,14 @@ class _EnvironmentListTile extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final VoidCallback onExport;
 
   const _EnvironmentListTile({
     required this.environment,
     required this.isSelected,
     required this.onTap,
     required this.onDelete,
+    required this.onExport,
   });
 
   @override
@@ -230,6 +365,15 @@ class _EnvironmentListTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                IconButton(
+                  iconSize: layout.smallIconSize,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  icon: Icon(Icons.file_download, color: theme.colorScheme.onSurface),
+                  tooltip: 'Export environment',
+                  onPressed: onExport,
+                ),
+                SizedBox(width: layout.tabSpacing),
                 IconButton(
                   iconSize: layout.smallIconSize,
                   padding: EdgeInsets.zero,

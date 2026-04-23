@@ -58,9 +58,11 @@ Future<SettingsEntity> init() async {
   await Hive.openBox<HttpRequestConfig>(HiveBoxes.history);
   await Hive.openBox<HttpRequestTabModel>(HiveBoxes.tabs);
   await Hive.openBox<CollectionNode>(HiveBoxes.collections);
-  await Hive.openBox<EnvironmentModel>(HiveBoxes.environments);
+  final environmentsBox = await Hive.openBox<EnvironmentModel>(HiveBoxes.environments);
 
   final initialSettings = settingsBox.get('current')?.toEntity() ?? const SettingsEntity();
+  final initialEnvironments =
+      environmentsBox.values.map((model) => model.toEntity()).toList(growable: false);
 
   // Features - Settings
   sl.registerLazySingleton(() => SettingsBloc(
@@ -109,6 +111,7 @@ Future<SettingsEntity> init() async {
   sl.registerLazySingleton(() => EnvironmentsBloc(
     getEnvironmentsUseCase: sl(),
     saveEnvironmentsUseCase: sl(),
+    initialEnvironments: initialEnvironments,
   ));
 
   sl.registerLazySingleton(() => GetEnvironmentsUseCase(sl()));

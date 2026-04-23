@@ -75,6 +75,14 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     _debounceTimer = Timer(_saveDebounce, _persist);
   }
 
+  /// Cancel any pending debounced save and flush immediately. Use on structural
+  /// changes (add/remove/reorder/duplicate/close-others/close-right) so the
+  /// user never loses tabs if the app is quit before the 10s debounce fires.
+  Future<void> _persistNow() async {
+    _debounceTimer?.cancel();
+    await _persist();
+  }
+
   Future<void> _persist() async {
     try {
       await repository.saveTabs(state.tabs);
@@ -116,7 +124,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     }
   }
 
-  void _onAddTab(AddTab event, Emitter<TabsState> emit) {
+  Future<void> _onAddTab(AddTab event, Emitter<TabsState> emit) async {
     if (event.collectionNodeId != null) {
       final existingIndex = state.tabs.indexWhere((t) => t.collectionNodeId == event.collectionNodeId);
       if (existingIndex != -1) {
@@ -136,10 +144,10 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       tabs: [...state.tabs, newTab],
       activeIndex: state.tabs.length,
     ));
-    _scheduleSave();
+    await _persistNow();
   }
 
-  void _onRemoveTab(RemoveTab event, Emitter<TabsState> emit) {
+  Future<void> _onRemoveTab(RemoveTab event, Emitter<TabsState> emit) async {
     final index = state.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index == -1) return;
     _requests.cancelAndFinish(event.tabId);
@@ -152,14 +160,14 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       newActiveIndex = newTabs.length - 1;
     }
     emit(state.copyWith(tabs: newTabs, activeIndex: newActiveIndex));
-    _scheduleSave();
+    await _persistNow();
   }
 
   void _onSetActiveIndex(SetActiveIndex event, Emitter<TabsState> emit) {
     emit(state.copyWith(activeIndex: event.index));
   }
 
-  void _onReorderTabs(ReorderTabs event, Emitter<TabsState> emit) {
+  Future<void> _onReorderTabs(ReorderTabs event, Emitter<TabsState> emit) async {
     final tabs = [...state.tabs];
     final oldIndex = event.oldIndex;
     var newIndex = event.newIndex;
@@ -179,7 +187,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     }
 
     emit(state.copyWith(tabs: tabs, activeIndex: newActiveIndex));
-    _scheduleSave();
+    await _persistNow();
   }
 
   void _onUpdateTab(UpdateTab event, Emitter<TabsState> emit) {
@@ -192,7 +200,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     _scheduleSave();
   }
 
-  void _onCloseOtherTabs(CloseOtherTabs event, Emitter<TabsState> emit) {
+  Future<void> _onCloseOtherTabs(CloseOtherTabs event, Emitter<TabsState> emit) async {
     if (state.tabs.length <= 1) return;
     final tabToKeep = state.tabs.byId(event.tabId);
     if (tabToKeep == null) return;
@@ -200,10 +208,10 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       tabs: [tabToKeep],
       activeIndex: 0,
     ));
-    _scheduleSave();
+    await _persistNow();
   }
 
-  void _onCloseTabsToTheRight(CloseTabsToTheRight event, Emitter<TabsState> emit) {
+  Future<void> _onCloseTabsToTheRight(CloseTabsToTheRight event, Emitter<TabsState> emit) async {
     final index = state.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index == -1 || index >= state.tabs.length - 1) return;
     final newTabs = state.tabs.sublist(0, index + 1);
@@ -215,10 +223,10 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       tabs: newTabs,
       activeIndex: newActiveIndex,
     ));
-    _scheduleSave();
+    await _persistNow();
   }
 
-  void _onDuplicateTab(DuplicateTab event, Emitter<TabsState> emit) {
+  Future<void> _onDuplicateTab(DuplicateTab event, Emitter<TabsState> emit) async {
     final index = state.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index == -1) return;
     final tabToDuplicate = state.tabs[index];
@@ -241,7 +249,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       tabs: newTabs,
       activeIndex: index + 1,
     ));
-    _scheduleSave();
+    await _persistNow();
   }
 
   Future<void> _onSendRequest(SendRequest event, Emitter<TabsState> emit) async {

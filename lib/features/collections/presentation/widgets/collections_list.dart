@@ -1,9 +1,15 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_fancy_tree_view/flutter_fancy_tree_view.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
+import 'package:getman/core/utils/postman/postman_collection_mapper.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
@@ -53,6 +59,65 @@ class _CollectionsListState extends State<CollectionsList> {
     }
   }
 
+  Future<void> _importCollections(BuildContext context) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final bloc = context.read<CollectionsBloc>();
+    final FilePickerResult? result;
+    try {
+      result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        withData: true,
+      );
+    } catch (e) {
+      debugPrint('File picker failed: $e');
+      messenger?.showSnackBar(SnackBar(content: Text('Import failed: $e')));
+      return;
+    }
+    if (result == null || result.files.isEmpty) return;
+
+    final imported = <CollectionNodeEntity>[];
+    final failures = <String>[];
+    for (final file in result.files) {
+      try {
+        final content = await _readFileContent(file);
+        if (content == null) {
+          failures.add('${file.name}: unable to read file');
+          continue;
+        }
+        imported.add(PostmanCollectionMapper.fromJson(content));
+      } catch (e) {
+        failures.add('${file.name}: $e');
+      }
+    }
+
+    if (imported.isNotEmpty) {
+      bloc.add(ImportCollections(imported));
+    }
+    if (failures.isNotEmpty) {
+      messenger?.showSnackBar(SnackBar(
+        content: Text(
+          imported.isEmpty
+              ? 'Import failed: ${failures.join('; ')}'
+              : 'Imported ${imported.length} collection(s). Skipped: ${failures.join('; ')}',
+        ),
+      ));
+    } else if (imported.isNotEmpty) {
+      messenger?.showSnackBar(SnackBar(
+        content: Text('Imported ${imported.length} collection(s).'),
+      ));
+    }
+  }
+
+  Future<String?> _readFileContent(PlatformFile file) async {
+    final bytes = file.bytes;
+    if (bytes != null) return utf8.decode(bytes);
+    final path = file.path;
+    if (path != null) return File(path).readAsString();
+    return null;
+  }
+
   List<CollectionNodeEntity> _filterNodes(List<CollectionNodeEntity> nodes, String query) {
     if (query.isEmpty) return nodes;
     final lowerQuery = query.toLowerCase();
@@ -83,17 +148,31 @@ class _CollectionsListState extends State<CollectionsList> {
         children: [
           Padding(
             padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'SEARCH COLLECTIONS...',
-                hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: context.appTypography.displayWeight, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
-                prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(context.appShape.panelRadius), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                isDense: true,
-              ),
-              style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'SEARCH COLLECTIONS...',
+                      hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: context.appTypography.displayWeight, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
+                      prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(context.appShape.panelRadius), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      isDense: true,
+                    ),
+                    style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
+                  ),
+                ),
+                SizedBox(width: layout.tabSpacing),
+                context.appDecoration.wrapInteractive(
+                  child: IconButton(
+                    icon: Icon(Icons.file_upload, size: layout.iconSize, color: theme.colorScheme.onSurface),
+                    tooltip: 'IMPORT FROM POSTMAN',
+                    onPressed: () => _importCollections(context),
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(
@@ -294,6 +373,9 @@ class _NodeContextMenu extends StatelessWidget {
           case 'add_subfolder':
              _showAddSubfolderDialog(context);
              break;
+          case 'export':
+            _exportNode(context);
+            break;
         }
       },
       itemBuilder: (context) => [
@@ -302,6 +384,7 @@ class _NodeContextMenu extends StatelessWidget {
         PopupMenuItem(value: 'rename', child: Text('RENAME', style: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold))),
         if (node.isFolder)
            PopupMenuItem(value: 'add_subfolder', child: Text('ADD SUBFOLDER', style: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold))),
+        PopupMenuItem(value: 'export', child: Text('EXPORT TO POSTMAN', style: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold))),
         PopupMenuItem(value: 'delete', child: Text('DELETE', style: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: FontWeight.bold, color: theme.colorScheme.error))),
       ],
     );
@@ -326,4 +409,33 @@ class _NodeContextMenu extends StatelessWidget {
       onConfirm: (name) => bloc.add(AddFolder(name, parentId: node.id)),
     );
   }
+
+  Future<void> _exportNode(BuildContext context) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    try {
+      final jsonString = PostmanCollectionMapper.toJson(node);
+      final fileName = '${slugFilename(node.name)}.postman_collection.json';
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: 'EXPORT COLLECTION',
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        bytes: utf8.encode(jsonString),
+      );
+      if (path == null) return;
+      if (!kIsWeb) {
+        await File(path).writeAsString(jsonString);
+      }
+      messenger?.showSnackBar(SnackBar(content: Text('Exported to $path')));
+    } catch (e) {
+      debugPrint('Export failed: $e');
+      messenger?.showSnackBar(SnackBar(content: Text('Export failed: $e')));
+    }
+  }
+}
+
+String slugFilename(String name) {
+  final trimmed = name.trim().toLowerCase();
+  final slug = trimmed.replaceAll(RegExp(r'[^a-z0-9]+'), '_').replaceAll(RegExp(r'^_+|_+$'), '');
+  return slug.isEmpty ? 'untitled' : slug;
 }

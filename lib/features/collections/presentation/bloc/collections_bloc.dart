@@ -25,6 +25,7 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
     on<RenameNode>(_onRenameNode);
     on<ToggleFavorite>(_onToggleFavorite);
     on<MoveNode>(_onMoveNode);
+    on<ImportCollections>(_onImportCollections);
   }
 
   /// Append [newNode] to [parentId]'s children, or to the root when [parentId]
@@ -106,5 +107,10 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
         ? [...afterRemoval, nodeToMove]
         : CollectionsTreeHelper.addToParent(afterRemoval, newParentId, nodeToMove);
     return _commit(emit, next);
+  }
+
+  Future<void> _onImportCollections(ImportCollections event, Emitter<CollectionsState> emit) {
+    if (event.rootNodes.isEmpty) return Future.value();
+    return _commit(emit, [...state.collections, ...event.rootNodes]);
   }
 }

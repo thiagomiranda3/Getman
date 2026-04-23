@@ -31,3 +31,10 @@ class DeleteEnvironment extends EnvironmentsEvent {
   @override
   List<Object?> get props => [id];
 }
+
+class ImportEnvironments extends EnvironmentsEvent {
+  final List<EnvironmentEntity> environments;
+  const ImportEnvironments(this.environments);
+  @override
+  List<Object?> get props => [environments];
+}
