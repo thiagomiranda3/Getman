@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/collections_list.dart';
@@ -123,29 +124,13 @@ class _SideMenuHeader extends StatelessWidget {
   }
 
   void _showNewFolderDialog(BuildContext context) {
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('NEW FOLDER'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: 'FOLDER NAME'),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CANCEL')),
-          ElevatedButton(
-            onPressed: () {
-              if (controller.text.isNotEmpty) {
-                context.read<CollectionsBloc>().add(AddFolder(controller.text));
-                Navigator.pop(dialogContext);
-              }
-            },
-            child: const Text('CREATE'),
-          ),
-        ],
-      ),
+    final bloc = context.read<CollectionsBloc>();
+    NamePromptDialog.show(
+      context,
+      title: 'NEW FOLDER',
+      hintText: 'FOLDER NAME',
+      confirmLabel: 'CREATE',
+      onConfirm: (name) => bloc.add(AddFolder(name)),
     );
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_fancy_tree_view/flutter_fancy_tree_view.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
+import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
@@ -307,44 +308,22 @@ class _NodeContextMenu extends StatelessWidget {
   }
 
   void _showRenameDialog(BuildContext context) {
-    final controller = TextEditingController(text: node.name);
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('RENAME'),
-        content: TextField(controller: controller, autofocus: true),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CANCEL')),
-          TextButton(
-            onPressed: () {
-              context.read<CollectionsBloc>().add(RenameNode(node.id, controller.text));
-              Navigator.pop(dialogContext);
-            },
-            child: const Text('SAVE'),
-          ),
-        ],
-      ),
+    final bloc = context.read<CollectionsBloc>();
+    NamePromptDialog.show(
+      context,
+      title: 'RENAME',
+      initialText: node.name,
+      onConfirm: (name) => bloc.add(RenameNode(node.id, name)),
     );
   }
 
   void _showAddSubfolderDialog(BuildContext context) {
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('ADD SUBFOLDER'),
-        content: TextField(controller: controller, autofocus: true),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CANCEL')),
-          TextButton(
-            onPressed: () {
-              context.read<CollectionsBloc>().add(AddFolder(controller.text, parentId: node.id));
-              Navigator.pop(dialogContext);
-            },
-            child: const Text('ADD'),
-          ),
-        ],
-      ),
+    final bloc = context.read<CollectionsBloc>();
+    NamePromptDialog.show(
+      context,
+      title: 'ADD SUBFOLDER',
+      confirmLabel: 'ADD',
+      onConfirm: (name) => bloc.add(AddFolder(name, parentId: node.id)),
     );
   }
 }

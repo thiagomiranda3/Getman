@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:getman/core/navigation/intents.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
@@ -222,29 +223,17 @@ class _RequestViewState extends State<RequestView> {
   }
 
   void _showSaveDialog(BuildContext context, HttpRequestTabEntity tab) {
-    final controller = TextEditingController(text: 'NEW REQUEST');
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('SAVE TO COLLECTION'),
-        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(labelText: 'REQUEST NAME')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CANCEL')),
-          TextButton(
-            onPressed: () {
-              context.read<CollectionsBloc>().add(SaveRequestToCollection(
-                controller.text,
-                tab.config.copyWith(),
-              ));
-              context.read<TabsBloc>().add(UpdateTab(
-                tab.copyWith(collectionName: controller.text),
-              ));
-              Navigator.pop(dialogContext);
-            },
-            child: const Text('SAVE'),
-          ),
-        ],
-      ),
-    ).whenComplete(controller.dispose);
+    final collectionsBloc = context.read<CollectionsBloc>();
+    final tabsBloc = context.read<TabsBloc>();
+    NamePromptDialog.show(
+      context,
+      title: 'SAVE TO COLLECTION',
+      initialText: 'NEW REQUEST',
+      hintText: 'REQUEST NAME',
+      onConfirm: (name) {
+        collectionsBloc.add(SaveRequestToCollection(name, tab.config.copyWith()));
+        tabsBloc.add(UpdateTab(tab.copyWith(collectionName: name)));
+      },
+    );
   }
 }

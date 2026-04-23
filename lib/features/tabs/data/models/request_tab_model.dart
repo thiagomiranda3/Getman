@@ -46,30 +46,6 @@ class HttpRequestTabModel extends HiveObject {
     String? tabId,
   }) : tabId = tabId ?? const Uuid().v4();
 
-  HttpRequestTabModel copyWith({
-    HttpRequestConfig? config,
-    String? responseBody,
-    Map<String, String>? responseHeaders,
-    int? statusCode,
-    int? durationMs,
-    bool? isSending,
-    String? collectionNodeId,
-    String? collectionName,
-    String? tabId,
-  }) {
-    return HttpRequestTabModel(
-      config: config ?? this.config,
-      responseBody: responseBody ?? this.responseBody,
-      responseHeaders: responseHeaders ?? this.responseHeaders,
-      statusCode: statusCode ?? this.statusCode,
-      durationMs: durationMs ?? this.durationMs,
-      isSending: isSending ?? this.isSending,
-      collectionNodeId: collectionNodeId ?? this.collectionNodeId,
-      collectionName: collectionName ?? this.collectionName,
-      tabId: tabId ?? this.tabId,
-    );
-  }
-
   factory HttpRequestTabModel.fromEntity(HttpRequestTabEntity entity) => HttpRequestTabModel(
     config: HttpRequestConfig.fromEntity(entity.config),
     responseBody: entity.responseBody,

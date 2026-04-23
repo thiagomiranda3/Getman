@@ -3,13 +3,10 @@ import 'package:getman/core/domain/entities/request_config_entity.dart';
 class CurlUtils {
   /// Parses a curl command into an [HttpRequestConfigEntity]
   static HttpRequestConfigEntity? parse(String curl, {required String id}) {
-    final trimmedCurl = curl.trim();
-    if (!trimmedCurl.toLowerCase().startsWith('curl ')) {
-      return null;
-    }
-
-    // Split the curl command into arguments, respecting quotes
-    final args = _splitArguments(trimmedCurl);
+    // Tokenize first; the first token tells us whether this really is a curl
+    // invocation. (The previous double-check — startsWith + args[0] — was
+    // redundant; tokenization already handles leading whitespace.)
+    final args = _splitArguments(curl.trim());
     if (args.isEmpty || args[0].toLowerCase() != 'curl') {
       return null;
     }

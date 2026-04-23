@@ -43,6 +43,7 @@ class MyApp extends StatelessWidget {
       child: BlocBuilder<SettingsBloc, SettingsState>(
         builder: (context, state) {
           final settings = state.settings;
+          final themeBuilder = resolveTheme(settings.themeId);
           return Shortcuts(
             shortcuts: const <ShortcutActivator, Intent>{
               SingleActivator(LogicalKeyboardKey.keyN, control: true): NewTabIntent(),
@@ -65,8 +66,8 @@ class MyApp extends StatelessWidget {
               child: MaterialApp.router(
                 title: 'GETMAN',
                 debugShowCheckedModeBanner: false,
-                theme: resolveTheme(settings.themeId)(Brightness.light, isCompact: settings.isCompactMode),
-                darkTheme: resolveTheme(settings.themeId)(Brightness.dark, isCompact: settings.isCompactMode),
+                theme: themeBuilder(Brightness.light, isCompact: settings.isCompactMode),
+                darkTheme: themeBuilder(Brightness.dark, isCompact: settings.isCompactMode),
                 themeMode: settings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
                 routerConfig: di.sl<AppRouter>().router,
                 builder: (context, child) {

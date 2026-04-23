@@ -60,33 +60,6 @@ class HttpRequestConfig extends HiveObject {
         params = params ?? {},
         auth = auth ?? {};
 
-  HttpRequestConfig copyWith({
-    String? method,
-    String? url,
-    Map<String, String>? headers,
-    Map<String, String>? params,
-    String? body,
-    Map<String, String>? auth,
-    String? responseBody,
-    Map<String, String>? responseHeaders,
-    int? statusCode,
-    int? durationMs,
-  }) {
-    return HttpRequestConfig(
-      id: id,
-      method: method ?? this.method,
-      url: url ?? this.url,
-      headers: headers ?? Map.from(this.headers),
-      params: params ?? Map.from(this.params),
-      body: body ?? this.body,
-      auth: auth ?? Map.from(this.auth),
-      responseBody: responseBody ?? this.responseBody,
-      responseHeaders: responseHeaders ?? this.responseHeaders,
-      statusCode: statusCode ?? this.statusCode,
-      durationMs: durationMs ?? this.durationMs,
-    );
-  }
-
   factory HttpRequestConfig.fromEntity(HttpRequestConfigEntity entity) => HttpRequestConfig(
     id: entity.id,
     method: entity.method,

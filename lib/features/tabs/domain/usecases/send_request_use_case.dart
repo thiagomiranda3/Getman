@@ -41,15 +41,14 @@ class SendRequestUseCase {
   }) async {
     try {
       final settings = await getSettingsUseCase();
-      var historyConfig = config.copyWith();
-      if (settings.saveResponseInHistory) {
-        historyConfig = historyConfig.copyWith(
-          responseBody: response?.body ?? failure?.message,
-          responseHeaders: response?.headers ?? const {},
-          statusCode: response?.statusCode ?? failure?.statusCode ?? 0,
-          durationMs: response?.durationMs ?? 0,
-        );
-      }
+      final historyConfig = settings.saveResponseInHistory
+          ? config.copyWith(
+              responseBody: response?.body ?? failure?.message,
+              responseHeaders: response?.headers ?? const {},
+              statusCode: response?.statusCode ?? failure?.statusCode ?? 0,
+              durationMs: response?.durationMs ?? 0,
+            )
+          : config;
       await addToHistoryUseCase(historyConfig, settings.historyLimit);
     } catch (e, st) {
       // History is best-effort; never fail the request because of persistence —

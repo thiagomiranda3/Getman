@@ -16,19 +16,23 @@ void main() {
       expect(appThemes[defaultThemeId], isNotNull);
     });
 
-    test('resolveTheme returns default for null', () {
-      final builder = resolveTheme(null);
-      expect(builder, appThemes[defaultThemeId]);
+    test('resolveTheme returns default builder for null', () {
+      expect(resolveTheme(null), appThemes[defaultThemeId]!.builder);
     });
 
-    test('resolveTheme returns default for unknown id', () {
-      final builder = resolveTheme('does-not-exist');
-      expect(builder, appThemes[defaultThemeId]);
+    test('resolveTheme returns default builder for unknown id', () {
+      expect(resolveTheme('does-not-exist'), appThemes[defaultThemeId]!.builder);
     });
 
     test('resolveTheme returns registered builder for known id', () {
-      final builder = resolveTheme(kBrutalistThemeId);
-      expect(builder, appThemes[kBrutalistThemeId]);
+      expect(resolveTheme(kBrutalistThemeId), appThemes[kBrutalistThemeId]!.builder);
+    });
+
+    test('every descriptor has a non-empty display name matching its id', () {
+      for (final entry in appThemes.entries) {
+        expect(entry.value.id, entry.key);
+        expect(entry.value.displayName, isNotEmpty);
+      }
     });
 
     // testWidgets absorbs the asynchronous google_fonts font-not-found error

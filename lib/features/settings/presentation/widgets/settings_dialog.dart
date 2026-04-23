@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
-import 'package:getman/core/theme/theme_ids.dart';
+import 'package:getman/core/theme/theme_registry.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
@@ -105,10 +105,12 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   trailing: DropdownButton<String>(
                     value: settings.themeId,
                     underline: const SizedBox.shrink(),
-                    items: const [
-                      DropdownMenuItem(value: kBrutalistThemeId, child: Text('BRUTALIST')),
-                      DropdownMenuItem(value: kEditorialThemeId, child: Text('EDITORIAL')),
-                      DropdownMenuItem(value: kRpgThemeId, child: Text('ARCANE QUEST')),
+                    items: [
+                      for (final descriptor in appThemes.values)
+                        DropdownMenuItem(
+                          value: descriptor.id,
+                          child: Text(descriptor.displayName),
+                        ),
                     ],
                     onChanged: (value) {
                       if (value != null) {

@@ -1,16 +1,14 @@
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/utils/equality.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart';
-
-const _headerMapEquality = MapEquality<String, String>();
 
 class RequestConfigSection extends StatelessWidget {
   final String tabId;
@@ -27,8 +25,8 @@ class RequestConfigSection extends StatelessWidget {
         final p = prev.tabs.byId(tabId);
         final n = next.tabs.byId(tabId);
         if (p == null || n == null) return true;
-        return !_headerMapEquality.equals(p.config.params, n.config.params) ||
-            !_headerMapEquality.equals(p.config.headers, n.config.headers);
+        return !headerMapEquality.equals(p.config.params, n.config.params) ||
+            !headerMapEquality.equals(p.config.headers, n.config.headers);
       },
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
@@ -160,10 +158,10 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
     // If the incoming items are the echo of our own last emission, the
     // current controllers are already correct — don't wipe them (which
     // would drop focus and blow away the user's half-typed row).
-    if (_lastEmitted != null && _headerMapEquality.equals(widget.items, _lastEmitted)) {
+    if (_lastEmitted != null && headerMapEquality.equals(widget.items, _lastEmitted)) {
       return;
     }
-    if (_headerMapEquality.equals(widget.items, oldWidget.items)) {
+    if (headerMapEquality.equals(widget.items, oldWidget.items)) {
       return;
     }
     _disposeControllers();

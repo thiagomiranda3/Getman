@@ -1,16 +1,14 @@
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/utils/equality.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart';
-
-const _headerMapEquality = MapEquality<String, String>();
 
 class ResponseSection extends StatelessWidget {
   final String tabId;
@@ -197,7 +195,7 @@ class _ResponseHeadersView extends StatelessWidget {
       buildWhen: (prev, next) {
         final p = prev.tabs.byId(tabId);
         final n = next.tabs.byId(tabId);
-        return !_headerMapEquality.equals(p?.responseHeaders, n?.responseHeaders);
+        return !headerMapEquality.equals(p?.responseHeaders, n?.responseHeaders);
       },
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
