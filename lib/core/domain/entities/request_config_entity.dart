@@ -1,5 +1,8 @@
 import 'package:equatable/equatable.dart';
 
+import '../../utils/url_query_utils.dart';
+import 'query_param_entity.dart';
+
 // Sentinel used by copyWith to distinguish "not provided" from "explicitly null".
 const Object _unset = Object();
 
@@ -8,7 +11,6 @@ class HttpRequestConfigEntity extends Equatable {
   final String method;
   final String url;
   final Map<String, String> headers;
-  final Map<String, String> params;
   final String body;
   final Map<String, String> auth;
   final String? responseBody;
@@ -24,7 +26,6 @@ class HttpRequestConfigEntity extends Equatable {
       'Content-Type': 'application/json',
       'Accept': '*/*',
     },
-    this.params = const {},
     this.body = '',
     this.auth = const {},
     this.responseBody,
@@ -33,11 +34,18 @@ class HttpRequestConfigEntity extends Equatable {
     this.durationMs,
   });
 
+  /// Derived view of the query params embedded in [url]. URL is the single
+  /// source of truth — params are never stored separately. Duplicates are
+  /// preserved in order.
+  List<QueryParamEntity> get params => UrlQueryUtils.parseQuery(url);
+
+  /// Rebuilds the entity. If [url] is supplied it wins. Otherwise, if [params]
+  /// is supplied, the current URL's query portion is rewritten to match.
   HttpRequestConfigEntity copyWith({
     String? method,
     String? url,
     Map<String, String>? headers,
-    Map<String, String>? params,
+    List<QueryParamEntity>? params,
     String? body,
     Map<String, String>? auth,
     Object? responseBody = _unset,
@@ -45,12 +53,15 @@ class HttpRequestConfigEntity extends Equatable {
     Object? statusCode = _unset,
     Object? durationMs = _unset,
   }) {
+    final resolvedUrl = url ??
+        (params != null
+            ? UrlQueryUtils.replaceQuery(this.url, params)
+            : this.url);
     return HttpRequestConfigEntity(
       id: id,
       method: method ?? this.method,
-      url: url ?? this.url,
+      url: resolvedUrl,
       headers: headers ?? Map.from(this.headers),
-      params: params ?? Map.from(this.params),
       body: body ?? this.body,
       auth: auth ?? Map.from(this.auth),
       responseBody: identical(responseBody, _unset) ? this.responseBody : responseBody as String?,
@@ -68,7 +79,6 @@ class HttpRequestConfigEntity extends Equatable {
     method,
     url,
     headers,
-    params,
     body,
     auth,
     responseBody,

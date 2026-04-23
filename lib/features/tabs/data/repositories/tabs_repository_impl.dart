@@ -3,6 +3,7 @@ import '../../../../core/error/guard.dart';
 import '../../../../core/network/http_response.dart';
 import '../../../../core/network/network_service.dart';
 import '../../../../core/utils/environment_resolver.dart';
+import '../../../../core/utils/url_query_utils.dart';
 import '../../domain/entities/request_tab_entity.dart';
 import '../../domain/repositories/tabs_repository.dart';
 import '../datasources/tabs_local_data_source.dart';
@@ -35,13 +36,26 @@ class TabsRepositoryImpl implements TabsRepository {
     Map<String, String> envVars = const {},
     NetworkCancelHandle? cancelHandle,
   }) {
+    final parts = UrlQueryUtils.parse(config.url);
+    final resolvedBase = EnvironmentResolver.resolve(parts.base, envVars);
+
+    // Duplicate keys ride through as list values — Dio (with ListFormat.multi)
+    // serializes `[1, 2]` as `?key=1&key=2`.
+    final queryMap = <String, List<String>>{};
+    for (final p in parts.params) {
+      queryMap
+          .putIfAbsent(p.key, () => <String>[])
+          .add(EnvironmentResolver.resolve(p.value, envVars));
+    }
+
     final resolvedBody = config.body.isNotEmpty
         ? EnvironmentResolver.resolve(config.body, envVars)
         : null;
+
     return networkService.request(
-      url: EnvironmentResolver.resolve(config.url, envVars),
+      url: resolvedBase,
       method: config.method,
-      queryParameters: EnvironmentResolver.resolveMap(config.params, envVars),
+      queryParameters: queryMap,
       data: resolvedBody,
       headers: EnvironmentResolver.resolveMap(config.headers, envVars),
       cancelHandle: cancelHandle,

@@ -27,6 +27,7 @@ class NetworkService {
       sendTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 60),
       validateStatus: (_) => true,
+      listFormat: ListFormat.multi,
     ));
     if (kDebugMode) {
       dio.interceptors.add(LogInterceptor(

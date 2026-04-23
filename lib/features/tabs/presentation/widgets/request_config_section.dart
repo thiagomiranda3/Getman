@@ -1,6 +1,8 @@
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:re_editor/re_editor.dart';
+import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/utils/equality.dart';
 import 'package:getman/core/utils/json_utils.dart';
@@ -9,6 +11,9 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart';
+
+const ListEquality<QueryParamEntity> _queryParamListEquality =
+    ListEquality<QueryParamEntity>();
 
 class RequestConfigSection extends StatelessWidget {
   final String tabId;
@@ -25,7 +30,9 @@ class RequestConfigSection extends StatelessWidget {
         final p = prev.tabs.byId(tabId);
         final n = next.tabs.byId(tabId);
         if (p == null || n == null) return true;
-        return !headerMapEquality.equals(p.config.params, n.config.params) ||
+        // URL carries the query — a single equality check captures any params
+        // change that would affect the PARAMS tab.
+        return p.config.url != n.config.url ||
             !headerMapEquality.equals(p.config.headers, n.config.headers);
       },
       builder: (context, state) {
@@ -62,17 +69,17 @@ class RequestConfigSection extends StatelessWidget {
                   decoration: context.appDecoration.panelBox(context, offset: 0),
                   child: TabBarView(
                     children: [
-                      _KeyValueEditor(
+                      _QueryParamsEditor(
                         items: tab.config.params,
-                        onChanged: (map) {
+                        onChanged: (list) {
                           final current = context.read<TabsBloc>().state.tabs.byId(tabId);
                           if (current == null) return;
                           context.read<TabsBloc>().add(UpdateTab(
-                            current.copyWith(config: current.config.copyWith(params: map)),
+                            current.copyWith(config: current.config.copyWith(params: list)),
                           ));
                         },
                       ),
-                      _KeyValueEditor(
+                      _HeadersEditor(
                         items: tab.config.headers,
                         onChanged: (map) {
                           final current = context.read<TabsBloc>().state.tabs.byId(tabId);
@@ -119,17 +126,144 @@ class RequestConfigSection extends StatelessWidget {
   }
 }
 
-class _KeyValueEditor extends StatefulWidget {
+/// Editor for ordered `List<QueryParamEntity>`. Duplicates allowed, order
+/// preserved. Mirrors the echo-suppression pattern of `_HeadersEditor`.
+class _QueryParamsEditor extends StatefulWidget {
+  final List<QueryParamEntity> items;
+  final Function(List<QueryParamEntity>) onChanged;
+
+  const _QueryParamsEditor({required this.items, required this.onChanged});
+
+  @override
+  State<_QueryParamsEditor> createState() => _QueryParamsEditorState();
+}
+
+class _QueryParamsEditorState extends State<_QueryParamsEditor> {
+  late List<TextEditingController> _keyControllers;
+  late List<TextEditingController> _valControllers;
+  List<QueryParamEntity>? _lastEmitted;
+
+  @override
+  void initState() {
+    super.initState();
+    _initControllers(widget.items);
+  }
+
+  void _initControllers(List<QueryParamEntity> items) {
+    _keyControllers = [];
+    _valControllers = [];
+
+    for (final p in items) {
+      _keyControllers.add(TextEditingController(text: p.key));
+      _valControllers.add(TextEditingController(text: p.value));
+    }
+    _keyControllers.add(TextEditingController());
+    _valControllers.add(TextEditingController());
+  }
+
+  @override
+  void didUpdateWidget(_QueryParamsEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_lastEmitted != null &&
+        _queryParamListEquality.equals(widget.items, _lastEmitted)) {
+      return;
+    }
+    if (_queryParamListEquality.equals(widget.items, oldWidget.items)) {
+      return;
+    }
+    _disposeControllers();
+    _initControllers(widget.items);
+    _lastEmitted = null;
+  }
+
+  void _disposeControllers() {
+    for (final c in _keyControllers) {
+      c.dispose();
+    }
+    for (final c in _valControllers) {
+      c.dispose();
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposeControllers();
+    super.dispose();
+  }
+
+  List<QueryParamEntity> _asList() {
+    final list = <QueryParamEntity>[];
+    for (int i = 0; i < _keyControllers.length; i++) {
+      final key = _keyControllers[i].text;
+      final val = _valControllers[i].text;
+      if (key.isNotEmpty) {
+        list.add(QueryParamEntity(key: key, value: val));
+      }
+    }
+    return list;
+  }
+
+  void _emit() {
+    final list = _asList();
+    _lastEmitted = list;
+    widget.onChanged(list);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final layout = context.appLayout;
+
+    return ListView.builder(
+      itemCount: _keyControllers.length,
+      itemBuilder: (context, index) {
+        return _KeyValueRow(
+          key: ValueKey(_keyControllers[index]),
+          keyController: _keyControllers[index],
+          valController: _valControllers[index],
+          layout: layout,
+          isLast: index == _keyControllers.length - 1,
+          onKeyChanged: (val) {
+            if (index == _keyControllers.length - 1 && val.isNotEmpty) {
+              setState(() {
+                _keyControllers.add(TextEditingController());
+                _valControllers.add(TextEditingController());
+              });
+            }
+            _emit();
+          },
+          onValChanged: (val) => _emit(),
+          onDelete: () {
+            setState(() {
+              _keyControllers[index].dispose();
+              _valControllers[index].dispose();
+              _keyControllers.removeAt(index);
+              _valControllers.removeAt(index);
+              if (_keyControllers.isEmpty) {
+                _keyControllers.add(TextEditingController());
+                _valControllers.add(TextEditingController());
+              }
+              _emit();
+            });
+          },
+        );
+      },
+    );
+  }
+}
+
+/// Editor for headers, still keyed as `Map<String, String>`. Duplicates are
+/// not a real concern for headers in this UI — last-write-wins is fine.
+class _HeadersEditor extends StatefulWidget {
   final Map<String, String> items;
   final Function(Map<String, String>) onChanged;
 
-  const _KeyValueEditor({required this.items, required this.onChanged});
+  const _HeadersEditor({required this.items, required this.onChanged});
 
   @override
-  State<_KeyValueEditor> createState() => _KeyValueEditorState();
+  State<_HeadersEditor> createState() => _HeadersEditorState();
 }
 
-class _KeyValueEditorState extends State<_KeyValueEditor> {
+class _HeadersEditorState extends State<_HeadersEditor> {
   late List<TextEditingController> _keyControllers;
   late List<TextEditingController> _valControllers;
   Map<String, String>? _lastEmitted;
@@ -153,11 +287,8 @@ class _KeyValueEditorState extends State<_KeyValueEditor> {
   }
 
   @override
-  void didUpdateWidget(_KeyValueEditor oldWidget) {
+  void didUpdateWidget(_HeadersEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // If the incoming items are the echo of our own last emission, the
-    // current controllers are already correct — don't wipe them (which
-    // would drop focus and blow away the user's half-typed row).
     if (_lastEmitted != null && headerMapEquality.equals(widget.items, _lastEmitted)) {
       return;
     }

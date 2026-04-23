@@ -2,8 +2,10 @@ import 'dart:convert';
 
 import 'package:uuid/uuid.dart';
 
+import '../../domain/entities/query_param_entity.dart';
 import '../../domain/entities/request_config_entity.dart';
 import '../../../features/collections/domain/entities/collection_node_entity.dart';
+import '../url_query_utils.dart';
 
 class PostmanCollectionMapper {
   static const String _schemaV21 =
@@ -96,9 +98,12 @@ class PostmanCollectionMapper {
         .map((e) => {'key': e.key, 'value': e.value, 'type': 'text'})
         .toList();
     final urlObj = <String, dynamic>{'raw': config.url};
-    if (config.params.isNotEmpty) {
-      urlObj['query'] = config.params.entries
-          .map((e) => {'key': e.key, 'value': e.value})
+    // Emit the structured `query` array so Postman's UI renders rows.
+    // Derived from the URL's query portion — duplicates preserved.
+    final query = UrlQueryUtils.parseQuery(config.url);
+    if (query.isNotEmpty) {
+      urlObj['query'] = query
+          .map((p) => {'key': p.key, 'value': p.value})
           .toList();
     }
     final result = <String, dynamic>{
@@ -153,16 +158,20 @@ class PostmanCollectionMapper {
 
   static HttpRequestConfigEntity _requestToConfig(Map<String, dynamic> request) {
     final method = (request['method'] as String?)?.toUpperCase() ?? 'GET';
-    final url = _parseUrl(request['url']);
-    final params = _parseQuery(request['url']);
+    final rawUrl = _parseUrl(request['url']);
+    final structuredQuery = _parseQueryList(request['url']);
+    // If Postman gave us a structured query block, it wins — merge into the
+    // raw URL's query portion. Otherwise keep raw as-is.
+    final mergedUrl = structuredQuery == null
+        ? rawUrl
+        : UrlQueryUtils.replaceQuery(rawUrl, structuredQuery);
     final headers = _parseHeaders(request['header']);
     final body = _parseBody(request['body']);
     return HttpRequestConfigEntity(
       id: _uuid.v4(),
       method: method,
-      url: url,
+      url: mergedUrl,
       headers: headers,
-      params: params,
       body: body,
     );
   }
@@ -182,17 +191,24 @@ class PostmanCollectionMapper {
     return '';
   }
 
-  static Map<String, String> _parseQuery(dynamic url) {
-    if (url is! Map) return {};
+  /// Returns null when the Postman payload did not include a structured
+  /// `url.query` array at all (caller should keep the raw URL's query intact).
+  /// Returns an empty list when `url.query` was present but empty or fully
+  /// disabled (caller should clear the raw URL's query).
+  static List<QueryParamEntity>? _parseQueryList(dynamic url) {
+    if (url is! Map) return null;
     final query = url['query'];
-    if (query is! List) return {};
-    final result = <String, String>{};
+    if (query is! List) return null;
+    final result = <QueryParamEntity>[];
     for (final entry in query.whereType<Map>()) {
       if (entry['disabled'] == true) continue;
       final key = entry['key'];
       final value = entry['value'];
       if (key is! String || key.isEmpty) continue;
-      result[key] = value is String ? value : (value?.toString() ?? '');
+      result.add(QueryParamEntity(
+        key: key,
+        value: value is String ? value : (value?.toString() ?? ''),
+      ));
     }
     return result;
   }
