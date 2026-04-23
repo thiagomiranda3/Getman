@@ -286,6 +286,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
                   collectionNodeId: node.id,
                   collectionName: node.name,
                 ));
+            Scaffold.maybeOf(context)?.closeDrawer();
           },
           child: MouseRegion(
             onEnter: (_) => setState(() => _isHovered = true),

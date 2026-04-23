@@ -92,7 +92,10 @@ class _HistoryListState extends State<HistoryList> {
         return _HistoryItemWidget(
           key: ValueKey(config.id),
           config: config,
-          onTap: () => context.read<TabsBloc>().add(AddTab(config: config.copyWith())),
+          onTap: () {
+            context.read<TabsBloc>().add(AddTab(config: config.copyWith()));
+            Scaffold.maybeOf(context)?.closeDrawer();
+          },
         );
       },
     );
