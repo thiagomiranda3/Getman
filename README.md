@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/brand/icon_1024.png" alt="Getman" width="160" height="160">
+</p>
+
 # Getman
 
 A fast, native HTTP client for desktop and the web — built with Flutter,

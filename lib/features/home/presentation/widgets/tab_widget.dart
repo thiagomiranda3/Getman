@@ -97,6 +97,7 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
                   onExit: (_) => setState(() => _isHovered = false),
                   child: GestureDetector(
                     onTap: widget.onTap,
+                    onTertiaryTapUp: (_) => _handleClose(),
                     onSecondaryTapDown: (details) => _showContextMenu(context, details.globalPosition, tab),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
