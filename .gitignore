@@ -45,3 +45,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Superpowers (visual brainstorming, scratch)
+.superpowers/
