@@ -44,3 +44,27 @@ ThemeDescriptor resolveThemeDescriptor(String? themeId) =>
     appThemes[themeId] ?? appThemes[defaultThemeId]!;
 
 AppThemeBuilder resolveTheme(String? themeId) => resolveThemeDescriptor(themeId).builder;
+
+// Cache keyed by (resolved theme id, brightness, isCompact).
+// ThemeData is immutable and theme builders are pure functions of these three
+// inputs, so entries are safe to share indefinitely.
+// Bounded: themes × brightness × compact ≤ ~12 entries total.
+final Map<(String, Brightness, bool), ThemeData> _themeDataCache = {};
+
+/// Resolve and build the [ThemeData] for [themeId], caching by
+/// (resolved theme id, brightness, isCompact) so repeated calls during
+/// BLoC rebuilds never re-run the expensive theme builder.
+ThemeData resolveThemeData(
+  String? themeId,
+  Brightness brightness, {
+  required bool isCompact,
+}) {
+  // Resolve the id first so an unknown id shares a cache entry with the
+  // fallback theme rather than creating a separate (never-reused) entry.
+  final resolvedId = resolveThemeDescriptor(themeId).id;
+  final key = (resolvedId, brightness, isCompact);
+  return _themeDataCache.putIfAbsent(
+    key,
+    () => resolveTheme(resolvedId)(brightness, isCompact: isCompact),
+  );
+}

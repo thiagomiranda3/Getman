@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/branded_tab_bar.dart';
 import 'package:getman/core/utils/equality.dart';
@@ -140,6 +141,11 @@ class _ResponseBodyView extends StatefulWidget {
 class _ResponseBodyViewState extends State<_ResponseBodyView> {
   int _pendingSyncId = 0;
 
+  // Large-mode state: non-null when the current body exceeds the threshold.
+  String? _largeBody;
+  bool _showFullPreview = false;
+  bool _highlightingOptedIn = false;
+
   @override
   void initState() {
     super.initState();
@@ -149,10 +155,49 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
 
   Future<void> _syncBody(String? rawBody) async {
     final syncId = ++_pendingSyncId;
+
+    if (rawBody != null && rawBody.length > kLargeResponseViewerChars) {
+      // Large path — skip prettify and editor; go to plain-text mode.
+      if (!mounted || syncId != _pendingSyncId) return;
+      setState(() {
+        _largeBody = rawBody;
+        _showFullPreview = false;
+        _highlightingOptedIn = false;
+      });
+      return;
+    }
+
+    // Normal path — prettify then load into the editor.
     final prettified = await JsonUtils.prettify(rawBody);
     // Only apply if no newer sync was started and we're still mounted.
     if (!mounted || syncId != _pendingSyncId) return;
     widget.responseController.text = prettified;
+    // Clear large mode if a previous response triggered it.
+    if (_largeBody != null) {
+      setState(() {
+        _largeBody = null;
+        _showFullPreview = false;
+        _highlightingOptedIn = false;
+      });
+    }
+  }
+
+  Future<void> _prettifyAndOptIn() async {
+    final body = _largeBody;
+    if (body == null) return;
+    final syncId = ++_pendingSyncId;
+    final prettified = await JsonUtils.prettify(body);
+    if (!mounted || syncId != _pendingSyncId) return;
+    widget.responseController.text = prettified;
+    setState(() => _highlightingOptedIn = true);
+  }
+
+  String _humanSize(int chars) {
+    if (chars < 1024) return '$chars B';
+    final kb = chars / 1024;
+    if (kb < 1024) return '${kb.toStringAsFixed(1)} KB';
+    final mb = kb / 1024;
+    return '${mb.toStringAsFixed(1)} MB';
   }
 
   @override
@@ -167,10 +212,106 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
         final tab = state.tabs.byId(widget.tabId);
         _syncBody(tab?.response?.body);
       },
-      child: SizedBox(
-        width: double.infinity,
-        child: JsonCodeEditor(controller: widget.responseController, readOnly: true),
+      child: _largeBody != null ? _buildLargeMode(context) : _buildEditorMode(),
+    );
+  }
+
+  Widget _buildEditorMode() {
+    return SizedBox(
+      width: double.infinity,
+      child: JsonCodeEditor(
+        controller: widget.responseController,
+        readOnly: true,
+        wordWrap: _highlightingOptedIn ? false : true,
       ),
+    );
+  }
+
+  Widget _buildLargeMode(BuildContext context) {
+    final layout = context.appLayout;
+    final typography = context.appTypography;
+    final palette = context.appPalette;
+    final theme = Theme.of(context);
+    final body = _largeBody!;
+    final sizeLabel = _humanSize(body.length);
+
+    final displayText = _showFullPreview
+        ? body
+        : body.substring(0, body.length.clamp(0, kLargeResponsePreviewChars));
+    final isTruncated = !_showFullPreview && body.length > kLargeResponsePreviewChars;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Banner row
+        ColoredBox(
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: layout.pagePadding,
+              vertical: layout.pagePadding / 2,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _highlightingOptedIn
+                        ? 'LARGE RESPONSE ($sizeLabel) — HIGHLIGHTING ENABLED'
+                        : 'LARGE RESPONSE ($sizeLabel) — HIGHLIGHTING DISABLED',
+                    style: TextStyle(
+                      fontSize: layout.fontSizeSmall,
+                      fontWeight: typography.titleWeight,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                if (!_highlightingOptedIn) ...[
+                  TextButton(
+                    onPressed: _prettifyAndOptIn,
+                    child: Text(
+                      'PRETTIFY ANYWAY',
+                      style: TextStyle(
+                        fontSize: layout.fontSizeSmall,
+                        fontWeight: typography.titleWeight,
+                      ),
+                    ),
+                  ),
+                  if (isTruncated)
+                    TextButton(
+                      onPressed: () => setState(() => _showFullPreview = true),
+                      child: Text(
+                        'SHOW FULL',
+                        style: TextStyle(
+                          fontSize: layout.fontSizeSmall,
+                          fontWeight: typography.titleWeight,
+                        ),
+                      ),
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        // Body — editor when opted-in, plain text otherwise
+        Expanded(
+          child: _highlightingOptedIn
+              ? _buildEditorMode()
+              : ColoredBox(
+                  color: palette.codeBackground,
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(layout.pagePadding),
+                    child: SelectableText(
+                      displayText,
+                      style: TextStyle(
+                        fontFamily: typography.codeFontFamily,
+                        fontSize: layout.fontSizeCode,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                ),
+        ),
+      ],
     );
   }
 }

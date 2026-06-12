@@ -9,11 +9,13 @@ import 'package:re_highlight/styles/atom-one-light.dart';
 class JsonCodeEditor extends StatelessWidget {
   final CodeLineEditingController controller;
   final bool readOnly;
+  final bool wordWrap;
 
   const JsonCodeEditor({
     super.key,
     required this.controller,
     this.readOnly = false,
+    this.wordWrap = true,
   });
 
   @override
@@ -26,7 +28,7 @@ class JsonCodeEditor extends StatelessWidget {
       child: CodeEditor(
         controller: controller,
         readOnly: readOnly,
-        wordWrap: true,
+        wordWrap: wordWrap,
         findBuilder: (context, controller, readOnly) => CodeFindPanel(controller: controller, readOnly: readOnly),
         style: CodeEditorStyle(
           fontSize: context.appLayout.fontSizeCode,

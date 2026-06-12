@@ -17,9 +17,14 @@ import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // All Google Fonts variants the app uses are bundled in assets/google_fonts/.
+  // Disallow runtime fetching so a missing variant fails loudly in debug
+  // instead of silently downloading over HTTP (jank + offline breakage).
+  GoogleFonts.config.allowRuntimeFetching = false;
   final initialSettings = await di.init();
   runApp(MyApp(initialSettings: initialSettings));
 }
@@ -52,7 +57,6 @@ class MyApp extends StatelessWidget {
             prev.settings.isCompactMode != next.settings.isCompactMode,
         builder: (context, state) {
           final settings = state.settings;
-          final themeBuilder = resolveTheme(settings.themeId);
           return Shortcuts(
             shortcuts: const <ShortcutActivator, Intent>{
               SingleActivator(LogicalKeyboardKey.keyN, control: true): NewTabIntent(),
@@ -75,8 +79,12 @@ class MyApp extends StatelessWidget {
               child: MaterialApp.router(
                 title: 'GETMAN',
                 debugShowCheckedModeBanner: false,
-                theme: themeBuilder(Brightness.light, isCompact: settings.isCompactMode),
-                darkTheme: themeBuilder(Brightness.dark, isCompact: settings.isCompactMode),
+                // Lerping ThemeData triggers ~12 full-tree rebuilds per theme
+                // change. The app's widget tree is too heavy for that; a single
+                // instant rebuild is both faster and visually cleaner.
+                themeAnimationDuration: Duration.zero,
+                theme: resolveThemeData(settings.themeId, Brightness.light, isCompact: settings.isCompactMode),
+                darkTheme: resolveThemeData(settings.themeId, Brightness.dark, isCompact: settings.isCompactMode),
                 themeMode: settings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
                 routerConfig: di.sl<AppRouter>().router,
                 builder: (context, child) {

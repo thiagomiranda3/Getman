@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/failures.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/network/network_service.dart';
@@ -46,9 +47,13 @@ class SendRequestUseCase {
   }) async {
     try {
       final settings = await getSettingsUseCase();
+      final rawBody = response?.body ?? failure?.message;
+      final cappedBody = rawBody != null && rawBody.length > kMaxPersistedResponseBodyChars
+          ? kResponseBodyTooLargePlaceholder
+          : rawBody;
       final historyConfig = settings.saveResponseInHistory
           ? config.copyWith(
-              responseBody: response?.body ?? failure?.message,
+              responseBody: cappedBody,
               responseHeaders: response?.headers ?? const {},
               statusCode: response?.statusCode ?? failure?.statusCode ?? 0,
               durationMs: response?.durationMs ?? 0,

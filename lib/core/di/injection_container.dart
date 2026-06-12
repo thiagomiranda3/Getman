@@ -50,6 +50,7 @@ Future<SettingsEntity> init() async {
   final settingsBox = await Hive.openBox<SettingsModel>(HiveBoxes.settings);
   await Hive.openBox<HttpRequestConfig>(HiveBoxes.history);
   await Hive.openBox<HttpRequestTabModel>(HiveBoxes.tabs);
+  await Hive.openBox(HiveBoxes.tabsMeta);
   await Hive.openBox<CollectionNode>(HiveBoxes.collections);
   final environmentsBox = await Hive.openBox<EnvironmentModel>(HiveBoxes.environments);
 

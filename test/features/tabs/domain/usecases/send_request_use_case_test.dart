@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/failures.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/features/history/domain/usecases/history_usecases.dart';
@@ -153,5 +154,58 @@ void main() {
     final result = await useCase(config: config, envVars: envVars);
 
     expect(result, response);
+  });
+
+  group('response body cap (6c)', () {
+    test('response body within limit is stored verbatim', () async {
+      const smallBody = '{"ok":true}';
+      when(() => repository.sendRequest(
+            any(),
+            envVars: any(named: 'envVars'),
+            cancelHandle: any(named: 'cancelHandle'),
+          )).thenAnswer(
+        (_) async => const HttpResponseEntity(
+          statusCode: 200,
+          body: smallBody,
+          headers: {},
+          durationMs: 5,
+        ),
+      );
+      when(() => getSettings.call())
+          .thenAnswer((_) async => const SettingsEntity(saveResponseInHistory: true));
+
+      await useCase(config: config, envVars: envVars);
+
+      final recorded =
+          verify(() => addToHistory.call(captureAny(), any())).captured.single
+              as HttpRequestConfigEntity;
+      expect(recorded.responseBody, smallBody);
+    });
+
+    test('response body over limit is replaced with the placeholder', () async {
+      // Build a body that exceeds kMaxPersistedResponseBodyChars.
+      final largeBody = 'x' * (kMaxPersistedResponseBodyChars + 1);
+      when(() => repository.sendRequest(
+            any(),
+            envVars: any(named: 'envVars'),
+            cancelHandle: any(named: 'cancelHandle'),
+          )).thenAnswer(
+        (_) async => HttpResponseEntity(
+          statusCode: 200,
+          body: largeBody,
+          headers: const {},
+          durationMs: 5,
+        ),
+      );
+      when(() => getSettings.call())
+          .thenAnswer((_) async => const SettingsEntity(saveResponseInHistory: true));
+
+      await useCase(config: config, envVars: envVars);
+
+      final recorded =
+          verify(() => addToHistory.call(captureAny(), any())).captured.single
+              as HttpRequestConfigEntity;
+      expect(recorded.responseBody, kResponseBodyTooLargePlaceholder);
+    });
   });
 }

@@ -12,6 +12,46 @@ abstract class HistoryLocalDataSource {
 class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
   Box<HttpRequestConfig> _box() => Hive.box<HttpRequestConfig>(HiveBoxes.history);
 
+  // Signature index: hashCode(method+url+body) → list of box keys with that hash.
+  // Built lazily on first addToHistory call; rebuilt if box length drifts (e.g.
+  // external deletes or box replacements between sessions).
+  Map<int, List<dynamic>>? _signatureIndex;
+  int _indexedKeyCount = 0;
+
+  void _buildIndex(Box<HttpRequestConfig> box) {
+    _signatureIndex = {};
+    _indexedKeyCount = 0;
+    for (final entry in box.toMap().entries) {
+      final hash = entry.value.hashCode;
+      (_signatureIndex![hash] ??= []).add(entry.key);
+      _indexedKeyCount++;
+    }
+  }
+
+  void _ensureIndex(Box<HttpRequestConfig> box) {
+    if (_signatureIndex == null) {
+      _buildIndex(box);
+      return;
+    }
+    // Defensive resync: if something mutated the box outside our tracking, rebuild.
+    if (_indexedKeyCount != box.length) {
+      _buildIndex(box);
+    }
+  }
+
+  void _indexRemoveKey(int hash, dynamic key) {
+    final keys = _signatureIndex?[hash];
+    if (keys == null) return;
+    keys.remove(key);
+    if (keys.isEmpty) _signatureIndex!.remove(hash);
+    _indexedKeyCount--;
+  }
+
+  void _indexAddKey(int hash, dynamic key) {
+    (_signatureIndex![hash] ??= []).add(key);
+    _indexedKeyCount++;
+  }
+
   @override
   Future<List<HttpRequestConfig>> getHistory() async {
     try {
@@ -25,17 +65,33 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
   Future<void> addToHistory(HttpRequestConfig config, int limit) async {
     try {
       final box = _box();
-      // HttpRequestConfig.== treats same-signature requests as equal (see
-      // request_config_model.dart), which is the contract this dedup relies on.
-      final existingIndex = box.values.toList().indexOf(config);
-      if (existingIndex != -1) {
-        await box.deleteAt(existingIndex);
+      _ensureIndex(box);
+
+      // Dedup: look up by signature hash, then confirm equality (hash-collision guard).
+      final candidates = List<dynamic>.from(
+        _signatureIndex![config.hashCode] ?? const [],
+      );
+      for (final key in candidates) {
+        final existing = box.get(key);
+        if (existing != null && existing == config) {
+          await box.delete(key);
+          _indexRemoveKey(config.hashCode, key);
+          break; // at most one duplicate by contract
+        }
       }
 
-      await box.add(config);
+      // Append newest entry.
+      final newKey = await box.add(config);
+      _indexAddKey(config.hashCode, newKey);
 
+      // Trim: remove oldest entries (index 0) until within limit.
       while (box.length > limit && box.isNotEmpty) {
+        final oldKey = box.keyAt(0);
+        final oldest = box.getAt(0);
         await box.deleteAt(0);
+        if (oldest != null && oldKey != null) {
+          _indexRemoveKey(oldest.hashCode, oldKey);
+        }
       }
     } catch (e) {
       throw PersistenceException('Failed to add to history', cause: e);

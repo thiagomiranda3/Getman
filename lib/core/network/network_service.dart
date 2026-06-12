@@ -22,12 +22,16 @@ class NetworkService {
   NetworkService({required Dio dio}) : _dio = dio;
 
   static Dio buildDio() {
+    // responseType: plain keeps the raw server bytes as a String; _stringifyBody's
+    // "if (data is String) return data" fast path then short-circuits decode/re-encode,
+    // saving two full JSON passes per response.
     final dio = Dio(BaseOptions(
       connectTimeout: const Duration(seconds: 30),
       sendTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 60),
       validateStatus: (_) => true,
       listFormat: ListFormat.multi,
+      responseType: ResponseType.plain,
     ));
     if (kDebugMode) {
       dio.interceptors.add(LogInterceptor(

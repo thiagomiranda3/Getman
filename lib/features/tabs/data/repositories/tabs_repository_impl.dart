@@ -1,4 +1,5 @@
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/guard.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/network/network_service.dart';
@@ -26,9 +27,42 @@ class TabsRepositoryImpl implements TabsRepository {
 
   @override
   Future<void> saveTabs(List<HttpRequestTabEntity> tabs) => guardPersistence(() async {
-    final models = tabs.map((e) => HttpRequestTabModel.fromEntity(e)).toList();
+    final models = tabs.map(_toPersistableModel).toList();
     await localDataSource.saveTabs(models);
   });
+
+  @override
+  Future<void> putTab(HttpRequestTabEntity tab) => guardPersistence(() async {
+    await localDataSource.putTab(_toPersistableModel(tab));
+  });
+
+  @override
+  Future<void> deleteTabs(List<String> tabIds) => guardPersistence(() async {
+    await localDataSource.deleteTabs(tabIds);
+  });
+
+  @override
+  Future<void> saveTabOrder(List<String> orderedTabIds) => guardPersistence(() async {
+    await localDataSource.saveOrder(orderedTabIds);
+  });
+
+  /// Maps the entity to its Hive model, replacing an over-limit response body
+  /// with [kResponseBodyTooLargePlaceholder]. The in-memory session keeps the
+  /// full body — only the on-disk copy is capped (see persistence_limits.dart).
+  HttpRequestTabModel _toPersistableModel(HttpRequestTabEntity entity) {
+    final response = entity.response;
+    final capped = response != null && response.body.length > kMaxPersistedResponseBodyChars
+        ? entity.copyWith(
+            response: HttpResponseEntity(
+              statusCode: response.statusCode,
+              body: kResponseBodyTooLargePlaceholder,
+              headers: response.headers,
+              durationMs: response.durationMs,
+            ),
+          )
+        : entity;
+    return HttpRequestTabModel.fromEntity(capped);
+  }
 
   @override
   Future<HttpResponseEntity> sendRequest(

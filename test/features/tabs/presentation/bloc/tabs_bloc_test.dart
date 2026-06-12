@@ -23,12 +23,19 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(_FakeConfig());
+    registerFallbackValue(const HttpRequestTabEntity(
+      tabId: 'fallback',
+      config: HttpRequestConfigEntity(id: 'fallback'),
+    ));
   });
 
   setUp(() {
     repository = MockTabsRepository();
     sendRequestUseCase = MockSendRequestUseCase();
     when(() => repository.saveTabs(any())).thenAnswer((_) async {});
+    when(() => repository.putTab(any())).thenAnswer((_) async {});
+    when(() => repository.deleteTabs(any())).thenAnswer((_) async {});
+    when(() => repository.saveTabOrder(any())).thenAnswer((_) async {});
     bloc = TabsBloc(repository: repository, sendRequestUseCase: sendRequestUseCase);
   });
 
@@ -39,6 +46,9 @@ void main() {
         isSending: isSending,
         config: HttpRequestConfigEntity(id: id, url: 'https://$id.dev'),
       );
+
+  Matcher hasTabId(String id) =>
+      isA<HttpRequestTabEntity>().having((t) => t.tabId, 'tabId', id);
 
   Future<void> loadWith(List<HttpRequestTabEntity> tabs) async {
     when(() => repository.getTabs()).thenAnswer((_) async => tabs);
@@ -65,6 +75,139 @@ void main() {
     test('resets stale isSending flags from a previous session', () async {
       await loadWith([tab('a', isSending: true), tab('b')]);
       expect(bloc.state.tabs.map((t) => t.isSending), everyElement(isFalse));
+    });
+
+    test('persists the auto-created tab and its order on a fresh boot', () async {
+      await loadWith([]);
+      await pumpEventQueue();
+
+      final id = bloc.state.tabs.single.tabId;
+      verify(() => repository.putTab(any(that: hasTabId(id)))).called(1);
+      verify(() => repository.saveTabOrder([id])).called(1);
+      verifyNever(() => repository.saveTabs(any()));
+    });
+  });
+
+  group('incremental persistence', () {
+    test('AddTab persists the new tab and the order, never the full list', () async {
+      await loadWith([tab('a')]);
+      bloc.add(const AddTab());
+      await pumpEventQueue();
+
+      final newId = bloc.state.tabs.last.tabId;
+      verify(() => repository.putTab(any(that: hasTabId(newId)))).called(1);
+      verify(() => repository.saveTabOrder(['a', newId])).called(1);
+      verifyNever(() => repository.saveTabs(any()));
+    });
+
+    test('RemoveTab deletes the tab and rewrites only the order', () async {
+      await loadWith([tab('a'), tab('b'), tab('c')]);
+      bloc.add(const RemoveTab('c'));
+      await pumpEventQueue();
+
+      verify(() => repository.deleteTabs(['c'])).called(1);
+      verify(() => repository.saveTabOrder(['a', 'b'])).called(1);
+      verifyNever(() => repository.putTab(any()));
+      verifyNever(() => repository.saveTabs(any()));
+    });
+
+    test('DuplicateTab persists the copy and the order', () async {
+      await loadWith([tab('a'), tab('b')]);
+      bloc.add(const DuplicateTab('a'));
+      await pumpEventQueue();
+
+      final copyId = bloc.state.tabs[1].tabId;
+      verify(() => repository.putTab(any(that: hasTabId(copyId)))).called(1);
+      verify(() => repository.saveTabOrder(['a', copyId, 'b'])).called(1);
+      verifyNever(() => repository.saveTabs(any()));
+    });
+
+    test('ReorderTabs persists only the order', () async {
+      await loadWith([tab('a'), tab('b'), tab('c')]);
+      bloc.add(const ReorderTabs(0, 3));
+      await pumpEventQueue();
+
+      verify(() => repository.saveTabOrder(['b', 'c', 'a'])).called(1);
+      verifyNever(() => repository.putTab(any()));
+      verifyNever(() => repository.deleteTabs(any()));
+      verifyNever(() => repository.saveTabs(any()));
+    });
+
+    test('CloseOtherTabs deletes the removed tabs and rewrites the order', () async {
+      await loadWith([tab('a'), tab('b'), tab('c')]);
+      bloc.add(const CloseOtherTabs('b'));
+      await pumpEventQueue();
+
+      verify(() => repository.deleteTabs(['a', 'c'])).called(1);
+      verify(() => repository.saveTabOrder(['b'])).called(1);
+      verifyNever(() => repository.putTab(any()));
+      verifyNever(() => repository.saveTabs(any()));
+    });
+
+    test('CloseTabsToTheRight deletes the removed tabs and rewrites the order', () async {
+      await loadWith([tab('a'), tab('b'), tab('c')]);
+      bloc.add(const CloseTabsToTheRight('a'));
+      await pumpEventQueue();
+
+      verify(() => repository.deleteTabs(['b', 'c'])).called(1);
+      verify(() => repository.saveTabOrder(['a'])).called(1);
+      verifyNever(() => repository.putTab(any()));
+      verifyNever(() => repository.saveTabs(any()));
+    });
+
+    test('UpdateTab marks the tab dirty and the flush persists only that tab', () async {
+      await loadWith([tab('a'), tab('b')]);
+      final updated = bloc.state.tabs.first.copyWith(
+        config: bloc.state.tabs.first.config.copyWith(url: 'https://edited.dev'),
+      );
+      bloc.add(UpdateTab(updated));
+      await pumpEventQueue();
+
+      verifyNever(() => repository.putTab(any())); // debounced, not yet flushed
+      await bloc.close(); // close() must flush the pending dirty set
+
+      final persisted = verify(() => repository.putTab(captureAny())).captured;
+      expect(persisted, hasLength(1));
+      expect(persisted.single, hasTabId('a'));
+      expect((persisted.single as HttpRequestTabEntity).config.url, 'https://edited.dev');
+      verifyNever(() => repository.saveTabs(any()));
+    });
+
+    test('a dirty tab closed before the flush is not persisted', () async {
+      await loadWith([tab('a'), tab('b')]);
+      final updated = bloc.state.tabs.first.copyWith(
+        config: bloc.state.tabs.first.config.copyWith(url: 'https://edited.dev'),
+      );
+      bloc.add(UpdateTab(updated));
+      bloc.add(const RemoveTab('a'));
+      await pumpEventQueue();
+
+      await bloc.close();
+
+      verifyNever(() => repository.putTab(any(that: hasTabId('a'))));
+      verify(() => repository.deleteTabs(['a'])).called(1);
+    });
+
+    test('a received response marks the tab dirty so the flush persists it', () async {
+      await loadWith([tab('a')]);
+      stubSend(() async => const HttpResponseEntity(
+            statusCode: 200,
+            body: '{"ok":true}',
+            headers: {},
+            durationMs: 1,
+          ));
+
+      bloc.add(const SendRequest(tabId: 'a'));
+      await expectLater(
+        bloc.stream,
+        emitsThrough(predicate<TabsState>((s) => s.tabs.single.response != null)),
+      );
+      await bloc.close();
+
+      final persisted = verify(() => repository.putTab(captureAny())).captured;
+      expect(persisted, hasLength(1));
+      expect(persisted.single, hasTabId('a'));
+      expect((persisted.single as HttpRequestTabEntity).response?.statusCode, 200);
     });
   });
 

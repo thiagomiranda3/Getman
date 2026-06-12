@@ -38,3 +38,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    # Pre-bundled Google Fonts (named per google_fonts' asset convention) so
+    # no font is ever fetched over HTTP at runtime. Licenses live alongside
+    # in assets/google_fonts/licenses/ (OFL).
+    - assets/google_fonts/

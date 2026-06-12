@@ -13,6 +13,7 @@ import 'package:getman/features/environments/presentation/widgets/environment_se
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/home/presentation/widgets/add_tab_button.dart';
 import 'package:getman/features/home/presentation/widgets/side_menu.dart';
+import 'package:getman/features/home/presentation/widgets/tab_content_stack.dart';
 import 'package:getman/features/home/presentation/widgets/tab_widget.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
@@ -21,7 +22,6 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
-import 'package:getman/features/tabs/presentation/screens/request_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/tab_switcher_sheet.dart';
 
 class MainScreen extends StatefulWidget {
@@ -302,9 +302,10 @@ class _MainScreenState extends State<MainScreen> {
                     ],
                   ),
                 )
-              : RequestView(
-                  key: ValueKey('view_${tabs[activeIndex].tabId}'),
-                  tabId: tabs[activeIndex].tabId,
+              : TabContentStack(
+                  key: const ValueKey('tabs'),
+                  tabs: tabs,
+                  activeIndex: activeIndex,
                 ),
     );
   }
