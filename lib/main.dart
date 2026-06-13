@@ -18,6 +18,7 @@ import 'package:getman/features/environments/presentation/bloc/environments_bloc
 import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
+import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
@@ -58,6 +59,7 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (_) => di.sl<TabsBloc>()..add(const LoadTabs())),
         BlocProvider(create: (_) => di.sl<EnvironmentsBloc>()..add(const LoadEnvironments())),
         BlocProvider(create: (_) => di.sl<RulesBloc>()),
+        BlocProvider(create: (_) => di.sl<RealtimeBloc>()),
       ],
       child: NetworkSettingsListener(
         child: WorkspaceSyncListener(
