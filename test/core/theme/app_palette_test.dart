@@ -19,6 +19,7 @@ void main() {
     codeBackground: Color(0xFF111111),
     variableResolved: Color(0xFF16A34A),
     variableUnresolved: Color(0xFFDC2626),
+    selectorActive: Color(0xFF6D28D9),
   );
 
   group('AppPalette', () {
@@ -68,16 +69,24 @@ void main() {
       expect(copy.codeBackground, const Color(0xFF222222));
       expect(copy.methodFallback, fallback);
       expect(copy.statusSuccess, Colors.green);
+      expect(copy.selectorActive, const Color(0xFF6D28D9));
+    });
+
+    test('copyWith overrides selectorActive', () {
+      final copy = palette.copyWith(selectorActive: const Color(0xFF123456));
+      expect(copy.selectorActive, const Color(0xFF123456));
     });
 
     test('lerp interpolates colors and picks other.methodColors map', () {
       final other = palette.copyWith(
         methodColors: const {'GET': Color(0xFF000000)},
         statusSuccess: Colors.white,
+        selectorActive: Colors.white,
       );
       final mid = palette.lerp(other, 1.0);
       expect(mid.methodColors['GET'], const Color(0xFF000000));
       expect(mid.statusSuccess, Colors.white);
+      expect(mid.selectorActive, Colors.white);
     });
   });
 }

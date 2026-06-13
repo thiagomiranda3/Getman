@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/branded_tab_bar.dart';
+import 'package:getman/core/utils/byte_format.dart';
+import 'package:getman/core/utils/cookie_parser.dart';
 import 'package:getman/core/utils/equality.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
@@ -38,7 +40,8 @@ class ResponseSection extends StatelessWidget {
         if (p == null || n == null) return true;
         return p.isSending != n.isSending ||
             p.response?.statusCode != n.response?.statusCode ||
-            p.response?.durationMs != n.response?.durationMs;
+            p.response?.durationMs != n.response?.durationMs ||
+            p.response?.body.length != n.response?.body.length;
       },
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
@@ -98,15 +101,16 @@ class ResponseSection extends StatelessWidget {
                   children: [
                     _ResponseMetadataItem(label: 'STATUS', value: response.statusCode.toString(), color: context.appPalette.statusAccent(response.statusCode), layout: layout),
                     _ResponseMetadataItem(label: 'TIME', value: '${response.durationMs} ms', color: theme.colorScheme.secondary, layout: layout),
+                    _ResponseMetadataItem(label: 'SIZE', value: formatBytes(responseSizeBytes(response)), color: theme.colorScheme.secondary, layout: layout),
                   ],
                 ),
               ),
             Expanded(
               child: DefaultTabController(
-                length: 2,
+                length: 3,
                 child: Column(
                   children: [
-                    const BrandedTabBar(labels: ['BODY', 'HEADERS']),
+                    const BrandedTabBar(labels: ['BODY', 'HEADERS', 'COOKIES']),
                     Expanded(
                       child: Container(
                         decoration: context.appDecoration.panelBox(context, offset: 0),
@@ -114,6 +118,7 @@ class ResponseSection extends StatelessWidget {
                           children: [
                             _ResponseBodyView(tabId: tabId, responseController: responseController),
                             _ResponseHeadersView(tabId: tabId),
+                            _ResponseCookiesView(tabId: tabId),
                           ],
                         ),
                       ),
@@ -141,6 +146,10 @@ class _ResponseBodyView extends StatefulWidget {
 class _ResponseBodyViewState extends State<_ResponseBodyView> {
   int _pendingSyncId = 0;
 
+  // Pretty (prettified JSON) vs Raw (verbatim body). Applies to the normal,
+  // sub-threshold path; the large-response banner has its own controls.
+  bool _raw = false;
+
   // Large-mode state: non-null when the current body exceeds the threshold.
   String? _largeBody;
   bool _showFullPreview = false;
@@ -167,11 +176,12 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
       return;
     }
 
-    // Normal path — prettify then load into the editor.
-    final prettified = await JsonUtils.prettify(rawBody);
+    // Normal path — prettify (or pass through verbatim in raw mode), then load
+    // into the editor.
+    final text = _raw ? (rawBody ?? '') : await JsonUtils.prettify(rawBody);
     // Only apply if no newer sync was started and we're still mounted.
     if (!mounted || syncId != _pendingSyncId) return;
-    widget.responseController.text = prettified;
+    widget.responseController.text = text;
     // Clear large mode if a previous response triggered it.
     if (_largeBody != null) {
       setState(() {
@@ -182,6 +192,13 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
     }
   }
 
+  void _setRaw(bool raw) {
+    if (_raw == raw) return;
+    setState(() => _raw = raw);
+    final body = context.read<TabsBloc>().state.tabs.byId(widget.tabId)?.response?.body;
+    _syncBody(body);
+  }
+
   Future<void> _prettifyAndOptIn() async {
     final body = _largeBody;
     if (body == null) return;
@@ -190,14 +207,6 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
     if (!mounted || syncId != _pendingSyncId) return;
     widget.responseController.text = prettified;
     setState(() => _highlightingOptedIn = true);
-  }
-
-  String _humanSize(int chars) {
-    if (chars < 1024) return '$chars B';
-    final kb = chars / 1024;
-    if (kb < 1024) return '${kb.toStringAsFixed(1)} KB';
-    final mb = kb / 1024;
-    return '${mb.toStringAsFixed(1)} MB';
   }
 
   @override
@@ -212,7 +221,18 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
         final tab = state.tabs.byId(widget.tabId);
         _syncBody(tab?.response?.body);
       },
-      child: _largeBody != null ? _buildLargeMode(context) : _buildEditorMode(),
+      child: _largeBody != null ? _buildLargeMode(context) : _buildSmallMode(),
+    );
+  }
+
+  /// Sub-threshold view: a Pretty/Raw toggle above the editor.
+  Widget _buildSmallMode() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _PrettyRawToggle(raw: _raw, onChanged: _setRaw),
+        Expanded(child: _buildEditorMode()),
+      ],
     );
   }
 
@@ -233,7 +253,7 @@ class _ResponseBodyViewState extends State<_ResponseBodyView> {
     final palette = context.appPalette;
     final theme = Theme.of(context);
     final body = _largeBody!;
-    final sizeLabel = _humanSize(body.length);
+    final sizeLabel = formatBytes(body.length);
 
     final displayText = _showFullPreview
         ? body
@@ -346,6 +366,128 @@ class _ResponseHeadersView extends StatelessWidget {
               dense: true,
               title: Text(e.key.toUpperCase(), style: TextStyle(fontWeight: context.appTypography.titleWeight, fontSize: layout.fontSizeNormal, color: theme.primaryColor)),
               subtitle: Text(e.value, style: TextStyle(fontSize: layout.fontSizeNormal, color: theme.colorScheme.onSurface)),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _PrettyRawToggle extends StatelessWidget {
+  final bool raw;
+  final ValueChanged<bool> onChanged;
+  const _PrettyRawToggle({required this.raw, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final layout = context.appLayout;
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: layout.pagePadding,
+        vertical: layout.isCompact ? 4 : 6,
+      ),
+      child: Row(
+        children: [
+          _seg(context, 'PRETTY', !raw, () => onChanged(false)),
+          SizedBox(width: layout.tabSpacing),
+          _seg(context, 'RAW', raw, () => onChanged(true)),
+        ],
+      ),
+    );
+  }
+
+  Widget _seg(BuildContext context, String label, bool active, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    final layout = context.appLayout;
+    final activeBg = context.appPalette.selectorActive;
+    final onActive = ThemeData.estimateBrightnessForColor(activeBg) == Brightness.dark
+        ? Colors.white
+        : Colors.black;
+    return context.appDecoration.wrapInteractive(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: layout.badgePaddingHorizontal + 4,
+          vertical: layout.badgePaddingVertical + 2,
+        ),
+        decoration: BoxDecoration(
+          color: active ? activeBg : Colors.transparent,
+          border: Border.all(color: theme.dividerColor, width: layout.borderThin),
+          borderRadius: BorderRadius.circular(context.appShape.buttonRadius),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: layout.fontSizeSmall,
+            fontWeight: context.appTypography.displayWeight,
+            color: active ? onActive : theme.colorScheme.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ResponseCookiesView extends StatelessWidget {
+  final String tabId;
+  const _ResponseCookiesView({required this.tabId});
+
+  @override
+  Widget build(BuildContext context) {
+    final layout = context.appLayout;
+    final theme = Theme.of(context);
+
+    return BlocBuilder<TabsBloc, TabsState>(
+      buildWhen: (prev, next) {
+        final p = prev.tabs.byId(tabId);
+        final n = next.tabs.byId(tabId);
+        return !stringMapEquality.equals(p?.response?.headers, n?.response?.headers);
+      },
+      builder: (context, state) {
+        final headers = state.tabs.byId(tabId)?.response?.headers;
+        if (headers == null) return const SizedBox();
+
+        String? setCookie;
+        for (final e in headers.entries) {
+          if (e.key.toLowerCase() == 'set-cookie') {
+            setCookie = e.value;
+            break;
+          }
+        }
+        final cookies = CookieParser.parse(setCookie);
+
+        if (cookies.isEmpty) {
+          return Center(
+            child: Text(
+              'NO COOKIES',
+              style: TextStyle(
+                fontSize: layout.fontSizeTitle,
+                fontWeight: context.appTypography.displayWeight,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          itemCount: cookies.length,
+          itemBuilder: (context, index) {
+            final c = cookies[index];
+            return ListTile(
+              dense: true,
+              title: Text(
+                c.name,
+                style: TextStyle(
+                  fontWeight: context.appTypography.titleWeight,
+                  fontSize: layout.fontSizeNormal,
+                  color: theme.primaryColor,
+                ),
+              ),
+              subtitle: Text(
+                c.attributes.isEmpty ? c.value : '${c.value}\n${c.attributes}',
+                style: TextStyle(fontSize: layout.fontSizeNormal, color: theme.colorScheme.onSurface),
+              ),
             );
           },
         );

@@ -1,4 +1,5 @@
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/utils/code_gen_service.dart';
 
 class CurlUtils {
   /// Parses a curl command into an [HttpRequestConfigEntity]
@@ -79,26 +80,9 @@ class CurlUtils {
     return args;
   }
 
-  /// Generates a curl command from an [HttpRequestConfigEntity]
-  static String generate(HttpRequestConfigEntity config) {
-    final buffer = StringBuffer();
-    buffer.write('curl --request ${config.method} \\\n');
-    buffer.write('  --url \'${config.url}\' \\\n');
-
-    config.headers.forEach((key, value) {
-      buffer.write('  --header \'$key: $value\' \\\n');
-    });
-
-    if (config.body.isNotEmpty) {
-      // Escape single quotes in body for the curl command
-      final escapedBody = config.body.replaceAll('\'', "'\\''");
-      buffer.write('  --data \'$escapedBody\'');
-    }
-
-    String result = buffer.toString().trim();
-    if (result.endsWith('\\')) {
-      result = result.substring(0, result.length - 1).trim();
-    }
-    return result;
-  }
+  /// Generates a curl command from an [HttpRequestConfigEntity]. Delegates to
+  /// [CodeGenService] so auth and body-type are reflected (single source of
+  /// truth for code generation).
+  static String generate(HttpRequestConfigEntity config) =>
+      CodeGenService.generate(config, CodeGenTarget.curl);
 }

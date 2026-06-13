@@ -24,6 +24,9 @@ class HttpRequestConfigAdapter extends TypeAdapter<HttpRequestConfig> {
       params: (fields[4] as Map?)?.cast<String, String>(),
       body: fields[5] == null ? '' : fields[5] as String,
       auth: (fields[6] as Map?)?.cast<String, String>(),
+      bodyType: fields[11] == null ? 'raw' : fields[11] as String,
+      formFields: (fields[12] as List?)?.cast<MultipartFieldModel>(),
+      bodyFilePath: fields[13] as String?,
       responseBody: fields[7] as String?,
       responseHeaders: (fields[8] as Map?)?.cast<String, String>(),
       statusCode: fields[9] as int?,
@@ -34,7 +37,7 @@ class HttpRequestConfigAdapter extends TypeAdapter<HttpRequestConfig> {
   @override
   void write(BinaryWriter writer, HttpRequestConfig obj) {
     writer
-      ..writeByte(11)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -56,7 +59,13 @@ class HttpRequestConfigAdapter extends TypeAdapter<HttpRequestConfig> {
       ..writeByte(9)
       ..write(obj.statusCode)
       ..writeByte(10)
-      ..write(obj.durationMs);
+      ..write(obj.durationMs)
+      ..writeByte(11)
+      ..write(obj.bodyType)
+      ..writeByte(12)
+      ..write(obj.formFields)
+      ..writeByte(13)
+      ..write(obj.bodyFilePath);
   }
 
   @override

@@ -292,6 +292,11 @@ class AppPalette extends ThemeExtension<AppPalette> {
   final Color variableResolved;
   final Color variableUnresolved;
 
+  /// Background for the active segment of a selector/toggle (body-type chips,
+  /// response Pretty/Raw toggle). Each theme maps it to its signature accent.
+  /// Pair with [Color]-derived contrast text via `ThemeData.estimateBrightnessForColor`.
+  final Color selectorActive;
+
   const AppPalette({
     required this.methodColors,
     required this.methodFallback,
@@ -304,6 +309,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.codeBackground,
     required this.variableResolved,
     required this.variableUnresolved,
+    required this.selectorActive,
   });
 
   Color methodColor(String method) =>
@@ -334,6 +340,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? codeBackground,
     Color? variableResolved,
     Color? variableUnresolved,
+    Color? selectorActive,
   }) {
     return AppPalette(
       methodColors: methodColors ?? this.methodColors,
@@ -347,6 +354,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
       codeBackground: codeBackground ?? this.codeBackground,
       variableResolved: variableResolved ?? this.variableResolved,
       variableUnresolved: variableUnresolved ?? this.variableUnresolved,
+      selectorActive: selectorActive ?? this.selectorActive,
     );
   }
 
@@ -365,6 +373,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
       codeBackground: Color.lerp(codeBackground, other.codeBackground, t)!,
       variableResolved: Color.lerp(variableResolved, other.variableResolved, t)!,
       variableUnresolved: Color.lerp(variableUnresolved, other.variableUnresolved, t)!,
+      selectorActive: Color.lerp(selectorActive, other.selectorActive, t)!,
     );
   }
 }

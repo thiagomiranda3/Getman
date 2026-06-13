@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/network/http_methods.dart';
 import 'package:getman/core/theme/app_theme.dart';
-import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
 import 'package:getman/core/ui/widgets/variable_highlight_controller.dart';
 import 'package:getman/core/utils/curl_utils.dart';
@@ -18,6 +16,7 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
+import 'package:getman/features/tabs/presentation/widgets/code_export_dialog.dart';
 
 void _setControllerPreservingEnd(TextEditingController controller, String text) {
   if (controller.text == text) return;
@@ -200,8 +199,8 @@ class _UrlBarState extends State<UrlBar> {
                           context.appDecoration.wrapInteractive(
                             child: IconButton(
                               icon: Icon(Icons.code, color: theme.colorScheme.secondary, size: iconSize),
-                              tooltip: 'Copy as cURL',
-                              onPressed: () => _copyAsCurl(context, tab),
+                              tooltip: 'Generate code',
+                              onPressed: () => CodeExportDialog.show(context, tab.config),
                             ),
                           ),
                           SizedBox(width: smallGap),
@@ -251,7 +250,7 @@ class _UrlBarState extends State<UrlBar> {
                             iconSize: iconSize,
                             isSaved: tab.collectionNodeId != null,
                             isVerticalLayout: settings.isVerticalLayout,
-                            onCopyCurl: () => _copyAsCurl(context, tab),
+                            onGenerateCode: () => CodeExportDialog.show(context, tab.config),
                             onSave: widget.onSave,
                             onToggleLayout: () => context.read<SettingsBloc>().add(UpdateVerticalLayout(!settings.isVerticalLayout)),
                           ),
@@ -289,16 +288,6 @@ class _UrlBarState extends State<UrlBar> {
     );
   }
 
-  void _copyAsCurl(BuildContext context, HttpRequestTabEntity tab) {
-    final curl = CurlUtils.generate(tab.config);
-    Clipboard.setData(ClipboardData(text: curl));
-    showAppSnackBar(
-      context,
-      'cURL command copied to clipboard',
-      backgroundColor: Theme.of(context).colorScheme.secondary,
-    );
-  }
-
   void _handleUrlChanged(BuildContext context, HttpRequestTabEntity tab, String val) {
     if (tab.config.url == val) return;
     final tabsBloc = context.read<TabsBloc>();
@@ -326,13 +315,13 @@ class _UrlBarState extends State<UrlBar> {
   }
 }
 
-enum _OverflowAction { copyCurl, save, toggleLayout }
+enum _OverflowAction { generateCode, save, toggleLayout }
 
 class _OverflowMenu extends StatelessWidget {
   final double iconSize;
   final bool isSaved;
   final bool isVerticalLayout;
-  final VoidCallback onCopyCurl;
+  final VoidCallback onGenerateCode;
   final VoidCallback onSave;
   final VoidCallback onToggleLayout;
 
@@ -340,7 +329,7 @@ class _OverflowMenu extends StatelessWidget {
     required this.iconSize,
     required this.isSaved,
     required this.isVerticalLayout,
-    required this.onCopyCurl,
+    required this.onGenerateCode,
     required this.onSave,
     required this.onToggleLayout,
   });
@@ -362,8 +351,8 @@ class _OverflowMenu extends StatelessWidget {
       icon: Icon(Icons.more_vert, color: theme.colorScheme.onSurface, size: iconSize),
       onSelected: (action) {
         switch (action) {
-          case _OverflowAction.copyCurl:
-            onCopyCurl();
+          case _OverflowAction.generateCode:
+            onGenerateCode();
             break;
           case _OverflowAction.save:
             onSave();
@@ -384,8 +373,8 @@ class _OverflowMenu extends StatelessWidget {
           ),
         ),
         PopupMenuItem(
-          value: _OverflowAction.copyCurl,
-          child: _menuRow(context, Icons.code, 'COPY AS cURL', theme.colorScheme.secondary),
+          value: _OverflowAction.generateCode,
+          child: _menuRow(context, Icons.code, 'GENERATE CODE', theme.colorScheme.secondary),
         ),
         PopupMenuItem(
           value: _OverflowAction.toggleLayout,

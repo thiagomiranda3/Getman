@@ -1,6 +1,8 @@
+import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
+import 'package:getman/features/tabs/data/models/multipart_field_model.dart';
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 
@@ -44,6 +46,18 @@ class HttpRequestConfig extends HiveObject {
   @HiveField(10)
   int? durationMs;
 
+  // Body-type fields (added after auth/response). Safe defaults mean records
+  // persisted before this migration read back as a raw body with no form
+  // fields — exactly today's behavior.
+  @HiveField(11, defaultValue: 'raw')
+  String bodyType;
+
+  @HiveField(12)
+  List<MultipartFieldModel> formFields;
+
+  @HiveField(13)
+  String? bodyFilePath;
+
   HttpRequestConfig({
     String? id,
     this.method = 'GET',
@@ -52,6 +66,9 @@ class HttpRequestConfig extends HiveObject {
     Map<String, String>? params,
     this.body = '',
     Map<String, String>? auth,
+    this.bodyType = 'raw',
+    List<MultipartFieldModel>? formFields,
+    this.bodyFilePath,
     this.responseBody,
     this.responseHeaders,
     this.statusCode,
@@ -63,7 +80,8 @@ class HttpRequestConfig extends HiveObject {
               'Accept': '*/*',
             },
         params = params ?? {},
-        auth = auth ?? {};
+        auth = auth ?? {},
+        formFields = formFields ?? [];
 
   factory HttpRequestConfig.fromEntity(HttpRequestConfigEntity entity) => HttpRequestConfig(
     id: entity.id,
@@ -74,6 +92,9 @@ class HttpRequestConfig extends HiveObject {
     params: const {},
     body: entity.body,
     auth: entity.auth,
+    bodyType: entity.bodyType.wire,
+    formFields: entity.formFields.map(MultipartFieldModel.fromEntity).toList(),
+    bodyFilePath: entity.bodyFilePath,
     responseBody: entity.responseBody,
     responseHeaders: entity.responseHeaders,
     statusCode: entity.statusCode,
@@ -98,6 +119,9 @@ class HttpRequestConfig extends HiveObject {
       headers: headers,
       body: body,
       auth: auth,
+      bodyType: BodyType.fromWire(bodyType),
+      formFields: formFields.map((f) => f.toEntity()).toList(),
+      bodyFilePath: bodyFilePath,
       responseBody: responseBody,
       responseHeaders: responseHeaders,
       statusCode: statusCode,

@@ -70,6 +70,7 @@ ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
     codeBackground: isDark ? EditorialPalette.codeBackgroundDark : EditorialPalette.codeBackgroundLight,
     variableResolved: EditorialPalette.statusAccentSuccess,
     variableUnresolved: EditorialPalette.statusAccentError,
+    selectorActive: EditorialPalette.accent,
   );
 
   final decoration = AppDecoration(

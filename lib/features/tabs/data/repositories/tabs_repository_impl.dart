@@ -1,3 +1,4 @@
+import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/guard.dart';
@@ -7,6 +8,7 @@ import 'package:getman/core/utils/environment_resolver.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
 import 'package:getman/features/tabs/data/datasources/tabs_local_data_source.dart';
 import 'package:getman/features/tabs/data/models/request_tab_model.dart';
+import 'package:getman/features/tabs/data/request_serializer.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 
@@ -82,16 +84,30 @@ class TabsRepositoryImpl implements TabsRepository {
           .add(EnvironmentResolver.resolve(p.value, envVars));
     }
 
-    final resolvedBody = config.body.isNotEmpty
-        ? EnvironmentResolver.resolve(config.body, envVars)
-        : null;
+    // Mutable copy: resolveMap can return the original (const) map verbatim
+    // when there are no variables, which auth injection must not mutate.
+    final headers = Map<String, String>.of(
+      EnvironmentResolver.resolveMap(config.headers, envVars),
+    );
+    RequestSerializer.injectAuth(
+      auth: AuthConfig.fromMap(config.auth),
+      headers: headers,
+      query: queryMap,
+      envVars: envVars,
+    );
+
+    final data = RequestSerializer.buildBody(
+      config: config,
+      headers: headers,
+      envVars: envVars,
+    );
 
     return networkService.request(
       url: resolvedBase,
       method: config.method,
       queryParameters: queryMap,
-      data: resolvedBody,
-      headers: EnvironmentResolver.resolveMap(config.headers, envVars),
+      data: data,
+      headers: headers,
       cancelHandle: cancelHandle,
     );
   }

@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/domain/entities/body_type.dart';
+import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 
@@ -70,6 +72,38 @@ void main() {
         QueryParamEntity(key: 'new', value: '2'),
       ]);
       expect(next.url, 'https://example.com/a?new=2#frag');
+    });
+  });
+
+  group('HttpRequestConfigEntity body-type fields', () {
+    test('defaults: raw body type, no form fields, null file path', () {
+      const config = HttpRequestConfigEntity(id: 'x');
+      expect(config.bodyType, BodyType.raw);
+      expect(config.formFields, isEmpty);
+      expect(config.bodyFilePath, isNull);
+    });
+
+    test('copyWith sets body type + form fields', () {
+      const config = HttpRequestConfigEntity(id: 'x');
+      final next = config.copyWith(
+        bodyType: BodyType.urlencoded,
+        formFields: const [MultipartFieldEntity(name: 'a', value: '1')],
+      );
+      expect(next.bodyType, BodyType.urlencoded);
+      expect(next.formFields, [const MultipartFieldEntity(name: 'a', value: '1')]);
+    });
+
+    test('copyWith clears bodyFilePath via the sentinel', () {
+      const config = HttpRequestConfigEntity(id: 'x', bodyFilePath: '/tmp/a');
+      expect(config.copyWith(bodyFilePath: null).bodyFilePath, isNull);
+      // Omitting the arg keeps the existing value.
+      expect(config.copyWith().bodyFilePath, '/tmp/a');
+    });
+
+    test('props include the new fields (drives dirty-tracking)', () {
+      const a = HttpRequestConfigEntity(id: 'x');
+      const b = HttpRequestConfigEntity(id: 'x', bodyType: BodyType.multipart);
+      expect(a == b, isFalse);
     });
   });
 }

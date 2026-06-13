@@ -260,4 +260,84 @@ void main() {
       expect(find.byType(SelectableText), findsNothing);
     },
   );
+
+  // -------------------------------------------------------------------------
+  // Test 5: small response exposes the Pretty/Raw toggle and stays an editor
+  // -------------------------------------------------------------------------
+  testWidgets('small response shows the Pretty/Raw toggle', (tester) async {
+    const tabId = 'tab5';
+    final tab = _tabWithBody(tabId, '{"ok":true}');
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+    final controller = CodeLineEditingController();
+    addTearDown(controller.dispose);
+
+    await _pump(tester, bloc: bloc, tabId: tabId, controller: controller);
+
+    expect(find.text('PRETTY'), findsOneWidget);
+    expect(find.text('RAW'), findsOneWidget);
+
+    await tester.tap(find.text('RAW'));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pumpAndSettle();
+
+    // Still an editor after switching to raw.
+    expect(find.byType(CodeEditor), findsOneWidget);
+  });
+
+  // -------------------------------------------------------------------------
+  // Test 6: COOKIES tab lists cookies parsed from the set-cookie header
+  // -------------------------------------------------------------------------
+  testWidgets('COOKIES tab lists parsed cookies', (tester) async {
+    const tabId = 'tab6';
+    const tab = HttpRequestTabEntity(
+      tabId: tabId,
+      config: HttpRequestConfigEntity(id: tabId),
+      response: HttpResponseEntity(
+        statusCode: 200,
+        body: '{"ok":true}',
+        headers: {'set-cookie': 'sid=abc123; Path=/; HttpOnly'},
+        durationMs: 5,
+      ),
+    );
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+    final controller = CodeLineEditingController();
+    addTearDown(controller.dispose);
+
+    await _pump(tester, bloc: bloc, tabId: tabId, controller: controller);
+
+    await tester.tap(find.text('COOKIES'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('sid'), findsOneWidget);
+  });
+
+  // -------------------------------------------------------------------------
+  // Test 7: the SIZE metadata item renders when metadata is shown
+  // -------------------------------------------------------------------------
+  testWidgets('SIZE appears in the metadata row', (tester) async {
+    const tabId = 'tab7';
+    final tab = _tabWithBody(tabId, '{"ok":true}');
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+    final controller = CodeLineEditingController();
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: brutalistTheme(Brightness.light),
+        home: Scaffold(
+          body: BlocProvider.value(
+            value: bloc,
+            child: ResponseSection(tabId: tabId, responseController: controller),
+          ),
+        ),
+      ),
+    );
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('SIZE: '), findsOneWidget);
+  });
 }

@@ -100,6 +100,7 @@ ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
     codeBackground: isDark ? RpgPalette.codeBackgroundDark : RpgPalette.codeBackgroundLight,
     variableResolved: RpgPalette.statusSuccess,
     variableUnresolved: RpgPalette.statusError,
+    selectorActive: RpgPalette.gold,
   );
 
   final decoration = AppDecoration(

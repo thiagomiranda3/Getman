@@ -29,6 +29,7 @@ import 'package:getman/features/settings/domain/repositories/settings_repository
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/tabs/data/datasources/tabs_local_data_source.dart';
+import 'package:getman/features/tabs/data/models/multipart_field_model.dart';
 import 'package:getman/features/tabs/data/models/request_tab_model.dart';
 import 'package:getman/features/tabs/data/repositories/tabs_repository_impl.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
@@ -46,6 +47,7 @@ Future<SettingsEntity> init() async {
   Hive.registerAdapter(HttpRequestTabModelAdapter());
   Hive.registerAdapter(CollectionNodeAdapter());
   Hive.registerAdapter(EnvironmentModelAdapter());
+  Hive.registerAdapter(MultipartFieldModelAdapter());
 
   final settingsBox = await Hive.openBox<SettingsModel>(HiveBoxes.settings);
   await Hive.openBox<HttpRequestConfig>(HiveBoxes.history);
