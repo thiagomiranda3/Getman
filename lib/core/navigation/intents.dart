@@ -19,3 +19,7 @@ class SaveRequestIntent extends Intent {
 class BeautifyJsonIntent extends Intent {
   const BeautifyJsonIntent();
 }
+
+class CommandPaletteIntent extends Intent {
+  const CommandPaletteIntent();
+}

@@ -12,6 +12,7 @@ import 'package:getman/features/collections/data/services/workspace_sync_service
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/workspace_sync_listener.dart';
+import 'package:getman/features/command_palette/presentation/widgets/command_palette.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
@@ -79,11 +80,19 @@ class MyApp extends StatelessWidget {
               SingleActivator(LogicalKeyboardKey.enter, meta: true): SendRequestIntent(),
               SingleActivator(LogicalKeyboardKey.keyB, control: true): BeautifyJsonIntent(),
               SingleActivator(LogicalKeyboardKey.keyB, meta: true): BeautifyJsonIntent(),
+              SingleActivator(LogicalKeyboardKey.keyK, control: true): CommandPaletteIntent(),
+              SingleActivator(LogicalKeyboardKey.keyK, meta: true): CommandPaletteIntent(),
             },
             child: Actions(
               actions: <Type, Action<Intent>>{
                 NewTabIntent: CallbackAction<NewTabIntent>(
                   onInvoke: (intent) => context.read<TabsBloc>().add(const AddTab()),
+                ),
+                CommandPaletteIntent: CallbackAction<CommandPaletteIntent>(
+                  onInvoke: (intent) {
+                    CommandPalette.show(context);
+                    return null;
+                  },
                 ),
               },
               child: MaterialApp.router(
