@@ -9,7 +9,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/auth_tab_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_editor_tabs.dart';
-import 'package:getman/features/tabs/presentation/widgets/response_section.dart';
+import 'package:getman/features/tabs/presentation/widgets/response_area.dart';
 import 'package:re_editor/re_editor.dart';
 
 /// Narrow-width alternative to [RequestConfigSection] + [ResponseSection].
@@ -84,7 +84,7 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel> with SingleTi
                   HeadersTabView(tabId: widget.tabId),
                   BodyTabView(tabId: widget.tabId, controller: widget.bodyController),
                   RulesTabView(key: ValueKey('rules_${widget.tabId}'), tabId: widget.tabId),
-                  ResponseSection(
+                  ResponseArea(
                     tabId: widget.tabId,
                     responseController: widget.responseController,
                     showMetadata: false,

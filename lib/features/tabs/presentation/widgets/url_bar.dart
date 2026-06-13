@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/http_methods.dart';
+import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
 import 'package:getman/core/ui/widgets/variable_highlight_controller.dart';
 import 'package:getman/core/utils/curl_utils.dart';
+import 'package:getman/core/utils/environment_resolver.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/features/environments/domain/logic/active_environment_helper.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
+import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
+import 'package:getman/features/realtime/presentation/bloc/realtime_event.dart';
+import 'package:getman/features/realtime/presentation/bloc/realtime_state.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
@@ -109,6 +115,7 @@ class _UrlBarState extends State<UrlBar> {
           final n = next.tabs.byId(widget.tabId);
           if (p == null || n == null) return true;
           return p.config.method != n.config.method ||
+              p.config.kind != n.config.kind ||
               p.isSending != n.isSending ||
               p.collectionNodeId != n.collectionNodeId;
         },
@@ -143,35 +150,66 @@ class _UrlBarState extends State<UrlBar> {
                           decoration: BoxDecoration(
                             border: Border(right: BorderSide(color: theme.dividerColor, width: layout.borderThick)),
                           ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              dropdownColor: theme.colorScheme.surface,
-                              value: tab.config.method,
-                              style: TextStyle(
-                                color: theme.colorScheme.onSurface,
-                                fontWeight: context.appTypography.displayWeight,
-                                fontSize: layout.fontSizeNormal,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              DropdownButtonHideUnderline(
+                                child: DropdownButton<RequestKind>(
+                                  dropdownColor: theme.colorScheme.surface,
+                                  value: tab.config.kind,
+                                  style: TextStyle(
+                                    color: theme.colorScheme.onSurface,
+                                    fontWeight: context.appTypography.displayWeight,
+                                    fontSize: layout.fontSizeSmall,
+                                  ),
+                                  items: const [
+                                    DropdownMenuItem(value: RequestKind.http, child: Text('HTTP')),
+                                    DropdownMenuItem(value: RequestKind.webSocket, child: Text('WS')),
+                                    DropdownMenuItem(value: RequestKind.sse, child: Text('SSE')),
+                                  ],
+                                  onChanged: (k) {
+                                    if (k != null && tab.config.kind != k) {
+                                      context.read<TabsBloc>().add(UpdateTab(
+                                        tab.copyWith(config: tab.config.copyWith(kind: k)),
+                                      ));
+                                    }
+                                  },
+                                ),
                               ),
-                              selectedItemBuilder: (context) {
-                                return HttpMethods.all.map((m) => Center(child: MethodBadge(method: m))).toList();
-                              },
-                              items: HttpMethods.all
-                                  .map((m) => DropdownMenuItem(
-                                    value: m,
-                                    child: SizedBox(
-                                      width: isNarrow ? 64 : (layout.isCompact ? 80 : 100),
-                                      child: Center(child: MethodBadge(method: m)),
+                              if (tab.config.kind == RequestKind.http) ...[
+                                SizedBox(width: smallGap),
+                                DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    dropdownColor: theme.colorScheme.surface,
+                                    value: tab.config.method,
+                                    style: TextStyle(
+                                      color: theme.colorScheme.onSurface,
+                                      fontWeight: context.appTypography.displayWeight,
+                                      fontSize: layout.fontSizeNormal,
                                     ),
-                                  ))
-                                  .toList(),
-                              onChanged: (val) {
-                                if (val != null && tab.config.method != val) {
-                                  context.read<TabsBloc>().add(UpdateTab(
-                                    tab.copyWith(config: tab.config.copyWith(method: val)),
-                                  ));
-                                }
-                              },
-                            ),
+                                    selectedItemBuilder: (context) {
+                                      return HttpMethods.all.map((m) => Center(child: MethodBadge(method: m))).toList();
+                                    },
+                                    items: HttpMethods.all
+                                        .map((m) => DropdownMenuItem(
+                                          value: m,
+                                          child: SizedBox(
+                                            width: isNarrow ? 64 : (layout.isCompact ? 80 : 100),
+                                            child: Center(child: MethodBadge(method: m)),
+                                          ),
+                                        ))
+                                        .toList(),
+                                    onChanged: (val) {
+                                      if (val != null && tab.config.method != val) {
+                                        context.read<TabsBloc>().add(UpdateTab(
+                                          tab.copyWith(config: tab.config.copyWith(method: val)),
+                                        ));
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                         SizedBox(width: gap),
@@ -205,7 +243,8 @@ class _UrlBarState extends State<UrlBar> {
                           ),
                           SizedBox(width: smallGap),
                         ],
-                        context.appDecoration.wrapInteractive(
+                        if (tab.config.kind == RequestKind.http)
+                          context.appDecoration.wrapInteractive(
                           child: ElevatedButton(
                             onPressed: tab.isSending
                               ? () => context.read<TabsBloc>().add(CancelRequest(tab.tabId))
@@ -243,7 +282,14 @@ class _UrlBarState extends State<UrlBar> {
                                 : Text('SEND', key: const ValueKey('send'), style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.displayWeight)),
                             ),
                           ),
-                        ),
+                        )
+                        else
+                          _RealtimeButton(
+                            tabId: tab.tabId,
+                            config: tab.config,
+                            isNarrow: isNarrow,
+                            activeVars: _activeVariables(context),
+                          ),
                         if (isNarrow) ...[
                           SizedBox(width: smallGap),
                           _OverflowMenu(
@@ -312,6 +358,65 @@ class _UrlBarState extends State<UrlBar> {
     tabsBloc.add(UpdateTab(
       latestTab.copyWith(config: latestTab.config.copyWith(body: prettified)),
     ));
+  }
+}
+
+/// CONNECT / DISCONNECT button for WebSocket & SSE requests, driven by the
+/// realtime connection status for this tab.
+class _RealtimeButton extends StatelessWidget {
+  final String tabId;
+  final HttpRequestConfigEntity config;
+  final bool isNarrow;
+  final Map<String, String> activeVars;
+
+  const _RealtimeButton({
+    required this.tabId,
+    required this.config,
+    required this.isNarrow,
+    required this.activeVars,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final layout = context.appLayout;
+    return BlocBuilder<RealtimeBloc, RealtimeState>(
+      buildWhen: (p, n) => p.sessionFor(tabId).connected != n.sessionFor(tabId).connected,
+      builder: (context, rt) {
+        final connected = rt.sessionFor(tabId).connected;
+        return context.appDecoration.wrapInteractive(
+          child: ElevatedButton(
+            onPressed: () {
+              final bloc = context.read<RealtimeBloc>();
+              if (connected) {
+                bloc.add(Disconnect(tabId));
+              } else {
+                bloc.add(Connect(
+                  tabId: tabId,
+                  kind: config.kind,
+                  url: EnvironmentResolver.resolve(config.url, activeVars),
+                  headers: EnvironmentResolver.resolveMap(config.headers, activeVars),
+                ));
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: connected ? theme.colorScheme.error : null,
+              foregroundColor: connected ? theme.colorScheme.onError : null,
+              padding: EdgeInsets.symmetric(
+                horizontal: isNarrow ? 12 : layout.buttonPaddingHorizontal,
+                vertical: isNarrow ? 10 : layout.buttonPaddingVertical,
+              ),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              connected ? (isNarrow ? 'STOP' : 'DISCONNECT') : 'CONNECT',
+              style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.displayWeight),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
