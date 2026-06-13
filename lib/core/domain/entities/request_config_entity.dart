@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
 
@@ -37,6 +38,10 @@ class HttpRequestConfigEntity extends Equatable {
   /// source of truth — params are never stored separately. Duplicates are
   /// preserved in order.
   List<QueryParamEntity> get params => UrlQueryUtils.parseQuery(url);
+
+  /// Type-safe view over the raw [auth] map. An empty map reads as
+  /// [AuthType.none], so legacy records round-trip without migration.
+  AuthConfig get authConfig => AuthConfig.fromMap(auth);
 
   /// Rebuilds the entity. If [url] is supplied it wins. Otherwise, if [params]
   /// is supplied, the current URL's query portion is rewritten to match.

@@ -18,6 +18,7 @@ class MockNetworkService extends Mock implements NetworkService {}
 
 void main() {
   late MockTabsLocalDataSource dataSource;
+  late MockNetworkService networkService;
   late TabsRepositoryImpl repository;
 
   setUpAll(() {
@@ -29,9 +30,10 @@ void main() {
 
   setUp(() {
     dataSource = MockTabsLocalDataSource();
+    networkService = MockNetworkService();
     repository = TabsRepositoryImpl(
       localDataSource: dataSource,
-      networkService: MockNetworkService(),
+      networkService: networkService,
     );
   });
 
@@ -97,6 +99,76 @@ void main() {
       final models = verify(() => dataSource.saveTabs(captureAny())).captured.single
           as List<HttpRequestTabModel>;
       expect(models.single.responseBody, kResponseBodyTooLargePlaceholder);
+    });
+  });
+
+  group('sendRequest auth injection', () {
+    const response =
+        HttpResponseEntity(statusCode: 200, body: '', headers: {}, durationMs: 1);
+
+    void stubRequest() {
+      when(() => networkService.request(
+            url: any(named: 'url'),
+            method: any(named: 'method'),
+            queryParameters: any(named: 'queryParameters'),
+            data: any(named: 'data'),
+            headers: any(named: 'headers'),
+            cancelHandle: any(named: 'cancelHandle'),
+          )).thenAnswer((_) async => response);
+    }
+
+    Map<String, dynamic> capturedHeaders() {
+      return verify(() => networkService.request(
+            url: any(named: 'url'),
+            method: any(named: 'method'),
+            queryParameters: any(named: 'queryParameters'),
+            data: any(named: 'data'),
+            headers: captureAny(named: 'headers'),
+            cancelHandle: any(named: 'cancelHandle'),
+          )).captured.single as Map<String, dynamic>;
+    }
+
+    test('injects a Bearer Authorization header, resolving env vars', () async {
+      stubRequest();
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        url: 'https://api.dev/x',
+        auth: {'type': 'bearer', 'token': '{{tok}}'},
+      );
+
+      await repository.sendRequest(config, envVars: {'tok': 'secret'});
+
+      expect(capturedHeaders()['Authorization'], 'Bearer secret');
+    });
+
+    test('does not inject auth when config.auth is empty', () async {
+      stubRequest();
+      const config = HttpRequestConfigEntity(id: 'c', url: 'https://api.dev/x');
+
+      await repository.sendRequest(config);
+
+      expect(capturedHeaders().containsKey('Authorization'), isFalse);
+    });
+
+    test('api-key in query rides through to queryParameters', () async {
+      stubRequest();
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        url: 'https://api.dev/x',
+        auth: {'type': 'apikey', 'key': 'api_key', 'value': 'v', 'addTo': 'query'},
+      );
+
+      await repository.sendRequest(config);
+
+      final query = verify(() => networkService.request(
+            url: any(named: 'url'),
+            method: any(named: 'method'),
+            queryParameters: captureAny(named: 'queryParameters'),
+            data: any(named: 'data'),
+            headers: any(named: 'headers'),
+            cancelHandle: any(named: 'cancelHandle'),
+          )).captured.single as Map<String, List<String>>;
+      expect(query['api_key'], ['v']);
     });
   });
 
