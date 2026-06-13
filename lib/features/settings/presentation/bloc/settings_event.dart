@@ -69,3 +69,45 @@ class UpdateActiveEnvironmentId extends SettingsEvent {
   @override
   List<Object?> get props => [id];
 }
+
+class UpdateConnectTimeout extends SettingsEvent {
+  final int ms;
+  const UpdateConnectTimeout(this.ms);
+  @override
+  List<Object?> get props => [ms];
+}
+
+class UpdateSendTimeout extends SettingsEvent {
+  final int ms;
+  const UpdateSendTimeout(this.ms);
+  @override
+  List<Object?> get props => [ms];
+}
+
+class UpdateReceiveTimeout extends SettingsEvent {
+  final int ms;
+  const UpdateReceiveTimeout(this.ms);
+  @override
+  List<Object?> get props => [ms];
+}
+
+class UpdateFollowRedirects extends SettingsEvent {
+  final bool value;
+  const UpdateFollowRedirects(this.value);
+  @override
+  List<Object?> get props => [value];
+}
+
+class UpdateVerifySsl extends SettingsEvent {
+  final bool value;
+  const UpdateVerifySsl(this.value);
+  @override
+  List<Object?> get props => [value];
+}
+
+class UpdateProxyUrl extends SettingsEvent {
+  final String? url;
+  const UpdateProxyUrl(this.url);
+  @override
+  List<Object?> get props => [url];
+}

@@ -133,7 +133,8 @@ Future<SettingsEntity> init() async {
   sl.registerLazySingleton(() => const TabDirtyChecker());
 
   // Core
-  sl.registerLazySingleton(() => NetworkService(dio: NetworkService.buildDio()));
+  sl.registerLazySingleton(
+      () => NetworkService(dio: NetworkService.buildDio(initialSettings.toNetworkConfig())));
   sl.registerLazySingleton(() => AppRouter());
 
   return initialSettings;

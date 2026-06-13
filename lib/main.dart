@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/di/injection_container.dart' as di;
 import 'package:getman/core/navigation/app_router.dart';
 import 'package:getman/core/navigation/intents.dart';
+import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/theme_registry.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
@@ -15,6 +16,7 @@ import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
+import 'package:getman/features/settings/presentation/widgets/network_settings_listener.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -38,6 +40,7 @@ class MyApp extends StatelessWidget {
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<TabDirtyChecker>.value(value: di.sl<TabDirtyChecker>()),
+        RepositoryProvider<NetworkService>.value(value: di.sl<NetworkService>()),
       ],
       child: MultiBlocProvider(
       providers: [
@@ -48,7 +51,8 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (_) => di.sl<TabsBloc>()..add(const LoadTabs())),
         BlocProvider(create: (_) => di.sl<EnvironmentsBloc>()..add(const LoadEnvironments())),
       ],
-      child: BlocBuilder<SettingsBloc, SettingsState>(
+      child: NetworkSettingsListener(
+        child: BlocBuilder<SettingsBloc, SettingsState>(
         // Rebuilding here re-runs the theme builder and rebuilds the entire
         // MaterialApp — gate it to the three settings that actually feed it.
         buildWhen: (prev, next) =>
@@ -100,6 +104,7 @@ class MyApp extends StatelessWidget {
             ),
           );
         },
+      ),
       ),
       ),
     );

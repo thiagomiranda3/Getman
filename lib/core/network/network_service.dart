@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:getman/core/error/failures.dart';
+import 'package:getman/core/network/dio_adapter_config.dart';
 import 'package:getman/core/network/http_response.dart';
+import 'package:getman/core/network/network_config.dart';
 
 String _jsonEncode(dynamic data) => json.encode(data);
 
@@ -21,18 +23,20 @@ class NetworkService {
 
   NetworkService({required Dio dio}) : _dio = dio;
 
-  static Dio buildDio() {
+  static Dio buildDio([NetworkConfig config = NetworkConfig.defaults]) {
     // responseType: plain keeps the raw server bytes as a String; _stringifyBody's
     // "if (data is String) return data" fast path then short-circuits decode/re-encode,
     // saving two full JSON passes per response.
     final dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 30),
-      sendTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 60),
+      connectTimeout: Duration(milliseconds: config.connectTimeoutMs),
+      sendTimeout: Duration(milliseconds: config.sendTimeoutMs),
+      receiveTimeout: Duration(milliseconds: config.receiveTimeoutMs),
+      followRedirects: config.followRedirects,
       validateStatus: (_) => true,
       listFormat: ListFormat.multi,
       responseType: ResponseType.plain,
     ));
+    configureHttpAdapter(dio, verifySsl: config.verifySsl, proxyUrl: config.proxyUrl);
     if (kDebugMode) {
       dio.interceptors.add(LogInterceptor(
         requestBody: false,
@@ -44,6 +48,18 @@ class NetworkService {
       ));
     }
     return dio;
+  }
+
+  /// Re-applies [config] to the live client without rebuilding it: timeouts and
+  /// follow-redirects are mutated on [BaseOptions]; SSL/proxy swap the adapter.
+  /// Interceptors (e.g. the cookie jar) are preserved.
+  void applyConfig(NetworkConfig config) {
+    _dio.options
+      ..connectTimeout = Duration(milliseconds: config.connectTimeoutMs)
+      ..sendTimeout = Duration(milliseconds: config.sendTimeoutMs)
+      ..receiveTimeout = Duration(milliseconds: config.receiveTimeoutMs)
+      ..followRedirects = config.followRedirects;
+    configureHttpAdapter(_dio, verifySsl: config.verifySsl, proxyUrl: config.proxyUrl);
   }
 
   Future<HttpResponseEntity> request({

@@ -28,7 +28,16 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     on<UpdateSideMenuWidth>((e, emit) => _apply(emit, (s) => s.copyWith(sideMenuWidth: e.width)));
     on<UpdateThemeId>((e, emit) => _apply(emit, (s) => s.copyWith(themeId: e.themeId)));
     on<UpdateActiveEnvironmentId>((e, emit) => _apply(emit, (s) => s.copyWith(activeEnvironmentId: e.id)));
+    on<UpdateConnectTimeout>((e, emit) => _apply(emit, (s) => s.copyWith(connectTimeoutMs: _clampTimeout(e.ms))));
+    on<UpdateSendTimeout>((e, emit) => _apply(emit, (s) => s.copyWith(sendTimeoutMs: _clampTimeout(e.ms))));
+    on<UpdateReceiveTimeout>((e, emit) => _apply(emit, (s) => s.copyWith(receiveTimeoutMs: _clampTimeout(e.ms))));
+    on<UpdateFollowRedirects>((e, emit) => _apply(emit, (s) => s.copyWith(followRedirects: e.value)));
+    on<UpdateVerifySsl>((e, emit) => _apply(emit, (s) => s.copyWith(verifySsl: e.value)));
+    on<UpdateProxyUrl>((e, emit) => _apply(emit, (s) => s.copyWith(proxyUrl: e.url)));
   }
+
+  // 0 disables the timeout (Dio treats Duration.zero as no limit); never negative.
+  static int _clampTimeout(int ms) => ms < 0 ? 0 : ms;
 
   Future<void> _apply(
     Emitter<SettingsState> emit,

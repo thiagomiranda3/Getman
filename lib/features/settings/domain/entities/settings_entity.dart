@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:getman/core/network/network_config.dart';
 import 'package:getman/core/theme/theme_ids.dart';
 
 const Object _unchanged = Object();
@@ -85,6 +86,16 @@ class SettingsEntity extends Equatable {
           identical(workspacePath, _unchanged) ? this.workspacePath : workspacePath as String?,
     );
   }
+
+  /// Maps the network-related settings to the transport-layer [NetworkConfig].
+  NetworkConfig toNetworkConfig() => NetworkConfig(
+        connectTimeoutMs: connectTimeoutMs,
+        sendTimeoutMs: sendTimeoutMs,
+        receiveTimeoutMs: receiveTimeoutMs,
+        followRedirects: followRedirects,
+        verifySsl: verifySsl,
+        proxyUrl: proxyUrl,
+      );
 
   @override
   List<Object?> get props => [
