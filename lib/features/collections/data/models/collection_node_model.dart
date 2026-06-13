@@ -1,7 +1,7 @@
+import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/history/data/models/request_config_model.dart';
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
-import '../../../../features/history/data/models/request_config_model.dart';
-import '../../domain/entities/collection_node_entity.dart';
 
 part 'collection_node_model.g.dart';
 

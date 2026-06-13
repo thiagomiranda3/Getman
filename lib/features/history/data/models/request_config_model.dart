@@ -1,8 +1,8 @@
+import 'package:getman/core/domain/entities/query_param_entity.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/utils/url_query_utils.dart';
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
-import '../../../../core/domain/entities/query_param_entity.dart';
-import '../../../../core/domain/entities/request_config_entity.dart';
-import '../../../../core/utils/url_query_utils.dart';
 
 part 'request_config_model.g.dart';
 

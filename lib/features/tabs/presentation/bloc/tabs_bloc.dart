@@ -1,15 +1,16 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/error/failures.dart';
+import 'package:getman/core/network/http_response.dart';
+import 'package:getman/core/network/network_service.dart';
+import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
+import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:uuid/uuid.dart';
-import '../../domain/entities/request_tab_entity.dart';
-import '../../domain/repositories/tabs_repository.dart';
-import '../../domain/usecases/send_request_use_case.dart';
-import '../../../../core/domain/entities/request_config_entity.dart';
-import '../../../../core/error/failures.dart';
-import '../../../../core/network/network_service.dart';
-import 'tabs_event.dart';
-import 'tabs_state.dart';
 
 class _RequestManager {
   final Map<String, NetworkCancelHandle> _handles = {};
@@ -48,8 +49,13 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   final SendRequestUseCase sendRequestUseCase;
 
   final _RequestManager _requests = _RequestManager();
+
+  /// Tabs edited since the last flush. The debounce timer persists only these
+  /// (via `putTab`), never the whole list — full rewrites serialize every
+  /// cached response body on the UI isolate (see persistence_limits.dart).
+  final Set<String> _dirtyTabIds = {};
   Timer? _debounceTimer;
-  final Uuid uuid = const Uuid();
+  static const Uuid _uuid = Uuid();
 
   static const _saveDebounce = Duration(seconds: 10);
 
@@ -72,20 +78,45 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
 
   void _scheduleSave() {
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(_saveDebounce, _persist);
+    _debounceTimer = Timer(_saveDebounce, _flushDirtyTabs);
   }
 
-  /// Cancel any pending debounced save and flush immediately. Use on structural
-  /// changes (add/remove/reorder/duplicate/close-others/close-right) so the
-  /// user never loses tabs if the app is quit before the 10s debounce fires.
-  Future<void> _persistNow() async {
-    _debounceTimer?.cancel();
-    await _persist();
+  /// Persist every dirty tab still alive in [state] via `putTab`. Iterates a
+  /// snapshot and removes each id just before its write: an edit landing
+  /// mid-flush re-dirties the id (instead of being swallowed by a wholesale
+  /// clear), and a failed write re-adds it so the next debounce retries.
+  Future<void> _flushDirtyTabs() async {
+    if (_dirtyTabIds.isEmpty) return;
+    final pending = _dirtyTabIds.toList(growable: false);
+    for (final id in pending) {
+      _dirtyTabIds.remove(id);
+      final tab = state.tabs.byId(id);
+      if (tab == null) continue;
+      try {
+        await repository.putTab(tab);
+      } on PersistenceFailure catch (f) {
+        _dirtyTabIds.add(id);
+        debugPrint('Tab save failed: ${f.message}');
+      }
+    }
   }
 
-  Future<void> _persist() async {
+  Future<void> _persistOrder() async {
     try {
-      await repository.saveTabs(state.tabs);
+      await repository.saveTabOrder(
+        state.tabs.map((t) => t.tabId).toList(growable: false),
+      );
+    } on PersistenceFailure catch (f) {
+      debugPrint('Tab order save failed: ${f.message}');
+    }
+  }
+
+  /// Run a structural write (putTab/deleteTabs/saveTabOrder). UI state is
+  /// already emitted and must never be blocked or reverted by a failed write —
+  /// failures are logged, matching the debounce path.
+  Future<void> _guardWrite(Future<void> Function() write) async {
+    try {
+      await write();
     } on PersistenceFailure catch (f) {
       debugPrint('Tab save failed: ${f.message}');
     }
@@ -95,7 +126,9 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   Future<void> close() async {
     _debounceTimer?.cancel();
     _requests.cancelAll();
-    await _persist();
+    // Flush pending edits incrementally — no full saveTabs rewrite on quit.
+    await _flushDirtyTabs();
+    await _persistOrder();
     return super.close();
   }
 
@@ -104,15 +137,19 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     try {
       final tabs = await repository.getTabs();
       if (tabs.isEmpty) {
-        final newTabId = uuid.v4();
+        final newTabId = _uuid.v4();
+        final newTab = HttpRequestTabEntity(
+          tabId: newTabId,
+          config: HttpRequestConfigEntity(id: newTabId, url: ''),
+        );
         emit(state.copyWith(
-          tabs: [HttpRequestTabEntity(
-            tabId: newTabId,
-            config: HttpRequestConfigEntity(id: newTabId, url: ''),
-          )],
+          tabs: [newTab],
           activeIndex: 0,
           isLoading: false,
         ));
+        // Persist the fresh tab + order so a clean boot is consistent on disk.
+        await _guardWrite(() => repository.putTab(newTab));
+        await _persistOrder();
       } else {
         // Reset transient in-flight flags — there is no live request after a restart.
         final sanitized = tabs.map((t) => t.isSending ? t.copyWith(isSending: false) : t).toList();
@@ -134,8 +171,8 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     }
 
     final newTab = HttpRequestTabEntity(
-      tabId: uuid.v4(),
-      config: event.config ?? HttpRequestConfigEntity(id: uuid.v4()),
+      tabId: _uuid.v4(),
+      config: event.config ?? HttpRequestConfigEntity(id: _uuid.v4()),
       collectionNodeId: event.collectionNodeId,
       collectionName: event.collectionName,
     );
@@ -144,7 +181,8 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       tabs: [...state.tabs, newTab],
       activeIndex: state.tabs.length,
     ));
-    await _persistNow();
+    await _guardWrite(() => repository.putTab(newTab));
+    await _persistOrder();
   }
 
   Future<void> _onRemoveTab(RemoveTab event, Emitter<TabsState> emit) async {
@@ -160,10 +198,15 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       newActiveIndex = newTabs.length - 1;
     }
     emit(state.copyWith(tabs: newTabs, activeIndex: newActiveIndex));
-    await _persistNow();
+    _dirtyTabIds.remove(event.tabId);
+    await _guardWrite(() => repository.deleteTabs([event.tabId]));
+    await _persistOrder();
   }
 
   void _onSetActiveIndex(SetActiveIndex event, Emitter<TabsState> emit) {
+    // Reject out-of-range indices (e.g. from a stale sheet/menu context) so
+    // widgets can index `tabs[activeIndex]` without re-checking bounds.
+    if (event.index < 0 || event.index >= state.tabs.length) return;
     emit(state.copyWith(activeIndex: event.index));
   }
 
@@ -187,7 +230,8 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     }
 
     emit(state.copyWith(tabs: tabs, activeIndex: newActiveIndex));
-    await _persistNow();
+    // Reordering changes no tab payloads — only the order list.
+    await _persistOrder();
   }
 
   void _onUpdateTab(UpdateTab event, Emitter<TabsState> emit) {
@@ -197,6 +241,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final newTabs = [...state.tabs];
     newTabs[index] = event.tab;
     emit(state.copyWith(tabs: newTabs));
+    _dirtyTabIds.add(event.tab.tabId);
     _scheduleSave();
   }
 
@@ -204,17 +249,27 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     if (state.tabs.length <= 1) return;
     final tabToKeep = state.tabs.byId(event.tabId);
     if (tabToKeep == null) return;
+    final removedIds = state.tabs
+        .where((t) => t.tabId != event.tabId)
+        .map((t) => t.tabId)
+        .toList(growable: false);
     emit(state.copyWith(
       tabs: [tabToKeep],
       activeIndex: 0,
     ));
-    await _persistNow();
+    _dirtyTabIds.removeAll(removedIds);
+    await _guardWrite(() => repository.deleteTabs(removedIds));
+    await _persistOrder();
   }
 
   Future<void> _onCloseTabsToTheRight(CloseTabsToTheRight event, Emitter<TabsState> emit) async {
     final index = state.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index == -1 || index >= state.tabs.length - 1) return;
     final newTabs = state.tabs.sublist(0, index + 1);
+    final removedIds = state.tabs
+        .sublist(index + 1)
+        .map((t) => t.tabId)
+        .toList(growable: false);
     int newActiveIndex = state.activeIndex;
     if (newActiveIndex > index) {
       newActiveIndex = index;
@@ -223,7 +278,9 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       tabs: newTabs,
       activeIndex: newActiveIndex,
     ));
-    await _persistNow();
+    _dirtyTabIds.removeAll(removedIds);
+    await _guardWrite(() => repository.deleteTabs(removedIds));
+    await _persistOrder();
   }
 
   Future<void> _onDuplicateTab(DuplicateTab event, Emitter<TabsState> emit) async {
@@ -231,7 +288,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     if (index == -1) return;
     final tabToDuplicate = state.tabs[index];
     final duplicatedTab = HttpRequestTabEntity(
-      tabId: uuid.v4(),
+      tabId: _uuid.v4(),
       config: tabToDuplicate.config.copyWith(),
       collectionNodeId: null,
       collectionName: null,
@@ -249,19 +306,19 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       tabs: newTabs,
       activeIndex: index + 1,
     ));
-    await _persistNow();
+    await _guardWrite(() => repository.putTab(duplicatedTab));
+    await _persistOrder();
   }
 
   Future<void> _onSendRequest(SendRequest event, Emitter<TabsState> emit) async {
-    final activeIndex = state.activeIndex;
-    if (activeIndex < 0 || activeIndex >= state.tabs.length) return;
+    final tab = state.tabs.byId(event.tabId);
+    if (tab == null || tab.isSending) return;
 
-    final activeTab = state.tabs[activeIndex];
-    final tabId = activeTab.tabId;
-    final config = activeTab.config;
+    final tabId = tab.tabId;
+    final config = tab.config;
     final handle = _requests.start(tabId);
 
-    emit(state.copyWith(tabs: _replaceTabById(state.tabs, activeTab.copyWith(isSending: true))));
+    emit(state.copyWith(tabs: _replaceTabById(state.tabs, tab.copyWith(isSending: true))));
 
     try {
       final response = await sendRequestUseCase(
@@ -272,11 +329,9 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       _requests.finish(tabId);
       _applyToTab(emit, tabId, (live) => live.copyWith(
         isSending: false,
-        statusCode: response.statusCode,
-        durationMs: response.durationMs,
-        responseBody: response.body,
-        responseHeaders: response.headers,
+        response: response,
       ));
+      _markResponseDirty(tabId);
     } on NetworkFailure catch (f) {
       _requests.finish(tabId);
 
@@ -287,12 +342,30 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
 
       _applyToTab(emit, tabId, (live) => live.copyWith(
         isSending: false,
-        statusCode: f.statusCode ?? 0,
-        durationMs: 0,
-        responseBody: f.message,
-        responseHeaders: const <String, String>{},
+        response: HttpResponseEntity(
+          statusCode: f.statusCode ?? 0,
+          body: f.message,
+          headers: const {},
+          durationMs: 0,
+        ),
       ));
+      _markResponseDirty(tabId);
+    } catch (e) {
+      // Anything unexpected must still release the tab — otherwise it is
+      // stuck on "SENDING" with no way to retry or cancel.
+      _requests.finish(tabId);
+      debugPrint('SendRequest failed unexpectedly: $e');
+      _applyToTab(emit, tabId, (live) => live.copyWith(isSending: false));
     }
+  }
+
+  /// Schedule a debounced persist for the tab that just received a response
+  /// (or error response) so cached responses survive a restart. No-op when the
+  /// tab was closed while the request ran.
+  void _markResponseDirty(String tabId) {
+    if (state.tabs.byId(tabId) == null) return;
+    _dirtyTabIds.add(tabId);
+    _scheduleSave();
   }
 
   /// Resolve [tabId] against the latest state and emit a new state with the

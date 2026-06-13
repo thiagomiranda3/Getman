@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:re_editor/re_editor.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:re_editor/re_editor.dart';
 
 class CodeFindPanel extends StatefulWidget implements PreferredSizeWidget {
   final CodeFindController controller;
@@ -43,7 +43,7 @@ class _CodeFindPanelState extends State<CodeFindPanel> {
     }
 
     final theme = Theme.of(context);
-    final layout = theme.extension<AppLayout>()!;
+    final layout = context.appLayout;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

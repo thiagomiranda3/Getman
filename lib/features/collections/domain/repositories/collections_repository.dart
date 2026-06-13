@@ -1,4 +1,4 @@
-import '../entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 
 abstract class CollectionsRepository {
   Future<List<CollectionNodeEntity>> getCollections();

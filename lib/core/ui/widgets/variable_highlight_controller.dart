@@ -1,20 +1,20 @@
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
-import '../../utils/environment_resolver.dart';
+import 'package:getman/core/utils/environment_resolver.dart';
 
 class VariableHighlightController extends TextEditingController {
   Map<String, String> _variables;
-  Color _resolvedColor;
-  Color _unresolvedColor;
+
+  // Theme-dependent, so they can't be known at construction time (no
+  // BuildContext yet). The owning widget pushes them via [updateColors] in
+  // `didChangeDependencies`; until then tokens render unhighlighted.
+  Color? _resolvedColor;
+  Color? _unresolvedColor;
 
   VariableHighlightController({
     super.text,
     Map<String, String> variables = const {},
-    required Color resolvedColor,
-    required Color unresolvedColor,
-  })  : _variables = variables,
-        _resolvedColor = resolvedColor,
-        _unresolvedColor = unresolvedColor;
+  }) : _variables = variables;
 
   Map<String, String> get variables => _variables;
 
@@ -42,6 +42,12 @@ class VariableHighlightController extends TextEditingController {
       return TextSpan(style: style, text: '');
     }
 
+    final resolvedColor = _resolvedColor;
+    final unresolvedColor = _unresolvedColor;
+    if (resolvedColor == null || unresolvedColor == null) {
+      return TextSpan(style: style, text: current);
+    }
+
     final matches = EnvironmentResolver.findVariables(current).toList();
     if (matches.isEmpty) {
       return TextSpan(style: style, text: current);
@@ -55,7 +61,7 @@ class VariableHighlightController extends TextEditingController {
       }
       final resolved = _variables.containsKey(match.name);
       final highlightStyle = (style ?? const TextStyle()).copyWith(
-        color: resolved ? _resolvedColor : _unresolvedColor,
+        color: resolved ? resolvedColor : unresolvedColor,
         fontWeight: FontWeight.w800,
       );
       children.add(TextSpan(

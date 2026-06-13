@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:equatable/equatable.dart';
-import '../../../../core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/network/http_response.dart';
 
 // Sentinel used by copyWith to distinguish "not provided" from "explicitly null".
 const Object _unset = Object();
@@ -11,12 +12,18 @@ extension HttpRequestTabLookup on Iterable<HttpRequestTabEntity> {
   HttpRequestTabEntity? byId(String id) => firstWhereOrNull((t) => t.tabId == id);
 }
 
+extension HttpRequestTabDisplay on HttpRequestTabEntity {
+  /// Title shown in the tab strip, switcher sheet, and phone tab chip.
+  String get displayTitle =>
+      collectionName ?? (config.url.isEmpty ? 'NEW REQUEST' : config.url);
+}
+
 class HttpRequestTabEntity extends Equatable {
   final HttpRequestConfigEntity config;
-  final String? responseBody;
-  final Map<String, String>? responseHeaders;
-  final int? statusCode;
-  final int? durationMs;
+
+  /// Last response received on this tab, or null when nothing has been sent
+  /// (or the last send was cancelled before completing).
+  final HttpResponseEntity? response;
   final bool isSending;
   final String? collectionNodeId;
   final String? collectionName;
@@ -25,10 +32,7 @@ class HttpRequestTabEntity extends Equatable {
   const HttpRequestTabEntity({
     required this.config,
     required this.tabId,
-    this.responseBody,
-    this.responseHeaders,
-    this.statusCode,
-    this.durationMs,
+    this.response,
     this.isSending = false,
     this.collectionNodeId,
     this.collectionName,
@@ -36,10 +40,7 @@ class HttpRequestTabEntity extends Equatable {
 
   HttpRequestTabEntity copyWith({
     HttpRequestConfigEntity? config,
-    Object? responseBody = _unset,
-    Object? responseHeaders = _unset,
-    Object? statusCode = _unset,
-    Object? durationMs = _unset,
+    Object? response = _unset,
     bool? isSending,
     Object? collectionNodeId = _unset,
     Object? collectionName = _unset,
@@ -47,12 +48,7 @@ class HttpRequestTabEntity extends Equatable {
   }) {
     return HttpRequestTabEntity(
       config: config ?? this.config,
-      responseBody: identical(responseBody, _unset) ? this.responseBody : responseBody as String?,
-      responseHeaders: identical(responseHeaders, _unset)
-          ? this.responseHeaders
-          : responseHeaders as Map<String, String>?,
-      statusCode: identical(statusCode, _unset) ? this.statusCode : statusCode as int?,
-      durationMs: identical(durationMs, _unset) ? this.durationMs : durationMs as int?,
+      response: identical(response, _unset) ? this.response : response as HttpResponseEntity?,
       isSending: isSending ?? this.isSending,
       collectionNodeId: identical(collectionNodeId, _unset)
           ? this.collectionNodeId
@@ -67,10 +63,7 @@ class HttpRequestTabEntity extends Equatable {
   @override
   List<Object?> get props => [
     config,
-    responseBody,
-    responseHeaders,
-    statusCode,
-    durationMs,
+    response,
     isSending,
     collectionNodeId,
     collectionName,

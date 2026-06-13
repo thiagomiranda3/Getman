@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../domain/entities/environment_entity.dart';
+import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 
 class EnvironmentsState extends Equatable {
   final List<EnvironmentEntity> environments;

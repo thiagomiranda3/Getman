@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../domain/entities/environment_entity.dart';
+import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 
 abstract class EnvironmentsEvent extends Equatable {
   const EnvironmentsEvent();
@@ -11,11 +11,14 @@ class LoadEnvironments extends EnvironmentsEvent {
   const LoadEnvironments();
 }
 
+/// Carries the full entity (not just a name) so the dispatching widget knows
+/// the new environment's id up front — bloc state updates are asynchronous,
+/// so an id generated inside the handler would be unknowable at the call site.
 class AddEnvironment extends EnvironmentsEvent {
-  final String name;
-  const AddEnvironment(this.name);
+  final EnvironmentEntity environment;
+  const AddEnvironment(this.environment);
   @override
-  List<Object?> get props => [name];
+  List<Object?> get props => [environment];
 }
 
 class UpdateEnvironment extends EnvironmentsEvent {

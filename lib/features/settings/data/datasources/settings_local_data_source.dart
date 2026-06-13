@@ -1,7 +1,7 @@
+import 'package:getman/core/error/exceptions.dart';
+import 'package:getman/core/storage/hive_boxes.dart';
+import 'package:getman/features/settings/data/models/settings_model.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import '../../../../core/error/exceptions.dart';
-import '../../../../core/storage/hive_boxes.dart';
-import '../models/settings_model.dart';
 
 abstract class SettingsLocalDataSource {
   Future<SettingsModel> getSettings();

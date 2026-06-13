@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/themes/rpg/rpg_decorations.dart';
+import 'package:getman/core/theme/themes/rpg/rpg_palette.dart';
+import 'package:getman/core/theme/themes/rpg/rpg_sparkle.dart';
 import 'package:google_fonts/google_fonts.dart';
-
-import '../../app_theme.dart';
-import 'rpg_decorations.dart';
-import 'rpg_palette.dart';
-import 'rpg_sparkle.dart';
 
 /// Arcane Quest — an RPG-flavoured theme with sparkle-on-tap, animated
 /// starfield background, glowing gold panels, and carved-stone typography.
@@ -109,7 +108,6 @@ ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
     wrapInteractive: ({required child, onTap, scaleDown}) =>
         RpgSparkle(onTap: onTap, scaleDown: scaleDown ?? 0.96, child: child),
     scaffoldBackground: rpgScaffoldBackground,
-    doubleRule: rpgDoubleRule,
   );
 
   final cinzelUppercase = TextStyle(

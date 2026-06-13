@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../core/error/failures.dart';
-import '../../domain/entities/environment_entity.dart';
-import '../../domain/usecases/environments_usecases.dart';
-import 'environments_event.dart';
-import 'environments_state.dart';
+import 'package:getman/core/error/failures.dart';
+import 'package:getman/features/environments/domain/entities/environment_entity.dart';
+import 'package:getman/features/environments/domain/usecases/environments_usecases.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
 
 class EnvironmentsBloc extends Bloc<EnvironmentsEvent, EnvironmentsState> {
   final GetEnvironmentsUseCase getEnvironmentsUseCase;
@@ -36,13 +36,17 @@ class EnvironmentsBloc extends Bloc<EnvironmentsEvent, EnvironmentsState> {
 
   Future<void> _onLoad(LoadEnvironments event, Emitter<EnvironmentsState> emit) async {
     emit(state.copyWith(isLoading: true));
-    final environments = await getEnvironmentsUseCase();
-    emit(state.copyWith(environments: environments, isLoading: false));
+    try {
+      final environments = await getEnvironmentsUseCase();
+      emit(state.copyWith(environments: environments, isLoading: false));
+    } on PersistenceFailure catch (f) {
+      debugPrint('LoadEnvironments failed: ${f.message}');
+      emit(state.copyWith(isLoading: false));
+    }
   }
 
   Future<void> _onAdd(AddEnvironment event, Emitter<EnvironmentsState> emit) {
-    final next = [...state.environments, EnvironmentEntity(name: event.name)];
-    return _commit(emit, next);
+    return _commit(emit, [...state.environments, event.environment]);
   }
 
   Future<void> _onUpdate(UpdateEnvironment event, Emitter<EnvironmentsState> emit) {

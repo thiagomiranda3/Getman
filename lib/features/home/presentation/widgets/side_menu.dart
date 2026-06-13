@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/ui/widgets/branded_tab_bar.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
@@ -31,29 +32,10 @@ class SideMenu extends StatelessWidget {
                   bottom: BorderSide(color: theme.dividerColor, width: layout.borderThick),
                 ),
               ),
-              child: TabBar(
-                dividerColor: Colors.transparent,
-                indicator: BoxDecoration(
-                  color: theme.primaryColor,
-                  border: Border(
-                    top: BorderSide(color: theme.dividerColor, width: layout.borderThick),
-                    left: BorderSide(color: theme.dividerColor, width: layout.borderThick),
-                    right: BorderSide(color: theme.dividerColor, width: layout.borderThick),
-                  ),
-                ),
-                labelColor: theme.colorScheme.onPrimary,
-                unselectedLabelColor: theme.colorScheme.onSurface,
-                labelStyle: TextStyle(
-                  fontSize: layout.fontSizeNormal,
-                  fontWeight: context.appTypography.displayWeight,
-                  overflow: TextOverflow.fade,
-                ),
+              child: const BrandedTabBar(
+                labels: ['COLLECTIONS', 'HISTORY'],
                 padding: EdgeInsets.zero,
-                labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-                tabs: const [
-                  Tab(text: 'COLLECTIONS'),
-                  Tab(text: 'HISTORY'),
-                ],
+                labelPadding: EdgeInsets.symmetric(horizontal: 4),
               ),
             ),
             const Expanded(

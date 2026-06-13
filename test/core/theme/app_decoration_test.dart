@@ -8,7 +8,6 @@ BoxDecoration _noopTab(BuildContext ctx, {required bool active, required bool ho
     const BoxDecoration();
 Widget _noopWrap({required Widget child, VoidCallback? onTap, double? scaleDown}) => child;
 Widget _noopScaffoldBg(BuildContext ctx, {required Widget child}) => child;
-Widget _noopDoubleRule(BuildContext ctx) => const SizedBox.shrink();
 
 void main() {
   group('AppDecoration', () {
@@ -17,7 +16,6 @@ void main() {
       tabShape: _noopTab,
       wrapInteractive: _noopWrap,
       scaffoldBackground: _noopScaffoldBg,
-      doubleRule: _noopDoubleRule,
     );
 
     test('copyWith swaps provided closures and keeps others', () {

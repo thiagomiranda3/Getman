@@ -1,6 +1,6 @@
+import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
-import '../../domain/entities/environment_entity.dart';
 
 part 'environment_model.g.dart';
 

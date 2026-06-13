@@ -16,7 +16,7 @@ class Splitter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<AppLayout>()!;
+    final layout = context.appLayout;
     final splitterSize = layout.isCompact ? 12.0 : 16.0;
 
     return GestureDetector(

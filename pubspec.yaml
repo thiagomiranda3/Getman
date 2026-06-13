@@ -15,13 +15,10 @@ dependencies:
   re_editor: ^0.8.0
   re_highlight: ^0.0.3
   google_fonts: ^6.2.1
-  flutter_json_view: ^1.1.5
   hive: ^2.2.3
   hive_flutter: ^1.1.0
-  path_provider: ^2.1.5
   flutter_fancy_tree_view: ^1.1.1
   uuid: ^4.5.1
-  intl: ^0.20.2
   shimmer: ^3.0.0
   flutter_bloc: ^9.1.1
   get_it: ^9.2.1
@@ -41,3 +38,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    # Pre-bundled Google Fonts (named per google_fonts' asset convention) so
+    # no font is ever fetched over HTTP at runtime. Licenses live alongside
+    # in assets/google_fonts/licenses/ (OFL).
+    - assets/google_fonts/

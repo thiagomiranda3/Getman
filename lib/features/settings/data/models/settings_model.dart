@@ -1,6 +1,6 @@
+import 'package:getman/core/theme/theme_ids.dart';
+import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:hive/hive.dart';
-import '../../../../core/theme/theme_ids.dart';
-import '../../domain/entities/settings_entity.dart';
 
 part 'settings_model.g.dart';
 

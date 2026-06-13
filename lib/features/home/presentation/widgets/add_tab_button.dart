@@ -5,9 +5,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 
 class AddTabButton extends StatefulWidget {
-  final AppLayout layout;
-
-  const AddTabButton({super.key, required this.layout});
+  const AddTabButton({super.key});
 
   @override
   State<AddTabButton> createState() => _AddTabButtonState();
@@ -19,6 +17,7 @@ class _AddTabButtonState extends State<AddTabButton> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final layout = context.appLayout;
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
@@ -26,11 +25,11 @@ class _AddTabButtonState extends State<AddTabButton> {
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
           color: _isHovered ? theme.primaryColor : theme.scaffoldBackgroundColor,
-          border: Border(left: BorderSide(color: theme.dividerColor, width: widget.layout.borderThick)),
+          border: Border(left: BorderSide(color: theme.dividerColor, width: layout.borderThick)),
         ),
         child: context.appDecoration.wrapInteractive(
           child: IconButton(
-            icon: Icon(Icons.add, size: widget.layout.addIconSize, color: theme.colorScheme.onSurface),
+            icon: Icon(Icons.add, size: layout.addIconSize, color: theme.colorScheme.onSurface),
             onPressed: () => context.read<TabsBloc>().add(const AddTab()),
           ),
         ),

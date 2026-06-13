@@ -1,5 +1,5 @@
-import '../entities/environment_entity.dart';
-import '../repositories/environments_repository.dart';
+import 'package:getman/features/environments/domain/entities/environment_entity.dart';
+import 'package:getman/features/environments/domain/repositories/environments_repository.dart';
 
 class GetEnvironmentsUseCase {
   final EnvironmentsRepository repository;

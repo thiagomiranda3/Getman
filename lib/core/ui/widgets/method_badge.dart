@@ -9,7 +9,7 @@ class MethodBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<AppLayout>()!;
+    final layout = context.appLayout;
     final color = context.appPalette.methodColor(method);
 
     return Container(

@@ -1,7 +1,7 @@
-import '../../../collections/domain/entities/collection_node_entity.dart';
-import '../../../collections/domain/logic/collections_tree_helper.dart';
-import '../../../../core/domain/entities/request_config_entity.dart';
-import '../../../tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
+import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 
 class TabDirtyChecker {
   const TabDirtyChecker();

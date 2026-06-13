@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../app_theme.dart';
+import 'package:getman/core/theme/app_theme.dart';
 
 BoxDecoration brutalistPanelBox(
   BuildContext context, {
@@ -55,9 +55,3 @@ BoxDecoration brutalistTabShape(
 }
 
 Widget brutalistScaffoldBackground(BuildContext context, {required Widget child}) => child;
-
-Widget brutalistDoubleRule(BuildContext context) {
-  final layout = context.appLayout;
-  final color = Theme.of(context).dividerColor;
-  return Container(height: layout.borderThick, color: color);
-}

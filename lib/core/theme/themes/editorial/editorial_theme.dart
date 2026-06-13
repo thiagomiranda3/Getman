@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/themes/editorial/editorial_decorations.dart';
+import 'package:getman/core/theme/themes/editorial/editorial_fade.dart';
+import 'package:getman/core/theme/themes/editorial/editorial_palette.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../app_theme.dart';
-import 'editorial_decorations.dart';
-import 'editorial_fade.dart';
-import 'editorial_palette.dart';
 
 ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
   final bool isDark = brightness == Brightness.dark;
@@ -78,7 +78,6 @@ ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
     wrapInteractive: ({required child, onTap, scaleDown}) =>
         EditorialFade(onTap: onTap, child: child),
     scaffoldBackground: editorialScaffoldBackground,
-    doubleRule: editorialDoubleRule,
   );
 
   final plexUppercase = TextStyle(

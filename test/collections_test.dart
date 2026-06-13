@@ -1,11 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
+import 'package:getman/core/error/failures.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
+import 'package:mocktail/mocktail.dart';
 
 class MockCollectionsRepository extends Mock implements CollectionsRepository {}
 
@@ -56,6 +57,24 @@ void main() {
     );
   });
 
+  test('clears isLoading and keeps current tree when the read fails', () async {
+    // Arrange
+    when(() => mockRepository.getCollections())
+        .thenThrow(const PersistenceFailure('corrupted box'));
+
+    // Act
+    collectionsBloc.add(const LoadCollections());
+
+    // Assert
+    await expectLater(
+      collectionsBloc.stream,
+      emitsInOrder([
+        const CollectionsState(collections: [], isLoading: true),
+        const CollectionsState(collections: [], isLoading: false),
+      ]),
+    );
+  });
+
   test('should call saveCollections when AddFolder is added', () async {
     // Arrange
     when(() => mockRepository.getCollections()).thenAnswer((_) async => []);
@@ -67,5 +86,60 @@ void main() {
     // Assert
     await untilCalled(() => mockRepository.saveCollections(any()));
     verify(() => mockRepository.saveCollections(any())).called(1);
+  });
+
+  group('tree mutations', () {
+    const child = CollectionNodeEntity(id: 'child', name: 'Child', isFolder: true);
+    const parent = CollectionNodeEntity(
+      id: 'parent',
+      name: 'Parent',
+      isFolder: true,
+      children: [child],
+    );
+
+    setUp(() async {
+      when(() => mockRepository.getCollections()).thenAnswer((_) async => [parent]);
+      when(() => mockRepository.saveCollections(any())).thenAnswer((_) async => {});
+      collectionsBloc.add(const LoadCollections());
+      await expectLater(
+        collectionsBloc.stream,
+        emitsThrough(predicate<CollectionsState>((s) => !s.isLoading && s.collections.isNotEmpty)),
+      );
+    });
+
+    test('AddFolder appends to the root when the parent no longer exists', () async {
+      collectionsBloc.add(const AddFolder('Orphan', parentId: 'ghost'));
+      await untilCalled(() => mockRepository.saveCollections(any()));
+
+      final roots = collectionsBloc.state.collections;
+      expect(roots.map((n) => n.name), containsAll(['Parent', 'Orphan']));
+    });
+
+    test('MoveNode rejects a move into the node\'s own subtree', () async {
+      collectionsBloc.add(const MoveNode('parent', 'child'));
+      await Future<void>.delayed(Duration.zero);
+
+      // Tree unchanged: parent still at root, child still inside it.
+      final roots = collectionsBloc.state.collections;
+      expect(roots.single.id, 'parent');
+      expect(roots.single.children.single.id, 'child');
+    });
+
+    test('MoveNode to null re-roots the node', () async {
+      collectionsBloc.add(const MoveNode('child', null));
+      await untilCalled(() => mockRepository.saveCollections(any()));
+
+      final roots = collectionsBloc.state.collections;
+      expect(roots.map((n) => n.id), containsAll(['parent', 'child']));
+      expect(roots.firstWhere((n) => n.id == 'parent').children, isEmpty);
+    });
+
+    test('ImportCollections appends the imported roots', () async {
+      const imported = CollectionNodeEntity(id: 'imp', name: 'Imported', isFolder: true);
+      collectionsBloc.add(const ImportCollections([imported]));
+      await untilCalled(() => mockRepository.saveCollections(any()));
+
+      expect(collectionsBloc.state.collections.map((n) => n.id), containsAll(['parent', 'imp']));
+    });
   });
 }

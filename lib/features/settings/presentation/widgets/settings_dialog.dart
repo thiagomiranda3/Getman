@@ -42,7 +42,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<AppLayout>()!;
+    final layout = context.appLayout;
 
     return BlocBuilder<SettingsBloc, SettingsState>(
       buildWhen: (prev, next) => prev.settings != next.settings,

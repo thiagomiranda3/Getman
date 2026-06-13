@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../domain/entities/settings_entity.dart';
+import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 
 class SettingsState extends Equatable {
   final SettingsEntity settings;

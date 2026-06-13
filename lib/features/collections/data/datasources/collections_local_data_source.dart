@@ -1,7 +1,8 @@
+import 'package:getman/core/error/exceptions.dart';
+import 'package:getman/core/storage/hive_boxes.dart';
+import 'package:getman/core/storage/hive_helpers.dart';
+import 'package:getman/features/collections/data/models/collection_node_model.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import '../../../../core/error/exceptions.dart';
-import '../../../../core/storage/hive_boxes.dart';
-import '../models/collection_node_model.dart';
 
 abstract class CollectionsLocalDataSource {
   Future<List<CollectionNode>> getCollections();
@@ -23,9 +24,7 @@ class CollectionsLocalDataSourceImpl implements CollectionsLocalDataSource {
   @override
   Future<void> saveCollections(List<CollectionNode> collections) async {
     try {
-      final box = _box();
-      await box.clear();
-      await box.addAll(collections);
+      await replaceAllInBox(_box(), collections);
     } catch (e) {
       throw PersistenceException('Failed to save collections', cause: e);
     }

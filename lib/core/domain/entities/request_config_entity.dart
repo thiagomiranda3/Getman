@@ -1,7 +1,6 @@
 import 'package:equatable/equatable.dart';
-
-import '../../utils/url_query_utils.dart';
-import 'query_param_entity.dart';
+import 'package:getman/core/domain/entities/query_param_entity.dart';
+import 'package:getman/core/utils/url_query_utils.dart';
 
 // Sentinel used by copyWith to distinguish "not provided" from "explicitly null".
 const Object _unset = Object();

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:re_editor/re_editor.dart';
 import 'package:getman/core/navigation/intents.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
+import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
 import 'package:getman/core/utils/json_utils.dart';
@@ -21,6 +21,7 @@ import 'package:getman/features/tabs/presentation/widgets/request_config_section
 import 'package:getman/features/tabs/presentation/widgets/response_section.dart';
 import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.dart';
 import 'package:getman/features/tabs/presentation/widgets/url_bar.dart';
+import 'package:re_editor/re_editor.dart';
 
 const double _splitMin = 0.1;
 const double _splitMax = 0.9;
@@ -81,6 +82,9 @@ class _RequestViewState extends State<RequestView> {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<SettingsBloc, SettingsState>(
+      buildWhen: (prev, next) =>
+          prev.settings.splitRatio != next.settings.splitRatio ||
+          prev.settings.isVerticalLayout != next.settings.isVerticalLayout,
       builder: (context, settingsState) {
         final settings = settingsState.settings;
         final layout = context.appLayout;
@@ -192,8 +196,6 @@ class _RequestViewState extends State<RequestView> {
     if (tab == null) return;
 
     final collectionsBloc = context.read<CollectionsBloc>();
-    final theme = Theme.of(context);
-    final layout = context.appLayout;
 
     final savedNode = tab.collectionNodeId == null
         ? null
@@ -204,19 +206,7 @@ class _RequestViewState extends State<RequestView> {
         tab.collectionNodeId!,
         tab.config.copyWith(),
       ));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: theme.primaryColor,
-          elevation: 0,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(context.appShape.panelRadius),
-            side: BorderSide(color: theme.dividerColor, width: layout.borderThick),
-          ),
-          content: Text('REQUEST UPDATED!', style: TextStyle(color: theme.colorScheme.onPrimary, fontSize: context.appLayout.fontSizeNormal, fontWeight: context.appTypography.displayWeight)),
-          duration: const Duration(seconds: 1),
-        ),
-      );
+      showAppSnackBar(context, 'REQUEST UPDATED!', duration: const Duration(seconds: 1));
       return;
     }
 

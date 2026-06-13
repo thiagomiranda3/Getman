@@ -1,46 +1,28 @@
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/history/domain/repositories/history_repository.dart';
 import 'package:getman/features/history/domain/usecases/history_usecases.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
-import 'package:getman/features/history/presentation/bloc/history_event.dart';
 import 'package:getman/features/history/presentation/bloc/history_state.dart';
+import 'package:mocktail/mocktail.dart';
 
 class MockHistoryRepository extends Mock implements HistoryRepository {}
 
-class _FakeHttpRequestConfigEntity extends Fake implements HttpRequestConfigEntity {}
-
 void main() {
   late MockHistoryRepository mockRepository;
-  late GetHistoryUseCase getHistoryUseCase;
-  late AddToHistoryUseCase addToHistoryUseCase;
-  late ClearHistoryUseCase clearHistoryUseCase;
-  late WatchHistoryUseCase watchHistoryUseCase;
-  late HistoryBloc historyBloc;
+  late StreamController<List<HttpRequestConfigEntity>> watchController;
 
-  setUpAll(() {
-    registerFallbackValue(_FakeHttpRequestConfigEntity());
-  });
+  HistoryBloc buildBloc() =>
+      HistoryBloc(watchHistoryUseCase: WatchHistoryUseCase(mockRepository));
 
   setUp(() {
     mockRepository = MockHistoryRepository();
-    when(() => mockRepository.watchHistory()).thenAnswer((_) => const Stream.empty());
-    getHistoryUseCase = GetHistoryUseCase(mockRepository);
-    addToHistoryUseCase = AddToHistoryUseCase(mockRepository);
-    clearHistoryUseCase = ClearHistoryUseCase(mockRepository);
-    watchHistoryUseCase = WatchHistoryUseCase(mockRepository);
-    historyBloc = HistoryBloc(
-      getHistoryUseCase: getHistoryUseCase,
-      addToHistoryUseCase: addToHistoryUseCase,
-      clearHistoryUseCase: clearHistoryUseCase,
-      watchHistoryUseCase: watchHistoryUseCase,
-    );
+    watchController = StreamController<List<HttpRequestConfigEntity>>();
+    when(() => mockRepository.watchHistory()).thenAnswer((_) => watchController.stream);
   });
 
-  tearDown(() {
-    historyBloc.close();
-  });
+  tearDown(() => watchController.close());
 
   const tConfig = HttpRequestConfigEntity(
     id: '1',
@@ -48,37 +30,40 @@ void main() {
     url: 'https://example.com',
   );
 
-  test('initial state should be HistoryState with empty list', () {
-    expect(historyBloc.state, const HistoryState());
+  test('starts loading until the watch stream delivers the initial list', () async {
+    final bloc = buildBloc();
+    addTearDown(bloc.close);
+
+    expect(bloc.state.isLoading, isTrue);
+
+    watchController.add(const [tConfig]);
+    await expectLater(
+      bloc.stream,
+      emits(const HistoryState(history: [tConfig], isLoading: false)),
+    );
   });
 
-  test('should emit [isLoading: true, history: [...]] when LoadHistory is added', () async {
-    // Arrange
-    when(() => mockRepository.getHistory()).thenAnswer((_) async => [tConfig]);
+  test('updates state on every subsequent watch emission, newest list winning', () async {
+    final bloc = buildBloc();
+    addTearDown(bloc.close);
 
-    // Act
-    historyBloc.add(const LoadHistory());
+    watchController.add(const [tConfig]);
+    watchController.add(const []);
 
-    // Assert
     await expectLater(
-      historyBloc.stream,
+      bloc.stream,
       emitsInOrder([
-        const HistoryState(history: [], isLoading: true),
         const HistoryState(history: [tConfig], isLoading: false),
+        const HistoryState(history: [], isLoading: false),
       ]),
     );
   });
 
-  test('should call addToHistory when AddRequestToHistory is added', () async {
-    // Arrange
-    when(() => mockRepository.addToHistory(any(), any())).thenAnswer((_) async => {});
-    when(() => mockRepository.getHistory()).thenAnswer((_) async => [tConfig]);
-
-    // Act
-    historyBloc.add(const AddRequestToHistory(tConfig, 10));
-
-    // Assert
-    await untilCalled(() => mockRepository.addToHistory(any(), any()));
-    verify(() => mockRepository.addToHistory(tConfig, 10)).called(1);
+  test('ignores emissions arriving after close instead of throwing', () async {
+    final bloc = buildBloc();
+    await bloc.close();
+    // Must not throw "Cannot add new events after calling close".
+    watchController.add(const [tConfig]);
+    await Future<void>.delayed(Duration.zero);
   });
 }

@@ -1,8 +1,3 @@
-import 'dart:convert';
-import 'dart:io';
-
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_fancy_tree_view/flutter_fancy_tree_view.dart';
@@ -10,6 +5,7 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
+import 'package:getman/core/utils/json_file_io.dart';
 import 'package:getman/core/utils/postman/postman_collection_mapper.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
@@ -61,63 +57,14 @@ class _CollectionsListState extends State<CollectionsList> {
     }
   }
 
-  Future<void> _importCollections(BuildContext context) async {
-    final messenger = ScaffoldMessenger.maybeOf(context);
+  Future<void> _importCollections(BuildContext context) {
     final bloc = context.read<CollectionsBloc>();
-    final FilePickerResult? result;
-    try {
-      result = await FilePicker.platform.pickFiles(
-        allowMultiple: true,
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-        withData: true,
-      );
-    } catch (e) {
-      debugPrint('File picker failed: $e');
-      messenger?.showSnackBar(SnackBar(content: Text('Import failed: $e')));
-      return;
-    }
-    if (result == null || result.files.isEmpty) return;
-
-    final imported = <CollectionNodeEntity>[];
-    final failures = <String>[];
-    for (final file in result.files) {
-      try {
-        final content = await _readFileContent(file);
-        if (content == null) {
-          failures.add('${file.name}: unable to read file');
-          continue;
-        }
-        imported.add(PostmanCollectionMapper.fromJson(content));
-      } catch (e) {
-        failures.add('${file.name}: $e');
-      }
-    }
-
-    if (imported.isNotEmpty) {
-      bloc.add(ImportCollections(imported));
-    }
-    if (failures.isNotEmpty) {
-      messenger?.showSnackBar(SnackBar(
-        content: Text(
-          imported.isEmpty
-              ? 'Import failed: ${failures.join('; ')}'
-              : 'Imported ${imported.length} collection(s). Skipped: ${failures.join('; ')}',
-        ),
-      ));
-    } else if (imported.isNotEmpty) {
-      messenger?.showSnackBar(SnackBar(
-        content: Text('Imported ${imported.length} collection(s).'),
-      ));
-    }
-  }
-
-  Future<String?> _readFileContent(PlatformFile file) async {
-    final bytes = file.bytes;
-    if (bytes != null) return utf8.decode(bytes);
-    final path = file.path;
-    if (path != null) return File(path).readAsString();
-    return null;
+    return importJsonFilesWithFeedback<CollectionNodeEntity>(
+      context,
+      parse: (content) => [PostmanCollectionMapper.fromJson(content)],
+      onImported: (imported) => bloc.add(ImportCollections(imported)),
+      noun: 'collection',
+    );
   }
 
   List<CollectionNodeEntity> _filterNodes(List<CollectionNodeEntity> nodes, String query) {
@@ -227,7 +174,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<AppLayout>()!;
+    final layout = context.appLayout;
     final node = widget.entry.node;
     final isPhone = context.isPhone;
     final rowMinHeight = isPhone ? context.touchTargetMin : 0.0;
@@ -371,7 +318,7 @@ class _NodeContextMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final layout = theme.extension<AppLayout>()!;
+    final layout = context.appLayout;
 
     return PopupMenuButton<String>(
       icon: Icon(Icons.more_vert, size: layout.iconSize, color: theme.colorScheme.onSurface),
@@ -432,32 +379,12 @@ class _NodeContextMenu extends StatelessWidget {
     );
   }
 
-  Future<void> _exportNode(BuildContext context) async {
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    try {
-      final jsonString = PostmanCollectionMapper.toJson(node);
-      final fileName = '${slugFilename(node.name)}.postman_collection.json';
-      final path = await FilePicker.platform.saveFile(
-        dialogTitle: 'EXPORT COLLECTION',
-        fileName: fileName,
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-        bytes: utf8.encode(jsonString),
-      );
-      if (path == null) return;
-      if (!kIsWeb) {
-        await File(path).writeAsString(jsonString);
-      }
-      messenger?.showSnackBar(SnackBar(content: Text('Exported to $path')));
-    } catch (e) {
-      debugPrint('Export failed: $e');
-      messenger?.showSnackBar(SnackBar(content: Text('Export failed: $e')));
-    }
+  Future<void> _exportNode(BuildContext context) {
+    return saveJsonFileWithFeedback(
+      context,
+      jsonString: PostmanCollectionMapper.toJson(node),
+      fileName: '${slugFilename(node.name)}.postman_collection.json',
+      dialogTitle: 'EXPORT COLLECTION',
+    );
   }
-}
-
-String slugFilename(String name) {
-  final trimmed = name.trim().toLowerCase();
-  final slug = trimmed.replaceAll(RegExp(r'[^a-z0-9]+'), '_').replaceAll(RegExp(r'^_+|_+$'), '');
-  return slug.isEmpty ? 'untitled' : slug;
 }

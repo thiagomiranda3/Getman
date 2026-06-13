@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/network/http_methods.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
 import 'package:getman/core/ui/widgets/variable_highlight_controller.dart';
 import 'package:getman/core/utils/curl_utils.dart';
@@ -41,10 +42,9 @@ class _UrlBarState extends State<UrlBar> {
   @override
   void initState() {
     super.initState();
-    _urlController = VariableHighlightController(
-      resolvedColor: const Color(0xFF16A34A),
-      unresolvedColor: const Color(0xFFDC2626),
-    );
+    // Token colors come from AppPalette in didChangeDependencies — never
+    // hardcode them here (CLAUDE.md §4.10).
+    _urlController = VariableHighlightController();
   }
 
   @override
@@ -118,6 +118,8 @@ class _UrlBarState extends State<UrlBar> {
           if (tab == null) return const SizedBox.shrink();
 
           return BlocBuilder<SettingsBloc, SettingsState>(
+            buildWhen: (prev, next) =>
+                prev.settings.isVerticalLayout != next.settings.isVerticalLayout,
             builder: (context, settingsState) {
               final settings = settingsState.settings;
               final layout = context.appLayout;
@@ -208,7 +210,10 @@ class _UrlBarState extends State<UrlBar> {
                           child: ElevatedButton(
                             onPressed: tab.isSending
                               ? () => context.read<TabsBloc>().add(CancelRequest(tab.tabId))
-                              : () => context.read<TabsBloc>().add(SendRequest(envVars: _activeVariables(context))),
+                              : () => context.read<TabsBloc>().add(SendRequest(
+                                    tabId: tab.tabId,
+                                    envVars: _activeVariables(context),
+                                  )),
                             style: ElevatedButton.styleFrom(
                                backgroundColor: tab.isSending ? theme.colorScheme.error : null,
                                foregroundColor: tab.isSending ? theme.colorScheme.onError : null,
@@ -285,15 +290,12 @@ class _UrlBarState extends State<UrlBar> {
   }
 
   void _copyAsCurl(BuildContext context, HttpRequestTabEntity tab) {
-    final theme = Theme.of(context);
     final curl = CurlUtils.generate(tab.config);
     Clipboard.setData(ClipboardData(text: curl));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('cURL command copied to clipboard'),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: theme.colorScheme.secondary,
-      ),
+    showAppSnackBar(
+      context,
+      'cURL command copied to clipboard',
+      backgroundColor: Theme.of(context).colorScheme.secondary,
     );
   }
 

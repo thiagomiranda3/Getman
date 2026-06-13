@@ -1,5 +1,5 @@
+import 'package:getman/features/home/presentation/screens/main_screen.dart';
 import 'package:go_router/go_router.dart';
-import '../../features/home/presentation/screens/main_screen.dart';
 
 class AppRouter {
   static const String home = '/';

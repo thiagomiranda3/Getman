@@ -1,13 +1,9 @@
-import 'dart:convert';
-import 'dart:io';
-
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
+import 'package:getman/core/utils/json_file_io.dart';
 import 'package:getman/core/utils/postman/postman_collection_mapper.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
@@ -284,31 +280,11 @@ class _FolderEntry {
   const _FolderEntry({required this.node, required this.depth});
 }
 
-Future<void> _exportNode(BuildContext context, CollectionNodeEntity node) async {
-  final messenger = ScaffoldMessenger.maybeOf(context);
-  try {
-    final jsonString = PostmanCollectionMapper.toJson(node);
-    final fileName = '${_slugFilename(node.name)}.postman_collection.json';
-    final path = await FilePicker.platform.saveFile(
-      dialogTitle: 'EXPORT COLLECTION',
-      fileName: fileName,
-      type: FileType.custom,
-      allowedExtensions: ['json'],
-      bytes: utf8.encode(jsonString),
-    );
-    if (path == null) return;
-    if (!kIsWeb) {
-      await File(path).writeAsString(jsonString);
-    }
-    messenger?.showSnackBar(SnackBar(content: Text('Exported to $path')));
-  } catch (e) {
-    debugPrint('Export failed: $e');
-    messenger?.showSnackBar(SnackBar(content: Text('Export failed: $e')));
-  }
-}
-
-String _slugFilename(String name) {
-  final trimmed = name.trim().toLowerCase();
-  final slug = trimmed.replaceAll(RegExp(r'[^a-z0-9]+'), '_').replaceAll(RegExp(r'^_+|_+$'), '');
-  return slug.isEmpty ? 'untitled' : slug;
+Future<void> _exportNode(BuildContext context, CollectionNodeEntity node) {
+  return saveJsonFileWithFeedback(
+    context,
+    jsonString: PostmanCollectionMapper.toJson(node),
+    fileName: '${slugFilename(node.name)}.postman_collection.json',
+    dialogTitle: 'EXPORT COLLECTION',
+  );
 }

@@ -1,8 +1,8 @@
-import '../../../../core/error/guard.dart';
-import '../../domain/entities/collection_node_entity.dart';
-import '../../domain/repositories/collections_repository.dart';
-import '../datasources/collections_local_data_source.dart';
-import '../models/collection_node_model.dart';
+import 'package:getman/core/error/guard.dart';
+import 'package:getman/features/collections/data/datasources/collections_local_data_source.dart';
+import 'package:getman/features/collections/data/models/collection_node_model.dart';
+import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
 
 class CollectionsRepositoryImpl implements CollectionsRepository {
   final CollectionsLocalDataSource localDataSource;

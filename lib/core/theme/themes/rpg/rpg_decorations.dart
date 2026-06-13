@@ -1,9 +1,8 @@
 import 'dart:math' as math;
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-
-import '../../app_theme.dart';
-import 'rpg_palette.dart';
+import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/themes/rpg/rpg_palette.dart';
 
 BoxDecoration rpgPanelBox(
   BuildContext context, {
@@ -94,36 +93,6 @@ Widget rpgScaffoldBackground(BuildContext context, {required Widget child}) {
   return _RpgAnimatedBackground(child: child);
 }
 
-Widget rpgDoubleRule(BuildContext context) {
-  final color = Theme.of(context).dividerColor;
-  return Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(
-        height: 1,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [
-            color.withValues(alpha: 0),
-            color,
-            color.withValues(alpha: 0),
-          ]),
-        ),
-      ),
-      const SizedBox(height: 2),
-      Container(
-        height: 2,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [
-            RpgPalette.gold.withValues(alpha: 0),
-            RpgPalette.gold,
-            RpgPalette.gold.withValues(alpha: 0),
-          ]),
-        ),
-      ),
-    ],
-  );
-}
-
 /// Slowly drifting starfield + radial vignette behind the app.
 ///
 /// Uses a single long-looping controller to keep cost near zero — particle
@@ -140,14 +109,21 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final List<_Mote> _motes;
+  late final ValueNotifier<double> _frameNotifier;
 
   @override
   void initState() {
     super.initState();
+    _frameNotifier = ValueNotifier<double>(0.0);
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 60),
     )..repeat();
+    _controller.addListener(() {
+      // Quantize to 30 steps per second (60s loop × 30 steps/s = 1800 steps total).
+      final q = (_controller.value * (60 * 30)).floorToDouble() / (60 * 30);
+      if (q != _frameNotifier.value) _frameNotifier.value = q;
+    });
     final rng = math.Random(42);
     _motes = List.generate(45, (_) {
       return _Mote(
@@ -164,6 +140,7 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
   @override
   void dispose() {
     _controller.dispose();
+    _frameNotifier.dispose();
     super.dispose();
   }
 
@@ -190,14 +167,13 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
             ),
           ),
         ),
-        widget.child,
+        RepaintBoundary(child: widget.child),
         Positioned.fill(
           child: IgnorePointer(
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (_, _) => CustomPaint(
+            child: RepaintBoundary(
+              child: CustomPaint(
                 painter: _StarfieldPainter(
-                  t: _controller.value,
+                  tListenable: _frameNotifier,
                   motes: _motes,
                   isDark: isDark,
                 ),
@@ -229,18 +205,19 @@ class _Mote {
 }
 
 class _StarfieldPainter extends CustomPainter {
-  final double t;
+  final ValueListenable<double> tListenable;
   final List<_Mote> motes;
   final bool isDark;
 
   _StarfieldPainter({
-    required this.t,
+    required this.tListenable,
     required this.motes,
     required this.isDark,
-  });
+  }) : super(repaint: tListenable);
 
   @override
   void paint(Canvas canvas, Size size) {
+    final t = tListenable.value;
     for (final m in motes) {
       final dy = ((m.seedY + t * m.speed) % 1.0) * size.height;
       final dx = ((m.seedX + math.sin((t + m.twinkleOffset) * math.pi * 2) * 0.01) % 1.0) * size.width;
@@ -275,5 +252,5 @@ class _StarfieldPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _StarfieldPainter old) =>
-      old.t != t || old.motes != motes || old.isDark != isDark;
+      old.motes != motes || old.isDark != isDark;
 }

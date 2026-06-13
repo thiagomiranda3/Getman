@@ -72,6 +72,8 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
     final layout = context.appLayout;
 
     return BlocBuilder<TabsBloc, TabsState>(
+      buildWhen: (prev, next) =>
+          prev.tabs.byId(widget.tabId) != next.tabs.byId(widget.tabId),
       builder: (context, state) {
         final tab = state.tabs.byId(widget.tabId);
         if (tab == null) return const SizedBox.shrink();
@@ -80,7 +82,7 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
         return BlocSelector<CollectionsBloc, CollectionsState, bool>(
           selector: (collState) => dirtyChecker(tab: tab, collections: collState.collections),
           builder: (context, isDirty) {
-            final title = tab.collectionName ?? (tab.config.url.isEmpty ? 'NEW REQUEST' : tab.config.url);
+            final title = tab.displayTitle;
             final displayTitle = (title.length > layout.tabTitleMaxLength
                 ? '${title.substring(0, layout.tabTitleMaxLength)}...'
                 : title).toUpperCase();

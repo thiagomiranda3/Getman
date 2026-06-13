@@ -1,4 +1,4 @@
-import '../domain/entities/query_param_entity.dart';
+import 'package:getman/core/domain/entities/query_param_entity.dart';
 
 class UrlParts {
   final String base;

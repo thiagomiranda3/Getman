@@ -1,11 +1,9 @@
 import 'dart:convert';
-
+import 'package:getman/core/domain/entities/query_param_entity.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/utils/url_query_utils.dart';
+import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:uuid/uuid.dart';
-
-import '../../domain/entities/query_param_entity.dart';
-import '../../domain/entities/request_config_entity.dart';
-import '../../../features/collections/domain/entities/collection_node_entity.dart';
-import '../url_query_utils.dart';
 
 class PostmanCollectionMapper {
   static const String _schemaV21 =

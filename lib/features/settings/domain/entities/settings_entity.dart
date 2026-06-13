@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../../../core/theme/theme_ids.dart';
+import 'package:getman/core/theme/theme_ids.dart';
 
 const Object _unchanged = Object();
 

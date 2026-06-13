@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../domain/entities/request_tab_entity.dart';
+import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 
 class TabsState extends Equatable {
   final List<HttpRequestTabEntity> tabs;

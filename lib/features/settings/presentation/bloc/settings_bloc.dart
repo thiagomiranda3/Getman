@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../core/error/failures.dart';
-import '../../domain/entities/settings_entity.dart';
-import '../../domain/usecases/settings_usecases.dart';
-import 'settings_event.dart';
-import 'settings_state.dart';
+import 'package:getman/core/error/failures.dart';
+import 'package:getman/features/settings/domain/entities/settings_entity.dart';
+import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 
 /// Lower bound for `historyLimit` — 0 or negative would cause the trim loop
 /// in `HistoryLocalDataSourceImpl.addToHistory` to drop the just-added entry.

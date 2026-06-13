@@ -26,3 +26,5 @@ linter:
     unnecessary_this: true
     avoid_unused_constructor_parameters: true
     prefer_final_locals: true
+    always_use_package_imports: true
+    directives_ordering: true

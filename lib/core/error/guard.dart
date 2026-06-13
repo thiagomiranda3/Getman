@@ -1,5 +1,5 @@
-import 'exceptions.dart';
-import 'failures.dart';
+import 'package:getman/core/error/exceptions.dart';
+import 'package:getman/core/error/failures.dart';
 
 /// Runs [op] and translates any [PersistenceException] into a
 /// [PersistenceFailure]. Repositories use this at the data-layer boundary so

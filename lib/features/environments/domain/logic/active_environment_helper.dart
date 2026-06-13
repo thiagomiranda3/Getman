@@ -1,4 +1,4 @@
-import '../entities/environment_entity.dart';
+import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 
 class ActiveEnvironmentHelper {
   static Map<String, String> variablesFor(

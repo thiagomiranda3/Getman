@@ -1,11 +1,12 @@
 import 'package:flutter/foundation.dart';
-import '../../../../core/error/failures.dart';
-import '../../../../core/network/http_response.dart';
-import '../../../../core/network/network_service.dart';
-import '../../../../core/domain/entities/request_config_entity.dart';
-import '../../../history/domain/usecases/history_usecases.dart';
-import '../../../settings/domain/usecases/settings_usecases.dart';
-import '../repositories/tabs_repository.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/persistence_limits.dart';
+import 'package:getman/core/error/failures.dart';
+import 'package:getman/core/network/http_response.dart';
+import 'package:getman/core/network/network_service.dart';
+import 'package:getman/features/history/domain/usecases/history_usecases.dart';
+import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
+import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 
 class SendRequestUseCase {
   final TabsRepository tabsRepository;
@@ -46,9 +47,13 @@ class SendRequestUseCase {
   }) async {
     try {
       final settings = await getSettingsUseCase();
+      final rawBody = response?.body ?? failure?.message;
+      final cappedBody = rawBody != null && rawBody.length > kMaxPersistedResponseBodyChars
+          ? kResponseBodyTooLargePlaceholder
+          : rawBody;
       final historyConfig = settings.saveResponseInHistory
           ? config.copyWith(
-              responseBody: response?.body ?? failure?.message,
+              responseBody: cappedBody,
               responseHeaders: response?.headers ?? const {},
               statusCode: response?.statusCode ?? failure?.statusCode ?? 0,
               durationMs: response?.durationMs ?? 0,

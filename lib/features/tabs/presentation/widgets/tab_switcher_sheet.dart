@@ -168,7 +168,7 @@ class _TabRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
-    final title = tab.collectionName ?? (tab.config.url.isEmpty ? 'NEW REQUEST' : tab.config.url);
+    final title = tab.displayTitle;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),

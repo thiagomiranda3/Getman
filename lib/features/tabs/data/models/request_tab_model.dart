@@ -1,7 +1,8 @@
+import 'package:getman/core/network/http_response.dart';
+import 'package:getman/features/history/data/models/request_config_model.dart';
+import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
-import '../../../../features/history/data/models/request_config_model.dart';
-import '../../domain/entities/request_tab_entity.dart';
 
 part 'request_tab_model.g.dart';
 
@@ -48,10 +49,10 @@ class HttpRequestTabModel extends HiveObject {
 
   factory HttpRequestTabModel.fromEntity(HttpRequestTabEntity entity) => HttpRequestTabModel(
     config: HttpRequestConfig.fromEntity(entity.config),
-    responseBody: entity.responseBody,
-    responseHeaders: entity.responseHeaders,
-    statusCode: entity.statusCode,
-    durationMs: entity.durationMs,
+    responseBody: entity.response?.body,
+    responseHeaders: entity.response?.headers,
+    statusCode: entity.response?.statusCode,
+    durationMs: entity.response?.durationMs,
     isSending: entity.isSending,
     collectionNodeId: entity.collectionNodeId,
     collectionName: entity.collectionName,
@@ -60,10 +61,16 @@ class HttpRequestTabModel extends HiveObject {
 
   HttpRequestTabEntity toEntity() => HttpRequestTabEntity(
     config: config.toEntity(),
-    responseBody: responseBody,
-    responseHeaders: responseHeaders,
-    statusCode: statusCode,
-    durationMs: durationMs,
+    // The Hive layout keeps the four response columns flat (typeId 2 is
+    // load-bearing); statusCode is the discriminator for "a response exists".
+    response: statusCode == null
+        ? null
+        : HttpResponseEntity(
+            statusCode: statusCode!,
+            body: responseBody ?? '',
+            headers: responseHeaders ?? const {},
+            durationMs: durationMs ?? 0,
+          ),
     isSending: isSending,
     collectionNodeId: collectionNodeId,
     collectionName: collectionName,

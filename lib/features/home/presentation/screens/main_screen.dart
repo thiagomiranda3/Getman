@@ -13,6 +13,7 @@ import 'package:getman/features/environments/presentation/widgets/environment_se
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/home/presentation/widgets/add_tab_button.dart';
 import 'package:getman/features/home/presentation/widgets/side_menu.dart';
+import 'package:getman/features/home/presentation/widgets/tab_content_stack.dart';
 import 'package:getman/features/home/presentation/widgets/tab_widget.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
@@ -21,7 +22,6 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
-import 'package:getman/features/tabs/presentation/screens/request_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/tab_switcher_sheet.dart';
 
 class MainScreen extends StatefulWidget {
@@ -140,15 +140,31 @@ class _MainScreenState extends State<MainScreen> {
     tabsBloc.add(RemoveTab(tabId));
   }
 
+  /// True when the shell must re-layout: loading flips, the active tab moves,
+  /// or the set/order of tabs changes. Per-tab content (titles, dirty stars)
+  /// rebuilds inside [TabWidget] / [_TabChip] with their own narrow selectors.
+  static bool _shellNeedsRebuild(TabsState prev, TabsState next) {
+    if (prev.isLoading != next.isLoading) return true;
+    if (prev.activeIndex != next.activeIndex) return true;
+    if (prev.tabs.length != next.tabs.length) return true;
+    for (int i = 0; i < prev.tabs.length; i++) {
+      if (prev.tabs[i].tabId != next.tabs[i].tabId) return true;
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return BlocBuilder<SettingsBloc, SettingsState>(
+      buildWhen: (prev, next) =>
+          prev.settings.sideMenuWidth != next.settings.sideMenuWidth,
       builder: (context, settingsState) {
         final settings = settingsState.settings;
         final currentSideMenuWidth = _localSideMenuWidth ?? settings.sideMenuWidth;
 
         return BlocBuilder<TabsBloc, TabsState>(
+          buildWhen: _shellNeedsRebuild,
           builder: (context, tabsState) {
             final activeIndex = tabsState.activeIndex;
             final tabs = tabsState.tabs;
@@ -169,7 +185,10 @@ class _MainScreenState extends State<MainScreen> {
                         context.read<EnvironmentsBloc>().state.environments,
                         context.read<SettingsBloc>().state.settings.activeEnvironmentId,
                       );
-                      context.read<TabsBloc>().add(SendRequest(envVars: envVars));
+                      context.read<TabsBloc>().add(SendRequest(
+                            tabId: tabs[activeIndex].tabId,
+                            envVars: envVars,
+                          ));
                     }
                     return null;
                   },
@@ -283,9 +302,10 @@ class _MainScreenState extends State<MainScreen> {
                     ],
                   ),
                 )
-              : RequestView(
-                  key: ValueKey('view_${tabs[activeIndex].tabId}'),
-                  tabId: tabs[activeIndex].tabId,
+              : TabContentStack(
+                  key: const ValueKey('tabs'),
+                  tabs: tabs,
+                  activeIndex: activeIndex,
                 ),
     );
   }
@@ -316,7 +336,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
           Expanded(
             child: context.useTabSwitcher
-                ? _TabChip(activeIndex: activeIndex, tabs: tabs, onRequestClose: _requestCloseConfirmation)
+                ? _TabChip(onRequestClose: _requestCloseConfirmation)
                 : Listener(
                     onPointerSignal: _handleTabBarPointerSignal,
                     child: Scrollbar(
@@ -350,7 +370,7 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                   ),
           ),
-          AddTabButton(layout: layout),
+          const AddTabButton(),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: layout.tabSpacing),
             child: const EnvironmentSelector(),
@@ -362,64 +382,77 @@ class _MainScreenState extends State<MainScreen> {
 }
 
 class _TabChip extends StatelessWidget {
-  final int activeIndex;
-  final List<HttpRequestTabEntity> tabs;
   final Future<bool> Function(BuildContext, String) onRequestClose;
 
-  const _TabChip({required this.activeIndex, required this.tabs, required this.onRequestClose});
+  const _TabChip({required this.onRequestClose});
+
+  static HttpRequestTabEntity? _activeTab(TabsState state) =>
+      (state.activeIndex >= 0 && state.activeIndex < state.tabs.length)
+          ? state.tabs[state.activeIndex]
+          : null;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
-    final active = (activeIndex >= 0 && activeIndex < tabs.length) ? tabs[activeIndex] : null;
-    final title = active == null
-        ? 'NO TABS'
-        : (active.collectionName ?? (active.config.url.isEmpty ? 'NEW REQUEST' : active.config.url));
 
-    return InkWell(
-      onTap: tabs.isEmpty
-          ? null
-          : () => TabSwitcherSheet.show(
-                context,
-                onRequestClose: (tabId) => onRequestClose(context, tabId),
-              ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: theme.primaryColor,
-                border: Border.all(color: theme.dividerColor, width: layout.borderThin),
-                borderRadius: BorderRadius.circular(context.appShape.panelRadius),
-              ),
-              child: Text(
-                tabs.isEmpty ? '0' : '${activeIndex + 1}/${tabs.length} ▾',
-                style: TextStyle(
-                  color: theme.colorScheme.onPrimary,
-                  fontSize: layout.fontSizeNormal,
-                  fontWeight: context.appTypography.displayWeight,
+    return BlocBuilder<TabsBloc, TabsState>(
+      // Subscribes on its own (the shell gates out per-tab changes) so the
+      // chip title tracks the URL while the user types.
+      buildWhen: (prev, next) =>
+          prev.activeIndex != next.activeIndex ||
+          prev.tabs.length != next.tabs.length ||
+          _activeTab(prev)?.displayTitle != _activeTab(next)?.displayTitle,
+      builder: (context, state) {
+        final tabs = state.tabs;
+        final activeIndex = state.activeIndex;
+        final title = _activeTab(state)?.displayTitle ?? 'NO TABS';
+
+        return InkWell(
+          onTap: tabs.isEmpty
+              ? null
+              : () => TabSwitcherSheet.show(
+                    context,
+                    onRequestClose: (tabId) => onRequestClose(context, tabId),
+                  ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: theme.primaryColor,
+                    border: Border.all(color: theme.dividerColor, width: layout.borderThin),
+                    borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+                  ),
+                  child: Text(
+                    tabs.isEmpty ? '0' : '${activeIndex + 1}/${tabs.length} ▾',
+                    style: TextStyle(
+                      color: theme.colorScheme.onPrimary,
+                      fontSize: layout.fontSizeNormal,
+                      fontWeight: context.appTypography.displayWeight,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: layout.fontSizeNormal,
-                  fontWeight: context.appTypography.titleWeight,
-                  color: theme.colorScheme.onSurface,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: layout.fontSizeNormal,
+                      fontWeight: context.appTypography.titleWeight,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

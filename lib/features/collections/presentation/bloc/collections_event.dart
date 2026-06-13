@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
-import '../../../../core/domain/entities/request_config_entity.dart';
-import '../../domain/entities/collection_node_entity.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 
 abstract class CollectionsEvent extends Equatable {
   const CollectionsEvent();

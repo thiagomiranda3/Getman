@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../../../core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
 
 abstract class HistoryEvent extends Equatable {
   const HistoryEvent();
@@ -7,22 +7,7 @@ abstract class HistoryEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class LoadHistory extends HistoryEvent {
-  const LoadHistory();
-}
-
-class AddRequestToHistory extends HistoryEvent {
-  final HttpRequestConfigEntity config;
-  final int limit;
-  const AddRequestToHistory(this.config, this.limit);
-  @override
-  List<Object?> get props => [config, limit];
-}
-
-class ClearHistory extends HistoryEvent {
-  const ClearHistory();
-}
-
+/// Internal: dispatched by the bloc's own `watchHistory()` subscription.
 class HistoryUpdated extends HistoryEvent {
   final List<HttpRequestConfigEntity> history;
   const HistoryUpdated(this.history);

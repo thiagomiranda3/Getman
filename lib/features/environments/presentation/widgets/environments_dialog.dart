@@ -1,14 +1,13 @@
-import 'dart:convert';
-import 'dart:io';
-
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart';
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
+import 'package:getman/core/ui/widgets/key_value_list_editor.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
+import 'package:getman/core/utils/equality.dart';
+import 'package:getman/core/utils/json_file_io.dart';
 import 'package:getman/core/utils/postman/postman_environment_mapper.dart';
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
@@ -59,12 +58,7 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
         if (!isFullscreen) {
           _selectedId ??= environments.isNotEmpty ? environments.first.id : null;
         }
-        final selected = _selectedId == null
-            ? null
-            : environments.firstWhere(
-                (e) => e.id == _selectedId,
-                orElse: () => EnvironmentEntity(id: '__none__', name: ''),
-              );
+        final selected = environments.firstWhereOrNull((e) => e.id == _selectedId);
 
         if (isFullscreen) {
           return _buildNarrow(context, environments, selected);
@@ -95,7 +89,7 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
             ),
             SizedBox(width: layout.sectionSpacing),
             Expanded(
-              child: selected == null || selected.id == '__none__'
+              child: selected == null
                   ? Center(
                       child: Text(
                         'Select or create an environment',
@@ -121,7 +115,7 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
     List<EnvironmentEntity> environments,
     EnvironmentEntity? selected,
   ) {
-    final showDetail = selected != null && selected.id != '__none__';
+    final showDetail = selected != null;
     final theme = Theme.of(context);
 
     // Intercept system back when a detail page is open so it pops to the list
@@ -255,11 +249,11 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
       hintText: 'ENVIRONMENT NAME',
       confirmLabel: 'CREATE',
       onConfirm: (name) {
-        bloc.add(AddEnvironment(name));
-        final envsAfter = bloc.state.environments;
-        if (envsAfter.isNotEmpty) {
-          setState(() => _selectedId = envsAfter.last.id);
-        }
+        // Build the entity here so its id is known before the bloc processes
+        // the event — reading bloc.state right after add() would race.
+        final environment = EnvironmentEntity(name: name);
+        bloc.add(AddEnvironment(environment));
+        setState(() => _selectedId = environment.id);
       },
     );
   }
@@ -276,115 +270,36 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
     }
   }
 
-  Future<void> _importEnvironments(BuildContext context) async {
-    final messenger = ScaffoldMessenger.maybeOf(context);
+  Future<void> _importEnvironments(BuildContext context) {
     final bloc = context.read<EnvironmentsBloc>();
-    final FilePickerResult? result;
-    try {
-      result = await FilePicker.platform.pickFiles(
-        allowMultiple: true,
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-        withData: true,
-      );
-    } catch (e) {
-      debugPrint('File picker failed: $e');
-      messenger?.showSnackBar(SnackBar(content: Text('Import failed: $e')));
-      return;
-    }
-    if (result == null || result.files.isEmpty) return;
-
-    final imported = <EnvironmentEntity>[];
-    final failures = <String>[];
-    for (final file in result.files) {
-      try {
-        final content = await _readFileContent(file);
-        if (content == null) {
-          failures.add('${file.name}: unable to read file');
-          continue;
-        }
-        imported.addAll(PostmanEnvironmentMapper.fromJson(content));
-      } catch (e) {
-        failures.add('${file.name}: $e');
-      }
-    }
-
-    if (imported.isNotEmpty) {
-      bloc.add(ImportEnvironments(imported));
-      setState(() => _selectedId = imported.first.id);
-    }
-    if (failures.isNotEmpty) {
-      messenger?.showSnackBar(SnackBar(
-        content: Text(
-          imported.isEmpty
-              ? 'Import failed: ${failures.join('; ')}'
-              : 'Imported ${imported.length} environment(s). Skipped: ${failures.join('; ')}',
-        ),
-      ));
-    } else if (imported.isNotEmpty) {
-      messenger?.showSnackBar(SnackBar(
-        content: Text('Imported ${imported.length} environment(s).'),
-      ));
-    }
+    return importJsonFilesWithFeedback<EnvironmentEntity>(
+      context,
+      parse: PostmanEnvironmentMapper.fromJson,
+      onImported: (imported) {
+        bloc.add(ImportEnvironments(imported));
+        if (mounted) setState(() => _selectedId = imported.first.id);
+      },
+      noun: 'environment',
+    );
   }
 
-  Future<void> _exportEnvironment(BuildContext context, EnvironmentEntity env) async {
-    await _saveJsonFile(
-      context: context,
+  Future<void> _exportEnvironment(BuildContext context, EnvironmentEntity env) {
+    return saveJsonFileWithFeedback(
+      context,
       jsonString: PostmanEnvironmentMapper.toJson(env),
-      fileName: '${_slugFilename(env.name)}.postman_environment.json',
+      fileName: '${slugFilename(env.name)}.postman_environment.json',
       dialogTitle: 'EXPORT ENVIRONMENT',
     );
   }
 
-  Future<void> _exportAllEnvironments(BuildContext context, List<EnvironmentEntity> envs) async {
-    await _saveJsonFile(
-      context: context,
+  Future<void> _exportAllEnvironments(BuildContext context, List<EnvironmentEntity> envs) {
+    return saveJsonFileWithFeedback(
+      context,
       jsonString: PostmanEnvironmentMapper.toJsonAll(envs),
       fileName: 'environments.postman_environments.json',
       dialogTitle: 'EXPORT ALL ENVIRONMENTS',
     );
   }
-
-  Future<void> _saveJsonFile({
-    required BuildContext context,
-    required String jsonString,
-    required String fileName,
-    required String dialogTitle,
-  }) async {
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    try {
-      final path = await FilePicker.platform.saveFile(
-        dialogTitle: dialogTitle,
-        fileName: fileName,
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-        bytes: utf8.encode(jsonString),
-      );
-      if (path == null) return;
-      if (!kIsWeb) {
-        await File(path).writeAsString(jsonString);
-      }
-      messenger?.showSnackBar(SnackBar(content: Text('Exported to $path')));
-    } catch (e) {
-      debugPrint('Export failed: $e');
-      messenger?.showSnackBar(SnackBar(content: Text('Export failed: $e')));
-    }
-  }
-
-  Future<String?> _readFileContent(PlatformFile file) async {
-    final bytes = file.bytes;
-    if (bytes != null) return utf8.decode(bytes);
-    final path = file.path;
-    if (path != null) return File(path).readAsString();
-    return null;
-  }
-}
-
-String _slugFilename(String name) {
-  final trimmed = name.trim().toLowerCase();
-  final slug = trimmed.replaceAll(RegExp(r'[^a-z0-9]+'), '_').replaceAll(RegExp(r'^_+|_+$'), '');
-  return slug.isEmpty ? 'untitled' : slug;
 }
 
 class _EnvironmentListTile extends StatelessWidget {
@@ -474,58 +389,26 @@ class _EnvironmentEditor extends StatefulWidget {
 
 class _EnvironmentEditorState extends State<_EnvironmentEditor> {
   late final TextEditingController _nameController;
-  late final List<TextEditingController> _keyControllers;
-  late final List<TextEditingController> _valueControllers;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.environment.name);
-    final entries = widget.environment.variables.entries.toList();
-    _keyControllers = entries.map((e) => TextEditingController(text: e.key)).toList();
-    _valueControllers = entries.map((e) => TextEditingController(text: e.value)).toList();
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    for (final c in _keyControllers) {
-      c.dispose();
-    }
-    for (final c in _valueControllers) {
-      c.dispose();
-    }
     super.dispose();
   }
 
-  void _emit() {
-    final variables = <String, String>{};
-    for (int i = 0; i < _keyControllers.length; i++) {
-      final key = _keyControllers[i].text.trim();
-      if (key.isEmpty) continue;
-      variables[key] = _valueControllers[i].text;
-    }
+  void _emit({Map<String, String>? variables}) {
     context.read<EnvironmentsBloc>().add(UpdateEnvironment(
       widget.environment.copyWith(
         name: _nameController.text,
-        variables: variables,
+        variables: variables ?? widget.environment.variables,
       ),
     ));
-  }
-
-  void _addRow() {
-    setState(() {
-      _keyControllers.add(TextEditingController());
-      _valueControllers.add(TextEditingController());
-    });
-  }
-
-  void _removeRow(int index) {
-    setState(() {
-      _keyControllers.removeAt(index).dispose();
-      _valueControllers.removeAt(index).dispose();
-    });
-    _emit();
   }
 
   @override
@@ -542,95 +425,26 @@ class _EnvironmentEditorState extends State<_EnvironmentEditor> {
           onChanged: (_) => _emit(),
         ),
         SizedBox(height: layout.sectionSpacing),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'VARIABLES',
-                style: TextStyle(
-                  fontSize: layout.fontSizeNormal,
-                  fontWeight: context.appTypography.titleWeight,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-            ),
-            context.appDecoration.wrapInteractive(
-              child: IconButton(
-                icon: Icon(Icons.add, size: layout.iconSize),
-                tooltip: 'ADD VARIABLE',
-                onPressed: _addRow,
-              ),
-            ),
-          ],
+        Text(
+          'VARIABLES',
+          style: TextStyle(
+            fontSize: layout.fontSizeNormal,
+            fontWeight: context.appTypography.titleWeight,
+            color: theme.colorScheme.onSurface,
+          ),
         ),
         SizedBox(height: layout.tabSpacing),
         Expanded(
-          child: _keyControllers.isEmpty
-              ? Center(
-                  child: Text(
-                    'No variables. Click + to add one.',
-                    style: TextStyle(
-                      fontSize: layout.fontSizeNormal,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                  ),
-                )
-              : ListView.builder(
-                  itemCount: _keyControllers.length,
-                  itemBuilder: (context, index) {
-                    final keyField = TextField(
-                      controller: _keyControllers[index],
-                      decoration: const InputDecoration(hintText: 'key'),
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      textCapitalization: TextCapitalization.none,
-                      onChanged: (_) => _emit(),
-                    );
-                    final valueField = TextField(
-                      controller: _valueControllers[index],
-                      decoration: const InputDecoration(hintText: 'value'),
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      textCapitalization: TextCapitalization.none,
-                      onChanged: (_) => _emit(),
-                    );
-                    final deleteButton = IconButton(
-                      iconSize: layout.smallIconSize,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
-                      tooltip: 'Remove',
-                      onPressed: () => _removeRow(index),
-                    );
-                    return Padding(
-                      padding: EdgeInsets.only(bottom: layout.tabSpacing),
-                      child: context.isPhone
-                          ? Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(child: keyField),
-                                    deleteButton,
-                                  ],
-                                ),
-                                SizedBox(height: layout.tabSpacing),
-                                valueField,
-                              ],
-                            )
-                          : Row(
-                              children: [
-                                Expanded(child: keyField),
-                                SizedBox(width: layout.tabSpacing),
-                                Expanded(child: valueField),
-                                SizedBox(width: layout.tabSpacing),
-                                deleteButton,
-                              ],
-                            ),
-                    );
-                  },
-                ),
+          child: KeyValueListEditor<Map<String, String>>(
+            items: widget.environment.variables,
+            decode: (variables) => [for (final e in variables.entries) (e.key, e.value)],
+            encode: (rows) => {
+              for (final (key, value) in rows)
+                if (key.trim().isNotEmpty) key.trim(): value,
+            },
+            equals: stringMapEquality.equals,
+            onChanged: (variables) => _emit(variables: variables),
+          ),
         ),
       ],
     );

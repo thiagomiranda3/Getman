@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../../../core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
 
 class HistoryState extends Equatable {
   final List<HttpRequestConfigEntity> history;

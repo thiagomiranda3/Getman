@@ -1,8 +1,8 @@
-import '../../../../core/error/guard.dart';
-import '../../domain/entities/environment_entity.dart';
-import '../../domain/repositories/environments_repository.dart';
-import '../datasources/environments_local_data_source.dart';
-import '../models/environment_model.dart';
+import 'package:getman/core/error/guard.dart';
+import 'package:getman/features/environments/data/datasources/environments_local_data_source.dart';
+import 'package:getman/features/environments/data/models/environment_model.dart';
+import 'package:getman/features/environments/domain/entities/environment_entity.dart';
+import 'package:getman/features/environments/domain/repositories/environments_repository.dart';
 
 class EnvironmentsRepositoryImpl implements EnvironmentsRepository {
   final EnvironmentsLocalDataSource localDataSource;

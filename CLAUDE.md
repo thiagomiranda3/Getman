@@ -33,12 +33,18 @@ lib/
     storage/         # HiveBoxes (box-name constants) + hive_helpers (replaceAllInBox)
     theme/
       app_theme.dart          # 5 ThemeExtensions + BuildContext access extension
+      responsive.dart         # LayoutMode tiers + responsive BuildContext extension
       theme_ids.dart          # String constants for theme IDs
-      theme_registry.dart     # AppThemeBuilder typedef + appThemes map + resolveTheme()
+      theme_registry.dart     # ThemeDescriptor (id, displayName, builder) + appThemes map + resolveTheme()
       themes/
-        brutalist/            # Brutalist theme implementation (palette, bounce, decorations, theme builder)
-    ui/widgets/      # Cross-feature atoms: MethodBadge, Splitter
-    utils/           # JsonUtils, CurlUtils
+        brutalist/            # palette, bounce, decorations, theme builder
+        editorial/            # second theme
+        rpg/                  # third theme ("Arcane Quest")
+    ui/widgets/      # Cross-feature atoms: MethodBadge, Splitter, BrandedTabBar,
+                     # KeyValueListEditor, VariableHighlightController,
+                     # ResponsiveDialog, NamePromptDialog, showAppSnackBar
+    utils/           # JsonUtils, CurlUtils, UrlQueryUtils, EnvironmentResolver,
+                     # json_file_io (Postman import/export plumbing), postman/ mappers
   features/
     <feature>/
       domain/        # Entities + abstract repositories + use cases (pure Dart, no Hive/Dio)
@@ -89,7 +95,7 @@ Entity ↔ Model boundary: every data-layer model implements `toEntity()` / `fro
 2. `di.init()` — opens Hive, registers adapters, opens boxes, reads current settings synchronously, registers all use cases, repositories, data sources, BLoCs, `NetworkService`, `AppRouter`, `TabDirtyChecker`.
 3. Returns `SettingsEntity` to pass as `initialSettings` into `SettingsBloc`.
 4. `MultiRepositoryProvider` exposes cross-feature services (currently `TabDirtyChecker`) to the widget tree.
-5. `MultiBlocProvider` creates `SettingsBloc`, `HistoryBloc`, `CollectionsBloc`, `TabsBloc` — each dispatches its `Load*` event eagerly at construction.
+5. `MultiBlocProvider` creates `SettingsBloc`, `HistoryBloc`, `CollectionsBloc`, `TabsBloc`, `EnvironmentsBloc`. Collections/Tabs/Environments dispatch their `Load*` event eagerly; `HistoryBloc` has no load event — it starts with `isLoading: true` and populates from its `watchHistory()` subscription (the stream yields the current list on subscribe). The root `BlocBuilder<SettingsBloc>` has a `buildWhen` gated to `themeId`/`isDarkMode`/`isCompactMode` — anything else would rebuild the whole `MaterialApp` per settings keystroke.
 6. `Shortcuts` + `Actions` wire global keyboard intents: **Ctrl/Cmd+N** new tab, **+W** close tab, **+S** save, **+Enter** send, **+B** beautify JSON.
 
 ### 4.2 Tabs feature (most complex)
@@ -98,9 +104,11 @@ Entity ↔ Model boundary: every data-layer model implements `toEntity()` / `fro
 - On `LoadTabs`, the BLoC sanitizes persisted tabs by resetting `isSending=false` — no real network call is alive after a restart.
 - `_onRemoveTab` cancels the tab's handle before dropping the tab.
 - `SendRequestUseCase` couples the network call with history persistence. History writes are best-effort: failures are caught and logged via `debugPrint` (never fail the request), but they are **not silent** — a regression in persistence will show up in console logs.
-- **Identity-based events**: `RemoveTab`, `CancelRequest`, `CloseOtherTabs`, `CloseTabsToTheRight`, and `DuplicateTab` all carry `String tabId`, not `int index`. Handlers resolve the current position via `indexWhere`/`firstWhereOrNull` and bail on miss. Only `SetActiveIndex` and `ReorderTabs` are position-based (position *is* the operation). Do not reintroduce index-based identity events — they race against concurrent emissions.
-- Cancellation flow: UI dispatches `CancelRequest(tabId)` → `_RequestManager.cancel(tabId)` → Dio throws `DioExceptionType.cancel` → mapped to `NetworkFailure(type: cancelled)` → BLoC clears `isSending` without emitting response data.
-- The cURL paste shortcut: `_handleUrlChanged` in `request_view.dart` treats URL input starting with `curl ` as a full request spec, runs it through `CurlUtils.parse`, and pushes a single `UpdateTab` with the parsed method/url/headers/body. Body is then prettified off the UI thread via `JsonUtils.prettify` (runs in `compute`).
+- **Identity-based events**: `RemoveTab`, `CancelRequest`, `CloseOtherTabs`, `CloseTabsToTheRight`, `DuplicateTab`, and `SendRequest` all carry `String tabId`, not `int index`. Handlers resolve the current position via `indexWhere`/`byId` and bail on miss. Only `SetActiveIndex` and `ReorderTabs` are position-based (position *is* the operation) — and `SetActiveIndex` rejects out-of-range indices so widgets may index `tabs[activeIndex]` safely. Do not reintroduce index-based identity events — they race against concurrent emissions.
+- **Responses are a value object**: `HttpRequestTabEntity.response` is an `HttpResponseEntity?` (`null` = nothing sent yet / last send cancelled). The Hive model (`HttpRequestTabModel`, typeId 2) still stores the four flat columns — `statusCode == null` is the discriminator on read. Don't re-flatten the entity.
+- Cancellation flow: UI dispatches `CancelRequest(tabId)` → `_RequestManager.cancel(tabId)` → Dio throws `DioExceptionType.cancel` → mapped to `NetworkFailure(type: cancelled)` → BLoC clears `isSending` without recording a response. Any non-`NetworkFailure` error in the send path also resets `isSending` (catch-all) — a tab must never be stuck on SENDING.
+- The cURL paste shortcut: `_handleUrlChanged` in `url_bar.dart` treats URL input starting with `curl ` as a full request spec, runs it through `CurlUtils.parse`, and pushes a single `UpdateTab` with the parsed method/url/headers/body. Body is then prettified off the UI thread via `JsonUtils.prettify` (runs in `compute`).
+- The PARAMS/HEADERS/BODY tab bodies live in `request_editor_tabs.dart` (`ParamsTabView`, `HeadersTabView`, `BodyTabView`) and are composed by both the split-pane `RequestConfigSection` and the phone `UnifiedRequestPanel` — edit them once, both layouts follow.
 
 ### 4.3 Collections feature
 - Tree is an immutable forest of `CollectionNodeEntity`. All mutations go through **pure** `CollectionsTreeHelper` functions (`addToParent`, `removeFromTree`, `renameInTree`, `toggleFavoriteInTree`, `updateConfigInTree`, `sort`, `findNode`). These never mutate input.
@@ -109,7 +117,7 @@ Entity ↔ Model boundary: every data-layer model implements `toEntity()` / `fro
 - Drag-and-drop: implemented with `Draggable<String>` (carrying `node.id`) and `DragTarget<String>`. Drop on root goes via the outer `DragTarget` at the list level.
 
 ### 4.4 History feature
-- `HistoryBloc` subscribes to `watchHistory()` on construction; the data source uses `Hive.Box.watch()` and emits on every box change.
+- History is **read-only from the UI**: writes happen only inside `SendRequestUseCase`. `HistoryBloc` has a single (internal) `HistoryUpdated` event and subscribes to `watchHistory()` on construction; the data source uses `Hive.Box.watch()` and emits on every box change. Don't add UI-dispatched history events without wiring real UI to them.
 - **Dedup** in `HistoryLocalDataSourceImpl.addToHistory` is by `method + url + body` only. Headers differences do not dedupe.
 - **Trim** uses a `while` loop so lowering `historyLimit` actually shrinks the box.
 - Ordering: the data source returns `box.values` in insertion order; the repository reverses so UI gets newest-first.
@@ -127,9 +135,10 @@ Entity ↔ Model boundary: every data-layer model implements `toEntity()` / `fro
 - `core/error/failures.dart` — `Failure` (Equatable, `implements Exception`) with `PersistenceFailure` and `NetworkFailure` (typed enum + statusCode). Repositories translate exceptions to failures at the `data/repositories/` boundary; BLoCs only ever handle `Failure` subtypes.
 
 ### 4.8 UI / Theming
-- The active `ThemeData` is produced by `resolveTheme(settings.themeId)(brightness, isCompact)` from `lib/core/theme/theme_registry.dart`. Each theme builder (currently only `brutalistTheme` under `lib/core/theme/themes/brutalist/`) attaches five `ThemeExtension`s: `AppLayout` (sizes), `AppPalette` (method/status colors + `codeBackground`), `AppShape` (panel/button/input/dialog radii), `AppTypography` (`TextTheme`, `codeFontFamily`, three weights), and `AppDecoration` (closures for `panelBox`, `tabShape`, `wrapInteractive`).
+- The active `ThemeData` is produced by `resolveTheme(settings.themeId)(brightness, isCompact)` from `lib/core/theme/theme_registry.dart`. Three themes are registered (`brutalist`, `editorial`, `rpg`), each as a `ThemeDescriptor` (id + display name + builder). Every theme builder attaches five `ThemeExtension`s: `AppLayout` (sizes), `AppPalette` (method/status colors + `codeBackground` + variable token colors), `AppShape` (panel/button/input/dialog radii), `AppTypography` (`TextTheme`, `codeFontFamily`, three weights), and `AppDecoration` (closures for `panelBox`, `tabShape`, `wrapInteractive`, `scaffoldBackground`).
 - **Never hardcode sizes, colors, radii, weights, or interaction behavior in widgets.** Pull from the per-theme extensions via `BuildContext` accessors defined in `extension AppThemeAccess on BuildContext` (`lib/core/theme/app_theme.dart`): `context.appLayout`, `context.appPalette`, `context.appShape`, `context.appTypography`, `context.appDecoration`.
-- Adding a new theme: drop a new `<name>_theme.dart` under `lib/core/theme/themes/<name>/`, export `ThemeData <name>Theme(Brightness, {bool isCompact})`, and register it in `theme_registry.dart`'s `appThemes` map with a new ID constant in `theme_ids.dart`. No widget edits are required — widgets consume the extensions uniformly.
+- Adding a new theme: drop a new `<name>_theme.dart` under `lib/core/theme/themes/<name>/`, export `ThemeData <name>Theme(Brightness, {bool isCompact})`, and register a `ThemeDescriptor` in `theme_registry.dart`'s `appThemes` map with a new ID constant in `theme_ids.dart`. No widget edits are required — widgets consume the extensions uniformly.
+- **Shared chrome atoms**: the filled-indicator tab strip is `BrandedTabBar` (`core/ui/widgets/`) — used by the request panel, unified phone panel, response panel, and side menu. Snackbars go through `showAppSnackBar(context, message)` — never construct styled `SnackBar`s inline.
 - **Colors**: method badges use `context.appPalette.methodColor(method)`; status-code bands use `context.appPalette.statusColor(code)` / `.statusAccent(code)`. Text on branded backgrounds (primary, method colors) → `Theme.of(context).colorScheme.onPrimary`. Error/destructive affordances (delete icons, cancel buttons) → `colorScheme.error` / `colorScheme.onError`. Never use `Colors.black`/`Colors.red`/`Colors.white` literals for themeable surfaces; `Colors.white` is only acceptable as deliberate contrast on a variable-colored status badge.
 - **Typography**: `context.appTypography.displayWeight` (brutalist = `w900`) for headlines/buttons/badges; `.titleWeight` (`w700` / `FontWeight.bold`) for titles and dialog actions; `.bodyWeight` (`w500`) for body text. Widget-specific weights that aren't display/title/body (e.g. `FontWeight.w600` one-off, popup menu item emphasis) may stay as literals. Code editors read `context.appTypography.codeFontFamily` and `context.appPalette.codeBackground`.
 - **Decorations**:
@@ -145,8 +154,9 @@ Entity ↔ Model boundary: every data-layer model implements `toEntity()` / `fro
 - The currently-active environment id is **not** owned by `EnvironmentsBloc`; it lives on `SettingsEntity.activeEnvironmentId` (per-user preference, persisted with settings). `null` means "No Environment" — a synthetic always-available option in the selector UI.
 - **Variable syntax:** `{{name}}` — the resolver in `lib/core/utils/environment_resolver.dart` accepts `[A-Za-z0-9_\-\.]+` identifiers with optional whitespace inside the braces (`{{ name }}` is valid). Unknown variable names are **left verbatim**, not blanked — silent empty substitution is worse than a visibly broken URL.
 - **Substitution scope:** `TabsRepositoryImpl.sendRequest` resolves against URL, query-param values, header values, and body (not header/param *keys*) before dispatching via `networkService.request`. **History records the templated (unresolved) config** — the user should be able to re-send a history entry under a different environment, matching Postman/Insomnia.
-- **Resolution plumbing:** the `SendRequest` event carries `Map<String, String> envVars`. Dispatchers that need real substitution — the SEND button in `UrlBar`, the `SendRequestIntent` shortcut in `MainScreen` — compute it via `ActiveEnvironmentHelper.variablesFor(environments, activeEnvironmentId)` read from `EnvironmentsBloc` + `SettingsBloc`.
-- **URL highlighting:** `VariableHighlightController` (in `lib/core/ui/widgets/`, a `TextEditingController` subclass) overrides `buildTextSpan` to color each `{{var}}` token. `UrlBar` owns this controller and pushes variable + color updates via `updateVariables` / `updateColors`; both methods `notifyListeners()` only when the underlying value actually changed (via `MapEquality` / `==`) so we don't thrash rebuilds.
+- **Resolution plumbing:** the `SendRequest` event carries `tabId` plus `Map<String, String> envVars`. Dispatchers that need real substitution — the SEND button in `UrlBar`, the `SendRequestIntent` shortcut in `MainScreen` — compute it via `ActiveEnvironmentHelper.variablesFor(environments, activeEnvironmentId)` read from `EnvironmentsBloc` + `SettingsBloc`.
+- **URL highlighting:** `VariableHighlightController` (in `lib/core/ui/widgets/`, a `TextEditingController` subclass) overrides `buildTextSpan` to color each `{{var}}` token. Colors are theme-dependent so the constructor takes none — the owning widget pushes variable + color updates via `updateVariables` / `updateColors` in `didChangeDependencies`; both methods `notifyListeners()` only when the underlying value actually changed (via `MapEquality` / `==`) so we don't thrash rebuilds. Until colors arrive, tokens render unhighlighted.
+- **`AddEnvironment` carries the full `EnvironmentEntity`,** not a name: bloc state updates are asynchronous, so an id generated inside the handler would be unknowable at the call site (the dialog needs it to select the new row).
 - **Palette:** `AppPalette.variableResolved` / `variableUnresolved`. Never hardcode green/red `Color` literals for variable tokens.
 - **Deleting the active environment** is handled at the widget layer in `EnvironmentsDialog._deleteEnvironment`: if the just-deleted id matches `SettingsEntity.activeEnvironmentId`, dispatch `UpdateActiveEnvironmentId(null)` on `SettingsBloc` after the delete. BLoC-to-BLoC coupling is intentionally avoided — the coordinator is the widget with both blocs in scope.
 
@@ -181,14 +191,16 @@ Verification bar: **`fvm flutter analyze` produces `No issues found!` AND `fvm f
 - `HiveObject` subclasses sometimes override `==` — Hive uses its own keys internally, so this is safe, but changes flow through every consumer (collections reference `HttpRequestConfig` too).
 - **BLoC tab lookups**: always `state.tabs.firstWhereOrNull((t) => t.tabId == id)`. Never index by position across state emissions — positions can shift. This applies to event *payloads* too: identity-addressed `TabsEvent`s carry `tabId`, not `index` (see §4.2).
 - **`listenWhen` / `buildWhen` are not optional**: `RequestView` rebuilds are expensive; narrow selectors are how we keep the editor responsive.
-- **Text controllers vs editor controllers**: `_KeyValueEditor` uses `TextEditingController`; the body and response panels use `re_editor.CodeLineEditingController`. Don't mix.
-- **`_setControllerPreservingEnd`** (in `request_view.dart`) is the only safe way to push text into a `TextEditingController` without jumping the cursor during an echo-write.
-- **`_lastEmitted` in `_KeyValueEditor`** intentionally suppresses rebuilds on echoes from the BLoC — keeps focus and half-typed state alive. Follow this pattern if you add similar inline editors.
+- **Text controllers vs editor controllers**: `KeyValueListEditor` uses `TextEditingController`; the body and response panels use `re_editor.CodeLineEditingController`. Don't mix.
+- **`_setControllerPreservingEnd`** (in `url_bar.dart`) is the only safe way to push text into a `TextEditingController` without jumping the cursor during an echo-write.
+- **Key/value editing is one widget**: `KeyValueListEditor` (`core/ui/widgets/`) backs params (ordered list), headers (map), and environment variables (map) via decode/encode/equals codecs. Its `_lastEmitted` echo-suppression keeps focus and half-typed state alive across the BLoC round-trip — never bypass it by writing a bespoke row editor.
 - **Keyboard shortcuts** are declared in `main.dart` (global) and in `RequestView` / `MainScreen` (scoped `Actions`). The `NewTabIntent` Action is at the root; `CloseTabIntent` and `SendRequestIntent` at `MainScreen`; `SaveRequestIntent` and `BeautifyJsonIntent` inside `RequestView`. Put intents where `context.read<TabsBloc>()` is reachable.
 - **Debug logs use `debugPrint`** — `print` is disallowed by the default lint profile.
+- **Imports are `package:getman/...` everywhere** (enforced by `always_use_package_imports` + `directives_ordering`). No relative imports.
+- **Postman file I/O lives in `core/utils/json_file_io.dart`** (`slugFilename`, `saveJsonFileWithFeedback`, `importJsonFilesWithFeedback`) — collections and environments both go through it; don't re-implement picker/snackbar plumbing per feature.
 - **`flutter_fancy_tree_view` is discontinued** — keep code changes compatible with eventual migration to `two_dimensional_scrollables`.
 - Settings `splitRatio` is clamped to `[_splitMin, _splitMax]` (0.1..0.9) in `request_view.dart`. The `flex:` math uses `_splitFlexUnits=1000` — if you touch this, preserve the clamping so panes can't go to zero.
-- **`SendRequest` carries `envVars`.** Always dispatch from a context that can `context.read<EnvironmentsBloc>()` + `context.read<SettingsBloc>()` and resolve via `ActiveEnvironmentHelper.variablesFor(...)`. A bare `SendRequest()` will send with empty envvars — any `{{var}}` in the config will go to the network verbatim.
+- **`SendRequest` carries `tabId` + `envVars`.** Always dispatch from a context that can `context.read<EnvironmentsBloc>()` + `context.read<SettingsBloc>()` and resolve via `ActiveEnvironmentHelper.variablesFor(...)`. Omitting `envVars` sends `{{var}}` placeholders to the network verbatim.
 - **Never resolve env vars in `SendRequestUseCase._record`.** History must keep the templated config so re-sending under a different environment works.
 - **`VariableHighlightController` diffing matters.** `updateVariables` / `updateColors` only notify listeners when the value actually changed (`MapEquality` / `==`). Bypassing this causes the URL bar to rebuild on every bloc emission.
 

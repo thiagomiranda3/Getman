@@ -1,5 +1,5 @@
-import '../entities/collection_node_entity.dart';
-import '../repositories/collections_repository.dart';
+import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
 
 class GetCollectionsUseCase {
   final CollectionsRepository repository;

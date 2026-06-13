@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
-import '../../domain/entities/request_tab_entity.dart';
-import '../../../../core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 
 abstract class TabsEvent extends Equatable {
   const TabsEvent();
@@ -71,11 +71,17 @@ class DuplicateTab extends TabsEvent {
   List<Object?> get props => [tabId];
 }
 
+/// Identity-addressed like every other tab event (CLAUDE.md §4.2): the
+/// dispatcher names the tab, so a concurrent tab switch can't redirect the
+/// send. [envVars] must be resolved by the dispatcher via
+/// `ActiveEnvironmentHelper.variablesFor(...)` — an empty map sends `{{var}}`
+/// placeholders to the network verbatim.
 class SendRequest extends TabsEvent {
+  final String tabId;
   final Map<String, String> envVars;
-  const SendRequest({this.envVars = const {}});
+  const SendRequest({required this.tabId, this.envVars = const {}});
   @override
-  List<Object?> get props => [envVars];
+  List<Object?> get props => [tabId, envVars];
 }
 
 class CancelRequest extends TabsEvent {

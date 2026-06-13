@@ -1,8 +1,6 @@
 import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
-
-import 'rpg_palette.dart';
+import 'package:getman/core/theme/themes/rpg/rpg_palette.dart';
 
 /// Interactive wrapper for the RPG theme.
 ///

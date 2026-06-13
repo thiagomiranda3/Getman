@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/themes/brutalist/brutalist_bounce.dart';
+import 'package:getman/core/theme/themes/brutalist/brutalist_decorations.dart';
+import 'package:getman/core/theme/themes/brutalist/brutalist_palette.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../app_theme.dart';
-import 'brutalist_bounce.dart';
-import 'brutalist_decorations.dart';
-import 'brutalist_palette.dart';
 
 ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
   final bool isDark = brightness == Brightness.dark;
@@ -53,7 +53,6 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
     wrapInteractive: ({required child, onTap, scaleDown}) =>
         BrutalBounce(onTap: onTap, scaleDown: scaleDown ?? 0.95, child: child),
     scaffoldBackground: brutalistScaffoldBackground,
-    doubleRule: brutalistDoubleRule,
   );
 
   final base = ThemeData(

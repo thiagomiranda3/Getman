@@ -1,8 +1,8 @@
-import '../../../../core/error/guard.dart';
-import '../../domain/entities/settings_entity.dart';
-import '../../domain/repositories/settings_repository.dart';
-import '../datasources/settings_local_data_source.dart';
-import '../models/settings_model.dart';
+import 'package:getman/core/error/guard.dart';
+import 'package:getman/features/settings/data/datasources/settings_local_data_source.dart';
+import 'package:getman/features/settings/data/models/settings_model.dart';
+import 'package:getman/features/settings/domain/entities/settings_entity.dart';
+import 'package:getman/features/settings/domain/repositories/settings_repository.dart';
 
 class SettingsRepositoryImpl implements SettingsRepository {
   final SettingsLocalDataSource localDataSource;

@@ -1,5 +1,5 @@
-import '../../domain/entities/settings_entity.dart';
-import '../../domain/repositories/settings_repository.dart';
+import 'package:getman/features/settings/domain/entities/settings_entity.dart';
+import 'package:getman/features/settings/domain/repositories/settings_repository.dart';
 
 class GetSettingsUseCase {
   final SettingsRepository repository;

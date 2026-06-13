@@ -1,17 +1,17 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/error/failures.dart';
+import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
+import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
 import 'package:uuid/uuid.dart';
-import '../../../../core/error/failures.dart';
-import '../../domain/entities/collection_node_entity.dart';
-import '../../domain/usecases/collections_usecases.dart';
-import '../../domain/logic/collections_tree_helper.dart';
-import 'collections_event.dart';
-import 'collections_state.dart';
 
 class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
   final GetCollectionsUseCase getCollectionsUseCase;
   final SaveCollectionsUseCase saveCollectionsUseCase;
-  final Uuid uuid = const Uuid();
+  static const Uuid _uuid = Uuid();
 
   CollectionsBloc({
     required this.getCollectionsUseCase,
@@ -51,18 +51,23 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
 
   Future<void> _onLoadCollections(LoadCollections event, Emitter<CollectionsState> emit) async {
     emit(state.copyWith(isLoading: true));
-    final collections = await getCollectionsUseCase();
-    emit(state.copyWith(collections: CollectionsTreeHelper.sort(collections), isLoading: false));
+    try {
+      final collections = await getCollectionsUseCase();
+      emit(state.copyWith(collections: CollectionsTreeHelper.sort(collections), isLoading: false));
+    } on PersistenceFailure catch (f) {
+      debugPrint('LoadCollections failed: ${f.message}');
+      emit(state.copyWith(isLoading: false));
+    }
   }
 
   Future<void> _onAddFolder(AddFolder event, Emitter<CollectionsState> emit) {
-    final newNode = CollectionNodeEntity(id: uuid.v4(), name: event.name, isFolder: true);
+    final newNode = CollectionNodeEntity(id: _uuid.v4(), name: event.name, isFolder: true);
     return _commit(emit, _addToTree(newNode, event.parentId));
   }
 
   Future<void> _onSaveRequestToCollection(SaveRequestToCollection event, Emitter<CollectionsState> emit) {
     final newNode = CollectionNodeEntity(
-      id: uuid.v4(),
+      id: _uuid.v4(),
       name: event.name,
       isFolder: false,
       config: event.config,
