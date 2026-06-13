@@ -1,0 +1,130 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
+import 'package:getman/core/network/realtime_frame.dart';
+import 'package:getman/core/network/sse_parser.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+
+/// A live realtime connection (WebSocket or SSE). [frames] is the session log
+/// stream; [send] is a no-op for read-only SSE. Always [close] to release it.
+abstract class RealtimeConnection {
+  Stream<RealtimeFrame> get frames;
+  void send(String message);
+  Future<void> close();
+}
+
+/// Opens WebSocket / SSE connections.
+///
+/// WebSocket uses `web_socket_channel` (cross-platform). Custom request headers
+/// are not supported on the browser WebSocket API, so auth on web must use a
+/// query param or subprotocol — documented limitation. SSE streams a Dio
+/// response; on web the XHR adapter may buffer rather than stream incrementally.
+class RealtimeService {
+  final Dio _dio;
+
+  RealtimeService({Dio? dio}) : _dio = dio ?? _buildSseDio();
+
+  // SSE is a long-lived stream — no receive timeout, or it would be killed.
+  static Dio _buildSseDio() => Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 30),
+        validateStatus: (_) => true,
+        responseType: ResponseType.stream,
+      ));
+
+  RealtimeConnection connectWebSocket(String url) => _WebSocketConnection(url);
+
+  RealtimeConnection connectSse(String url, {Map<String, String> headers = const {}}) =>
+      _SseConnection(_dio, url, headers);
+}
+
+class _WebSocketConnection implements RealtimeConnection {
+  final WebSocketChannel _channel;
+  final _controller = StreamController<RealtimeFrame>.broadcast();
+  StreamSubscription<dynamic>? _sub;
+
+  _WebSocketConnection(String url) : _channel = WebSocketChannel.connect(Uri.parse(url)) {
+    _emit(RealtimeFrame.open('Connecting to $url'));
+    _sub = _channel.stream.listen(
+      (msg) => _emit(RealtimeFrame.incoming(msg.toString())),
+      onError: (Object e) => _emit(RealtimeFrame.error(e.toString())),
+      onDone: () => _emit(RealtimeFrame.close()),
+    );
+  }
+
+  void _emit(RealtimeFrame f) {
+    if (!_controller.isClosed) _controller.add(f);
+  }
+
+  @override
+  Stream<RealtimeFrame> get frames => _controller.stream;
+
+  @override
+  void send(String message) {
+    _channel.sink.add(message);
+    _emit(RealtimeFrame.outgoing(message));
+  }
+
+  @override
+  Future<void> close() async {
+    await _sub?.cancel();
+    await _channel.sink.close();
+    if (!_controller.isClosed) await _controller.close();
+  }
+}
+
+class _SseConnection implements RealtimeConnection {
+  final _controller = StreamController<RealtimeFrame>.broadcast();
+  final SseParser _parser = SseParser();
+  final CancelToken _cancel = CancelToken();
+  StreamSubscription<dynamic>? _sub;
+
+  _SseConnection(Dio dio, String url, Map<String, String> headers) {
+    _emit(RealtimeFrame.open('Streaming $url'));
+    dio
+        .get<ResponseBody>(
+      url,
+      options: Options(
+        responseType: ResponseType.stream,
+        headers: {...headers, 'Accept': 'text/event-stream'},
+      ),
+      cancelToken: _cancel,
+    )
+        .then((response) {
+      final body = response.data;
+      if (body == null) {
+        _emit(RealtimeFrame.error('No response body'));
+        return;
+      }
+      _sub = body.stream.listen(
+        (bytes) {
+          for (final event in _parser.addChunk(utf8.decode(bytes, allowMalformed: true))) {
+            _emit(RealtimeFrame.incoming(event));
+          }
+        },
+        onError: (Object e) => _emit(RealtimeFrame.error(e.toString())),
+        onDone: () => _emit(RealtimeFrame.close()),
+      );
+    }).catchError((Object e) {
+      if (e is DioException && CancelToken.isCancel(e)) return;
+      _emit(RealtimeFrame.error(e.toString()));
+    });
+  }
+
+  void _emit(RealtimeFrame f) {
+    if (!_controller.isClosed) _controller.add(f);
+  }
+
+  @override
+  Stream<RealtimeFrame> get frames => _controller.stream;
+
+  @override
+  void send(String message) {/* SSE is read-only */}
+
+  @override
+  Future<void> close() async {
+    if (!_cancel.isCancelled) _cancel.cancel();
+    await _sub?.cancel();
+    if (!_controller.isClosed) await _controller.close();
+  }
+}
