@@ -1,5 +1,8 @@
 import 'package:get_it/get_it.dart';
 import 'package:getman/core/navigation/app_router.dart';
+import 'package:getman/core/network/cookie_interceptor.dart';
+import 'package:getman/core/network/cookie_store.dart';
+import 'package:getman/core/network/in_memory_cookie_store.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/features/collections/data/datasources/collections_local_data_source.dart';
@@ -8,6 +11,8 @@ import 'package:getman/features/collections/data/repositories/collections_reposi
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/cookies/data/hive_cookie_persistence.dart';
+import 'package:getman/features/cookies/data/models/stored_cookie_model.dart';
 import 'package:getman/features/environments/data/datasources/environments_local_data_source.dart';
 import 'package:getman/features/environments/data/models/environment_model.dart';
 import 'package:getman/features/environments/data/repositories/environments_repository_impl.dart';
@@ -48,6 +53,7 @@ Future<SettingsEntity> init() async {
   Hive.registerAdapter(CollectionNodeAdapter());
   Hive.registerAdapter(EnvironmentModelAdapter());
   Hive.registerAdapter(MultipartFieldModelAdapter());
+  Hive.registerAdapter(StoredCookieModelAdapter());
 
   final settingsBox = await Hive.openBox<SettingsModel>(HiveBoxes.settings);
   await Hive.openBox<HttpRequestConfig>(HiveBoxes.history);
@@ -55,6 +61,7 @@ Future<SettingsEntity> init() async {
   await Hive.openBox(HiveBoxes.tabsMeta);
   await Hive.openBox<CollectionNode>(HiveBoxes.collections);
   final environmentsBox = await Hive.openBox<EnvironmentModel>(HiveBoxes.environments);
+  await Hive.openBox<StoredCookieModel>(HiveBoxes.cookies);
 
   final initialSettings = settingsBox.get('current')?.toEntity() ?? const SettingsEntity();
   final initialEnvironments =
@@ -133,8 +140,14 @@ Future<SettingsEntity> init() async {
   sl.registerLazySingleton(() => const TabDirtyChecker());
 
   // Core
-  sl.registerLazySingleton(
-      () => NetworkService(dio: NetworkService.buildDio(initialSettings.toNetworkConfig())));
+  final cookieStore = InMemoryCookieStore(persistence: HiveCookiePersistence())..hydrate();
+  sl.registerLazySingleton<CookieStore>(() => cookieStore);
+  sl.registerLazySingleton(() => NetworkService(
+        dio: NetworkService.buildDio(
+          initialSettings.toNetworkConfig(),
+          CookieInterceptor(cookieStore),
+        ),
+      ));
   sl.registerLazySingleton(() => AppRouter());
 
   return initialSettings;

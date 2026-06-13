@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/theme/theme_registry.dart';
+import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
@@ -203,6 +205,18 @@ class _SettingsDialogState extends State<SettingsDialog> {
                             .add(UpdateProxyUrl(trimmed.isEmpty ? null : trimmed));
                       },
                     ),
+                  ),
+                ),
+                ListTile(
+                  leading: Icon(Icons.cookie_outlined, size: layout.iconSize),
+                  title: Text('COOKIES',
+                      style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight)),
+                  trailing: TextButton(
+                    onPressed: () async {
+                      await context.read<CookieStore>().clear();
+                      if (context.mounted) showAppSnackBar(context, 'Cookie jar cleared');
+                    },
+                    child: const Text('CLEAR'),
                   ),
                 ),
               ],

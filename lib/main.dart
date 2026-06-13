@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/di/injection_container.dart' as di;
 import 'package:getman/core/navigation/app_router.dart';
 import 'package:getman/core/navigation/intents.dart';
+import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/theme_registry.dart';
@@ -41,6 +42,7 @@ class MyApp extends StatelessWidget {
       providers: [
         RepositoryProvider<TabDirtyChecker>.value(value: di.sl<TabDirtyChecker>()),
         RepositoryProvider<NetworkService>.value(value: di.sl<NetworkService>()),
+        RepositoryProvider<CookieStore>.value(value: di.sl<CookieStore>()),
       ],
       child: MultiBlocProvider(
       providers: [

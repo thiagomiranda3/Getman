@@ -23,7 +23,10 @@ class NetworkService {
 
   NetworkService({required Dio dio}) : _dio = dio;
 
-  static Dio buildDio([NetworkConfig config = NetworkConfig.defaults]) {
+  static Dio buildDio([
+    NetworkConfig config = NetworkConfig.defaults,
+    Interceptor? cookieInterceptor,
+  ]) {
     // responseType: plain keeps the raw server bytes as a String; _stringifyBody's
     // "if (data is String) return data" fast path then short-circuits decode/re-encode,
     // saving two full JSON passes per response.
@@ -37,6 +40,7 @@ class NetworkService {
       responseType: ResponseType.plain,
     ));
     configureHttpAdapter(dio, verifySsl: config.verifySsl, proxyUrl: config.proxyUrl);
+    if (cookieInterceptor != null) dio.interceptors.add(cookieInterceptor);
     if (kDebugMode) {
       dio.interceptors.add(LogInterceptor(
         requestBody: false,

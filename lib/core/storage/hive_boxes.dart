@@ -11,4 +11,5 @@ class HiveBoxes {
   static const String history = 'history';
   static const String collections = 'collections';
   static const String environments = 'environments';
+  static const String cookies = 'cookies';
 }
