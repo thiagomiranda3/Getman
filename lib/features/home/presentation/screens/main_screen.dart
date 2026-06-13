@@ -6,6 +6,7 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
+import 'package:getman/features/chaining/presentation/widgets/chaining_write_back_listener.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/environments/domain/logic/active_environment_helper.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
@@ -196,11 +197,13 @@ class _MainScreenState extends State<MainScreen> {
               },
               child: Focus(
                 focusNode: _mainFocusNode,
-                child: Scaffold(
-                  drawer: context.useDrawerNav ? const Drawer(child: SideMenu()) : null,
-                  body: context.useDrawerNav
-                      ? _buildDrawerShell(context, theme, tabsState, activeIndex, tabs)
-                      : _buildSplitShell(context, theme, tabsState, activeIndex, tabs, currentSideMenuWidth),
+                child: ChainingWriteBackListener(
+                  child: Scaffold(
+                    drawer: context.useDrawerNav ? const Drawer(child: SideMenu()) : null,
+                    body: context.useDrawerNav
+                        ? _buildDrawerShell(context, theme, tabsState, activeIndex, tabs)
+                        : _buildSplitShell(context, theme, tabsState, activeIndex, tabs, currentSideMenuWidth),
+                  ),
                 ),
               ),
             );
