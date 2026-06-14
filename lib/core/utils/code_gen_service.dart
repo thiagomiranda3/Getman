@@ -4,6 +4,7 @@ import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/utils/header_utils.dart';
 
 /// Target language for generated request code.
 enum CodeGenTarget {
@@ -46,18 +47,18 @@ class CodeGenService {
       case AuthType.inherit:
         break;
       case AuthType.bearer:
-        if (auth.token.isNotEmpty && !_hasKey(headers, 'authorization')) {
+        if (auth.token.isNotEmpty && !HeaderUtils.hasHeader(headers, 'authorization')) {
           headers['Authorization'] = 'Bearer ${auth.token}';
         }
       case AuthType.basic:
-        if (!_hasKey(headers, 'authorization')) {
+        if (!HeaderUtils.hasHeader(headers, 'authorization')) {
           final encoded = base64.encode(utf8.encode('${auth.username}:${auth.password}'));
           headers['Authorization'] = 'Basic $encoded';
         }
       case AuthType.apiKey:
         if (auth.apiKeyName.isNotEmpty) {
           if (auth.apiKeyLocation == ApiKeyLocation.header) {
-            if (!_hasKey(headers, auth.apiKeyName)) headers[auth.apiKeyName] = auth.apiKeyValue;
+            if (!HeaderUtils.hasHeader(headers, auth.apiKeyName)) headers[auth.apiKeyName] = auth.apiKeyValue;
           } else {
             final sep = url.contains('?') ? '&' : '?';
             final name = Uri.encodeComponent(auth.apiKeyName);
@@ -70,12 +71,12 @@ class CodeGenService {
     // Mirror the send pipeline's content-type handling for structured bodies.
     switch (config.bodyType) {
       case BodyType.urlencoded:
-        _setKey(headers, 'Content-Type', 'application/x-www-form-urlencoded');
+        HeaderUtils.setHeader(headers, 'Content-Type', 'application/x-www-form-urlencoded');
       case BodyType.multipart:
-        _removeKey(headers, 'content-type');
+        HeaderUtils.removeHeader(headers, 'content-type');
       case BodyType.binary:
-        if (!_hasCustomContentType(headers)) {
-          _setKey(headers, 'Content-Type', 'application/octet-stream');
+        if (!HeaderUtils.hasCustomContentType(headers)) {
+          HeaderUtils.setHeader(headers, 'Content-Type', 'application/octet-stream');
         }
       case BodyType.none:
       case BodyType.raw:
@@ -246,29 +247,6 @@ class CodeGenService {
   /// it); single-line uses a simple single-quoted literal.
   static String _pyString(String v) => v.contains('\n') ? jsonEncode(v) : "'${_sq(v)}'";
 
-  static bool _hasKey(Map<String, String> h, String name) {
-    final l = name.toLowerCase();
-    return h.keys.any((k) => k.toLowerCase() == l);
-  }
-
-  static void _setKey(Map<String, String> h, String name, String value) {
-    _removeKey(h, name);
-    h[name] = value;
-  }
-
-  static void _removeKey(Map<String, String> h, String name) {
-    final l = name.toLowerCase();
-    h.removeWhere((k, _) => k.toLowerCase() == l);
-  }
-
-  static bool _hasCustomContentType(Map<String, String> h) {
-    for (final e in h.entries) {
-      if (e.key.toLowerCase() == 'content-type') {
-        return e.value.trim().toLowerCase() != 'application/json';
-      }
-    }
-    return false;
-  }
 }
 
 class _Effective {

@@ -5,6 +5,7 @@ import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/utils/environment_resolver.dart';
+import 'package:getman/core/utils/header_utils.dart';
 import 'package:getman/core/utils/io/file_reader.dart';
 import 'package:getman/core/utils/path_utils.dart';
 
@@ -36,12 +37,12 @@ class RequestSerializer {
       case AuthType.inherit:
         return;
       case AuthType.bearer:
-        if (_hasHeader(headers, 'authorization')) return;
+        if (HeaderUtils.hasHeader(headers, 'authorization')) return;
         final token = EnvironmentResolver.resolve(auth.token, envVars);
         if (token.isEmpty) return;
         headers['Authorization'] = 'Bearer $token';
       case AuthType.basic:
-        if (_hasHeader(headers, 'authorization')) return;
+        if (HeaderUtils.hasHeader(headers, 'authorization')) return;
         final user = EnvironmentResolver.resolve(auth.username, envVars);
         final pass = EnvironmentResolver.resolve(auth.password, envVars);
         final encoded = base64.encode(utf8.encode('$user:$pass'));
@@ -51,7 +52,7 @@ class RequestSerializer {
         if (name.isEmpty) return;
         final value = EnvironmentResolver.resolve(auth.apiKeyValue, envVars);
         if (auth.apiKeyLocation == ApiKeyLocation.header) {
-          if (_hasHeader(headers, name)) return;
+          if (HeaderUtils.hasHeader(headers, name)) return;
           headers[name] = value;
         } else {
           query.putIfAbsent(name, () => <String>[]).add(value);
@@ -85,13 +86,13 @@ class RequestSerializer {
       case BodyType.raw:
         return config.body.isEmpty ? null : r(config.body);
       case BodyType.urlencoded:
-        _setHeader(headers, 'Content-Type', 'application/x-www-form-urlencoded');
+        HeaderUtils.setHeader(headers, 'Content-Type', 'application/x-www-form-urlencoded');
         return <String, String>{
           for (final f in config.formFields)
             if (!f.isFile && f.name.isNotEmpty) r(f.name): r(f.value),
         };
       case BodyType.multipart:
-        _removeHeader(headers, 'content-type'); // Dio adds it with the boundary.
+        HeaderUtils.removeHeader(headers, 'content-type'); // Dio adds it with the boundary.
         final form = FormData();
         for (final f in config.formFields) {
           if (f.name.isEmpty) continue;
@@ -111,39 +112,11 @@ class RequestSerializer {
       case BodyType.binary:
         final path = config.bodyFilePath;
         if (path == null || path.isEmpty) return null;
-        if (!_hasCustomContentType(headers)) {
-          _setHeader(headers, 'Content-Type', 'application/octet-stream');
+        if (!HeaderUtils.hasCustomContentType(headers)) {
+          HeaderUtils.setHeader(headers, 'Content-Type', 'application/octet-stream');
         }
         return await readFileBytes(path);
     }
-  }
-
-  static bool _hasHeader(Map<String, String> headers, String name) {
-    final lower = name.toLowerCase();
-    return headers.keys.any((k) => k.toLowerCase() == lower);
-  }
-
-  /// Sets [name] to [value], dropping any case-variant of the key first so we
-  /// never emit both `Content-Type` and `content-type`.
-  static void _setHeader(Map<String, String> headers, String name, String value) {
-    _removeHeader(headers, name);
-    headers[name] = value;
-  }
-
-  static void _removeHeader(Map<String, String> headers, String name) {
-    final lower = name.toLowerCase();
-    headers.removeWhere((k, _) => k.toLowerCase() == lower);
-  }
-
-  /// True when a Content-Type is present that isn't the app's JSON default —
-  /// i.e. the user deliberately chose one, which a binary body should keep.
-  static bool _hasCustomContentType(Map<String, String> headers) {
-    for (final e in headers.entries) {
-      if (e.key.toLowerCase() == 'content-type') {
-        return e.value.trim().toLowerCase() != 'application/json';
-      }
-    }
-    return false;
   }
 
   static String _basename(String path) => PathUtils.basename(path);
