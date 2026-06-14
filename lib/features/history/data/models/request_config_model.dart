@@ -1,6 +1,7 @@
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
 import 'package:getman/features/tabs/data/models/multipart_field_model.dart';
 import 'package:hive/hive.dart';
@@ -58,6 +59,9 @@ class HttpRequestConfig extends HiveObject {
   @HiveField(13)
   String? bodyFilePath;
 
+  @HiveField(14, defaultValue: 0)
+  int kind;
+
   HttpRequestConfig({
     String? id,
     this.method = 'GET',
@@ -69,6 +73,7 @@ class HttpRequestConfig extends HiveObject {
     this.bodyType = 'raw',
     List<MultipartFieldModel>? formFields,
     this.bodyFilePath,
+    this.kind = 0,
     this.responseBody,
     this.responseHeaders,
     this.statusCode,
@@ -95,6 +100,7 @@ class HttpRequestConfig extends HiveObject {
     bodyType: entity.bodyType.wire,
     formFields: entity.formFields.map(MultipartFieldModel.fromEntity).toList(),
     bodyFilePath: entity.bodyFilePath,
+    kind: entity.kind.wire,
     responseBody: entity.responseBody,
     responseHeaders: entity.responseHeaders,
     statusCode: entity.statusCode,
@@ -122,6 +128,7 @@ class HttpRequestConfig extends HiveObject {
       bodyType: BodyType.fromWire(bodyType),
       formFields: formFields.map((f) => f.toEntity()).toList(),
       bodyFilePath: bodyFilePath,
+      kind: RequestKind.fromWire(kind),
       responseBody: responseBody,
       responseHeaders: responseHeaders,
       statusCode: statusCode,

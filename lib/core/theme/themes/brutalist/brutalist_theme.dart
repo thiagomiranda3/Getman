@@ -189,5 +189,12 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
     ),
   );
 
-  return base.copyWith(extensions: [layout, palette, shape, typography, decoration]);
+  return base.copyWith(extensions: [
+    layout,
+    palette,
+    shape,
+    typography,
+    decoration,
+    const AppCopy(emptyResponse: 'HIT SEND TO GET A RESPONSE'),
+  ]);
 }

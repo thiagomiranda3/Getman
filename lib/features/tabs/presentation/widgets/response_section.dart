@@ -51,7 +51,10 @@ class ResponseSection extends StatelessWidget {
 
         if (tab.isSending) {
           final shimmerFill = theme.colorScheme.onSurface.withValues(alpha: 0.08);
-          return Shimmer.fromColors(
+          return Semantics(
+            label: 'Loading response',
+            liveRegion: true,
+            child: Shimmer.fromColors(
             baseColor: theme.dividerColor.withValues(alpha: 0.1),
             highlightColor: theme.dividerColor.withValues(alpha: 0.3),
             child: Column(
@@ -76,6 +79,7 @@ class ResponseSection extends StatelessWidget {
                 ),
               ],
             ),
+          ),
           );
         }
 
@@ -84,9 +88,9 @@ class ResponseSection extends StatelessWidget {
            return Center(child: Column(
              mainAxisAlignment: MainAxisAlignment.center,
              children: [
-               Icon(Icons.bolt, size: layout.isCompact ? 48 : 64, color: theme.colorScheme.secondary),
+               ExcludeSemantics(child: Icon(Icons.bolt, size: layout.isCompact ? 48 : 64, color: theme.colorScheme.secondary)),
                SizedBox(height: layout.sectionSpacing),
-               Text('HIT SEND TO GET A RESPONSE', style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.displayWeight, color: theme.colorScheme.onSurface)),
+               Text(context.appCopy.emptyResponse, textAlign: TextAlign.center, style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.displayWeight, color: theme.colorScheme.onSurface)),
              ],
            ));
         }
@@ -577,7 +581,7 @@ class _ResponseTestsView extends StatelessWidget {
       child: Text(
         '$passed / $total PASSED',
         style: TextStyle(
-          color: Colors.white, // deliberate contrast on a status-colored pill
+          color: context.appPalette.onColor(color),
           fontWeight: context.appTypography.displayWeight,
           fontSize: layout.fontSizeNormal,
         ),
@@ -675,8 +679,8 @@ class _ResponseMetadataItem extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('$label: ', style: TextStyle(color: Colors.white, fontSize: layout.fontSizeSmall, fontWeight: context.appTypography.titleWeight)),
-          Text(value, style: TextStyle(color: Colors.white, fontWeight: context.appTypography.displayWeight, fontSize: layout.fontSizeNormal)),
+          Text('$label: ', style: TextStyle(color: context.appPalette.onColor(baseColor), fontSize: layout.fontSizeSmall, fontWeight: context.appTypography.titleWeight)),
+          Text(value, style: TextStyle(color: context.appPalette.onColor(baseColor), fontWeight: context.appTypography.displayWeight, fontSize: layout.fontSizeNormal)),
         ],
       ),
     );

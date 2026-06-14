@@ -71,11 +71,11 @@ void main() {
   }
 
   group('LoadTabs', () {
-    test('creates a single empty tab when nothing is persisted', () async {
+    test('seeds a single sample request when nothing is persisted', () async {
       await loadWith([]);
       expect(bloc.state.tabs, hasLength(1));
       expect(bloc.state.activeIndex, 0);
-      expect(bloc.state.tabs.single.config.url, isEmpty);
+      expect(bloc.state.tabs.single.config.url, 'https://httpbin.org/get');
     });
 
     test('resets stale isSending flags from a previous session', () async {

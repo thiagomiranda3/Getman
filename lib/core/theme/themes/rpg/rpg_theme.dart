@@ -323,5 +323,12 @@ ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
     ),
   );
 
-  return base.copyWith(extensions: [layout, palette, shape, typography, decoration]);
+  return base.copyWith(extensions: [
+    layout,
+    palette,
+    shape,
+    typography,
+    decoration,
+    const AppCopy(emptyResponse: 'CAST SEND TO SUMMON A RESPONSE'),
+  ]);
 }

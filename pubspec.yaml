@@ -25,6 +25,7 @@ dependencies:
   go_router: ^17.2.0
   equatable: ^2.0.8
   file_picker: ^8.0.0+1
+  web_socket_channel: ^3.0.0
 
 dev_dependencies:
   flutter_test:

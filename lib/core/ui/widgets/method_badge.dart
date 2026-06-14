@@ -24,7 +24,8 @@ class MethodBadge extends StatelessWidget {
       child: Text(
         method,
         style: TextStyle(
-          color: theme.colorScheme.onPrimary,
+          // Contrast against the per-method color, not a fixed onPrimary (a11y).
+          color: context.appPalette.methodOn(method),
           fontWeight: context.appTypography.displayWeight,
           fontSize: small ? layout.fontSizeSmall : layout.fontSizeNormal,
         ),

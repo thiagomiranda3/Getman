@@ -17,13 +17,14 @@ void main() {
         // testWidgets is used (rather than bare test) so the Flutter test zone
         // absorbs the asynchronous google_fonts font-not-found error that fires
         // after assertions pass when fonts are missing from test assets.
-        testWidgets('attaches all five extensions for brightness=$b isCompact=$c', (tester) async {
+        testWidgets('attaches all six extensions for brightness=$b isCompact=$c', (tester) async {
           final theme = brutalistTheme(b, isCompact: c);
           expect(theme.extension<AppLayout>(), isNotNull);
           expect(theme.extension<AppPalette>(), isNotNull);
           expect(theme.extension<AppShape>(), isNotNull);
           expect(theme.extension<AppTypography>(), isNotNull);
           expect(theme.extension<AppDecoration>(), isNotNull);
+          expect(theme.extension<AppCopy>(), isNotNull);
           expect(theme.extension<AppLayout>()!.isCompact, c);
           expect(theme.brightness, b);
         });

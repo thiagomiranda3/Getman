@@ -48,6 +48,24 @@ dialog — they all share the same engine.
   Postman.
 - **cURL paste.** Paste a `curl https://…` command into the URL bar and
   Getman parses it into method, URL, headers, and body in one step.
+- **Authentication.** Bearer, Basic, and API-key (header or query) auth,
+  resolved with `{{variables}}` at send time.
+- **Request bodies.** Raw, `x-www-form-urlencoded`, `multipart/form-data`
+  with file uploads, and binary.
+- **Code generation.** Export any request as cURL, JavaScript `fetch`, or
+  Python `requests` — `{{variables}}` left intact.
+- **No-code tests & chaining.** Capture a value from one response (JSONPath,
+  header, or regex) into an environment variable, and assert on status,
+  time, body, or headers — all without writing a script.
+- **Persistent cookie jar.** Per-domain cookies are sent automatically on
+  later requests, so session-based auth just works.
+- **Git-friendly workspace (desktop).** Mirror collections to a folder of
+  readable JSON files you can commit and review in PRs.
+- **Command palette.** `Cmd/Ctrl+K` to jump to any saved request, switch
+  environment, or change theme.
+- **Realtime.** WebSocket and Server-Sent Events with a live message log.
+- **Configurable networking.** Timeouts, follow-redirects, SSL verification,
+  and proxy — all in Settings.
 - **JSON editor, not a textarea.** Request and response bodies use
   `re_editor` with syntax highlighting, a built-in find panel, and a
   one-keystroke beautifier (Ctrl/Cmd+B).
@@ -173,6 +191,12 @@ must exactly match the repo name's casing.
   security model difference.
 - **Persistence.** Hive on web uses IndexedDB, scoped to the origin.
   Collections/history/tabs survive refresh but are per-browser.
+- **Realtime.** WebSocket works on web, but the browser can't set custom
+  headers on the handshake (use a query param or subprotocol for auth). SSE
+  may buffer instead of streaming incrementally under the browser HTTP
+  adapter — it streams as expected on the desktop builds.
+- **Workspace folders & network config** (timeouts/SSL/proxy) are
+  desktop/mobile features; the browser manages these itself.
 
 ## Release limitations
 

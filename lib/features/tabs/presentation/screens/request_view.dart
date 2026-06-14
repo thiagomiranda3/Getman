@@ -18,7 +18,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_config_section.dart';
-import 'package:getman/features/tabs/presentation/widgets/response_section.dart';
+import 'package:getman/features/tabs/presentation/widgets/response_area.dart';
 import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.dart';
 import 'package:getman/features/tabs/presentation/widgets/url_bar.dart';
 import 'package:re_editor/re_editor.dart';
@@ -172,7 +172,7 @@ class _RequestViewState extends State<RequestView> {
                                         ),
                                         Flexible(
                                           flex: _ratioToFlex(1 - currentRatio),
-                                          child: ResponseSection(tabId: widget.tabId, responseController: _responseController),
+                                          child: ResponseArea(tabId: widget.tabId, responseController: _responseController),
                                         ),
                                       ],
                                     );

@@ -3,6 +3,7 @@ import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
+import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
 
 // Sentinel used by copyWith to distinguish "not provided" from "explicitly null".
@@ -25,6 +26,9 @@ class HttpRequestConfigEntity extends Equatable {
   /// Filesystem path for a `binary` body (desktop/mobile only).
   final String? bodyFilePath;
 
+  /// The protocol this request speaks (HTTP / WebSocket / SSE).
+  final RequestKind kind;
+
   final String? responseBody;
   final Map<String, String>? responseHeaders;
   final int? statusCode;
@@ -43,6 +47,7 @@ class HttpRequestConfigEntity extends Equatable {
     this.bodyType = BodyType.raw,
     this.formFields = const [],
     this.bodyFilePath,
+    this.kind = RequestKind.http,
     this.responseBody,
     this.responseHeaders,
     this.statusCode,
@@ -70,6 +75,7 @@ class HttpRequestConfigEntity extends Equatable {
     BodyType? bodyType,
     List<MultipartFieldEntity>? formFields,
     Object? bodyFilePath = _unset,
+    RequestKind? kind,
     Object? responseBody = _unset,
     Object? responseHeaders = _unset,
     Object? statusCode = _unset,
@@ -89,6 +95,7 @@ class HttpRequestConfigEntity extends Equatable {
       bodyType: bodyType ?? this.bodyType,
       formFields: formFields ?? this.formFields,
       bodyFilePath: identical(bodyFilePath, _unset) ? this.bodyFilePath : bodyFilePath as String?,
+      kind: kind ?? this.kind,
       responseBody: identical(responseBody, _unset) ? this.responseBody : responseBody as String?,
       responseHeaders: identical(responseHeaders, _unset)
           ? this.responseHeaders
@@ -109,6 +116,7 @@ class HttpRequestConfigEntity extends Equatable {
     bodyType,
     formFields,
     bodyFilePath,
+    kind,
     responseBody,
     responseHeaders,
     statusCode,

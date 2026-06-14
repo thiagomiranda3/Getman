@@ -3,6 +3,7 @@ import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/network/request_kind.dart';
 
 void main() {
   group('HttpRequestConfigEntity.params getter', () {
@@ -104,6 +105,19 @@ void main() {
       const a = HttpRequestConfigEntity(id: 'x');
       const b = HttpRequestConfigEntity(id: 'x', bodyType: BodyType.multipart);
       expect(a == b, isFalse);
+    });
+  });
+
+  group('HttpRequestConfigEntity kind', () {
+    test('defaults to http', () {
+      expect(const HttpRequestConfigEntity(id: 'x').kind, RequestKind.http);
+    });
+
+    test('copyWith sets kind and it participates in equality', () {
+      const config = HttpRequestConfigEntity(id: 'x');
+      final ws = config.copyWith(kind: RequestKind.webSocket);
+      expect(ws.kind, RequestKind.webSocket);
+      expect(ws == config, isFalse);
     });
   });
 }

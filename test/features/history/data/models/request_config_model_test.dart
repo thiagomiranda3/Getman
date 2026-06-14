@@ -3,6 +3,7 @@ import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/features/history/data/models/request_config_model.dart';
 import 'package:getman/features/tabs/data/models/multipart_field_model.dart';
 
@@ -101,6 +102,23 @@ void main() {
       // method + url + body match → dedup-equal regardless of body type.
       expect(a == b, isTrue);
       expect(a.hashCode, b.hashCode);
+    });
+  });
+
+  group('request kind', () {
+    test('a model built without kind reads as http (pre-migration record)', () {
+      expect(HttpRequestConfig(id: 'id').toEntity().kind, RequestKind.http);
+    });
+
+    test('round-trips the kind', () {
+      const entity = HttpRequestConfigEntity(id: 'id', url: 'wss://x', kind: RequestKind.webSocket);
+      expect(HttpRequestConfig.fromEntity(entity).toEntity().kind, RequestKind.webSocket);
+    });
+
+    test('dedup ignores kind (method+url+body only)', () {
+      final http = HttpRequestConfig(id: 'a', method: 'GET', url: 'wss://x', kind: 0);
+      final ws = HttpRequestConfig(id: 'b', method: 'GET', url: 'wss://x', kind: 1);
+      expect(http == ws, isTrue);
     });
   });
 }

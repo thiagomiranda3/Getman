@@ -146,10 +146,12 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     try {
       final tabs = await repository.getTabs();
       if (tabs.isEmpty) {
+        // First run (nothing persisted): seed a working sample request so the
+        // user can hit SEND immediately rather than facing a blank URL bar.
         final newTabId = _uuid.v4();
         final newTab = HttpRequestTabEntity(
           tabId: newTabId,
-          config: HttpRequestConfigEntity(id: newTabId, url: ''),
+          config: HttpRequestConfigEntity(id: newTabId, method: 'GET', url: 'https://httpbin.org/get'),
         );
         emit(state.copyWith(
           tabs: [newTab],

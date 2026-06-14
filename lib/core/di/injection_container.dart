@@ -4,6 +4,7 @@ import 'package:getman/core/network/cookie_interceptor.dart';
 import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/in_memory_cookie_store.dart';
 import 'package:getman/core/network/network_service.dart';
+import 'package:getman/core/network/realtime_service.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/features/chaining/data/datasources/request_rules_local_data_source.dart';
 import 'package:getman/features/chaining/data/models/assertion_model.dart';
@@ -36,6 +37,7 @@ import 'package:getman/features/history/domain/repositories/history_repository.d
 import 'package:getman/features/history/domain/usecases/history_usecases.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
+import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
 import 'package:getman/features/settings/data/datasources/settings_local_data_source.dart';
 import 'package:getman/features/settings/data/models/settings_model.dart';
 import 'package:getman/features/settings/data/repositories/settings_repository_impl.dart';
@@ -162,6 +164,10 @@ Future<SettingsEntity> init() async {
   ));
 
   sl.registerLazySingleton<TabsLocalDataSource>(() => TabsLocalDataSourceImpl());
+
+  // Features - Realtime (WebSocket / SSE)
+  sl.registerLazySingleton(() => RealtimeService());
+  sl.registerLazySingleton(() => RealtimeBloc(service: sl()));
 
   // Features - Home
   sl.registerLazySingleton(() => const TabDirtyChecker());
