@@ -68,12 +68,14 @@ class RequestSerializer {
   ///
   /// Returns the value to hand to Dio as `data` (String / Map / FormData /
   /// bytes / null). File-backed rows are read via the platform file reader
-  /// (throws on web — file bodies are desktop/mobile only).
-  static dynamic buildBody({
+  /// (throws on web — file bodies are desktop/mobile only). Async so the file
+  /// reads happen off the UI isolate — a large upload never stalls the app
+  /// while the request is assembled.
+  static Future<dynamic> buildBody({
     required HttpRequestConfigEntity config,
     required Map<String, String> headers,
     required Map<String, String> envVars,
-  }) {
+  }) async {
     String r(String v) => EnvironmentResolver.resolve(v, envVars);
 
     switch (config.bodyType) {
@@ -98,7 +100,7 @@ class RequestSerializer {
             if (path == null || path.isEmpty) continue;
             form.files.add(MapEntry(
               name,
-              MultipartFile.fromBytes(readFileBytesSync(path), filename: _basename(path)),
+              MultipartFile.fromBytes(await readFileBytes(path), filename: _basename(path)),
             ));
           } else {
             form.fields.add(MapEntry(name, r(f.value)));
@@ -111,7 +113,7 @@ class RequestSerializer {
         if (!_hasCustomContentType(headers)) {
           _setHeader(headers, 'Content-Type', 'application/octet-stream');
         }
-        return readFileBytesSync(path);
+        return await readFileBytes(path);
     }
   }
 

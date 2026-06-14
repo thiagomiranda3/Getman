@@ -431,5 +431,44 @@ void main() {
       expect(tabState.extractionResults.single.variable, 'tok');
       expect(tabState.extractionResults.single.value, 'abc');
     });
+
+    test('large bodies run rules off the isolate (compute) and still land', () async {
+      final rules = MockGetRequestRulesUseCase();
+      when(() => rules.call('t1')).thenAnswer((_) async => const RequestRulesEntity(
+            configId: 't1',
+            extractionRules: [
+              ExtractionRule(id: 'e1', expression: 'token', targetVariable: 'tok'),
+            ],
+            assertions: [
+              Assertion(id: 'a1', target: AssertionTarget.statusCode, expected: '200'),
+            ],
+          ));
+      final ruleBloc = TabsBloc(
+        repository: repository,
+        sendRequestUseCase: sendRequestUseCase,
+        getRequestRulesUseCase: rules,
+      );
+      addTearDown(ruleBloc.close);
+
+      when(() => repository.getTabs()).thenAnswer((_) async => [tab('t1')]);
+      ruleBloc.add(const LoadTabs());
+      await ruleBloc.stream.firstWhere((s) => !s.isLoading && s.tabs.isNotEmpty);
+
+      // > 64 KiB body so _applyRules takes the compute() branch.
+      final pad = 'x' * (70 * 1024);
+      stubSend(() async => HttpResponseEntity(
+            statusCode: 200,
+            body: '{"token":"abc","pad":"$pad"}',
+            headers: const {},
+            durationMs: 5,
+          ));
+      ruleBloc.add(const SendRequest(tabId: 't1'));
+      await ruleBloc.stream
+          .firstWhere((s) => (s.tabs.byId('t1')?.assertionResults.isNotEmpty ?? false));
+
+      final tabState = ruleBloc.state.tabs.byId('t1')!;
+      expect(tabState.assertionResults.single.passed, isTrue);
+      expect(tabState.extractionResults.single.value, 'abc');
+    });
   });
 }

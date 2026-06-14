@@ -41,14 +41,18 @@ class JsonPath {
   }
 
   /// Decodes [rawJson] then reads [path]. Null on parse failure or miss.
-  static Object? readFromString(String rawJson, String path) {
-    Object? decoded;
+  static Object? readFromString(String rawJson, String path) =>
+      read(tryDecode(rawJson), path);
+
+  /// Decodes [rawJson] to a JSON object/array/scalar, or null on parse failure.
+  /// Lets callers decode a body **once** and run many [read]s against the
+  /// result (instead of re-decoding per path).
+  static Object? tryDecode(String rawJson) {
     try {
-      decoded = jsonDecode(rawJson);
+      return jsonDecode(rawJson);
     } catch (_) {
       return null;
     }
-    return read(decoded, path);
   }
 
   /// Whether [path] is syntactically valid (distinguishes "bad path" from

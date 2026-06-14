@@ -10,11 +10,23 @@ import 'package:getman/features/chaining/domain/entities/assertion.dart';
 class AssertionEngine {
   AssertionEngine._();
 
-  static List<AssertionResult> run(List<Assertion> assertions, HttpResponseEntity response) {
+  /// Decodes the body once, then delegates to [runDecoded]. Callers running
+  /// both engines should decode once themselves and use [runDecoded] (see
+  /// `rules_runner.dart`).
+  static List<AssertionResult> run(List<Assertion> assertions, HttpResponseEntity response) =>
+      runDecoded(assertions, response, JsonPath.tryDecode(response.body));
+
+  /// Like [run] but reuses an already-decoded JSON [decodedBody] (null when the
+  /// body wasn't JSON), so N bodyJsonPath assertions don't re-decode N times.
+  static List<AssertionResult> runDecoded(
+    List<Assertion> assertions,
+    HttpResponseEntity response,
+    Object? decodedBody,
+  ) {
     final results = <AssertionResult>[];
     for (final a in assertions) {
       if (!a.enabled) continue;
-      final (actual, present) = _actual(a, response);
+      final (actual, present) = _actual(a, response, decodedBody);
       final passed = _compare(a.comparator, actual, a.expected, present);
       results.add(AssertionResult(label: _label(a), passed: passed, actual: actual));
     }
@@ -22,14 +34,14 @@ class AssertionEngine {
   }
 
   /// Returns the actual value as a string + whether it was present at all.
-  static (String, bool) _actual(Assertion a, HttpResponseEntity response) {
+  static (String, bool) _actual(Assertion a, HttpResponseEntity response, Object? decodedBody) {
     switch (a.target) {
       case AssertionTarget.statusCode:
         return (response.statusCode.toString(), true);
       case AssertionTarget.responseTime:
         return (response.durationMs.toString(), true);
       case AssertionTarget.bodyJsonPath:
-        final v = JsonPath.readFromString(response.body, a.path);
+        final v = JsonPath.read(decodedBody, a.path);
         return v == null ? ('(not found)', false) : (_stringify(v), true);
       case AssertionTarget.header:
         final h = _header(response.headers, a.path);

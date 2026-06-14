@@ -11,14 +11,26 @@ import 'package:getman/features/chaining/domain/entities/extraction_rule.dart';
 class ExtractionEngine {
   ExtractionEngine._();
 
+  /// Decodes the body once, then delegates to [runDecoded]. Callers running
+  /// both engines should decode once themselves and use [runDecoded] (see
+  /// `rules_runner.dart`).
   static List<ExtractionResult> run(
     List<ExtractionRule> rules,
     HttpResponseEntity response,
+  ) =>
+      runDecoded(rules, response, JsonPath.tryDecode(response.body));
+
+  /// Like [run] but reuses an already-decoded JSON [decodedBody] (null when the
+  /// body wasn't JSON), so N jsonPath rules don't re-decode the body N times.
+  static List<ExtractionResult> runDecoded(
+    List<ExtractionRule> rules,
+    HttpResponseEntity response,
+    Object? decodedBody,
   ) {
     final results = <ExtractionResult>[];
     for (final rule in rules) {
       if (!rule.enabled || rule.targetVariable.isEmpty) continue;
-      final value = _extract(rule, response);
+      final value = _extract(rule, response, decodedBody);
       results.add(ExtractionResult(
         variable: rule.targetVariable,
         value: value,
@@ -28,10 +40,10 @@ class ExtractionEngine {
     return results;
   }
 
-  static String? _extract(ExtractionRule rule, HttpResponseEntity response) {
+  static String? _extract(ExtractionRule rule, HttpResponseEntity response, Object? decodedBody) {
     switch (rule.kind) {
       case ExtractionKind.jsonPath:
-        final v = JsonPath.readFromString(response.body, rule.expression);
+        final v = JsonPath.read(decodedBody, rule.expression);
         return v == null ? null : _stringify(v);
       case ExtractionKind.header:
         return _header(response.headers, rule.expression);

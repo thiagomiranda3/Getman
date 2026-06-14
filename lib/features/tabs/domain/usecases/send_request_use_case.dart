@@ -4,6 +4,7 @@ import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/failures.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/network/network_service.dart';
+import 'package:getman/core/utils/perf_trace.dart';
 import 'package:getman/features/history/domain/usecases/history_usecases.dart';
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
@@ -25,12 +26,15 @@ class SendRequestUseCase {
     NetworkCancelHandle? cancelHandle,
   }) async {
     try {
-      final response = await tabsRepository.sendRequest(
-        config,
-        envVars: envVars,
-        cancelHandle: cancelHandle,
+      final response = await traceAsync(
+        'send.request',
+        () => tabsRepository.sendRequest(
+          config,
+          envVars: envVars,
+          cancelHandle: cancelHandle,
+        ),
       );
-      await _record(config, response: response);
+      await traceAsync('send.recordHistory', () => _record(config, response: response));
       return response;
     } on NetworkFailure catch (f) {
       if (f.type != NetworkFailureType.cancelled) {

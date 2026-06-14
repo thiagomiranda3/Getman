@@ -125,7 +125,8 @@ void main() {
       headers = {'Content-Type': 'application/json'};
     });
 
-    dynamic build(HttpRequestConfigEntity config, {Map<String, String> env = const {}}) {
+    // buildBody is async (file reads happen off the UI isolate).
+    Future<dynamic> build(HttpRequestConfigEntity config, {Map<String, String> env = const {}}) {
       return RequestSerializer.buildBody(config: config, headers: headers, envVars: env);
     }
 
@@ -143,12 +144,12 @@ void main() {
           bodyFilePath: bodyFilePath,
         );
 
-    test('none returns null', () {
-      expect(build(cfg(bodyType: BodyType.none)), isNull);
+    test('none returns null', () async {
+      expect(await build(cfg(bodyType: BodyType.none)), isNull);
     });
 
-    test('raw resolves env vars and is returned verbatim', () {
-      final data = build(
+    test('raw resolves env vars and is returned verbatim', () async {
+      final data = await build(
         cfg(bodyType: BodyType.raw, body: '{"k":"{{v}}"}'),
         env: {'v': 'x'},
       );
@@ -157,12 +158,12 @@ void main() {
       expect(headers['Content-Type'], 'application/json');
     });
 
-    test('raw with empty body returns null', () {
-      expect(build(cfg(bodyType: BodyType.raw)), isNull);
+    test('raw with empty body returns null', () async {
+      expect(await build(cfg(bodyType: BodyType.raw)), isNull);
     });
 
-    test('urlencoded builds a map and forces the content type', () {
-      final data = build(
+    test('urlencoded builds a map and forces the content type', () async {
+      final data = await build(
         cfg(bodyType: BodyType.urlencoded, formFields: const [
           MultipartFieldEntity(name: 'a', value: '1'),
           MultipartFieldEntity(name: 'b', value: '{{x}}'),
@@ -174,8 +175,8 @@ void main() {
       expect(headers['Content-Type'], 'application/x-www-form-urlencoded');
     });
 
-    test('multipart builds FormData with text fields and strips content type', () {
-      final data = build(cfg(bodyType: BodyType.multipart, formFields: const [
+    test('multipart builds FormData with text fields and strips content type', () async {
+      final data = await build(cfg(bodyType: BodyType.multipart, formFields: const [
         MultipartFieldEntity(name: 'field', value: 'v'),
       ])) as FormData;
       expect(data.fields, hasLength(1));
@@ -185,12 +186,12 @@ void main() {
       expect(headers.containsKey('Content-Type'), isFalse);
     });
 
-    test('multipart reads a file row into FormData.files', () {
+    test('multipart reads a file row into FormData.files', () async {
       final file = File('${Directory.systemTemp.path}/getman_test_upload.txt')
         ..writeAsStringSync('hello');
       addTearDown(() => file.existsSync() ? file.deleteSync() : null);
 
-      final data = build(cfg(bodyType: BodyType.multipart, formFields: [
+      final data = await build(cfg(bodyType: BodyType.multipart, formFields: [
         MultipartFieldEntity(name: 'doc', isFile: true, filePath: file.path),
       ])) as FormData;
 
@@ -199,28 +200,28 @@ void main() {
       expect(data.files.first.value.filename, 'getman_test_upload.txt');
     });
 
-    test('binary reads file bytes and sets octet-stream over the JSON default', () {
+    test('binary reads file bytes and sets octet-stream over the JSON default', () async {
       final file = File('${Directory.systemTemp.path}/getman_test_binary.bin')
         ..writeAsBytesSync([1, 2, 3]);
       addTearDown(() => file.existsSync() ? file.deleteSync() : null);
 
-      final data = build(cfg(bodyType: BodyType.binary, bodyFilePath: file.path));
+      final data = await build(cfg(bodyType: BodyType.binary, bodyFilePath: file.path));
       expect(data, [1, 2, 3]);
       expect(headers['Content-Type'], 'application/octet-stream');
     });
 
-    test('binary keeps a user-chosen content type', () {
+    test('binary keeps a user-chosen content type', () async {
       headers['Content-Type'] = 'image/png';
       final file = File('${Directory.systemTemp.path}/getman_test_img.bin')
         ..writeAsBytesSync([9]);
       addTearDown(() => file.existsSync() ? file.deleteSync() : null);
 
-      build(cfg(bodyType: BodyType.binary, bodyFilePath: file.path));
+      await build(cfg(bodyType: BodyType.binary, bodyFilePath: file.path));
       expect(headers['Content-Type'], 'image/png');
     });
 
-    test('binary with no file path returns null', () {
-      expect(build(cfg(bodyType: BodyType.binary)), isNull);
+    test('binary with no file path returns null', () async {
+      expect(await build(cfg(bodyType: BodyType.binary)), isNull);
     });
   });
 }

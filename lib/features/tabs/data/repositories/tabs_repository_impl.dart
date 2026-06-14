@@ -71,7 +71,7 @@ class TabsRepositoryImpl implements TabsRepository {
     HttpRequestConfigEntity config, {
     Map<String, String> envVars = const {},
     NetworkCancelHandle? cancelHandle,
-  }) {
+  }) async {
     final parts = UrlQueryUtils.parse(config.url);
     final resolvedBase = EnvironmentResolver.resolve(parts.base, envVars);
 
@@ -96,7 +96,7 @@ class TabsRepositoryImpl implements TabsRepository {
       envVars: envVars,
     );
 
-    final data = RequestSerializer.buildBody(
+    final data = await RequestSerializer.buildBody(
       config: config,
       headers: headers,
       envVars: envVars,

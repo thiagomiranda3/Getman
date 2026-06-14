@@ -5,9 +5,9 @@ import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/error/failures.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/network/network_service.dart';
+import 'package:getman/core/utils/perf_trace.dart';
 import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';
-import 'package:getman/features/chaining/domain/logic/assertion_engine.dart';
-import 'package:getman/features/chaining/domain/logic/extraction_engine.dart';
+import 'package:getman/features/chaining/domain/logic/rules_runner.dart';
 import 'package:getman/features/chaining/domain/usecases/request_rules_usecases.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
@@ -67,6 +67,11 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
 
   static const _saveDebounce = Duration(seconds: 10);
 
+  /// Bodies at or below this run the post-response rules inline; larger bodies
+  /// decode + evaluate on a background isolate (`compute`). The threshold sits
+  /// well above isolate-spawn overhead so small responses don't pay it.
+  static const int _ruleComputeThresholdBytes = 64 * 1024;
+
   TabsBloc({
     required this.repository,
     required this.sendRequestUseCase,
@@ -102,7 +107,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       final tab = state.tabs.byId(id);
       if (tab == null) continue;
       try {
-        await repository.putTab(tab);
+        await traceAsync('tabs.putTab', () => repository.putTab(tab));
       } on PersistenceFailure catch (f) {
         _dirtyTabIds.add(id);
         debugPrint('Tab save failed: ${f.message}');
@@ -417,11 +422,19 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       return;
     }
     if (rules.isEmpty) return;
-    final extraction = ExtractionEngine.run(rules.extractionRules, response);
-    final assertions = AssertionEngine.run(rules.assertions, response);
+    final input = RulesRunInput(
+      extractionRules: rules.extractionRules,
+      assertions: rules.assertions,
+      response: response,
+    );
+    // Decode + evaluate once; off the UI isolate for large bodies. `_applyToTab`
+    // re-resolves the tab after the await, so a closed/replaced tab is a no-op.
+    final output = response.body.length <= _ruleComputeThresholdBytes
+        ? traceSync('rules.run', () => runRules(input))
+        : await traceAsync('rules.run.isolate', () => compute(runRules, input));
     _applyToTab(emit, tabId, (live) => live.copyWith(
-          extractionResults: extraction,
-          assertionResults: assertions,
+          extractionResults: output.extraction,
+          assertionResults: output.assertions,
         ));
   }
 
