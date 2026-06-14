@@ -412,11 +412,12 @@ class _EnvironmentEditorState extends State<_EnvironmentEditor> {
     super.dispose();
   }
 
-  void _emit({Map<String, String>? variables}) {
+  void _emit({Map<String, String>? variables, Set<String>? secretKeys}) {
     context.read<EnvironmentsBloc>().add(UpdateEnvironment(
       widget.environment.copyWith(
         name: _nameController.text,
         variables: variables ?? widget.environment.variables,
+        secretKeys: secretKeys ?? widget.environment.secretKeys,
       ),
     ));
   }
@@ -453,7 +454,14 @@ class _EnvironmentEditorState extends State<_EnvironmentEditor> {
                 if (key.trim().isNotEmpty) key.trim(): value,
             },
             equals: stringMapEquality.equals,
-            onChanged: (variables) => _emit(variables: variables),
+            secretKeys: widget.environment.secretKeys,
+            onSecretKeysChanged: (keys) => _emit(secretKeys: keys),
+            // Drop secret flags for variables that no longer exist (e.g. a
+            // renamed or deleted key) so the set never drifts from the map.
+            onChanged: (variables) => _emit(
+              variables: variables,
+              secretKeys: widget.environment.secretKeys.intersection(variables.keys.toSet()),
+            ),
           ),
         ),
       ],

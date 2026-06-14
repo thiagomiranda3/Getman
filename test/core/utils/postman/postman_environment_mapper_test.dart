@@ -20,6 +20,24 @@ void main() {
       final hostEntry = values.firstWhere((v) => (v as Map)['key'] == 'host') as Map;
       expect(hostEntry['value'], 'staging.api');
     });
+
+    test('masks secret values and tags them as type "secret"', () {
+      final env = EnvironmentEntity(
+        name: 'Staging',
+        variables: const {'host': 'staging.api', 'token': 's3cr3t'},
+        secretKeys: const {'token'},
+      );
+      final decoded = jsonDecode(PostmanEnvironmentMapper.toJson(env)) as Map<String, dynamic>;
+      final values = (decoded['values'] as List).cast<Map<String, dynamic>>();
+
+      final tokenEntry = values.firstWhere((v) => v['key'] == 'token');
+      expect(tokenEntry['value'], '', reason: 'secret value is redacted on export');
+      expect(tokenEntry['type'], 'secret');
+
+      final hostEntry = values.firstWhere((v) => v['key'] == 'host');
+      expect(hostEntry['value'], 'staging.api', reason: 'non-secret values are unchanged');
+      expect(hostEntry['type'], 'default');
+    });
   });
 
   group('PostmanEnvironmentMapper.toJsonAll', () {

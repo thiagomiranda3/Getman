@@ -40,5 +40,27 @@ void main() {
       expect(copy.variables, {'x': '1'});
       expect(copy.name, 'Env');
     });
+
+    test('roundtrip preserves secretKeys', () {
+      final entity = EnvironmentEntity(
+        id: 'env-1',
+        name: 'Local',
+        variables: const {'token': 'abc', 'baseUrl': 'http://x'},
+        secretKeys: const {'token'},
+      );
+      final back = EnvironmentModel.fromEntity(entity).toEntity();
+      expect(back.secretKeys, {'token'});
+    });
+
+    test('secretKeys defaults to empty', () {
+      final model = EnvironmentModel(name: 'X');
+      expect(model.secretKeys, isEmpty);
+      expect(model.toEntity().secretKeys, isEmpty);
+    });
+
+    test('copyWith preserves secretKeys when not provided', () {
+      final entity = EnvironmentEntity(id: 'a', name: 'Env', secretKeys: const {'k'});
+      expect(entity.copyWith(name: 'Env2').secretKeys, {'k'});
+    });
   });
 }

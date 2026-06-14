@@ -21,6 +21,14 @@ class KeyValueListEditor<T extends Object> extends StatefulWidget {
   final T Function(List<(String, String)> rows) encode;
   final bool Function(T a, T b) equals;
 
+  /// Names flagged secret. When non-null, each row shows a lock toggle and
+  /// secret rows obscure their value (with a reveal toggle). Null (the default,
+  /// used by params/headers) disables all secret affordances.
+  final Set<String>? secretKeys;
+
+  /// Called with the new secret-key set when a row's lock is toggled.
+  final ValueChanged<Set<String>>? onSecretKeysChanged;
+
   const KeyValueListEditor({
     super.key,
     required this.items,
@@ -28,6 +36,8 @@ class KeyValueListEditor<T extends Object> extends StatefulWidget {
     required this.decode,
     required this.encode,
     required this.equals,
+    this.secretKeys,
+    this.onSecretKeysChanged,
   });
 
   @override
@@ -96,6 +106,16 @@ class _KeyValueListEditorState<T extends Object> extends State<KeyValueListEdito
     widget.onChanged(value);
   }
 
+  void _toggleSecret(int index) {
+    final secrets = widget.secretKeys;
+    if (secrets == null) return;
+    final key = _keyControllers[index].text.trim();
+    if (key.isEmpty) return;
+    final next = Set<String>.of(secrets);
+    next.contains(key) ? next.remove(key) : next.add(key);
+    widget.onSecretKeysChanged?.call(next);
+  }
+
   @override
   Widget build(BuildContext context) {
     final layout = context.appLayout;
@@ -103,11 +123,16 @@ class _KeyValueListEditorState<T extends Object> extends State<KeyValueListEdito
     return ListView.builder(
       itemCount: _keyControllers.length,
       itemBuilder: (context, index) {
+        final secrets = widget.secretKeys;
+        final keyText = _keyControllers[index].text;
         return _KeyValueRow(
           key: ValueKey(_keyControllers[index]),
           keyController: _keyControllers[index],
           valController: _valControllers[index],
           layout: layout,
+          showSecretToggle: secrets != null,
+          isSecret: secrets != null && keyText.isNotEmpty && secrets.contains(keyText),
+          onToggleSecret: secrets == null ? null : () => _toggleSecret(index),
           onKeyChanged: (val) {
             if (index == _keyControllers.length - 1 && val.isNotEmpty) {
               setState(_addEmptyRow);
@@ -138,6 +163,9 @@ class _KeyValueRow extends StatefulWidget {
   final ValueChanged<String> onKeyChanged;
   final ValueChanged<String> onValChanged;
   final VoidCallback onDelete;
+  final bool showSecretToggle;
+  final bool isSecret;
+  final VoidCallback? onToggleSecret;
 
   const _KeyValueRow({
     super.key,
@@ -147,6 +175,9 @@ class _KeyValueRow extends StatefulWidget {
     required this.onKeyChanged,
     required this.onValChanged,
     required this.onDelete,
+    this.showSecretToggle = false,
+    this.isSecret = false,
+    this.onToggleSecret,
   });
 
   @override
@@ -155,6 +186,7 @@ class _KeyValueRow extends StatefulWidget {
 
 class _KeyValueRowState extends State<_KeyValueRow> {
   bool _isHovered = false;
+  bool _revealed = false;
 
   @override
   Widget build(BuildContext context) {
@@ -181,10 +213,21 @@ class _KeyValueRowState extends State<_KeyValueRow> {
     );
     final valueField = TextField(
       style: textStyle,
+      obscureText: widget.isSecret && !_revealed,
       decoration: InputDecoration(
         hintText: 'VALUE',
         isDense: true,
         contentPadding: fieldPadding,
+        // Reveal toggle lives in the field so the row layout is unchanged.
+        suffixIcon: widget.isSecret
+            ? IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: Icon(_revealed ? Icons.visibility_off : Icons.visibility,
+                    size: widget.layout.isCompact ? 18 : 20),
+                tooltip: _revealed ? 'Hide value' : 'Reveal value',
+                onPressed: () => setState(() => _revealed = !_revealed),
+              )
+            : null,
       ),
       controller: widget.valController,
       autocorrect: false,
@@ -192,6 +235,21 @@ class _KeyValueRowState extends State<_KeyValueRow> {
       textCapitalization: TextCapitalization.none,
       onChanged: widget.onValChanged,
     );
+    final secretButton = widget.showSecretToggle
+        ? context.appDecoration.wrapInteractive(
+            child: IconButton(
+              icon: Icon(
+                widget.isSecret ? Icons.lock_outline : Icons.lock_open_outlined,
+                size: widget.layout.isCompact ? 20 : 24,
+                color: widget.isSecret
+                    ? theme.colorScheme.secondary
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+              tooltip: widget.isSecret ? 'Unmark secret' : 'Mark secret',
+              onPressed: widget.onToggleSecret,
+            ),
+          )
+        : null;
     final deleteButton = context.appDecoration.wrapInteractive(
       child: IconButton(
         icon: Icon(
@@ -228,6 +286,7 @@ class _KeyValueRowState extends State<_KeyValueRow> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(child: keyField),
+                      ?secretButton,
                       deleteButton,
                     ],
                   ),
@@ -241,6 +300,7 @@ class _KeyValueRowState extends State<_KeyValueRow> {
                   SizedBox(width: widget.layout.isCompact ? 8 : 12),
                   Expanded(child: valueField),
                   SizedBox(width: widget.layout.isCompact ? 4 : 8),
+                  ?secretButton,
                   deleteButton,
                 ],
               ),
