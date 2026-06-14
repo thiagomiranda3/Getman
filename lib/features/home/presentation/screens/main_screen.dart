@@ -194,6 +194,30 @@ class _MainScreenState extends State<MainScreen> {
                     return null;
                   },
                 ),
+                NextTabIntent: CallbackAction<NextTabIntent>(
+                  onInvoke: (_) {
+                    if (tabs.length < 2) return null;
+                    context.read<TabsBloc>().add(SetActiveIndex((activeIndex + 1) % tabs.length));
+                    return null;
+                  },
+                ),
+                PrevTabIntent: CallbackAction<PrevTabIntent>(
+                  onInvoke: (_) {
+                    if (tabs.length < 2) return null;
+                    context.read<TabsBloc>().add(
+                          SetActiveIndex((activeIndex - 1 + tabs.length) % tabs.length),
+                        );
+                    return null;
+                  },
+                ),
+                JumpToTabIntent: CallbackAction<JumpToTabIntent>(
+                  // SetActiveIndex rejects out-of-range indices, so Cmd+5 with
+                  // three tabs open is a safe no-op.
+                  onInvoke: (intent) {
+                    context.read<TabsBloc>().add(SetActiveIndex(intent.index));
+                    return null;
+                  },
+                ),
               },
               child: Focus(
                 focusNode: _mainFocusNode,
