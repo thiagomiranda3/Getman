@@ -14,7 +14,9 @@ import 'package:getman/features/environments/presentation/bloc/environments_bloc
 import 'package:getman/features/environments/presentation/widgets/environment_selector.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/home/presentation/widgets/add_tab_button.dart';
+import 'package:getman/features/home/presentation/widgets/empty_tabs_placeholder.dart';
 import 'package:getman/features/home/presentation/widgets/side_menu.dart';
+import 'package:getman/features/home/presentation/widgets/tab_chip.dart';
 import 'package:getman/features/home/presentation/widgets/tab_content_stack.dart';
 import 'package:getman/features/home/presentation/widgets/tab_widget.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
@@ -24,7 +26,6 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
-import 'package:getman/features/tabs/presentation/widgets/tab_switcher_sheet.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -144,7 +145,7 @@ class _MainScreenState extends State<MainScreen> {
 
   /// True when the shell must re-layout: loading flips, the active tab moves,
   /// or the set/order of tabs changes. Per-tab content (titles, dirty stars)
-  /// rebuilds inside [TabWidget] / [_TabChip] with their own narrow selectors.
+  /// rebuilds inside [TabWidget] / [TabChip] with their own narrow selectors.
   static bool _shellNeedsRebuild(TabsState prev, TabsState next) {
     if (prev.isLoading != next.isLoading) return true;
     if (prev.activeIndex != next.activeIndex) return true;
@@ -300,43 +301,7 @@ class _MainScreenState extends State<MainScreen> {
       child: tabsState.isLoading
           ? const Center(key: ValueKey('loading'), child: CircularProgressIndicator())
           : tabs.isEmpty
-              ? Center(
-                  key: const ValueKey('empty'),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.bolt, size: 64, color: theme.dividerColor.withValues(alpha: 0.3)),
-                      const SizedBox(height: 16),
-                      Text(
-                        'NO OPEN TABS',
-                        style: TextStyle(
-                          fontSize: context.appLayout.fontSizeSubtitle,
-                          fontWeight: context.appTypography.displayWeight,
-                          color: theme.dividerColor.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'PRESS CTRL+N TO CREATE A NEW REQUEST',
-                        style: TextStyle(
-                          fontSize: context.appLayout.fontSizeNormal,
-                          fontWeight: context.appTypography.titleWeight,
-                          color: theme.dividerColor.withValues(alpha: 0.2),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      context.appDecoration.wrapInteractive(
-                        child: ElevatedButton(
-                          onPressed: () => context.read<TabsBloc>().add(const AddTab()),
-                          style: ElevatedButton.styleFrom(
-                            padding: EdgeInsets.symmetric(horizontal: context.appLayout.buttonPaddingHorizontal, vertical: context.appLayout.buttonPaddingVertical),
-                          ),
-                          child: const Text('NEW REQUEST'),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
+              ? const EmptyTabsPlaceholder(key: ValueKey('empty'))
               : TabContentStack(
                   key: const ValueKey('tabs'),
                   tabs: tabs,
@@ -371,7 +336,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
           Expanded(
             child: context.useTabSwitcher
-                ? _TabChip(onRequestClose: _requestCloseConfirmation)
+                ? TabChip(onRequestClose: _requestCloseConfirmation)
                 : Listener(
                     onPointerSignal: _handleTabBarPointerSignal,
                     child: Scrollbar(
@@ -412,82 +377,6 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _TabChip extends StatelessWidget {
-  final Future<bool> Function(BuildContext, String) onRequestClose;
-
-  const _TabChip({required this.onRequestClose});
-
-  static HttpRequestTabEntity? _activeTab(TabsState state) =>
-      (state.activeIndex >= 0 && state.activeIndex < state.tabs.length)
-          ? state.tabs[state.activeIndex]
-          : null;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final layout = context.appLayout;
-
-    return BlocBuilder<TabsBloc, TabsState>(
-      // Subscribes on its own (the shell gates out per-tab changes) so the
-      // chip title tracks the URL while the user types.
-      buildWhen: (prev, next) =>
-          prev.activeIndex != next.activeIndex ||
-          prev.tabs.length != next.tabs.length ||
-          _activeTab(prev)?.displayTitle != _activeTab(next)?.displayTitle,
-      builder: (context, state) {
-        final tabs = state.tabs;
-        final activeIndex = state.activeIndex;
-        final title = _activeTab(state)?.displayTitle ?? 'NO TABS';
-
-        return InkWell(
-          onTap: tabs.isEmpty
-              ? null
-              : () => TabSwitcherSheet.show(
-                    context,
-                    onRequestClose: (tabId) => onRequestClose(context, tabId),
-                  ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: theme.primaryColor,
-                    border: Border.all(color: theme.dividerColor, width: layout.borderThin),
-                    borderRadius: BorderRadius.circular(context.appShape.panelRadius),
-                  ),
-                  child: Text(
-                    tabs.isEmpty ? '0' : '${activeIndex + 1}/${tabs.length} ▾',
-                    style: TextStyle(
-                      color: theme.colorScheme.onPrimary,
-                      fontSize: layout.fontSizeNormal,
-                      fontWeight: context.appTypography.displayWeight,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: layout.fontSizeNormal,
-                      fontWeight: context.appTypography.titleWeight,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }
