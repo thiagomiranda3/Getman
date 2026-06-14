@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:getman/core/domain/entities/auth_config.dart';
+import 'package:getman/core/domain/auth_application.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
@@ -41,31 +41,20 @@ class CodeGenService {
     final headers = Map<String, String>.of(config.headers);
     var url = config.url;
 
-    final auth = config.authConfig;
-    switch (auth.type) {
-      case AuthType.none:
-      case AuthType.inherit:
-        break;
-      case AuthType.bearer:
-        if (auth.token.isNotEmpty && !HeaderUtils.hasHeader(headers, 'authorization')) {
-          headers['Authorization'] = 'Bearer ${auth.token}';
-        }
-      case AuthType.basic:
-        if (!HeaderUtils.hasHeader(headers, 'authorization')) {
-          final encoded = base64.encode(utf8.encode('${auth.username}:${auth.password}'));
-          headers['Authorization'] = 'Basic $encoded';
-        }
-      case AuthType.apiKey:
-        if (auth.apiKeyName.isNotEmpty) {
-          if (auth.apiKeyLocation == ApiKeyLocation.header) {
-            if (!HeaderUtils.hasHeader(headers, auth.apiKeyName)) headers[auth.apiKeyName] = auth.apiKeyValue;
-          } else {
-            final sep = url.contains('?') ? '&' : '?';
-            final name = Uri.encodeComponent(auth.apiKeyName);
-            final value = Uri.encodeComponent(auth.apiKeyValue);
-            url += '$sep$name=$value';
-          }
-        }
+    // Code-gen emits a template: pass the identity resolver so `{{vars}}` stay
+    // verbatim. Same auth decision as the send path (auth_application.dart).
+    final auth = resolveAuthApplication(
+      auth: config.authConfig,
+      currentHeaders: headers,
+      resolve: (value) => value,
+    );
+    headers.addAll(auth.headers);
+    final apiKeyQuery = auth.queryParam;
+    if (apiKeyQuery != null) {
+      final sep = url.contains('?') ? '&' : '?';
+      final name = Uri.encodeComponent(apiKeyQuery.key);
+      final value = Uri.encodeComponent(apiKeyQuery.value);
+      url += '$sep$name=$value';
     }
 
     // Mirror the send pipeline's content-type handling for structured bodies.

@@ -1,6 +1,5 @@
-import 'dart:convert';
-
 import 'package:dio/dio.dart';
+import 'package:getman/core/domain/auth_application.dart';
 import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
@@ -32,31 +31,15 @@ class RequestSerializer {
     required Map<String, List<String>> query,
     required Map<String, String> envVars,
   }) {
-    switch (auth.type) {
-      case AuthType.none:
-      case AuthType.inherit:
-        return;
-      case AuthType.bearer:
-        if (HeaderUtils.hasHeader(headers, 'authorization')) return;
-        final token = EnvironmentResolver.resolve(auth.token, envVars);
-        if (token.isEmpty) return;
-        headers['Authorization'] = 'Bearer $token';
-      case AuthType.basic:
-        if (HeaderUtils.hasHeader(headers, 'authorization')) return;
-        final user = EnvironmentResolver.resolve(auth.username, envVars);
-        final pass = EnvironmentResolver.resolve(auth.password, envVars);
-        final encoded = base64.encode(utf8.encode('$user:$pass'));
-        headers['Authorization'] = 'Basic $encoded';
-      case AuthType.apiKey:
-        final name = EnvironmentResolver.resolve(auth.apiKeyName, envVars);
-        if (name.isEmpty) return;
-        final value = EnvironmentResolver.resolve(auth.apiKeyValue, envVars);
-        if (auth.apiKeyLocation == ApiKeyLocation.header) {
-          if (HeaderUtils.hasHeader(headers, name)) return;
-          headers[name] = value;
-        } else {
-          query.putIfAbsent(name, () => <String>[]).add(value);
-        }
+    final app = resolveAuthApplication(
+      auth: auth,
+      currentHeaders: headers,
+      resolve: (value) => EnvironmentResolver.resolve(value, envVars),
+    );
+    headers.addAll(app.headers);
+    final queryParam = app.queryParam;
+    if (queryParam != null) {
+      query.putIfAbsent(queryParam.key, () => <String>[]).add(queryParam.value);
     }
   }
 
