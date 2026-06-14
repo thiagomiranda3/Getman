@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_fancy_tree_view/flutter_fancy_tree_view.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
@@ -17,6 +16,7 @@ import 'package:getman/features/collections/presentation/bloc/collections_state.
 import 'package:getman/features/collections/presentation/widgets/node_action_sheet.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 
 class CollectionsList extends StatefulWidget {
   const CollectionsList({super.key});
@@ -26,18 +26,25 @@ class CollectionsList extends StatefulWidget {
 }
 
 class _CollectionsListState extends State<CollectionsList> {
-  late final TreeController<CollectionNodeEntity> _treeController;
+  final TreeViewController _treeController = TreeViewController();
+  // The flattened forest of nodes fed to the TreeView, rebuilt from bloc state.
+  List<TreeViewNode<CollectionNodeEntity>> _tree =
+      const <TreeViewNode<CollectionNodeEntity>>[];
+  // Expansion is tracked by [CollectionNodeEntity.id] rather than node identity
+  // (the H2 fix). two_dimensional_scrollables has no id-keyed override hook, so
+  // each rebuild reseeds `TreeViewNode(expanded:)` from this set; tapping a node
+  // updates it via [TreeView.onNodeToggle]. Collection mutations rebuild
+  // non-equal entities (copyWith rewrites the ancestor chain), so a value-keyed
+  // set would lose expansion and collapse folders on every edit.
+  final Set<String> _expandedIds = <String>{};
   final TextEditingController _searchController = TextEditingController();
-  // Defers the recursive filter + expandAll() animation until typing pauses, so
-  // each keystroke doesn't walk the whole tree and re-trigger expansion.
+  // Defers the recursive filter + force-expand until typing pauses, so each
+  // keystroke doesn't walk the whole tree and rebuild the node forest.
   final Debouncer _searchDebouncer = Debouncer();
 
   @override
   void initState() {
     super.initState();
-    _treeController = _IdKeyedTreeController(
-      childrenProvider: (node) => node.children,
-    );
     _rebuildTree();
     _searchController.addListener(() => _searchDebouncer.run(_rebuildTree));
   }
@@ -45,20 +52,50 @@ class _CollectionsListState extends State<CollectionsList> {
   @override
   void dispose() {
     _searchDebouncer.dispose();
-    _treeController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  /// Recompute the tree roots from the current collections state + search
-  /// query, and expand everything while searching. Called outside of `build`
-  /// to avoid mutating the controller during paint.
+  /// Recompute the tree from the current collections state + search query, and
+  /// force-expand matching folders while searching. Called outside of `build`
+  /// to avoid mutating state during paint.
   void _rebuildTree() {
     final collections = context.read<CollectionsBloc>().state.collections;
     final query = _searchController.text;
-    _treeController.roots = _filterNodes(collections, query);
+    final filtered = _filterNodes(collections, query);
     if (query.isNotEmpty) {
-      _treeController.expandAll();
+      _collectFolderIds(filtered, _expandedIds);
+    }
+    final next = _buildNodes(filtered);
+    if (mounted) {
+      setState(() => _tree = next);
+    } else {
+      _tree = next;
+    }
+  }
+
+  /// Map the entity forest onto [TreeViewNode]s, seeding expansion by id.
+  List<TreeViewNode<CollectionNodeEntity>> _buildNodes(
+    List<CollectionNodeEntity> nodes,
+  ) {
+    return [
+      for (final node in nodes)
+        TreeViewNode<CollectionNodeEntity>(
+          node,
+          children: node.isFolder ? _buildNodes(node.children) : null,
+          expanded: _expandedIds.contains(node.id),
+        ),
+    ];
+  }
+
+  /// Add every folder id in [nodes] (recursively) to [out] — replicates the old
+  /// expandAll() behaviour while searching.
+  void _collectFolderIds(List<CollectionNodeEntity> nodes, Set<String> out) {
+    for (final node in nodes) {
+      if (node.isFolder) {
+        out.add(node.id);
+        _collectFolderIds(node.children, out);
+      }
     }
   }
 
@@ -132,7 +169,8 @@ class _CollectionsListState extends State<CollectionsList> {
           Expanded(
             child: BlocBuilder<CollectionsBloc, CollectionsState>(
               // Only switch between loading / empty / tree — not on every tree
-              // mutation (the AnimatedTreeView is driven by _treeController).
+              // mutation (the TreeView is driven by _tree, rebuilt in
+              // _rebuildTree via the BlocListener above).
               buildWhen: (p, n) =>
                   p.isLoading != n.isLoading ||
                   p.collections.isEmpty != n.collections.isEmpty,
@@ -143,31 +181,52 @@ class _CollectionsListState extends State<CollectionsList> {
                 if (state.collections.isEmpty) {
                   return _buildEmptyState(context);
                 }
-                return context.isPhone
-                    ? AnimatedTreeView<CollectionNodeEntity>(
-                        treeController: _treeController,
-                        nodeBuilder: (context, entry) => _CollectionNodeWidget(
-                          key: ValueKey(entry.node.id),
-                          entry: entry,
-                          onToggle: () => _treeController.toggleExpansion(entry.node),
-                        ),
-                      )
-                    : DragTarget<String>(
-                        onAcceptWithDetails: (details) =>
-                            context.read<CollectionsBloc>().add(MoveNode(details.data, null)),
-                        builder: (context, candidateData, rejectedData) {
-                          return AnimatedTreeView<CollectionNodeEntity>(
-                            treeController: _treeController,
-                            nodeBuilder: (context, entry) {
-                              return _CollectionNodeWidget(
-                                key: ValueKey(entry.node.id),
-                                entry: entry,
-                                onToggle: () => _treeController.toggleExpansion(entry.node),
-                              );
-                            },
-                          );
-                        },
-                      );
+                // Rows have unbounded cross-axis width in the 2D TreeView, so we
+                // bound each one to the viewport width (restores the Expanded
+                // layout + makes horizontal scroll a no-op). Row height is fixed
+                // (the TreeView has no content-sized extent).
+                final rowHeight =
+                    context.appLayout.treeRowExtent > context.touchTargetMin
+                        ? context.appLayout.treeRowExtent
+                        : context.touchTargetMin;
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final rowWidth = constraints.maxWidth;
+                    final tree = TreeView<CollectionNodeEntity>(
+                      tree: _tree,
+                      controller: _treeController,
+                      // Indentation is applied manually in the row (see
+                      // _CollectionNodeWidget) so the hover/drag highlight spans
+                      // the full row width.
+                      indentation: TreeViewIndentationType.none,
+                      treeRowBuilder: (node) =>
+                          TreeRow(extent: FixedTreeRowExtent(rowHeight)),
+                      onNodeToggle: (node) {
+                        final id = node.content.id;
+                        if (node.isExpanded) {
+                          _expandedIds.add(id);
+                        } else {
+                          _expandedIds.remove(id);
+                        }
+                      },
+                      treeNodeBuilder: (context, node, animationStyle) =>
+                          _CollectionNodeWidget(
+                            key: ValueKey(node.content.id),
+                            node: node,
+                            controller: _treeController,
+                            rowWidth: rowWidth,
+                            rowHeight: rowHeight,
+                          ),
+                    );
+                    if (context.isPhone) return tree;
+                    return DragTarget<String>(
+                      onAcceptWithDetails: (details) => context
+                          .read<CollectionsBloc>()
+                          .add(MoveNode(details.data, null)),
+                      builder: (context, candidateData, rejectedData) => tree,
+                    );
+                  },
+                );
               },
             ),
           ),
@@ -214,39 +273,18 @@ class _CollectionsListState extends State<CollectionsList> {
   }
 }
 
-/// A [TreeController] that tracks expansion by [CollectionNodeEntity.id] rather
-/// than node identity/equality. Collection mutations rebuild non-equal entities
-/// (copyWith rewrites the whole ancestor chain), so the default equality-keyed
-/// expansion set would no longer match and folders collapsed on every
-/// rename/add/favorite/config-edit (H2). Keying by the stable id survives the
-/// rebuild. Overriding these two methods is the package's prescribed extension
-/// point; neither calls notifyListeners (cascading ops invoke them many times).
-class _IdKeyedTreeController extends TreeController<CollectionNodeEntity> {
-  _IdKeyedTreeController({required super.childrenProvider}) : super(roots: const []);
-
-  final Set<String> _expandedIds = <String>{};
-
-  @override
-  bool getExpansionState(CollectionNodeEntity node) => _expandedIds.contains(node.id);
-
-  @override
-  void setExpansionState(CollectionNodeEntity node, bool expanded) {
-    if (expanded) {
-      _expandedIds.add(node.id);
-    } else {
-      _expandedIds.remove(node.id);
-    }
-  }
-}
-
 class _CollectionNodeWidget extends StatefulWidget {
-  final TreeEntry<CollectionNodeEntity> entry;
-  final VoidCallback onToggle;
+  final TreeViewNode<CollectionNodeEntity> node;
+  final TreeViewController controller;
+  final double rowWidth;
+  final double rowHeight;
 
   const _CollectionNodeWidget({
     super.key,
-    required this.entry,
-    required this.onToggle,
+    required this.node,
+    required this.controller,
+    required this.rowWidth,
+    required this.rowHeight,
   });
 
   @override
@@ -261,23 +299,26 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
-    final node = widget.entry.node;
+    final node = widget.node.content;
+    final isExpanded = widget.node.isExpanded;
+    final indent = (widget.node.depth ?? 0) * layout.depthPaddingMultiplier;
     final isPhone = context.isPhone;
-    final rowMinHeight = isPhone ? context.touchTargetMin : 0.0;
     final onLongPress = isPhone ? () => NodeActionSheet.show(context, node) : null;
 
     Widget content;
     if (node.isFolder) {
-      final folderInner = context.appDecoration.wrapInteractive(
+      final folderInner = SizedBox(
+        width: widget.rowWidth,
+        height: widget.rowHeight,
+        child: context.appDecoration.wrapInteractive(
         child: InkWell(
-          onTap: widget.onToggle,
+          onTap: () => widget.controller.toggleNode(widget.node),
           onLongPress: onLongPress,
           child: MouseRegion(
             onEnter: (_) => setState(() => _isHovered = true),
             onExit: (_) => setState(() => _isHovered = false),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              constraints: BoxConstraints(minHeight: rowMinHeight),
               decoration: BoxDecoration(
                 color: _isDragOver
                     ? theme.primaryColor.withValues(alpha: 0.3)
@@ -286,12 +327,12 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
                     ? Border.all(color: theme.primaryColor, width: layout.borderThin)
                     : Border.all(color: Colors.transparent, width: layout.borderThin),
               ),
-              child: TreeIndentation(
-                entry: widget.entry,
+              child: Padding(
+                padding: EdgeInsets.only(left: indent),
                 child: Row(
                   children: [
                     Icon(
-                      widget.entry.isExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
+                      isExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
                       size: layout.smallIconSize,
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
@@ -307,6 +348,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
               ),
             ),
           ),
+        ),
         ),
       );
 
@@ -326,7 +368,10 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
               builder: (context, candidateData, rejectedData) => folderInner,
             );
     } else {
-      content = context.appDecoration.wrapInteractive(
+      content = SizedBox(
+        width: widget.rowWidth,
+        height: widget.rowHeight,
+        child: context.appDecoration.wrapInteractive(
         child: InkWell(
           onTap: () {
             final config = node.config;
@@ -344,12 +389,11 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
             onExit: (_) => setState(() => _isHovered = false),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              constraints: BoxConstraints(minHeight: rowMinHeight),
               decoration: BoxDecoration(
                 color: _isHovered ? theme.hoverColor : Colors.transparent,
               ),
-              child: TreeIndentation(
-                entry: widget.entry,
+              child: Padding(
+                padding: EdgeInsets.only(left: indent),
                 child: Row(
                   children: [
                     SizedBox(width: layout.smallIconSize),
@@ -364,6 +408,7 @@ class _CollectionNodeWidgetState extends State<_CollectionNodeWidget> {
               ),
             ),
           ),
+        ),
         ),
       );
     }

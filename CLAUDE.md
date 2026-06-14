@@ -19,7 +19,7 @@ Getman is a high-performance, aesthetically pleasing HTTP client built with Flut
 - **Routing**: `go_router` (single route today; room to grow in `AppRouter`).
 - **Code editor**: `re_editor` + `re_highlight` (JSON highlighting, built-in find panel). Controller type is `CodeLineEditingController`, **not** `TextEditingController`.
 - **UUIDs**: `uuid` package; entities generate their own IDs in constructors when not given.
-- **Tree UI**: `flutter_fancy_tree_view` (**DISCONTINUED on pub.dev**; plan a migration to `two_dimensional_scrollables`).
+- **Tree UI**: `two_dimensional_scrollables` (`TreeView`). Expansion is tracked by `CollectionNodeEntity.id` in a `Set<String>` seeded into each `TreeViewNode(expanded:)` on rebuild (the H2 fix — value-keyed expansion collapses on every mutation). Rows use `TreeViewIndentationType.none` + manual `depthPaddingMultiplier` padding, a fixed `AppLayout.treeRowExtent`, and a viewport-width `SizedBox` (rows have unbounded cross-axis width in the 2D viewport, so this restores the `Expanded` layout + neutralizes horizontal scroll).
 - **Reactive helpers**: `collection` (for `MapEquality`, `ListEquality`, `firstWhereOrNull`).
 - **Style**: `google_fonts` (Lexend base, JetBrainsMono in code editors).
 - **Realtime**: `web_socket_channel` (WebSocket; SSE rides on `dio` response streams via `SseParser`).
@@ -242,7 +242,7 @@ Verification bar: **`fvm flutter analyze` produces `No issues found!` AND `fvm f
 - **Debug logs use `debugPrint`** — `print` is disallowed by the default lint profile.
 - **Imports are `package:getman/...` everywhere** (enforced by `always_use_package_imports` + `directives_ordering`). No relative imports.
 - **Postman file I/O lives in `core/utils/json_file_io.dart`** (`slugFilename`, `saveJsonFileWithFeedback`, `importJsonFilesWithFeedback`) — collections and environments both go through it; don't re-implement picker/snackbar plumbing per feature. `saveJsonFileWithFeedback` takes an `allowedExtensions` param (default `['json']`); the response Save action passes `['json','txt']`.
-- **`flutter_fancy_tree_view` is discontinued** — keep code changes compatible with eventual migration to `two_dimensional_scrollables`.
+- **The collections tree uses `two_dimensional_scrollables`'s `TreeView`** (sole consumer: `collections_list.dart`). It has no id-keyed expansion hook, so expansion is owned manually via `_expandedIds` (`Set<String>`) + reseeded `TreeViewNode(expanded:)` each rebuild; tapping a node updates the set in `onNodeToggle`. Don't switch to value-keyed expansion (H2 regression). Row extent is fixed (no content-sizing in the 2D viewport) — size via `AppLayout.treeRowExtent`, not a literal.
 - Settings `splitRatio` is clamped to `[_splitMin, _splitMax]` (0.1..0.9) in `request_view.dart`. The `flex:` math uses `_splitFlexUnits=1000` — if you touch this, preserve the clamping so panes can't go to zero.
 - **`SendRequest` carries `tabId` + `envVars`.** Always dispatch from a context that can `context.read<EnvironmentsBloc>()` + `context.read<SettingsBloc>()` and resolve via `ActiveEnvironmentHelper.variablesFor(...)`. Omitting `envVars` sends `{{var}}` placeholders to the network verbatim.
 - **Never resolve env vars in `SendRequestUseCase._record`.** History must keep the templated config so re-sending under a different environment works.
