@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:getman/core/domain/entities/body_type.dart';
+import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
@@ -109,20 +111,60 @@ class PostmanCollectionMapper {
       'header': headers,
       'url': urlObj,
     };
-    if (config.body.isNotEmpty) {
-      final isJson = config.headers.entries.any((e) =>
-          e.key.toLowerCase() == 'content-type' &&
-          e.value.toLowerCase().contains('json'));
-      result['body'] = {
-        'mode': 'raw',
-        'raw': config.body,
-        if (isJson)
-          'options': {
-            'raw': {'language': 'json'},
-          },
-      };
-    }
+    final body = _configToBody(config);
+    if (body != null) result['body'] = body;
     return result;
+  }
+
+  /// Maps the request's body type to a Postman `body` block. Returns null when
+  /// there's nothing to emit (no body / empty raw / empty file path). Form rows
+  /// with an empty key are skipped, matching the send pipeline and the import
+  /// side (which skips empty keys too).
+  static Map<String, dynamic>? _configToBody(HttpRequestConfigEntity config) {
+    switch (config.bodyType) {
+      case BodyType.none:
+        return null;
+      case BodyType.raw:
+        if (config.body.isEmpty) return null;
+        final isJson = config.headers.entries.any((e) =>
+            e.key.toLowerCase() == 'content-type' &&
+            e.value.toLowerCase().contains('json'));
+        return {
+          'mode': 'raw',
+          'raw': config.body,
+          if (isJson)
+            'options': {
+              'raw': {'language': 'json'},
+            },
+        };
+      case BodyType.urlencoded:
+        return {
+          'mode': 'urlencoded',
+          'urlencoded': [
+            for (final f in config.formFields)
+              if (!f.isFile && f.name.isNotEmpty) {'key': f.name, 'value': f.value},
+          ],
+        };
+      case BodyType.multipart:
+        return {
+          'mode': 'formdata',
+          'formdata': [
+            for (final f in config.formFields)
+              if (f.name.isNotEmpty)
+                if (f.isFile)
+                  {'key': f.name, 'type': 'file', 'src': f.filePath ?? ''}
+                else
+                  {'key': f.name, 'type': 'text', 'value': f.value},
+          ],
+        };
+      case BodyType.binary:
+        final path = config.bodyFilePath;
+        if (path == null || path.isEmpty) return null;
+        return {
+          'mode': 'file',
+          'file': {'src': path},
+        };
+    }
   }
 
   // ---------- import helpers ----------
@@ -170,7 +212,10 @@ class PostmanCollectionMapper {
       method: method,
       url: mergedUrl,
       headers: headers,
-      body: body,
+      body: body.body,
+      bodyType: body.bodyType,
+      formFields: body.formFields,
+      bodyFilePath: body.bodyFilePath,
     );
   }
 
@@ -235,13 +280,78 @@ class PostmanCollectionMapper {
     return result;
   }
 
-  static String _parseBody(dynamic body) {
-    if (body is! Map) return '';
-    final mode = body['mode'];
-    if (mode == 'raw') {
-      final raw = body['raw'];
-      return raw is String ? raw : '';
+  /// Reconstructs the body fields from a Postman `body` block. Mirrors the
+  /// export side: raw → raw body; urlencoded/formdata → form rows + body type;
+  /// file → binary path. Anything unrecognized falls back to an empty raw body.
+  static ({
+    BodyType bodyType,
+    String body,
+    List<MultipartFieldEntity> formFields,
+    String? bodyFilePath,
+  }) _parseBody(dynamic body) {
+    if (body is Map) {
+      switch (body['mode']) {
+        case 'raw':
+          final raw = body['raw'];
+          return (
+            bodyType: BodyType.raw,
+            body: raw is String ? raw : '',
+            formFields: const [],
+            bodyFilePath: null,
+          );
+        case 'urlencoded':
+          return (
+            bodyType: BodyType.urlencoded,
+            body: '',
+            formFields: _parseFormList(body['urlencoded'], multipart: false),
+            bodyFilePath: null,
+          );
+        case 'formdata':
+          return (
+            bodyType: BodyType.multipart,
+            body: '',
+            formFields: _parseFormList(body['formdata'], multipart: true),
+            bodyFilePath: null,
+          );
+        case 'file':
+          final file = body['file'];
+          final src = file is Map ? file['src'] : null;
+          return (
+            bodyType: BodyType.binary,
+            body: '',
+            formFields: const [],
+            bodyFilePath: src is String && src.isNotEmpty ? src : null,
+          );
+      }
     }
-    return '';
+    return (bodyType: BodyType.raw, body: '', formFields: const [], bodyFilePath: null);
+  }
+
+  /// Parses a Postman `urlencoded` / `formdata` array into form rows. Disabled
+  /// and empty-key entries are skipped (matching headers/query parsing). For
+  /// multipart, `type:'file'` rows become file rows carrying `src` as the path.
+  static List<MultipartFieldEntity> _parseFormList(dynamic list, {required bool multipart}) {
+    if (list is! List) return const [];
+    final result = <MultipartFieldEntity>[];
+    for (final entry in list.whereType<Map>()) {
+      if (entry['disabled'] == true) continue;
+      final key = entry['key'];
+      if (key is! String || key.isEmpty) continue;
+      if (multipart && entry['type'] == 'file') {
+        final src = entry['src'];
+        result.add(MultipartFieldEntity(
+          name: key,
+          isFile: true,
+          filePath: src is String ? src : null,
+        ));
+      } else {
+        final value = entry['value'];
+        result.add(MultipartFieldEntity(
+          name: key,
+          value: value is String ? value : (value?.toString() ?? ''),
+        ));
+      }
+    }
+    return result;
   }
 }

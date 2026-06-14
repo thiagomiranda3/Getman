@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/domain/entities/body_type.dart';
+import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/utils/postman/postman_collection_mapper.dart';
@@ -336,6 +338,62 @@ void main() {
         [const QueryParamEntity(key: 'dry', value: 'true')],
       );
       expect(leaf.config!.body, '{"a":1}');
+    });
+
+    test('export then import preserves a urlencoded form body', () {
+      const leaf = CollectionNodeEntity(
+        id: 'leaf',
+        name: 'Login',
+        isFolder: false,
+        config: HttpRequestConfigEntity(
+          id: 'cfg',
+          method: 'POST',
+          url: 'https://api.example.com/login',
+          bodyType: BodyType.urlencoded,
+          formFields: [
+            MultipartFieldEntity(name: 'user', value: 'alice'),
+            MultipartFieldEntity(name: 'pass', value: 'secret'),
+          ],
+        ),
+      );
+
+      final reimported =
+          PostmanCollectionMapper.fromJson(PostmanCollectionMapper.toJson(leaf));
+      final config = reimported.children.first.config!;
+
+      expect(config.bodyType, BodyType.urlencoded);
+      expect(config.formFields, const [
+        MultipartFieldEntity(name: 'user', value: 'alice'),
+        MultipartFieldEntity(name: 'pass', value: 'secret'),
+      ]);
+    });
+
+    test('export then import preserves a multipart form body (text + file)', () {
+      const leaf = CollectionNodeEntity(
+        id: 'leaf',
+        name: 'Upload',
+        isFolder: false,
+        config: HttpRequestConfigEntity(
+          id: 'cfg',
+          method: 'POST',
+          url: 'https://api.example.com/upload',
+          bodyType: BodyType.multipart,
+          formFields: [
+            MultipartFieldEntity(name: 'caption', value: 'hi'),
+            MultipartFieldEntity(name: 'file', isFile: true, filePath: '/tmp/a.png'),
+          ],
+        ),
+      );
+
+      final reimported =
+          PostmanCollectionMapper.fromJson(PostmanCollectionMapper.toJson(leaf));
+      final config = reimported.children.first.config!;
+
+      expect(config.bodyType, BodyType.multipart);
+      expect(config.formFields, const [
+        MultipartFieldEntity(name: 'caption', value: 'hi'),
+        MultipartFieldEntity(name: 'file', isFile: true, filePath: '/tmp/a.png'),
+      ]);
     });
   });
 }
