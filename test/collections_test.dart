@@ -23,6 +23,8 @@ void main() {
     collectionsBloc = CollectionsBloc(
       getCollectionsUseCase: getCollectionsUseCase,
       saveCollectionsUseCase: saveCollectionsUseCase,
+      // Keep the debounce tiny so `untilCalled(saveCollections)` resolves fast.
+      saveDebounce: const Duration(milliseconds: 10),
     );
   });
 
@@ -148,6 +150,43 @@ void main() {
       await untilCalled(() => mockRepository.saveCollections(any()));
 
       expect(collectionsBloc.state.collections.map((n) => n.id), ['ws']);
+    });
+  });
+
+  group('debounced persistence', () {
+    test('coalesces a burst of edits into a single save', () async {
+      when(() => mockRepository.getCollections()).thenAnswer((_) async => []);
+      when(() => mockRepository.saveCollections(any())).thenAnswer((_) async {});
+      final bloc = CollectionsBloc(
+        getCollectionsUseCase: getCollectionsUseCase,
+        saveCollectionsUseCase: saveCollectionsUseCase,
+        saveDebounce: const Duration(milliseconds: 100),
+      );
+      addTearDown(bloc.close);
+
+      bloc.add(const AddFolder('A'));
+      bloc.add(const AddFolder('B'));
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+
+      verify(() => mockRepository.saveCollections(any())).called(1);
+      expect(bloc.state.collections.map((n) => n.name), containsAll(['A', 'B']));
+    });
+
+    test('close flushes a pending save', () async {
+      when(() => mockRepository.getCollections()).thenAnswer((_) async => []);
+      when(() => mockRepository.saveCollections(any())).thenAnswer((_) async {});
+      final bloc = CollectionsBloc(
+        getCollectionsUseCase: getCollectionsUseCase,
+        saveCollectionsUseCase: saveCollectionsUseCase,
+        saveDebounce: const Duration(seconds: 30), // won't fire on its own in-test
+      );
+
+      bloc.add(const AddFolder('A'));
+      await Future<void>.delayed(Duration.zero); // let the event emit
+      verifyNever(() => mockRepository.saveCollections(any())); // still debounced
+      await bloc.close(); // flush on close
+
+      verify(() => mockRepository.saveCollections(any())).called(1);
     });
   });
 }

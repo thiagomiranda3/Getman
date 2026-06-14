@@ -35,6 +35,10 @@ void main() async {
   GoogleFonts.config.allowRuntimeFetching = false;
   final initialSettings = await di.init();
   runApp(MyApp(initialSettings: initialSettings));
+  // Open the deferred boxes (cookies, request-rules) + hydrate the cookie jar
+  // after the first frame, so cold start isn't blocked by reads no first frame
+  // needs.
+  WidgetsBinding.instance.addPostFrameCallback((_) => di.warmUpDeferredBoxes());
 }
 
 class MyApp extends StatelessWidget {

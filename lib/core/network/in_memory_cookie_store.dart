@@ -41,10 +41,16 @@ class InMemoryCookieStore implements CookieStore {
     for (final cookie in parsed) {
       _cookies.removeWhere((c) => c.key == cookie.key);
       // A server can delete a cookie by setting it already-expired; honor that
-      // by simply not re-adding an expired one.
-      if (!cookie.isExpired(now())) _cookies.add(cookie);
+      // by simply not re-adding an expired one. Persist incrementally — one
+      // put/delete per affected cookie, not a whole-jar rewrite. Best-effort:
+      // never block the request path on a write.
+      if (cookie.isExpired(now())) {
+        persistence.remove(cookie.key);
+      } else {
+        _cookies.add(cookie);
+        persistence.upsert(cookie);
+      }
     }
-    _persist();
   }
 
   @override
@@ -59,10 +65,5 @@ class InMemoryCookieStore implements CookieStore {
   void _pruneExpired() {
     final n = now();
     _cookies.removeWhere((c) => c.isExpired(n));
-  }
-
-  void _persist() {
-    // Best-effort durability; never block the request path on a write failure.
-    persistence.saveAll(List.of(_cookies));
   }
 }

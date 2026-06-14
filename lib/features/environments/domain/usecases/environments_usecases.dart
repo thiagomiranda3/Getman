@@ -13,3 +13,15 @@ class SaveEnvironmentsUseCase {
   Future<void> call(List<EnvironmentEntity> environments) =>
       repository.saveEnvironments(environments);
 }
+
+class PutEnvironmentUseCase {
+  final EnvironmentsRepository repository;
+  PutEnvironmentUseCase(this.repository);
+  Future<void> call(EnvironmentEntity environment) => repository.putEnvironment(environment);
+}
+
+class DeleteEnvironmentUseCase {
+  final EnvironmentsRepository repository;
+  DeleteEnvironmentUseCase(this.repository);
+  Future<void> call(String id) => repository.deleteEnvironment(id);
+}

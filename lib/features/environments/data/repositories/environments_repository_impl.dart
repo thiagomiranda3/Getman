@@ -16,6 +16,16 @@ class EnvironmentsRepositoryImpl implements EnvironmentsRepository {
   });
 
   @override
+  Future<void> putEnvironment(EnvironmentEntity environment) => guardPersistence(() async {
+    await localDataSource.putEnvironment(EnvironmentModel.fromEntity(environment));
+  });
+
+  @override
+  Future<void> deleteEnvironment(String id) => guardPersistence(() async {
+    await localDataSource.deleteEnvironment(id);
+  });
+
+  @override
   Future<void> saveEnvironments(List<EnvironmentEntity> environments) =>
       guardPersistence(() async {
     final models = environments.map((e) => EnvironmentModel.fromEntity(e)).toList();

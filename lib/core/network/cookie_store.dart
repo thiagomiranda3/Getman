@@ -20,6 +20,12 @@ abstract class CookieStore {
 /// kept abstract here so the store stays testable without Hive.
 abstract class CookiePersistence {
   List<NetworkCookie> loadAll();
-  Future<void> saveAll(List<NetworkCookie> cookies);
+
+  /// Inserts or overwrites a single cookie (keyed by [NetworkCookie.key]).
+  Future<void> upsert(NetworkCookie cookie);
+
+  /// Removes a single cookie by its [NetworkCookie.key].
+  Future<void> remove(String key);
+
   Future<void> clearAll();
 }

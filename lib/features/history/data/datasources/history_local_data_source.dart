@@ -84,14 +84,19 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
       final newKey = await box.add(config);
       _indexAddKey(config.hashCode, newKey);
 
-      // Trim: remove oldest entries (index 0) until within limit.
-      while (box.length > limit && box.isNotEmpty) {
-        final oldKey = box.keyAt(0);
-        final oldest = box.getAt(0);
-        await box.deleteAt(0);
-        if (oldest != null && oldKey != null) {
-          _indexRemoveKey(oldest.hashCode, oldKey);
+      // Trim: drop the oldest (lowest-index) entries in ONE batched delete so
+      // a single watch event fires instead of one per removal.
+      if (box.length > limit) {
+        final removeCount = box.length - limit;
+        final keysToRemove = <dynamic>[];
+        for (var i = 0; i < removeCount; i++) {
+          final oldKey = box.keyAt(i);
+          final oldest = box.getAt(i);
+          if (oldKey == null) continue;
+          keysToRemove.add(oldKey);
+          if (oldest != null) _indexRemoveKey(oldest.hashCode, oldKey);
         }
+        await box.deleteAll(keysToRemove);
       }
     } catch (e) {
       throw PersistenceException('Failed to add to history', cause: e);

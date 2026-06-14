@@ -5,14 +5,17 @@ import 'package:getman/core/network/network_cookie.dart';
 
 class _FakePersistence implements CookiePersistence {
   List<NetworkCookie> stored;
-  List<NetworkCookie>? lastSaved;
+  final List<NetworkCookie> upserted = [];
+  final List<String> removed = [];
   bool cleared = false;
   _FakePersistence([this.stored = const []]);
 
   @override
   List<NetworkCookie> loadAll() => stored;
   @override
-  Future<void> saveAll(List<NetworkCookie> cookies) async => lastSaved = cookies;
+  Future<void> upsert(NetworkCookie cookie) async => upserted.add(cookie);
+  @override
+  Future<void> remove(String key) async => removed.add(key);
   @override
   Future<void> clearAll() async => cleared = true;
 }
@@ -37,9 +40,11 @@ void main() {
     expect(store.all(), hasLength(1));
   });
 
-  test('storeFromSetCookie adds, then cookieHeaderFor returns matching cookies', () {
+  test('storeFromSetCookie upserts incrementally, then cookieHeaderFor matches', () {
     store.storeFromSetCookie(Uri.parse('https://api.dev/x'), 'sid=abc; Path=/');
-    expect(persistence.lastSaved, hasLength(1));
+    // One incremental upsert — not a whole-jar rewrite.
+    expect(persistence.upserted, hasLength(1));
+    expect(persistence.upserted.single.name, 'sid');
     expect(store.cookieHeaderFor(Uri.parse('https://api.dev/x')), 'sid=abc');
     // Different host → no cookies.
     expect(store.cookieHeaderFor(Uri.parse('https://other.dev/x')), isNull);
@@ -51,6 +56,15 @@ void main() {
     store.storeFromSetCookie(uri, 'sid=two');
     expect(store.all(), hasLength(1));
     expect(store.cookieHeaderFor(uri), 'sid=two');
+    // Same key upserted twice (latest wins).
+    expect(persistence.upserted.map((c) => c.value), ['one', 'two']);
+  });
+
+  test('an already-expired Set-Cookie removes the cookie from durable storage', () {
+    final uri = Uri.parse('https://api.dev/');
+    store.storeFromSetCookie(uri, 'sid=gone; Max-Age=0');
+    expect(store.all(), isEmpty);
+    expect(persistence.removed, isNotEmpty);
   });
 
   test('expired cookies are filtered out of the request header', () {

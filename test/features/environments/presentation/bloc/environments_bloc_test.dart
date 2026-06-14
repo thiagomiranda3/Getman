@@ -13,12 +13,20 @@ void main() {
   late MockEnvironmentsRepository mockRepository;
   late EnvironmentsBloc bloc;
 
+  setUpAll(() {
+    registerFallbackValue(EnvironmentEntity(id: 'fallback', name: 'fallback'));
+  });
+
   setUp(() {
     mockRepository = MockEnvironmentsRepository();
+    when(() => mockRepository.putEnvironment(any())).thenAnswer((_) async {});
+    when(() => mockRepository.deleteEnvironment(any())).thenAnswer((_) async {});
     when(() => mockRepository.saveEnvironments(any())).thenAnswer((_) async {});
     bloc = EnvironmentsBloc(
       getEnvironmentsUseCase: GetEnvironmentsUseCase(mockRepository),
       saveEnvironmentsUseCase: SaveEnvironmentsUseCase(mockRepository),
+      putEnvironmentUseCase: PutEnvironmentUseCase(mockRepository),
+      deleteEnvironmentUseCase: DeleteEnvironmentUseCase(mockRepository),
     );
   });
 
@@ -29,31 +37,32 @@ void main() {
       final env = EnvironmentEntity(id: 'env-1', name: 'Staging');
 
       bloc.add(AddEnvironment(env));
-      await untilCalled(() => mockRepository.saveEnvironments(any()));
+      await untilCalled(() => mockRepository.putEnvironment(any()));
 
       expect(bloc.state.environments, [env]);
       expect(bloc.state.environments.single.id, 'env-1');
     });
 
-    test('persists the new list', () async {
+    test('persists only the added environment (single keyed put)', () async {
       final env = EnvironmentEntity(id: 'env-1', name: 'Staging');
 
       bloc.add(AddEnvironment(env));
-      await untilCalled(() => mockRepository.saveEnvironments(any()));
+      await untilCalled(() => mockRepository.putEnvironment(any()));
 
-      verify(() => mockRepository.saveEnvironments([env])).called(1);
+      verify(() => mockRepository.putEnvironment(env)).called(1);
+      verifyNever(() => mockRepository.saveEnvironments(any()));
     });
   });
 
   group('UpdateEnvironment', () {
-    test('replaces the environment with a matching id', () async {
+    test('replaces the environment with a matching id and puts it', () async {
       final original = EnvironmentEntity(id: 'env-1', name: 'Staging');
       final updated = original.copyWith(name: 'Production', variables: {'host': 'prod'});
 
       bloc.add(AddEnvironment(original));
-      await untilCalled(() => mockRepository.saveEnvironments(any()));
+      await untilCalled(() => mockRepository.putEnvironment(original));
       bloc.add(UpdateEnvironment(updated));
-      await untilCalled(() => mockRepository.saveEnvironments([updated]));
+      await untilCalled(() => mockRepository.putEnvironment(updated));
 
       expect(bloc.state.environments, [updated]);
     });
@@ -63,25 +72,26 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(bloc.state.environments, isEmpty);
-      verifyNever(() => mockRepository.saveEnvironments(any()));
+      verifyNever(() => mockRepository.putEnvironment(any()));
     });
   });
 
   group('DeleteEnvironment', () {
-    test('removes the environment with the given id', () async {
+    test('removes the environment and deletes it by id', () async {
       final env = EnvironmentEntity(id: 'env-1', name: 'Staging');
       bloc.add(AddEnvironment(env));
-      await untilCalled(() => mockRepository.saveEnvironments(any()));
+      await untilCalled(() => mockRepository.putEnvironment(any()));
 
       bloc.add(const DeleteEnvironment('env-1'));
-      await untilCalled(() => mockRepository.saveEnvironments([]));
+      await untilCalled(() => mockRepository.deleteEnvironment('env-1'));
 
       expect(bloc.state.environments, isEmpty);
+      verify(() => mockRepository.deleteEnvironment('env-1')).called(1);
     });
   });
 
   group('ImportEnvironments', () {
-    test('appends all imported environments', () async {
+    test('appends all imported environments and batch-saves', () async {
       final a = EnvironmentEntity(id: 'a', name: 'A');
       final b = EnvironmentEntity(id: 'b', name: 'B');
 
@@ -89,6 +99,7 @@ void main() {
       await untilCalled(() => mockRepository.saveEnvironments(any()));
 
       expect(bloc.state.environments, [a, b]);
+      verify(() => mockRepository.saveEnvironments([a, b])).called(1);
     });
   });
 

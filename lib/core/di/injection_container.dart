@@ -56,6 +56,10 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 final sl = GetIt.instance;
 
+/// Held so [warmUpDeferredBoxes] can hydrate the same instance that DI handed
+/// to the network interceptor.
+InMemoryCookieStore? _cookieStore;
+
 Future<SettingsEntity> init() async {
   await Hive.initFlutter();
 
@@ -70,14 +74,25 @@ Future<SettingsEntity> init() async {
   Hive.registerAdapter(AssertionModelAdapter());
   Hive.registerAdapter(RequestRulesModelAdapter());
 
-  final settingsBox = await Hive.openBox<SettingsModel>(HiveBoxes.settings);
-  await Hive.openBox<HttpRequestConfig>(HiveBoxes.history);
-  await Hive.openBox<HttpRequestTabModel>(HiveBoxes.tabs);
-  await Hive.openBox(HiveBoxes.tabsMeta);
-  await Hive.openBox<CollectionNode>(HiveBoxes.collections);
-  final environmentsBox = await Hive.openBox<EnvironmentModel>(HiveBoxes.environments);
-  await Hive.openBox<StoredCookieModel>(HiveBoxes.cookies);
-  await Hive.openBox<RequestRulesModel>(HiveBoxes.requestRules);
+  // Open the boxes that have an eager reader on the first frame in PARALLEL
+  // (settings → theme, environments → initial list, and the eager Load* events
+  // for tabs/collections + HistoryBloc's subscribe-time read). Cookies and
+  // request-rules have no first-frame reader and are deferred to
+  // [warmUpDeferredBoxes] after the first frame.
+  final boxes = await Future.wait<Box<dynamic>>([
+    Hive.openBox<SettingsModel>(HiveBoxes.settings),
+    Hive.openBox<EnvironmentModel>(HiveBoxes.environments),
+    Hive.openBox<HttpRequestConfig>(HiveBoxes.history),
+    Hive.openBox<HttpRequestTabModel>(HiveBoxes.tabs),
+    Hive.openBox(HiveBoxes.tabsMeta),
+    Hive.openBox<CollectionNode>(HiveBoxes.collections),
+  ]);
+  final settingsBox = boxes[0] as Box<SettingsModel>;
+  final environmentsBox = boxes[1] as Box<EnvironmentModel>;
+
+  // Re-key any legacy int-keyed environments by id so per-id put/delete writes
+  // overwrite the same logical environment (no-op once keys are strings).
+  await EnvironmentsLocalDataSourceImpl.migrateLegacyKeysIfNeeded();
 
   final initialSettings = settingsBox.get('current')?.toEntity() ?? const SettingsEntity();
   final initialEnvironments =
@@ -135,11 +150,15 @@ Future<SettingsEntity> init() async {
   sl.registerLazySingleton(() => EnvironmentsBloc(
     getEnvironmentsUseCase: sl(),
     saveEnvironmentsUseCase: sl(),
+    putEnvironmentUseCase: sl(),
+    deleteEnvironmentUseCase: sl(),
     initialEnvironments: initialEnvironments,
   ));
 
   sl.registerLazySingleton(() => GetEnvironmentsUseCase(sl()));
   sl.registerLazySingleton(() => SaveEnvironmentsUseCase(sl()));
+  sl.registerLazySingleton(() => PutEnvironmentUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteEnvironmentUseCase(sl()));
 
   sl.registerLazySingleton<EnvironmentsRepository>(() => EnvironmentsRepositoryImpl(sl()));
 
@@ -172,8 +191,10 @@ Future<SettingsEntity> init() async {
   // Features - Home
   sl.registerLazySingleton(() => const TabDirtyChecker());
 
-  // Core
-  final cookieStore = InMemoryCookieStore(persistence: HiveCookiePersistence())..hydrate();
+  // Core. Cookie store is created empty here — its box is opened and hydrated
+  // off the first-frame path by [warmUpDeferredBoxes].
+  final cookieStore = InMemoryCookieStore(persistence: HiveCookiePersistence());
+  _cookieStore = cookieStore;
   sl.registerLazySingleton<CookieStore>(() => cookieStore);
   sl.registerLazySingleton(() => NetworkService(
         dio: NetworkService.buildDio(
@@ -184,4 +205,17 @@ Future<SettingsEntity> init() async {
   sl.registerLazySingleton(() => AppRouter());
 
   return initialSettings;
+}
+
+/// Opens the boxes that have no first-frame reader (cookies, request-rules),
+/// migrates the cookie jar to its keyed layout, then hydrates the cookie store.
+/// Call once after the first frame is scheduled (see `main.dart`) so cold start
+/// isn't blocked by these reads. Safe to call when boxes are already open.
+Future<void> warmUpDeferredBoxes() async {
+  await Future.wait<Box<dynamic>>([
+    Hive.openBox<StoredCookieModel>(HiveBoxes.cookies),
+    Hive.openBox<RequestRulesModel>(HiveBoxes.requestRules),
+  ]);
+  await HiveCookiePersistence.migrateLegacyKeysIfNeeded();
+  _cookieStore?.hydrate();
 }
