@@ -32,6 +32,7 @@ void main() {
   late MockEnvironmentsBloc envBloc;
   late MockSettingsBloc settingsBloc;
   late StreamController<TabsState> tabsStream;
+  late StreamController<SettingsState> settingsStream;
 
   const tabId = 't1';
   HttpRequestTabEntity tabWith(List<ExtractionResult> results) => HttpRequestTabEntity(
@@ -49,10 +50,15 @@ void main() {
     envBloc = MockEnvironmentsBloc();
     when(() => envBloc.add(any())).thenReturn(null);
 
+    settingsStream = StreamController<SettingsState>.broadcast();
     settingsBloc = MockSettingsBloc();
+    when(() => settingsBloc.stream).thenAnswer((_) => settingsStream.stream);
   });
 
-  tearDown(() => tabsStream.close());
+  tearDown(() {
+    tabsStream.close();
+    settingsStream.close();
+  });
 
   Future<void> pump(WidgetTester tester) async {
     await tester.pumpWidget(
@@ -138,6 +144,37 @@ void main() {
     await tester.pump();
 
     verify(() => envBloc.add(any())).called(1);
+  });
+
+  testWidgets('a capture made with no active environment is written once one is selected later',
+      (tester) async {
+    // Start with NO active environment.
+    var settings = const SettingsState(settings: SettingsEntity());
+    when(() => settingsBloc.state).thenAnswer((_) => settings);
+    when(() => envBloc.state).thenReturn(EnvironmentsState(
+        environments: [EnvironmentEntity(id: 'e1', name: 'Prod', variables: const {})]));
+
+    await pump(tester);
+
+    final captureState = TabsState(tabs: [
+      tabWith(const [ExtractionResult(variable: 'tok', value: 'abc', matched: true)]),
+    ]);
+    when(() => tabsBloc.state).thenReturn(captureState); // _flush reads the live state
+    tabsStream.add(captureState);
+    await tester.pump();
+
+    // No environment yet → nothing persisted, but the capture must NOT be lost.
+    verifyNever(() => envBloc.add(any()));
+
+    // User now selects an environment (emits on SettingsBloc only — no new TabsState).
+    settings = const SettingsState(settings: SettingsEntity(activeEnvironmentId: 'e1'));
+    settingsStream.add(settings);
+    await tester.pump();
+
+    final event = verify(() => envBloc.add(captureAny())).captured.single as UpdateEnvironment;
+    expect(event.environment.id, 'e1');
+    expect(event.environment.variables, {'tok': 'abc'},
+        reason: 'the pending capture is flushed when an environment becomes active');
   });
 
   testWidgets('with no active environment, nothing is written', (tester) async {
