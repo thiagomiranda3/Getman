@@ -92,6 +92,54 @@ void main() {
     expect(event.environment.variables, {'old': '1', 'tok': 'abc'});
   });
 
+  testWidgets('writes captured values from a NON-active tab (user switched away mid-flight)',
+      (tester) async {
+    // Two tabs; tab B (index 1) is the active one. Tab A's request is still in
+    // flight when the user switches to B, then A returns with a capture.
+    HttpRequestTabEntity tab(String id, List<ExtractionResult> results) => HttpRequestTabEntity(
+          tabId: id,
+          config: HttpRequestConfigEntity(id: id),
+          extractionResults: results,
+        );
+    when(() => tabsBloc.state)
+        .thenReturn(TabsState(tabs: [tab('A', const []), tab('B', const [])], activeIndex: 1));
+    when(() => settingsBloc.state)
+        .thenReturn(const SettingsState(settings: SettingsEntity(activeEnvironmentId: 'e1')));
+    when(() => envBloc.state).thenReturn(EnvironmentsState(
+        environments: [EnvironmentEntity(id: 'e1', name: 'Prod', variables: const {})]));
+
+    await pump(tester);
+
+    tabsStream.add(TabsState(tabs: [
+      tab('A', const [ExtractionResult(variable: 'tok', value: 'fromA', matched: true)]),
+      tab('B', const []),
+    ], activeIndex: 1));
+    await tester.pump();
+
+    final event = verify(() => envBloc.add(captureAny())).captured.single as UpdateEnvironment;
+    expect(event.environment.id, 'e1');
+    expect(event.environment.variables, {'tok': 'fromA'},
+        reason: 'capture on the non-active tab must still reach the active environment');
+  });
+
+  testWidgets('does not re-write an unchanged capture on a later emission', (tester) async {
+    when(() => settingsBloc.state)
+        .thenReturn(const SettingsState(settings: SettingsEntity(activeEnvironmentId: 'e1')));
+    when(() => envBloc.state).thenReturn(EnvironmentsState(
+        environments: [EnvironmentEntity(id: 'e1', name: 'Prod', variables: const {})]));
+
+    await pump(tester);
+
+    const results = [ExtractionResult(variable: 'tok', value: 'abc', matched: true)];
+    tabsStream.add(TabsState(tabs: [tabWith(results)]));
+    await tester.pump();
+    // An unrelated emission carrying the SAME capture must not write again.
+    tabsStream.add(TabsState(tabs: [tabWith(results)]));
+    await tester.pump();
+
+    verify(() => envBloc.add(any())).called(1);
+  });
+
   testWidgets('with no active environment, nothing is written', (tester) async {
     when(() => settingsBloc.state).thenReturn(const SettingsState(settings: SettingsEntity()));
     when(() => envBloc.state).thenReturn(const EnvironmentsState());
