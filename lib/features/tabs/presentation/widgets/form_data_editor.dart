@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
+import 'package:getman/core/utils/path_utils.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
@@ -264,7 +265,7 @@ class _RowState {
         valueController: TextEditingController(text: f.value),
         isFile: f.isFile,
         filePath: f.filePath,
-        fileName: f.filePath?.split(RegExp(r'[/\\]')).last,
+        fileName: f.filePath == null ? null : PathUtils.basename(f.filePath!),
       );
 
   factory _RowState.empty() => _RowState(

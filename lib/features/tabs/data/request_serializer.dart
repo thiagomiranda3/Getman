@@ -6,6 +6,7 @@ import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/utils/environment_resolver.dart';
 import 'package:getman/core/utils/io/file_reader.dart';
+import 'package:getman/core/utils/path_utils.dart';
 
 /// Data-layer helper that turns a request's auth + body configuration into the
 /// concrete headers / query / payload handed to [NetworkService]. Lives in the
@@ -145,5 +146,5 @@ class RequestSerializer {
     return false;
   }
 
-  static String _basename(String path) => path.split(RegExp(r'[/\\]')).last;
+  static String _basename(String path) => PathUtils.basename(path);
 }

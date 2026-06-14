@@ -354,6 +354,9 @@ class _UrlBarState extends State<UrlBar> {
     final prettified = await JsonUtils.prettify(rawBody);
     final latestTab = tabsBloc.state.tabs.byId(tabId);
     if (latestTab == null) return;
+    // If the user edited the body while prettify ran in its isolate, don't
+    // clobber that newer edit with the stale prettified result.
+    if (latestTab.config.body != rawBody) return;
     if (latestTab.config.body == prettified) return;
     tabsBloc.add(UpdateTab(
       latestTab.copyWith(config: latestTab.config.copyWith(body: prettified)),
