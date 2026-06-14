@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
 import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
 
 CollectionNodeEntity folder(String id, String name, {List<CollectionNodeEntity> children = const [], bool favorite = false}) =>
@@ -159,6 +160,71 @@ void main() {
       final result = CollectionsTreeHelper.updateConfigInTree(nodes, 'x', newConfig);
       expect(result.first.config?.url, 'https://new');
       expect(result.first.config?.method, 'POST');
+    });
+  });
+
+  group('saved examples', () {
+    SavedExampleEntity example(String id, String name) => SavedExampleEntity(
+          id: id,
+          name: name,
+          capturedAt: DateTime.utc(2026, 6, 14),
+          config: const HttpRequestConfigEntity(id: 'x', responseBody: '{"ok":true}', statusCode: 200),
+        );
+
+    test('addExampleToNode appends to the target leaf (newest last)', () {
+      final nodes = [leaf('x', 'X')];
+      final result = CollectionsTreeHelper.addExampleToNode(nodes, 'x', example('e1', 'First'));
+      expect(result.first.examples.map((e) => e.id), ['e1']);
+      // The carried response snapshot survives.
+      expect(result.first.examples.first.config.statusCode, 200);
+      expect(result.first.examples.first.config.responseBody, '{"ok":true}');
+    });
+
+    test('addExampleToNode does not mutate the input list', () {
+      final nodes = [leaf('x', 'X')];
+      CollectionsTreeHelper.addExampleToNode(nodes, 'x', example('e1', 'First'));
+      expect(nodes.first.examples, isEmpty);
+    });
+
+    test('addExampleToNode is a no-op for a missing id', () {
+      final nodes = [leaf('x', 'X')];
+      final result = CollectionsTreeHelper.addExampleToNode(nodes, 'nope', example('e1', 'First'));
+      expect(result.first.examples, isEmpty);
+    });
+
+    test('removeExampleFromNode drops only the matching example', () {
+      final nodes = [
+        leaf('x', 'X').copyWith(examples: [example('e1', 'First'), example('e2', 'Second')]),
+      ];
+      final result = CollectionsTreeHelper.removeExampleFromNode(nodes, 'x', 'e1');
+      expect(result.first.examples.map((e) => e.id), ['e2']);
+    });
+
+    test('renameExampleInNode renames only the matching example', () {
+      final nodes = [
+        leaf('x', 'X').copyWith(examples: [example('e1', 'First'), example('e2', 'Second')]),
+      ];
+      final result = CollectionsTreeHelper.renameExampleInNode(nodes, 'x', 'e2', 'Renamed');
+      expect(result.first.examples.firstWhere((e) => e.id == 'e2').name, 'Renamed');
+      expect(result.first.examples.firstWhere((e) => e.id == 'e1').name, 'First');
+    });
+
+    test('examples on a nested leaf are reachable', () {
+      final nodes = [
+        folder('root', 'Root', children: [leaf('deep', 'Deep')]),
+      ];
+      final result = CollectionsTreeHelper.addExampleToNode(nodes, 'deep', example('e1', 'First'));
+      final deep = CollectionsTreeHelper.findNode(result, 'deep');
+      expect(deep?.examples.map((e) => e.id), ['e1']);
+    });
+
+    test('sort leaves examples untouched', () {
+      final nodes = [
+        leaf('b', 'B').copyWith(examples: [example('e1', 'First')]),
+        leaf('a', 'A'),
+      ];
+      final sorted = CollectionsTreeHelper.sort(nodes);
+      expect(sorted.firstWhere((n) => n.id == 'b').examples.map((e) => e.id), ['e1']);
     });
   });
 }

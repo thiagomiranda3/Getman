@@ -1,5 +1,6 @@
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
 
 class CollectionsTreeHelper {
   static List<CollectionNodeEntity> sort(List<CollectionNodeEntity> collections) {
@@ -55,6 +56,52 @@ class CollectionsTreeHelper {
     String description,
   ) =>
       _updateNodeById(nodes, id, (node) => node.copyWith(description: description));
+
+  /// Append [example] to the node's saved examples (newest last). No-op if the
+  /// id is missing.
+  static List<CollectionNodeEntity> addExampleToNode(
+    List<CollectionNodeEntity> nodes,
+    String id,
+    SavedExampleEntity example,
+  ) =>
+      _updateNodeById(
+        nodes,
+        id,
+        (node) => node.copyWith(examples: [...node.examples, example]),
+      );
+
+  /// Remove the example with [exampleId] from the node. No-op if either id is
+  /// missing.
+  static List<CollectionNodeEntity> removeExampleFromNode(
+    List<CollectionNodeEntity> nodes,
+    String id,
+    String exampleId,
+  ) =>
+      _updateNodeById(
+        nodes,
+        id,
+        (node) => node.copyWith(
+          examples: node.examples.where((e) => e.id != exampleId).toList(),
+        ),
+      );
+
+  /// Rename the example with [exampleId] inside the node. No-op if either id is
+  /// missing.
+  static List<CollectionNodeEntity> renameExampleInNode(
+    List<CollectionNodeEntity> nodes,
+    String id,
+    String exampleId,
+    String newName,
+  ) =>
+      _updateNodeById(
+        nodes,
+        id,
+        (node) => node.copyWith(
+          examples: node.examples
+              .map((e) => e.id == exampleId ? e.copyWith(name: newName) : e)
+              .toList(),
+        ),
+      );
 
   static CollectionNodeEntity? findNode(List<CollectionNodeEntity> nodes, String id) {
     for (final node in nodes) {
