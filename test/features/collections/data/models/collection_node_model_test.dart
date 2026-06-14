@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/collections/data/models/collection_node_model.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
 
 void main() {
   group('CollectionNode <-> entity', () {
@@ -24,6 +26,48 @@ void main() {
       const entity = CollectionNodeEntity(id: 'a', name: 'A');
       final back = CollectionNode.fromEntity(entity).toEntity();
       expect(back.description, isNull);
+    });
+
+    test('round-trips saved examples incl. the response snapshot', () {
+      final entity = CollectionNodeEntity(
+        id: 'req',
+        name: 'GetUsers',
+        isFolder: false,
+        config: const HttpRequestConfigEntity(id: 'req', url: 'https://api/users'),
+        examples: [
+          SavedExampleEntity(
+            id: 'e1',
+            name: '200 OK',
+            capturedAt: DateTime.utc(2026, 6, 14, 14, 32),
+            config: const HttpRequestConfigEntity(
+              id: 'req',
+              url: 'https://api/users',
+              statusCode: 200,
+              responseBody: '{"ok":true}',
+              responseHeaders: {'content-type': 'application/json'},
+              durationMs: 42,
+            ),
+          ),
+        ],
+      );
+
+      final back = CollectionNode.fromEntity(entity).toEntity();
+
+      expect(back.examples, hasLength(1));
+      final example = back.examples.single;
+      expect(example.id, 'e1');
+      expect(example.name, '200 OK');
+      expect(example.capturedAt, DateTime.utc(2026, 6, 14, 14, 32));
+      expect(example.config.statusCode, 200);
+      expect(example.config.responseBody, '{"ok":true}');
+      expect(example.config.responseHeaders, {'content-type': 'application/json'});
+      expect(example.config.durationMs, 42);
+    });
+
+    test('a node with no examples round-trips as an empty list', () {
+      const entity = CollectionNodeEntity(id: 'a', name: 'A');
+      final back = CollectionNode.fromEntity(entity).toEntity();
+      expect(back.examples, isEmpty);
     });
   });
 

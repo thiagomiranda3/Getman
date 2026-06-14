@@ -1,53 +1,41 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'collection_node_model.dart';
+part of 'saved_example_model.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
 // **************************************************************************
 
-class CollectionNodeAdapter extends TypeAdapter<CollectionNode> {
+class SavedExampleModelAdapter extends TypeAdapter<SavedExampleModel> {
   @override
-  final int typeId = 3;
+  final int typeId = 10;
 
   @override
-  CollectionNode read(BinaryReader reader) {
+  SavedExampleModel read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return CollectionNode(
+    return SavedExampleModel(
       id: fields[0] as String?,
       name: fields[1] as String,
-      isFolder: fields[2] as bool,
-      children: (fields[3] as List?)?.cast<CollectionNode>(),
-      config: fields[4] as HttpRequestConfig?,
-      isFavorite: fields[5] as bool,
-      description: fields[6] as String?,
-      examples: (fields[7] as List?)?.cast<SavedExampleModel>(),
+      capturedAtMs: fields[2] as int,
+      config: fields[3] as HttpRequestConfig,
     );
   }
 
   @override
-  void write(BinaryWriter writer, CollectionNode obj) {
+  void write(BinaryWriter writer, SavedExampleModel obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(4)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
       ..write(obj.name)
       ..writeByte(2)
-      ..write(obj.isFolder)
+      ..write(obj.capturedAtMs)
       ..writeByte(3)
-      ..write(obj.children)
-      ..writeByte(4)
-      ..write(obj.config)
-      ..writeByte(5)
-      ..write(obj.isFavorite)
-      ..writeByte(6)
-      ..write(obj.description)
-      ..writeByte(7)
-      ..write(obj.examples);
+      ..write(obj.config);
   }
 
   @override
@@ -56,7 +44,7 @@ class CollectionNodeAdapter extends TypeAdapter<CollectionNode> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is CollectionNodeAdapter &&
+      other is SavedExampleModelAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

@@ -18,6 +18,7 @@ import 'package:getman/features/chaining/presentation/bloc/rules_bloc.dart';
 import 'package:getman/features/collections/data/datasources/collections_local_data_source.dart';
 import 'package:getman/features/collections/data/datasources/workspace_data_source_factory.dart';
 import 'package:getman/features/collections/data/models/collection_node_model.dart';
+import 'package:getman/features/collections/data/models/saved_example_model.dart';
 import 'package:getman/features/collections/data/repositories/collections_repository_impl.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
@@ -64,6 +65,7 @@ Future<SettingsEntity> init() async {
   Hive.registerAdapter(HttpRequestConfigAdapter());
   Hive.registerAdapter(HttpRequestTabModelAdapter());
   Hive.registerAdapter(CollectionNodeAdapter());
+  Hive.registerAdapter(SavedExampleModelAdapter());
   Hive.registerAdapter(EnvironmentModelAdapter());
   Hive.registerAdapter(MultipartFieldModelAdapter());
   Hive.registerAdapter(StoredCookieModelAdapter());
