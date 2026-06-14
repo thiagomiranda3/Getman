@@ -9,7 +9,6 @@ import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/branded_tab_bar.dart';
 import 'package:getman/core/utils/byte_format.dart';
 import 'package:getman/core/utils/cookie_parser.dart';
-import 'package:getman/core/utils/equality.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
@@ -385,9 +384,12 @@ class _ResponseHeadersView extends StatelessWidget {
 
     return BlocBuilder<TabsBloc, TabsState>(
       buildWhen: (prev, next) {
-        final p = prev.tabs.byId(tabId);
-        final n = next.tabs.byId(tabId);
-        return !stringMapEquality.equals(p?.response?.headers, n?.response?.headers);
+        // response is replaced wholesale on each send, so a reference check is
+        // an O(1) gate — no MapEquality over headers on every state emission.
+        return !identical(
+          prev.tabs.byId(tabId)?.response,
+          next.tabs.byId(tabId)?.response,
+        );
       },
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
@@ -478,9 +480,12 @@ class _ResponseCookiesView extends StatelessWidget {
 
     return BlocBuilder<TabsBloc, TabsState>(
       buildWhen: (prev, next) {
-        final p = prev.tabs.byId(tabId);
-        final n = next.tabs.byId(tabId);
-        return !stringMapEquality.equals(p?.response?.headers, n?.response?.headers);
+        // response is replaced wholesale on each send, so a reference check is
+        // an O(1) gate — no MapEquality over headers on every state emission.
+        return !identical(
+          prev.tabs.byId(tabId)?.response,
+          next.tabs.byId(tabId)?.response,
+        );
       },
       builder: (context, state) {
         final headers = state.tabs.byId(tabId)?.response?.headers;

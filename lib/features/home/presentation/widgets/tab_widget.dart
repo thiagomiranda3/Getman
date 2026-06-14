@@ -73,8 +73,20 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
     final layout = context.appLayout;
 
     return BlocBuilder<TabsBloc, TabsState>(
-      buildWhen: (prev, next) =>
-          prev.tabs.byId(widget.tabId) != next.tabs.byId(widget.tabId),
+      // The chrome only shows the title (collectionName / config.url) and the
+      // dirty marker (config vs saved). Rebuild on those, but NOT on response
+      // arrival / isSending / extraction results — otherwise every body
+      // keystroke or a multi-MB response would drag the whole entity (incl. the
+      // response body) through `==` and rebuild the chrome of every open tab.
+      buildWhen: (prev, next) {
+        final p = prev.tabs.byId(widget.tabId);
+        final n = next.tabs.byId(widget.tabId);
+        if (identical(p, n)) return false;
+        if (p == null || n == null) return p != n;
+        return p.config != n.config ||
+            p.collectionName != n.collectionName ||
+            p.collectionNodeId != n.collectionNodeId;
+      },
       builder: (context, state) {
         final tab = state.tabs.byId(widget.tabId);
         if (tab == null) return const SizedBox.shrink();

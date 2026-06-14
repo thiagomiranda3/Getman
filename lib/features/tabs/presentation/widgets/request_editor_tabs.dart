@@ -9,6 +9,7 @@ import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/key_value_list_editor.dart';
 import 'package:getman/core/utils/equality.dart';
 import 'package:getman/core/utils/json_utils.dart';
+import 'package:getman/core/utils/path_utils.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
@@ -306,7 +307,7 @@ class _BinaryBodyPicker extends StatelessWidget {
         final tab = state.tabs.byId(tabId);
         if (tab == null) return const SizedBox.shrink();
         final path = tab.config.bodyFilePath;
-        final name = path?.split(RegExp(r'[/\\]')).last;
+        final name = path == null ? null : PathUtils.basename(path);
         return Center(
           child: Padding(
             padding: EdgeInsets.all(layout.pagePadding),
