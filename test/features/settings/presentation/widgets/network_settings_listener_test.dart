@@ -70,6 +70,18 @@ void main() {
     verify(() => network.applyConfig(any())).called(1);
   });
 
+  testWidgets('applies config when the client certificate changes', (tester) async {
+    await pump(tester);
+
+    await tester.runAsync(() async {
+      bloc.add(const UpdateClientCertificate(certPath: '/c.pem', keyPath: '/k.pem'));
+      await bloc.stream.firstWhere((s) => s.settings.clientCertPath == '/c.pem');
+    });
+    await tester.pump();
+
+    verify(() => network.applyConfig(any())).called(1);
+  });
+
   testWidgets('ignores non-network setting changes', (tester) async {
     await pump(tester);
 

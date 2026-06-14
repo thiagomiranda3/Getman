@@ -12,6 +12,7 @@ import 'package:getman/features/cookies/presentation/widgets/cookie_manager_dial
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
+import 'package:getman/features/settings/presentation/widgets/client_certificate_tile.dart';
 
 class SettingsDialog extends StatefulWidget {
   const SettingsDialog({super.key});
@@ -232,6 +233,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     ),
                   ),
                 ),
+                const ClientCertificateTile(),
                 ListTile(
                   leading: Icon(Icons.cookie_outlined, size: layout.iconSize),
                   title: Text('COOKIES',

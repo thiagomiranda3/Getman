@@ -65,6 +65,15 @@ class SettingsModel extends HiveObject {
   @HiveField(18, defaultValue: 5)
   int maxRedirects;
 
+  @HiveField(19)
+  String? clientCertPath;
+
+  @HiveField(20)
+  String? clientKeyPath;
+
+  @HiveField(21)
+  String? clientCertPassphrase;
+
   SettingsModel({
     this.historyLimit = 100,
     this.saveResponseInHistory = false,
@@ -83,6 +92,9 @@ class SettingsModel extends HiveObject {
     this.maxRedirects = 5,
     this.verifySsl = true,
     this.proxyUrl,
+    this.clientCertPath,
+    this.clientKeyPath,
+    this.clientCertPassphrase,
     this.workspacePath,
     this.workspaceBookmark,
   });
@@ -105,6 +117,9 @@ class SettingsModel extends HiveObject {
     int? maxRedirects,
     bool? verifySsl,
     Object? proxyUrl = _unchanged,
+    Object? clientCertPath = _unchanged,
+    Object? clientKeyPath = _unchanged,
+    Object? clientCertPassphrase = _unchanged,
     Object? workspacePath = _unchanged,
     Object? workspaceBookmark = _unchanged,
   }) {
@@ -129,6 +144,13 @@ class SettingsModel extends HiveObject {
       maxRedirects: maxRedirects ?? this.maxRedirects,
       verifySsl: verifySsl ?? this.verifySsl,
       proxyUrl: identical(proxyUrl, _unchanged) ? this.proxyUrl : proxyUrl as String?,
+      clientCertPath:
+          identical(clientCertPath, _unchanged) ? this.clientCertPath : clientCertPath as String?,
+      clientKeyPath:
+          identical(clientKeyPath, _unchanged) ? this.clientKeyPath : clientKeyPath as String?,
+      clientCertPassphrase: identical(clientCertPassphrase, _unchanged)
+          ? this.clientCertPassphrase
+          : clientCertPassphrase as String?,
       workspacePath:
           identical(workspacePath, _unchanged) ? this.workspacePath : workspacePath as String?,
       workspaceBookmark: identical(workspaceBookmark, _unchanged)
@@ -155,6 +177,9 @@ class SettingsModel extends HiveObject {
     'maxRedirects': maxRedirects,
     'verifySsl': verifySsl,
     'proxyUrl': proxyUrl,
+    'clientCertPath': clientCertPath,
+    'clientKeyPath': clientKeyPath,
+    'clientCertPassphrase': clientCertPassphrase,
     'workspacePath': workspacePath,
     'workspaceBookmark': workspaceBookmark,
   };
@@ -177,6 +202,9 @@ class SettingsModel extends HiveObject {
     maxRedirects: json['maxRedirects'] ?? 5,
     verifySsl: json['verifySsl'] ?? true,
     proxyUrl: json['proxyUrl'] as String?,
+    clientCertPath: json['clientCertPath'] as String?,
+    clientKeyPath: json['clientKeyPath'] as String?,
+    clientCertPassphrase: json['clientCertPassphrase'] as String?,
     workspacePath: json['workspacePath'] as String?,
     workspaceBookmark: json['workspaceBookmark'] as String?,
   );
@@ -199,6 +227,9 @@ class SettingsModel extends HiveObject {
     maxRedirects: entity.maxRedirects,
     verifySsl: entity.verifySsl,
     proxyUrl: entity.proxyUrl,
+    clientCertPath: entity.clientCertPath,
+    clientKeyPath: entity.clientKeyPath,
+    clientCertPassphrase: entity.clientCertPassphrase,
     workspacePath: entity.workspacePath,
     workspaceBookmark: entity.workspaceBookmark,
   );
@@ -221,6 +252,9 @@ class SettingsModel extends HiveObject {
     maxRedirects: maxRedirects,
     verifySsl: verifySsl,
     proxyUrl: proxyUrl,
+    clientCertPath: clientCertPath,
+    clientKeyPath: clientKeyPath,
+    clientCertPassphrase: clientCertPassphrase,
     workspacePath: workspacePath,
     workspaceBookmark: workspaceBookmark,
   );

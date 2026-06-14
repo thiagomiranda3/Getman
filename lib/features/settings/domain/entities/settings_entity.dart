@@ -32,6 +32,14 @@ class SettingsEntity extends Equatable {
   final bool verifySsl;
   final String? proxyUrl;
 
+  /// Client certificate for mutual TLS (desktop/mobile only; the web build
+  /// ignores them). PEM cert + PEM key file paths + optional passphrase. The
+  /// passphrase is stored in plaintext in the local settings box, like the
+  /// proxy — acceptable for a local-only app.
+  final String? clientCertPath;
+  final String? clientKeyPath;
+  final String? clientCertPassphrase;
+
   /// Optional on-disk workspace folder for git-friendly collections (desktop
   /// only; `null` means Hive-only, today's behavior).
   final String? workspacePath;
@@ -60,6 +68,9 @@ class SettingsEntity extends Equatable {
     this.maxRedirects = 5,
     this.verifySsl = true,
     this.proxyUrl,
+    this.clientCertPath,
+    this.clientKeyPath,
+    this.clientCertPassphrase,
     this.workspacePath,
     this.workspaceBookmark,
   });
@@ -82,6 +93,9 @@ class SettingsEntity extends Equatable {
     int? maxRedirects,
     bool? verifySsl,
     Object? proxyUrl = _unchanged,
+    Object? clientCertPath = _unchanged,
+    Object? clientKeyPath = _unchanged,
+    Object? clientCertPassphrase = _unchanged,
     Object? workspacePath = _unchanged,
     Object? workspaceBookmark = _unchanged,
   }) {
@@ -106,6 +120,13 @@ class SettingsEntity extends Equatable {
       maxRedirects: maxRedirects ?? this.maxRedirects,
       verifySsl: verifySsl ?? this.verifySsl,
       proxyUrl: identical(proxyUrl, _unchanged) ? this.proxyUrl : proxyUrl as String?,
+      clientCertPath:
+          identical(clientCertPath, _unchanged) ? this.clientCertPath : clientCertPath as String?,
+      clientKeyPath:
+          identical(clientKeyPath, _unchanged) ? this.clientKeyPath : clientKeyPath as String?,
+      clientCertPassphrase: identical(clientCertPassphrase, _unchanged)
+          ? this.clientCertPassphrase
+          : clientCertPassphrase as String?,
       workspacePath:
           identical(workspacePath, _unchanged) ? this.workspacePath : workspacePath as String?,
       workspaceBookmark: identical(workspaceBookmark, _unchanged)
@@ -123,6 +144,9 @@ class SettingsEntity extends Equatable {
         maxRedirects: maxRedirects,
         verifySsl: verifySsl,
         proxyUrl: proxyUrl,
+        clientCertPath: clientCertPath,
+        clientKeyPath: clientKeyPath,
+        clientCertPassphrase: clientCertPassphrase,
       );
 
   @override
@@ -144,6 +168,9 @@ class SettingsEntity extends Equatable {
     maxRedirects,
     verifySsl,
     proxyUrl,
+    clientCertPath,
+    clientKeyPath,
+    clientCertPassphrase,
     workspacePath,
     workspaceBookmark,
   ];

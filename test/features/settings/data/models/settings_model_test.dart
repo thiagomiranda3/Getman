@@ -111,22 +111,64 @@ void main() {
         verifySsl: false,
         proxyUrl: 'p:1',
         workspacePath: '/ws',
+        clientCertPath: '/c.pem',
+        clientKeyPath: '/k.pem',
+        clientCertPassphrase: 'secret',
       );
       final back = SettingsModel.fromEntity(entity).toEntity();
       expect(back.connectTimeoutMs, 5);
       expect(back.verifySsl, isFalse);
       expect(back.proxyUrl, 'p:1');
       expect(back.workspacePath, '/ws');
+      expect(back.clientCertPath, '/c.pem');
+      expect(back.clientKeyPath, '/k.pem');
+      expect(back.clientCertPassphrase, 'secret');
     });
 
-    test('copyWith clears proxyUrl / workspacePath via the sentinel', () {
-      const entity = SettingsEntity(proxyUrl: 'p:1', workspacePath: '/ws');
+    test('json roundtrip preserves the client certificate', () {
+      final model = SettingsModel(
+        clientCertPath: '/c.pem',
+        clientKeyPath: '/k.pem',
+        clientCertPassphrase: 'secret',
+      );
+      final back = SettingsModel.fromJson(model.toJson());
+      expect(back.clientCertPath, '/c.pem');
+      expect(back.clientKeyPath, '/k.pem');
+      expect(back.clientCertPassphrase, 'secret');
+    });
+
+    test('toNetworkConfig maps the client certificate', () {
+      const entity = SettingsEntity(
+        clientCertPath: '/c.pem',
+        clientKeyPath: '/k.pem',
+        clientCertPassphrase: 'secret',
+      );
+      final config = entity.toNetworkConfig();
+      expect(config.clientCertPath, '/c.pem');
+      expect(config.clientKeyPath, '/k.pem');
+      expect(config.clientCertPassphrase, 'secret');
+    });
+
+    test('copyWith clears proxyUrl / workspacePath / cert fields via the sentinel', () {
+      const entity = SettingsEntity(
+        proxyUrl: 'p:1',
+        workspacePath: '/ws',
+        clientCertPath: '/c.pem',
+        clientKeyPath: '/k.pem',
+        clientCertPassphrase: 'secret',
+      );
       expect(entity.copyWith(proxyUrl: null).proxyUrl, isNull);
       expect(entity.copyWith(workspacePath: null).workspacePath, isNull);
+      expect(entity.copyWith(clientCertPath: null).clientCertPath, isNull);
+      expect(entity.copyWith(clientKeyPath: null).clientKeyPath, isNull);
+      expect(entity.copyWith(clientCertPassphrase: null).clientCertPassphrase, isNull);
       // Omitting keeps them.
       final kept = entity.copyWith(verifySsl: false);
       expect(kept.proxyUrl, 'p:1');
       expect(kept.workspacePath, '/ws');
+      expect(kept.clientCertPath, '/c.pem');
+      expect(kept.clientKeyPath, '/k.pem');
+      expect(kept.clientCertPassphrase, 'secret');
     });
   });
 

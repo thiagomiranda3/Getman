@@ -37,6 +37,12 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     on<UpdateMaxRedirects>((e, emit) => _apply(emit, (s) => s.copyWith(maxRedirects: _clampRedirects(e.value))));
     on<UpdateVerifySsl>((e, emit) => _apply(emit, (s) => s.copyWith(verifySsl: e.value)));
     on<UpdateProxyUrl>((e, emit) => _apply(emit, (s) => s.copyWith(proxyUrl: e.url)));
+    // Each cert field is passed explicitly so null clears it (no sentinel).
+    on<UpdateClientCertificate>((e, emit) => _apply(emit, (s) => s.copyWith(
+          clientCertPath: e.certPath,
+          clientKeyPath: e.keyPath,
+          clientCertPassphrase: e.passphrase,
+        )));
     // The bookmark is always set in lockstep with the path (both null on
     // disconnect), so pass it explicitly rather than via the copyWith sentinel.
     on<UpdateWorkspacePath>((e, emit) =>

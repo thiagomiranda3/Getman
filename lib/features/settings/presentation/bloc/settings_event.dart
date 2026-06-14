@@ -119,6 +119,18 @@ class UpdateVerifySsl extends SettingsEvent {
   List<Object?> get props => [value];
 }
 
+/// Replaces the full client-certificate (mTLS) trio. Each field is applied
+/// explicitly (null clears it), so callers send the whole current trio with one
+/// field changed, or all-null to disconnect.
+class UpdateClientCertificate extends SettingsEvent {
+  final String? certPath;
+  final String? keyPath;
+  final String? passphrase;
+  const UpdateClientCertificate({this.certPath, this.keyPath, this.passphrase});
+  @override
+  List<Object?> get props => [certPath, keyPath, passphrase];
+}
+
 class UpdateProxyUrl extends SettingsEvent {
   final String? url;
   const UpdateProxyUrl(this.url);

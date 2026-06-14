@@ -25,7 +25,10 @@ class NetworkSettingsListener extends StatelessWidget {
             a.followRedirects != b.followRedirects ||
             a.maxRedirects != b.maxRedirects ||
             a.verifySsl != b.verifySsl ||
-            a.proxyUrl != b.proxyUrl;
+            a.proxyUrl != b.proxyUrl ||
+            a.clientCertPath != b.clientCertPath ||
+            a.clientKeyPath != b.clientKeyPath ||
+            a.clientCertPassphrase != b.clientCertPassphrase;
       },
       listener: (context, state) =>
           context.read<NetworkService>().applyConfig(state.settings.toNetworkConfig()),
