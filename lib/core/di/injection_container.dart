@@ -96,6 +96,10 @@ Future<SettingsEntity> init() async {
   // Re-key any legacy int-keyed environments by id so per-id put/delete writes
   // overwrite the same logical environment (no-op once keys are strings).
   await EnvironmentsLocalDataSourceImpl.migrateLegacyKeysIfNeeded();
+  // Same for collections: re-key the legacy auto-increment box by root id so
+  // per-root keyed writes overwrite the same logical root (L12). Runs before
+  // collections are first read.
+  await CollectionsLocalDataSourceImpl.migrateLegacyKeysIfNeeded();
 
   final initialSettings = settingsBox.get('current')?.toEntity() ?? const SettingsEntity();
   final initialEnvironments =
