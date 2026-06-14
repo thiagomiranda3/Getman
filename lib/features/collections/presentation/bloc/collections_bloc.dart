@@ -35,6 +35,9 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
     on<RenameNode>(_onRenameNode);
     on<UpdateNodeDescription>(_onUpdateNodeDescription);
     on<ToggleFavorite>(_onToggleFavorite);
+    on<SaveExampleToNode>(_onSaveExampleToNode);
+    on<DeleteExample>(_onDeleteExample);
+    on<RenameExample>(_onRenameExample);
     on<MoveNode>(_onMoveNode);
     on<ImportCollections>(_onImportCollections);
     on<ReplaceCollections>(_onReplaceCollections);
@@ -136,6 +139,21 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
 
   Future<void> _onToggleFavorite(ToggleFavorite event, Emitter<CollectionsState> emit) {
     return _commit(emit, CollectionsTreeHelper.toggleFavoriteInTree(state.collections, event.id));
+  }
+
+  Future<void> _onSaveExampleToNode(SaveExampleToNode event, Emitter<CollectionsState> emit) {
+    if (CollectionsTreeHelper.findNode(state.collections, event.nodeId) == null) return Future.value();
+    return _commit(emit, CollectionsTreeHelper.addExampleToNode(state.collections, event.nodeId, event.example));
+  }
+
+  Future<void> _onDeleteExample(DeleteExample event, Emitter<CollectionsState> emit) {
+    if (CollectionsTreeHelper.findNode(state.collections, event.nodeId) == null) return Future.value();
+    return _commit(emit, CollectionsTreeHelper.removeExampleFromNode(state.collections, event.nodeId, event.exampleId));
+  }
+
+  Future<void> _onRenameExample(RenameExample event, Emitter<CollectionsState> emit) {
+    if (CollectionsTreeHelper.findNode(state.collections, event.nodeId) == null) return Future.value();
+    return _commit(emit, CollectionsTreeHelper.renameExampleInNode(state.collections, event.nodeId, event.exampleId, event.newName));
   }
 
   Future<void> _onMoveNode(MoveNode event, Emitter<CollectionsState> emit) {
