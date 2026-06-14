@@ -147,6 +147,7 @@ class _CollectionsListState extends State<CollectionsList> {
                     ? AnimatedTreeView<CollectionNodeEntity>(
                         treeController: _treeController,
                         nodeBuilder: (context, entry) => _CollectionNodeWidget(
+                          key: ValueKey(entry.node.id),
                           entry: entry,
                           onToggle: () => _treeController.toggleExpansion(entry.node),
                         ),
@@ -159,6 +160,7 @@ class _CollectionsListState extends State<CollectionsList> {
                             treeController: _treeController,
                             nodeBuilder: (context, entry) {
                               return _CollectionNodeWidget(
+                                key: ValueKey(entry.node.id),
                                 entry: entry,
                                 onToggle: () => _treeController.toggleExpansion(entry.node),
                               );
@@ -242,6 +244,7 @@ class _CollectionNodeWidget extends StatefulWidget {
   final VoidCallback onToggle;
 
   const _CollectionNodeWidget({
+    super.key,
     required this.entry,
     required this.onToggle,
   });
