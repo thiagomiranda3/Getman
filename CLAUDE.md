@@ -2,6 +2,11 @@
 
 Getman is a high-performance, aesthetically pleasing HTTP client built with Flutter, featuring a Neo-Brutalist design. Tabbed request UI, collections tree with drag-and-drop, request history, local-only persistence.
 
+> **Open work:** a prioritized, verified backlog of remaining tasks lives in
+> [`docs/BACKLOG.md`](docs/BACKLOG.md) (file paths + evidence + suggested fix +
+> a working agreement per item). Start there to pick up where the last session
+> left off.
+
 ---
 
 ## 1. Tech Stack
