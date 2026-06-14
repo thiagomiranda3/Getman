@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart';
+import 'dart:developer';
+
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/failures.dart';
@@ -67,7 +68,12 @@ class SendRequestUseCase {
     } catch (e, st) {
       // History is best-effort; never fail the request because of persistence —
       // but surface the failure so silent regressions are spotted.
-      debugPrint('SendRequestUseCase: failed to record history: $e\n$st');
+      log(
+        'SendRequestUseCase: failed to record history',
+        name: 'getman.send',
+        error: e,
+        stackTrace: st,
+      );
     }
   }
 }
