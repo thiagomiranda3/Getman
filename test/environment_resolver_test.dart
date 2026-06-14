@@ -75,6 +75,57 @@ void main() {
     });
   });
 
+  group('EnvironmentResolver dynamic variables', () {
+    test('resolves {{\$timestamp}} to unix seconds even with no environment', () {
+      final out = EnvironmentResolver.resolve('{{\$timestamp}}', const {});
+      expect(out, matches(RegExp(r'^\d+$')));
+    });
+
+    test('resolves {{\$isoTimestamp}} to a parseable ISO-8601 instant', () {
+      final out = EnvironmentResolver.resolve('{{\$isoTimestamp}}', const {});
+      expect(() => DateTime.parse(out), returnsNormally);
+      expect(out, contains('T'));
+    });
+
+    test('resolves {{\$randomInt}} to 0..1000', () {
+      final n = int.parse(EnvironmentResolver.resolve('{{\$randomInt}}', const {}));
+      expect(n, inInclusiveRange(0, 1000));
+    });
+
+    test('resolves {{\$guid}} / {{\$randomUUID}} to a v4 UUID', () {
+      final uuidRe = RegExp(
+          r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$');
+      expect(EnvironmentResolver.resolve('{{\$guid}}', const {}), matches(uuidRe));
+      expect(EnvironmentResolver.resolve('{{\$randomUUID}}', const {}), matches(uuidRe));
+    });
+
+    test('each occurrence of {{\$guid}} is independent', () {
+      final out = EnvironmentResolver.resolve('{{\$guid}}|{{\$guid}}', const {});
+      final parts = out.split('|');
+      expect(parts[0], isNot(parts[1]));
+    });
+
+    test('an env variable of the same name wins over a dynamic one', () {
+      expect(EnvironmentResolver.resolve('{{\$timestamp}}', {r'$timestamp': 'pinned'}), 'pinned');
+    });
+
+    test('unknown \$-prefixed names are left verbatim', () {
+      expect(EnvironmentResolver.resolve('{{\$nope}}', const {}), '{{\$nope}}');
+    });
+
+    test('isDynamic recognizes built-ins only', () {
+      expect(EnvironmentResolver.isDynamic(r'$guid'), isTrue);
+      expect(EnvironmentResolver.isDynamic('guid'), isFalse);
+      expect(EnvironmentResolver.isDynamic(r'$nope'), isFalse);
+    });
+
+    test('findVariables captures \$-prefixed names', () {
+      final matches = EnvironmentResolver.findVariables('{{\$timestamp}}').toList();
+      expect(matches, hasLength(1));
+      expect(matches.first.name, r'$timestamp');
+    });
+  });
+
   group('EnvironmentResolver.resolveMap', () {
     test('empty input returns empty map', () {
       expect(EnvironmentResolver.resolveMap(const {}, {'a': '1'}), const <String, String>{});

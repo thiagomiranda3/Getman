@@ -77,7 +77,9 @@ class VariableHighlightController extends TextEditingController {
       if (match.start > cursor) {
         children.add(TextSpan(style: style, text: current.substring(cursor, match.start)));
       }
-      final resolved = _variables.containsKey(match.name);
+      // Built-in dynamic vars ({{$timestamp}}, {{$guid}}, …) always resolve.
+      final resolved = _variables.containsKey(match.name) ||
+          EnvironmentResolver.isDynamic(match.name);
       final highlightStyle = (style ?? const TextStyle()).copyWith(
         color: resolved ? resolvedColor : unresolvedColor,
         fontWeight: FontWeight.w800,
