@@ -7,6 +7,11 @@ Getman is a high-performance, aesthetically pleasing HTTP client built with Flut
 > a working agreement per item). Start there to pick up where the last session
 > left off.
 
+> **User-facing docs:** the feature wiki is published at
+> <https://github.com/thiagomiranda3/Getman/wiki> (source: the separate
+> `Getman.wiki.git` repo). It must be kept in sync with the app — see the
+> **Keep the wiki in sync** mandate in §7 Workflow.
+
 ---
 
 ## 1. Tech Stack
@@ -270,3 +275,4 @@ Verification bar: **`fvm flutter analyze` produces `No issues found!` AND `fvm f
 - **Verify before claiming done**: `fvm flutter analyze` clean + `fvm flutter test` green.
 - **Hive regen is not optional**: after any `@HiveField` or `@HiveType` change, rerun `build_runner`.
 - **Surgical edits**: don't restructure unrelated code. One concern per change.
+- **Keep the wiki in sync**: any change that adds or alters how a feature is *used* — a new feature, a new/renamed setting, a changed keyboard shortcut, a new body/auth/code-gen type, a renamed UI label, changed defaults or limits — must be reflected in the GitHub wiki as part of the same work, not deferred. The wiki is the separate `Getman.wiki.git` repo: clone `https://github.com/thiagomiranda3/Getman.wiki.git`, edit the relevant `*.md` page (one per feature; nav lives in `_Sidebar.md`, and add a page there if you create one), then commit + push (default branch `master`); it serves at <https://github.com/thiagomiranda3/Getman/wiki>. Keep wording accurate to the code (verbatim UI labels). Purely internal refactors with no behavior/usage change don't need a wiki edit. (One-time setup only: a brand-new wiki's `.wiki.git` 404s on clone/push until its first page is created in the web UI — no API exists for that; ours is already initialized.)
