@@ -146,6 +146,8 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -154,8 +156,21 @@ jobs:
       - name: List artifacts
         run: ls -lh artifacts
 
+      - name: Extract changelog notes for this tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" {flag=1; next}
+            /^## \[/ && flag {exit}
+            flag {print}
+          ' CHANGELOG.md > release_notes.md || true
+          if [ ! -s release_notes.md ]; then
+            echo "Release ${GITHUB_REF_NAME}." > release_notes.md
+          fi
+
       - uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          draft: false
+          body_path: release_notes.md
           generate_release_notes: true
           files: artifacts/*
