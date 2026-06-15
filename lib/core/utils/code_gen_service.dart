@@ -10,7 +10,10 @@ import 'package:getman/core/utils/header_utils.dart';
 enum CodeGenTarget {
   curl('cURL'),
   jsFetch('JavaScript — fetch'),
-  pythonRequests('Python — requests');
+  nodeAxios('Node.js — axios'),
+  pythonRequests('Python — requests'),
+  goNetHttp('Go — net/http'),
+  javaOkHttp('Java — OkHttp');
 
   final String label;
   const CodeGenTarget(this.label);
@@ -30,8 +33,14 @@ class CodeGenService {
         return _curl(eff);
       case CodeGenTarget.jsFetch:
         return _fetch(eff);
+      case CodeGenTarget.nodeAxios:
+        return _nodeAxios(eff);
       case CodeGenTarget.pythonRequests:
         return _python(eff);
+      case CodeGenTarget.goNetHttp:
+        return _goNetHttp(eff);
+      case CodeGenTarget.javaOkHttp:
+        return _javaOkHttp(eff);
     }
   }
 
@@ -191,7 +200,190 @@ class CodeGenService {
     return b.toString();
   }
 
+  // ---- Node.js axios ----
+
+  static String _nodeAxios(_Effective e) {
+    final pre = StringBuffer();
+    final opts = StringBuffer();
+    opts.write("  method: '${e.method}',\n");
+    opts.write("  url: '${e.url}',\n");
+
+    final isMultipart = e.bodyType == BodyType.multipart;
+    if (e.headers.isNotEmpty || isMultipart) {
+      opts.write('  headers: {\n');
+      e.headers.forEach((k, v) => opts.write("    '$k': '${_sq(v)}',\n"));
+      // form.getHeaders() carries the multipart boundary content-type.
+      if (isMultipart) opts.write('    ...form.getHeaders(),\n');
+      opts.write('  },\n');
+    }
+
+    switch (e.bodyType) {
+      case BodyType.none:
+        break;
+      case BodyType.raw:
+        if (e.rawBody.isNotEmpty) opts.write('  data: ${_jsString(e.rawBody)},\n');
+      case BodyType.urlencoded:
+        opts.write('  data: new URLSearchParams(${_jsObject(e.formFields)}),\n');
+      case BodyType.multipart:
+        opts.write('  data: form,\n');
+      case BodyType.binary:
+        break;
+    }
+
+    if (isMultipart) {
+      pre.write("const FormData = require('form-data');\n");
+      pre.write('const form = new FormData();\n');
+      for (final f in e.formFields) {
+        if (f.name.isEmpty) continue;
+        if (f.isFile) {
+          pre.write("// form.append('${f.name}', fs.createReadStream('${f.filePath ?? ''}'));\n");
+        } else {
+          pre.write("form.append('${f.name}', '${_sq(f.value)}');\n");
+        }
+      }
+    } else if (e.bodyType == BodyType.binary) {
+      pre.write('// Read the file at ${e.binaryPath ?? ''} (e.g. fs.readFileSync) and set it as `data`.\n');
+    }
+
+    final b = StringBuffer("const axios = require('axios');\n");
+    if (pre.isNotEmpty) {
+      b.write('\n');
+      b.write(pre.toString());
+    }
+    b.write('\nconst options = {\n');
+    b.write(opts.toString());
+    b.write('};\n\n');
+    b.write('axios.request(options)\n');
+    b.write('  .then((res) => console.log(res.data))\n');
+    b.write('  .catch((err) => console.error(err));');
+    return b.toString();
+  }
+
+  // ---- Go net/http ----
+
+  static String _goNetHttp(_Effective e) {
+    final imports = <String>{'fmt', 'io', 'net/http'};
+    final body = StringBuffer();
+    final comments = StringBuffer();
+    var reqBodyArg = 'nil';
+
+    switch (e.bodyType) {
+      case BodyType.none:
+        break;
+      case BodyType.raw:
+        if (e.rawBody.isNotEmpty) {
+          imports.add('strings');
+          body.write('\tpayload := strings.NewReader(${_dqString(e.rawBody)})\n');
+          reqBodyArg = 'payload';
+        }
+      case BodyType.urlencoded:
+        imports.add('strings');
+        body.write('\tpayload := strings.NewReader(${_dqString(_urlEncodedString(e.formFields))})\n');
+        reqBodyArg = 'payload';
+      case BodyType.multipart:
+        comments.write('\t// Build a multipart/form-data body with mime/multipart.Writer (omitted).\n');
+      case BodyType.binary:
+        comments.write('\t// Open the file at ${e.binaryPath ?? ''} and pass it as the request body.\n');
+    }
+
+    final b = StringBuffer('package main\n\n');
+    b.write('import (\n');
+    for (final i in imports.toList()..sort()) {
+      b.write('\t"$i"\n');
+    }
+    b.write(')\n\n');
+    b.write('func main() {\n');
+    b.write('\turl := ${_dqString(e.url)}\n');
+    b.write('\tmethod := "${e.method}"\n\n');
+    if (body.isNotEmpty) {
+      b.write(body.toString());
+      b.write('\n');
+    }
+    if (comments.isNotEmpty) b.write(comments.toString());
+    b.write('\tclient := &http.Client{}\n');
+    b.write('\treq, err := http.NewRequest(method, url, $reqBodyArg)\n');
+    b.write('\tif err != nil {\n\t\tpanic(err)\n\t}\n');
+    e.headers.forEach((k, v) {
+      b.write('\treq.Header.Add(${_dqString(k)}, ${_dqString(v)})\n');
+    });
+    b.write('\n\tres, err := client.Do(req)\n');
+    b.write('\tif err != nil {\n\t\tpanic(err)\n\t}\n');
+    b.write('\tdefer res.Body.Close()\n\n');
+    b.write('\tbody, _ := io.ReadAll(res.Body)\n');
+    b.write('\tfmt.Println(string(body))\n');
+    b.write('}');
+    return b.toString();
+  }
+
+  // ---- Java OkHttp ----
+
+  static String _javaOkHttp(_Effective e) {
+    final b = StringBuffer('OkHttpClient client = new OkHttpClient();\n\n');
+    var bodyExpr = 'null';
+
+    switch (e.bodyType) {
+      case BodyType.none:
+        break;
+      case BodyType.raw:
+        if (e.rawBody.isNotEmpty) {
+          final ct = _contentTypeOf(e.headers, 'application/json');
+          b.write('MediaType mediaType = MediaType.parse(${_dqString(ct)});\n');
+          b.write('RequestBody body = RequestBody.create(${_dqString(e.rawBody)}, mediaType);\n\n');
+          bodyExpr = 'body';
+        }
+      case BodyType.urlencoded:
+        b.write('RequestBody body = new FormBody.Builder()\n');
+        for (final f in e.formFields) {
+          if (f.isFile || f.name.isEmpty) continue;
+          b.write('  .add(${_dqString(f.name)}, ${_dqString(f.value)})\n');
+        }
+        b.write('  .build();\n\n');
+        bodyExpr = 'body';
+      case BodyType.multipart:
+        b.write('RequestBody body = new MultipartBody.Builder().setType(MultipartBody.FORM)\n');
+        for (final f in e.formFields) {
+          if (f.name.isEmpty) continue;
+          if (f.isFile) {
+            b.write('  // .addFormDataPart(${_dqString(f.name)}, "${f.filePath ?? ''}", '
+                'RequestBody.create(new File("${f.filePath ?? ''}"), null))\n');
+          } else {
+            b.write('  .addFormDataPart(${_dqString(f.name)}, ${_dqString(f.value)})\n');
+          }
+        }
+        b.write('  .build();\n\n');
+        bodyExpr = 'body';
+      case BodyType.binary:
+        b.write('// Read the file at ${e.binaryPath ?? ''} into a RequestBody '
+            '(RequestBody.create(new File(...), mediaType)).\n');
+        b.write('RequestBody body = null;\n\n');
+        bodyExpr = 'body';
+    }
+
+    // The body/mediaType carries the content-type for any non-empty body, so
+    // skip a redundant (and for multipart, boundary-less) Content-Type header.
+    final skipContentType = e.bodyType != BodyType.none;
+
+    b.write('Request request = new Request.Builder()\n');
+    b.write('  .url(${_dqString(e.url)})\n');
+    b.write('  .method("${e.method}", $bodyExpr)\n');
+    e.headers.forEach((k, v) {
+      if (skipContentType && k.toLowerCase() == 'content-type') return;
+      b.write('  .addHeader(${_dqString(k)}, ${_dqString(v)})\n');
+    });
+    b.write('  .build();\n\n');
+    b.write('Response response = client.newCall(request).execute();\n');
+    b.write('System.out.println(response.body().string());');
+    return b.toString();
+  }
+
   // ---- helpers ----
+
+  static String _contentTypeOf(Map<String, String> headers, String fallback) {
+    for (final entry in headers.entries) {
+      if (entry.key.toLowerCase() == 'content-type') return entry.value;
+    }
+    return fallback;
+  }
 
   static String _urlEncodedString(List<MultipartFieldEntity> fields) {
     return [
@@ -235,6 +427,16 @@ class CodeGenService {
   /// double-quoted literal (valid Python — so an embedded `'''` can't break
   /// it); single-line uses a simple single-quoted literal.
   static String _pyString(String v) => v.contains('\n') ? jsonEncode(v) : "'${_sq(v)}'";
+
+  /// A double-quoted string literal valid in Go and Java. Multiline payloads use
+  /// a JSON-encoded literal (its escapes are a compatible subset); single-line
+  /// uses a simple double-quoted literal.
+  static String _dqString(String v) => v.contains('\n') ? jsonEncode(v) : '"${_dq(v)}"';
+
+  /// Escapes a value for embedding inside a `"..."` literal (backslash first,
+  /// then newline, then the double quote).
+  static String _dq(String v) =>
+      v.replaceAll('\\', '\\\\').replaceAll('\n', '\\n').replaceAll('"', '\\"');
 
 }
 

@@ -8,9 +8,11 @@ import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/confirm_dialog.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 import 'package:getman/features/collections/presentation/widgets/workspace_settings_tile.dart';
+import 'package:getman/features/cookies/presentation/widgets/cookie_manager_dialog.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
+import 'package:getman/features/settings/presentation/widgets/client_certificate_tile.dart';
 
 class SettingsDialog extends StatefulWidget {
   const SettingsDialog({super.key});
@@ -32,6 +34,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
   late final TextEditingController _connectTimeoutController;
   late final TextEditingController _sendTimeoutController;
   late final TextEditingController _receiveTimeoutController;
+  late final TextEditingController _maxRedirectsController;
   late final TextEditingController _proxyController;
 
   @override
@@ -42,6 +45,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     _connectTimeoutController = TextEditingController(text: s.connectTimeoutMs.toString());
     _sendTimeoutController = TextEditingController(text: s.sendTimeoutMs.toString());
     _receiveTimeoutController = TextEditingController(text: s.receiveTimeoutMs.toString());
+    _maxRedirectsController = TextEditingController(text: s.maxRedirects.toString());
     _proxyController = TextEditingController(text: s.proxyUrl ?? '');
   }
 
@@ -51,6 +55,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     _connectTimeoutController.dispose();
     _sendTimeoutController.dispose();
     _receiveTimeoutController.dispose();
+    _maxRedirectsController.dispose();
     _proxyController.dispose();
     super.dispose();
   }
@@ -190,6 +195,9 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   value: settings.followRedirects,
                   onChanged: (val) => context.read<SettingsBloc>().add(UpdateFollowRedirects(val)),
                 ),
+                if (settings.followRedirects)
+                  _timeoutTile(context, 'MAX REDIRECTS', _maxRedirectsController,
+                      (v) => UpdateMaxRedirects(v)),
                 SwitchListTile(
                   activeThumbColor: theme.colorScheme.secondary,
                   activeTrackColor: theme.primaryColor,
@@ -225,26 +233,36 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     ),
                   ),
                 ),
+                const ClientCertificateTile(),
                 ListTile(
                   leading: Icon(Icons.cookie_outlined, size: layout.iconSize),
                   title: Text('COOKIES',
                       style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight)),
-                  trailing: TextButton(
-                    onPressed: () {
-                      ConfirmDialog.show(
-                        context,
-                        title: 'Clear cookies?',
-                        message: 'Removes every stored cookie from the jar. This cannot be undone.',
-                        confirmLabel: 'CLEAR',
-                        onConfirm: () async {
-                          final messenger = ScaffoldMessenger.of(context);
-                          final store = context.read<CookieStore>();
-                          await store.clear();
-                          showAppSnackBarVia(messenger, 'Cookie jar cleared');
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton(
+                        onPressed: () => CookieManagerDialog.show(context),
+                        child: const Text('MANAGE'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          ConfirmDialog.show(
+                            context,
+                            title: 'Clear cookies?',
+                            message: 'Removes every stored cookie from the jar. This cannot be undone.',
+                            confirmLabel: 'CLEAR',
+                            onConfirm: () async {
+                              final messenger = ScaffoldMessenger.of(context);
+                              final store = context.read<CookieStore>();
+                              await store.clear();
+                              showAppSnackBarVia(messenger, 'Cookie jar cleared');
+                            },
+                          );
                         },
-                      );
-                    },
-                    child: const Text('CLEAR'),
+                        child: const Text('CLEAR'),
+                      ),
+                    ],
                   ),
                 ),
                 const Divider(),

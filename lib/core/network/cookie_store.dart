@@ -12,6 +12,10 @@ abstract class CookieStore {
   /// Snapshot of all stored cookies (for a manager UI).
   List<NetworkCookie> all();
 
+  /// Removes a single [cookie] (matched by its `domain|path|name` key) from
+  /// memory and durable storage. No-op when it is not present.
+  Future<void> remove(NetworkCookie cookie);
+
   /// Removes every cookie from memory and durable storage.
   Future<void> clear();
 }

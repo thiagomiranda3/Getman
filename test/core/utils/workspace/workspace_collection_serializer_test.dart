@@ -4,6 +4,7 @@ import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/utils/workspace/workspace_collection_serializer.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
 
 void main() {
   group('request node', () {
@@ -57,6 +58,23 @@ void main() {
       // Dropped on disk → null after reload.
       expect(c.responseBody, isNull);
       expect(c.statusCode, isNull);
+    });
+
+    test('omits saved examples (local-only, not git-tracked)', () {
+      final withExamples = leaf.copyWith(examples: [
+        SavedExampleEntity(
+          id: 'e1',
+          name: '200 OK',
+          capturedAt: DateTime.utc(2026, 6, 14),
+          config: const HttpRequestConfigEntity(id: 'cfg-1', responseBody: 'SECRET-EXAMPLE'),
+        ),
+      ]);
+      final json = WorkspaceCollectionSerializer.requestToJson(withExamples);
+      expect(json.containsKey('examples'), isFalse);
+      expect(json.toString(), isNot(contains('SECRET-EXAMPLE')));
+
+      final back = WorkspaceCollectionSerializer.requestFromJson(json);
+      expect(back.examples, isEmpty);
     });
   });
 

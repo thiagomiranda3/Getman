@@ -32,8 +32,12 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       sendTimeoutMs: fields[10] == null ? 30000 : fields[10] as int,
       receiveTimeoutMs: fields[11] == null ? 60000 : fields[11] as int,
       followRedirects: fields[12] == null ? true : fields[12] as bool,
+      maxRedirects: fields[18] == null ? 5 : fields[18] as int,
       verifySsl: fields[13] == null ? true : fields[13] as bool,
       proxyUrl: fields[14] as String?,
+      clientCertPath: fields[19] as String?,
+      clientKeyPath: fields[20] as String?,
+      clientCertPassphrase: fields[21] as String?,
       workspacePath: fields[15] as String?,
       workspaceBookmark: fields[16] as String?,
     );
@@ -42,7 +46,7 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
   @override
   void write(BinaryWriter writer, SettingsModel obj) {
     writer
-      ..writeByte(18)
+      ..writeByte(22)
       ..writeByte(0)
       ..write(obj.historyLimit)
       ..writeByte(1)
@@ -78,7 +82,15 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       ..writeByte(16)
       ..write(obj.workspaceBookmark)
       ..writeByte(17)
-      ..write(obj.alwaysPrettifyLargeResponses);
+      ..write(obj.alwaysPrettifyLargeResponses)
+      ..writeByte(18)
+      ..write(obj.maxRedirects)
+      ..writeByte(19)
+      ..write(obj.clientCertPath)
+      ..writeByte(20)
+      ..write(obj.clientKeyPath)
+      ..writeByte(21)
+      ..write(obj.clientCertPassphrase);
   }
 
   @override

@@ -227,6 +227,11 @@ class _StarfieldPainter extends CustomPainter {
     required this.isDark,
   }) : super(repaint: tListenable);
 
+  // Reused across motes/frames — only `.color` changes per draw (the immutable
+  // blur MaskFilter is set once). Allocating per mote per frame was the hot spot.
+  final Paint _glowPaint = Paint()..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+  final Paint _corePaint = Paint();
+
   @override
   void paint(Canvas canvas, Size size) {
     final t = tListenable.value;
@@ -245,13 +250,11 @@ class _StarfieldPainter extends CustomPainter {
       final alphaBase = isDark ? 0.55 : 0.18;
       final color = _colorFor(m.hue).withValues(alpha: alphaBase * twinkle);
 
-      final glow = Paint()
-        ..color = color.withValues(alpha: color.a * 0.6)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
-      canvas.drawCircle(Offset(dx, dy), m.size * 2, glow);
+      _glowPaint.color = color.withValues(alpha: color.a * 0.6);
+      canvas.drawCircle(Offset(dx, dy), m.size * 2, _glowPaint);
 
-      final core = Paint()..color = color;
-      canvas.drawCircle(Offset(dx, dy), m.size, core);
+      _corePaint.color = color;
+      canvas.drawCircle(Offset(dx, dy), m.size, _corePaint);
     }
   }
 

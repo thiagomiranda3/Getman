@@ -5,19 +5,18 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/confirm_dialog.dart';
-import 'package:getman/core/ui/widgets/key_value_list_editor.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
-import 'package:getman/core/utils/equality.dart';
 import 'package:getman/core/utils/json_file_io.dart';
 import 'package:getman/core/utils/postman/postman_environment_mapper.dart';
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
+import 'package:getman/features/environments/presentation/widgets/environment_editor.dart';
+import 'package:getman/features/environments/presentation/widgets/environment_list_tile.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
-import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 
 class EnvironmentsDialog extends StatefulWidget {
   const EnvironmentsDialog({super.key});
@@ -101,7 +100,7 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
                         ),
                       ),
                     )
-                  : _EnvironmentEditor(key: ValueKey(selected.id), environment: selected),
+                  : EnvironmentEditor(key: ValueKey(selected.id), environment: selected),
             ),
           ],
         ),
@@ -147,7 +146,7 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
           child: showDetail
               ? Padding(
                   padding: EdgeInsets.all(context.appLayout.pagePadding),
-                  child: _EnvironmentEditor(key: ValueKey(selected.id), environment: selected),
+                  child: EnvironmentEditor(key: ValueKey(selected.id), environment: selected),
                 )
               : Padding(
                   padding: EdgeInsets.all(context.appLayout.pagePadding),
@@ -228,7 +227,7 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
                     itemBuilder: (context, index) {
                       final env = environments[index];
                       final isSelected = env.id == _selectedId;
-                      return _EnvironmentListTile(
+                      return EnvironmentListTile(
                         environment: env,
                         isSelected: isSelected,
                         onTap: () => onItemTap(env),
@@ -308,155 +307,6 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
       jsonString: PostmanEnvironmentMapper.toJsonAll(envs),
       fileName: 'environments.postman_environments.json',
       dialogTitle: 'EXPORT ALL ENVIRONMENTS',
-    );
-  }
-}
-
-class _EnvironmentListTile extends StatelessWidget {
-  final EnvironmentEntity environment;
-  final bool isSelected;
-  final VoidCallback onTap;
-  final VoidCallback onDelete;
-  final VoidCallback onExport;
-
-  const _EnvironmentListTile({
-    required this.environment,
-    required this.isSelected,
-    required this.onTap,
-    required this.onDelete,
-    required this.onExport,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final layout = context.appLayout;
-    return BlocBuilder<SettingsBloc, SettingsState>(
-      buildWhen: (p, n) => p.settings.activeEnvironmentId != n.settings.activeEnvironmentId,
-      builder: (context, settingsState) {
-        final isActive = settingsState.settings.activeEnvironmentId == environment.id;
-        return InkWell(
-          onTap: onTap,
-          child: Container(
-            color: isSelected ? theme.primaryColor.withValues(alpha: 0.3) : null,
-            padding: EdgeInsets.symmetric(
-              horizontal: layout.inputPadding,
-              vertical: layout.inputPaddingVertical,
-            ),
-            child: Row(
-              children: [
-                if (isActive)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: Icon(Icons.check_circle, size: layout.smallIconSize, color: theme.colorScheme.secondary),
-                  ),
-                Expanded(
-                  child: Text(
-                    environment.name,
-                    style: TextStyle(
-                      fontSize: layout.fontSizeNormal,
-                      fontWeight: isActive
-                          ? context.appTypography.titleWeight
-                          : context.appTypography.bodyWeight,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                IconButton(
-                  iconSize: layout.smallIconSize,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  icon: Icon(Icons.file_download, color: theme.colorScheme.onSurface),
-                  tooltip: 'Export environment',
-                  onPressed: onExport,
-                ),
-                SizedBox(width: layout.tabSpacing),
-                IconButton(
-                  iconSize: layout.smallIconSize,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
-                  tooltip: 'Delete environment',
-                  onPressed: onDelete,
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _EnvironmentEditor extends StatefulWidget {
-  final EnvironmentEntity environment;
-  const _EnvironmentEditor({super.key, required this.environment});
-
-  @override
-  State<_EnvironmentEditor> createState() => _EnvironmentEditorState();
-}
-
-class _EnvironmentEditorState extends State<_EnvironmentEditor> {
-  late final TextEditingController _nameController;
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController = TextEditingController(text: widget.environment.name);
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
-  }
-
-  void _emit({Map<String, String>? variables}) {
-    context.read<EnvironmentsBloc>().add(UpdateEnvironment(
-      widget.environment.copyWith(
-        name: _nameController.text,
-        variables: variables ?? widget.environment.variables,
-      ),
-    ));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final layout = context.appLayout;
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          controller: _nameController,
-          decoration: const InputDecoration(labelText: 'NAME'),
-          style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.titleWeight),
-          onChanged: (_) => _emit(),
-        ),
-        SizedBox(height: layout.sectionSpacing),
-        Text(
-          'VARIABLES',
-          style: TextStyle(
-            fontSize: layout.fontSizeNormal,
-            fontWeight: context.appTypography.titleWeight,
-            color: theme.colorScheme.onSurface,
-          ),
-        ),
-        SizedBox(height: layout.tabSpacing),
-        Expanded(
-          child: KeyValueListEditor<Map<String, String>>(
-            items: widget.environment.variables,
-            decode: (variables) => [for (final e in variables.entries) (e.key, e.value)],
-            encode: (rows) => {
-              for (final (key, value) in rows)
-                if (key.trim().isNotEmpty) key.trim(): value,
-            },
-            equals: stringMapEquality.equals,
-            onChanged: (variables) => _emit(variables: variables),
-          ),
-        ),
-      ],
     );
   }
 }

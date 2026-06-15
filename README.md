@@ -34,15 +34,16 @@ dialog — they all share the same engine.
   method, URL, headers, params, body, and response. Tabs persist across
   restarts (debounced saves, no surprise data loss).
 - **Collections tree** with drag-and-drop reordering, folders, favorites,
-  rename/delete, and per-node "save" to snapshot the current tab's
-  request.
+  rename/delete, free-text descriptions per folder or request, and per-node
+  "save" to snapshot the current tab's request.
 - **Request history** with automatic dedup by method + URL + body, a
   configurable size limit, and newest-first ordering.
 - **Environments.** Define named variable sets (`API_HOST`, `TOKEN`, …) and
   reference them anywhere — URL, query params, headers, or body — with
   `{{var}}` syntax. The URL bar highlights each token live (green for
   resolved, red for unknown). The active environment is one click away in
-  the top bar.
+  the top bar. Flag any variable as **secret** to mask its value in the
+  editor (with a reveal toggle) and redact it on export.
 - **Postman import / export.** Bring your existing `.json` collections in,
   or export Getman collections to share with teammates who still use
   Postman.
@@ -52,13 +53,15 @@ dialog — they all share the same engine.
   resolved with `{{variables}}` at send time.
 - **Request bodies.** Raw, `x-www-form-urlencoded`, `multipart/form-data`
   with file uploads, and binary.
-- **Code generation.** Export any request as cURL, JavaScript `fetch`, or
-  Python `requests` — `{{variables}}` left intact.
+- **Code generation.** Export any request as cURL, JavaScript `fetch`,
+  Node.js `axios`, Python `requests`, Go `net/http`, or Java OkHttp —
+  `{{variables}}` left intact.
 - **No-code tests & chaining.** Capture a value from one response (JSONPath,
   header, or regex) into an environment variable, and assert on status,
   time, body, or headers — all without writing a script.
 - **Persistent cookie jar.** Per-domain cookies are sent automatically on
-  later requests, so session-based auth just works.
+  later requests, so session-based auth just works — with a manager dialog
+  to inspect and delete individual cookies (grouped by domain).
 - **Git-friendly workspace (desktop).** Mirror collections to a folder of
   readable JSON files you can commit and review in PRs.
 - **Command palette.** `Cmd/Ctrl+K` to jump to any saved request, switch
@@ -68,14 +71,16 @@ dialog — they all share the same engine.
   and proxy — all in Settings.
 - **JSON editor, not a textarea.** Request and response bodies use
   `re_editor` with syntax highlighting, a built-in find panel, and a
-  one-keystroke beautifier (Ctrl/Cmd+B).
+  one-keystroke beautifier (Ctrl/Cmd+B). Copy the response or save it
+  straight to a file.
 - **Cancel in-flight requests.** Long-running call? Hit cancel — the Dio
   client is torn down cleanly and no stale response arrives five minutes
   later.
 - **Three themes.** Brutalist, Editorial, Arcane Quest — swap live without
   a restart. Compact mode tightens spacing on smaller displays.
-- **Keyboard-driven.** Send, save, beautify, close, and open tabs without
-  leaving the home row.
+- **Keyboard-driven.** Send, save, beautify, open/close tabs, switch
+  between tabs (Ctrl+Tab or Cmd/Ctrl+1–9), and jump to the URL bar — all
+  without leaving the home row.
 - **Local-first, private.** No accounts, no cloud, no telemetry. All data
   lives in a Hive store in your app-data directory.
 
@@ -97,13 +102,17 @@ Windows: click "More info" → "Run anyway".
 
 ## Keyboard shortcuts
 
-| Action             | macOS          | Windows / Linux |
-|--------------------|----------------|-----------------|
-| New tab            | `Cmd + N`      | `Ctrl + N`      |
-| Close current tab  | `Cmd + W`      | `Ctrl + W`      |
-| Send request       | `Cmd + Enter`  | `Ctrl + Enter`  |
-| Save to collection | `Cmd + S`      | `Ctrl + S`      |
-| Beautify JSON body | `Cmd + B`      | `Ctrl + B`      |
+| Action             | macOS                | Windows / Linux       |
+|--------------------|----------------------|-----------------------|
+| New tab            | `Cmd + N`            | `Ctrl + N`            |
+| Close current tab  | `Cmd + W`            | `Ctrl + W`            |
+| Send request       | `Cmd + Enter`        | `Ctrl + Enter`        |
+| Save to collection | `Cmd + S`            | `Ctrl + S`            |
+| Beautify JSON body | `Cmd + B`            | `Ctrl + B`            |
+| Command palette    | `Cmd + K`            | `Ctrl + K`            |
+| Focus URL bar      | `Cmd + L`            | `Ctrl + L`            |
+| Next / previous tab| `Ctrl + Tab` / `+Shift` | `Ctrl + Tab` / `+Shift` |
+| Jump to tab 1–9    | `Cmd + 1…9`          | `Ctrl + 1…9`          |
 
 ## Running from source
 

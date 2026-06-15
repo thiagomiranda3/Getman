@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/network/http_response.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 
 abstract class TabsEvent extends Equatable {
@@ -16,9 +17,13 @@ class AddTab extends TabsEvent {
   final HttpRequestConfigEntity? config;
   final String? collectionNodeId;
   final String? collectionName;
-  const AddTab({this.config, this.collectionNodeId, this.collectionName});
+
+  /// Pre-populates the new tab's response pane — used when opening a saved
+  /// example so its captured response shows immediately. Null for a fresh tab.
+  final HttpResponseEntity? response;
+  const AddTab({this.config, this.collectionNodeId, this.collectionName, this.response});
   @override
-  List<Object?> get props => [config, collectionNodeId, collectionName];
+  List<Object?> get props => [config, collectionNodeId, collectionName, response];
 }
 
 class RemoveTab extends TabsEvent {

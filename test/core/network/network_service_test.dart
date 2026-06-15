@@ -10,11 +10,13 @@ void main() {
         sendTimeoutMs: 2000,
         receiveTimeoutMs: 3000,
         followRedirects: false,
+        maxRedirects: 2,
       ));
       expect(dio.options.connectTimeout, const Duration(milliseconds: 1000));
       expect(dio.options.sendTimeout, const Duration(milliseconds: 2000));
       expect(dio.options.receiveTimeout, const Duration(milliseconds: 3000));
       expect(dio.options.followRedirects, isFalse);
+      expect(dio.options.maxRedirects, 2);
     });
 
     test('defaults preserve the prior hardcoded timeouts', () {
@@ -23,6 +25,7 @@ void main() {
       expect(dio.options.sendTimeout, const Duration(seconds: 30));
       expect(dio.options.receiveTimeout, const Duration(seconds: 60));
       expect(dio.options.followRedirects, isTrue);
+      expect(dio.options.maxRedirects, 5);
     });
   });
 
@@ -34,10 +37,12 @@ void main() {
       connectTimeoutMs: 5000,
       receiveTimeoutMs: 7000,
       followRedirects: false,
+      maxRedirects: 1,
     ));
 
     expect(dio.options.connectTimeout, const Duration(milliseconds: 5000));
     expect(dio.options.receiveTimeout, const Duration(milliseconds: 7000));
     expect(dio.options.followRedirects, isFalse);
+    expect(dio.options.maxRedirects, 1);
   });
 }

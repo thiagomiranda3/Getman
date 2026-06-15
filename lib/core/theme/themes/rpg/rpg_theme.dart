@@ -24,6 +24,7 @@ ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
     buttonRadius: 6,
     inputRadius: 4,
     dialogRadius: 10,
+    sheetRadius: 12,
   );
 
   // Fonts: Cinzel Decorative for display, Spectral for body, Fira Code for code.

@@ -44,14 +44,17 @@ class PostmanEnvironmentMapper {
   }
 
   static Map<String, dynamic> _envToMap(EnvironmentEntity env) {
-    final values = env.variables.entries
-        .map((e) => {
-              'key': e.key,
-              'value': e.value,
-              'type': 'default',
-              'enabled': true,
-            })
-        .toList();
+    final values = env.variables.entries.map((e) {
+      // Secret values are masked on export (matches Postman's shared-export
+      // behavior) and tagged `secret` rather than `default`.
+      final isSecret = env.secretKeys.contains(e.key);
+      return {
+        'key': e.key,
+        'value': isSecret ? '' : e.value,
+        'type': isSecret ? 'secret' : 'default',
+        'enabled': true,
+      };
+    }).toList();
     return {
       'id': _uuid.v4(),
       'name': env.name,

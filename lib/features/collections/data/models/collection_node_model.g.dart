@@ -23,13 +23,15 @@ class CollectionNodeAdapter extends TypeAdapter<CollectionNode> {
       children: (fields[3] as List?)?.cast<CollectionNode>(),
       config: fields[4] as HttpRequestConfig?,
       isFavorite: fields[5] as bool,
+      description: fields[6] as String?,
+      examples: (fields[7] as List?)?.cast<SavedExampleModel>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, CollectionNode obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -41,7 +43,11 @@ class CollectionNodeAdapter extends TypeAdapter<CollectionNode> {
       ..writeByte(4)
       ..write(obj.config)
       ..writeByte(5)
-      ..write(obj.isFavorite);
+      ..write(obj.isFavorite)
+      ..writeByte(6)
+      ..write(obj.description)
+      ..writeByte(7)
+      ..write(obj.examples);
   }
 
   @override

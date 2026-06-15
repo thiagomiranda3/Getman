@@ -15,7 +15,7 @@ ThemeData brutalistTheme(Brightness brightness, {bool isCompact = false}) {
   final Color currentSecondary = isDark ? BrutalistPalette.secondaryDark : BrutalistPalette.secondary;
 
   final AppLayout layout = isCompact ? AppLayout.compact : AppLayout.normal;
-  const AppShape shape = AppShape(panelRadius: 4, buttonRadius: 4, inputRadius: 4, dialogRadius: 8);
+  const AppShape shape = AppShape(panelRadius: 4, buttonRadius: 4, inputRadius: 4, dialogRadius: 8, sheetRadius: 12);
 
   final lexend = GoogleFonts.lexendTextTheme();
   final baseTextTheme = lexend.apply(bodyColor: text, displayColor: text).copyWith(

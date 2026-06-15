@@ -25,8 +25,8 @@ class TabSwitcherSheet extends StatelessWidget {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(context.appShape.sheetRadius)),
       ),
       builder: (sheetContext) => BlocProvider.value(
         value: tabsBloc,

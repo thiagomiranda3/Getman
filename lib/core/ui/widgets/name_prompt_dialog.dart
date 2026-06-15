@@ -13,6 +13,13 @@ class NamePromptDialog extends StatefulWidget {
   final String cancelLabel;
   final ValueChanged<String> onConfirm;
 
+  /// When true, an empty value is allowed (confirm stays enabled) — used by
+  /// free-text fields like a description that can legitimately be cleared.
+  final bool allowEmpty;
+
+  /// When true, the field grows to multiple lines (notes / descriptions).
+  final bool multiline;
+
   const NamePromptDialog({
     super.key,
     required this.title,
@@ -21,6 +28,8 @@ class NamePromptDialog extends StatefulWidget {
     this.hintText,
     this.confirmLabel = 'SAVE',
     this.cancelLabel = 'CANCEL',
+    this.allowEmpty = false,
+    this.multiline = false,
   });
 
   /// Convenience wrapper around [showDialog] that builds a [NamePromptDialog].
@@ -32,6 +41,8 @@ class NamePromptDialog extends StatefulWidget {
     String? hintText,
     String confirmLabel = 'SAVE',
     String cancelLabel = 'CANCEL',
+    bool allowEmpty = false,
+    bool multiline = false,
   }) {
     return showResponsiveDialog<void>(
       context,
@@ -41,6 +52,8 @@ class NamePromptDialog extends StatefulWidget {
         hintText: hintText,
         confirmLabel: confirmLabel,
         cancelLabel: cancelLabel,
+        allowEmpty: allowEmpty,
+        multiline: multiline,
         onConfirm: onConfirm,
       ),
     );
@@ -67,7 +80,7 @@ class _NamePromptDialogState extends State<NamePromptDialog> {
 
   void _submit() {
     final value = _controller.text;
-    if (value.trim().isEmpty) return; // matches the disabled-confirm guard
+    if (!widget.allowEmpty && value.trim().isEmpty) return; // matches the disabled-confirm guard
     Navigator.pop(context);
     widget.onConfirm(value);
   }
@@ -79,18 +92,23 @@ class _NamePromptDialogState extends State<NamePromptDialog> {
       content: TextField(
         controller: _controller,
         autofocus: true,
+        minLines: widget.multiline ? 3 : 1,
+        maxLines: widget.multiline ? 6 : 1,
+        keyboardType: widget.multiline ? TextInputType.multiline : null,
         decoration: widget.hintText == null
             ? null
             : InputDecoration(hintText: widget.hintText),
-        onSubmitted: (_) => _submit(),
+        // Multiline fields use Enter for newlines; submit via the button.
+        onSubmitted: widget.multiline ? null : (_) => _submit(),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(widget.cancelLabel)),
-        // Disable confirm while the field is empty so the no-op isn't silent.
+        // Disable confirm while the field is empty so the no-op isn't silent
+        // (unless empty is explicitly allowed, e.g. clearing a description).
         ValueListenableBuilder<TextEditingValue>(
           valueListenable: _controller,
           builder: (context, value, _) => TextButton(
-            onPressed: value.text.trim().isEmpty ? null : _submit,
+            onPressed: (!widget.allowEmpty && value.text.trim().isEmpty) ? null : _submit,
             child: Text(widget.confirmLabel),
           ),
         ),

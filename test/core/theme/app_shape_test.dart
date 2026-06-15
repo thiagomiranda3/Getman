@@ -3,8 +3,8 @@ import 'package:getman/core/theme/app_theme.dart';
 
 void main() {
   group('AppShape', () {
-    const a = AppShape(panelRadius: 4, buttonRadius: 4, inputRadius: 4, dialogRadius: 8);
-    const b = AppShape(panelRadius: 12, buttonRadius: 12, inputRadius: 12, dialogRadius: 20);
+    const a = AppShape(panelRadius: 4, buttonRadius: 4, inputRadius: 4, dialogRadius: 8, sheetRadius: 10);
+    const b = AppShape(panelRadius: 12, buttonRadius: 12, inputRadius: 12, dialogRadius: 20, sheetRadius: 30);
 
     test('copyWith preserves non-overridden fields', () {
       final copy = a.copyWith(panelRadius: 99);
@@ -12,6 +12,7 @@ void main() {
       expect(copy.buttonRadius, 4);
       expect(copy.inputRadius, 4);
       expect(copy.dialogRadius, 8);
+      expect(copy.sheetRadius, 10);
     });
 
     test('lerp interpolates radii', () {
@@ -20,6 +21,7 @@ void main() {
       expect(mid.buttonRadius, 8);
       expect(mid.inputRadius, 8);
       expect(mid.dialogRadius, 14);
+      expect(mid.sheetRadius, 20);
     });
 
     test('lerp with wrong type returns this', () {

@@ -31,11 +31,19 @@ class NetworkService {
       sendTimeout: Duration(milliseconds: config.sendTimeoutMs),
       receiveTimeout: Duration(milliseconds: config.receiveTimeoutMs),
       followRedirects: config.followRedirects,
+      maxRedirects: config.maxRedirects,
       validateStatus: (_) => true,
       listFormat: ListFormat.multi,
       responseType: ResponseType.plain,
     ));
-    configureHttpAdapter(dio, verifySsl: config.verifySsl, proxyUrl: config.proxyUrl);
+    configureHttpAdapter(
+      dio,
+      verifySsl: config.verifySsl,
+      proxyUrl: config.proxyUrl,
+      clientCertPath: config.clientCertPath,
+      clientKeyPath: config.clientKeyPath,
+      clientCertPassphrase: config.clientCertPassphrase,
+    );
     if (cookieInterceptor != null) dio.interceptors.add(cookieInterceptor);
     // No dio LogInterceptor: it dumps a verbose *** Request *** / *** Response ***
     // block to the console on every send (and its onResponse prints regardless
@@ -45,15 +53,23 @@ class NetworkService {
   }
 
   /// Re-applies [config] to the live client without rebuilding it: timeouts and
-  /// follow-redirects are mutated on [BaseOptions]; SSL/proxy swap the adapter.
-  /// Interceptors (e.g. the cookie jar) are preserved.
+  /// follow/max-redirects are mutated on [BaseOptions]; SSL/proxy/client-cert
+  /// swap the adapter. Interceptors (e.g. the cookie jar) are preserved.
   void applyConfig(NetworkConfig config) {
     _dio.options
       ..connectTimeout = Duration(milliseconds: config.connectTimeoutMs)
       ..sendTimeout = Duration(milliseconds: config.sendTimeoutMs)
       ..receiveTimeout = Duration(milliseconds: config.receiveTimeoutMs)
-      ..followRedirects = config.followRedirects;
-    configureHttpAdapter(_dio, verifySsl: config.verifySsl, proxyUrl: config.proxyUrl);
+      ..followRedirects = config.followRedirects
+      ..maxRedirects = config.maxRedirects;
+    configureHttpAdapter(
+      _dio,
+      verifySsl: config.verifySsl,
+      proxyUrl: config.proxyUrl,
+      clientCertPath: config.clientCertPath,
+      clientKeyPath: config.clientKeyPath,
+      clientCertPassphrase: config.clientCertPassphrase,
+    );
   }
 
   Future<HttpResponseEntity> request({

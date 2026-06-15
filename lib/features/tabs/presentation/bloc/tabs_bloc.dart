@@ -191,6 +191,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       config: event.config ?? HttpRequestConfigEntity(id: _uuid.v4()),
       collectionNodeId: event.collectionNodeId,
       collectionName: event.collectionName,
+      response: event.response,
     );
 
     emit(state.copyWith(

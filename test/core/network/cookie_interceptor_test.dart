@@ -20,6 +20,8 @@ class _FakeStore implements CookieStore {
   @override
   List<NetworkCookie> all() => const [];
   @override
+  Future<void> remove(NetworkCookie cookie) async {}
+  @override
   Future<void> clear() async {}
 }
 

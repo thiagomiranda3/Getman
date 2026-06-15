@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
 
 abstract class CollectionsEvent extends Equatable {
   const CollectionsEvent();
@@ -52,11 +53,48 @@ class RenameNode extends CollectionsEvent {
   List<Object?> get props => [id, newName];
 }
 
+/// Sets the free-text description on a node. An empty string clears it.
+class UpdateNodeDescription extends CollectionsEvent {
+  final String id;
+  final String description;
+  const UpdateNodeDescription(this.id, this.description);
+  @override
+  List<Object?> get props => [id, description];
+}
+
 class ToggleFavorite extends CollectionsEvent {
   final String id;
   const ToggleFavorite(this.id);
   @override
   List<Object?> get props => [id];
+}
+
+/// Appends a saved request+response snapshot to a leaf (request) node.
+class SaveExampleToNode extends CollectionsEvent {
+  final String nodeId;
+  final SavedExampleEntity example;
+  const SaveExampleToNode(this.nodeId, this.example);
+  @override
+  List<Object?> get props => [nodeId, example];
+}
+
+/// Removes a saved example from a node.
+class DeleteExample extends CollectionsEvent {
+  final String nodeId;
+  final String exampleId;
+  const DeleteExample(this.nodeId, this.exampleId);
+  @override
+  List<Object?> get props => [nodeId, exampleId];
+}
+
+/// Renames a saved example.
+class RenameExample extends CollectionsEvent {
+  final String nodeId;
+  final String exampleId;
+  final String newName;
+  const RenameExample(this.nodeId, this.exampleId, this.newName);
+  @override
+  List<Object?> get props => [nodeId, exampleId, newName];
 }
 
 class MoveNode extends CollectionsEvent {

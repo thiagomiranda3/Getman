@@ -6,23 +6,30 @@ class EnvironmentEntity extends Equatable {
   final String name;
   final Map<String, String> variables;
 
+  /// Names of variables flagged secret: rendered masked in the editor and
+  /// masked on export. Resolution at send time is unaffected.
+  final Set<String> secretKeys;
+
   EnvironmentEntity({
     String? id,
     required this.name,
     this.variables = const {},
+    this.secretKeys = const {},
   }) : id = id ?? const Uuid().v4();
 
   EnvironmentEntity copyWith({
     String? name,
     Map<String, String>? variables,
+    Set<String>? secretKeys,
   }) {
     return EnvironmentEntity(
       id: id,
       name: name ?? this.name,
       variables: variables ?? this.variables,
+      secretKeys: secretKeys ?? this.secretKeys,
     );
   }
 
   @override
-  List<Object?> get props => [id, name, variables];
+  List<Object?> get props => [id, name, variables, secretKeys];
 }

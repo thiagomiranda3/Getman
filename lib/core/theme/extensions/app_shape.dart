@@ -6,11 +6,15 @@ class AppShape extends ThemeExtension<AppShape> {
   final double inputRadius;
   final double dialogRadius;
 
+  /// Top-corner radius for modal bottom sheets (action sheets, tab switcher).
+  final double sheetRadius;
+
   const AppShape({
     required this.panelRadius,
     required this.buttonRadius,
     required this.inputRadius,
     required this.dialogRadius,
+    required this.sheetRadius,
   });
 
   @override
@@ -19,12 +23,14 @@ class AppShape extends ThemeExtension<AppShape> {
     double? buttonRadius,
     double? inputRadius,
     double? dialogRadius,
+    double? sheetRadius,
   }) {
     return AppShape(
       panelRadius: panelRadius ?? this.panelRadius,
       buttonRadius: buttonRadius ?? this.buttonRadius,
       inputRadius: inputRadius ?? this.inputRadius,
       dialogRadius: dialogRadius ?? this.dialogRadius,
+      sheetRadius: sheetRadius ?? this.sheetRadius,
     );
   }
 
@@ -37,6 +43,7 @@ class AppShape extends ThemeExtension<AppShape> {
       buttonRadius: l(buttonRadius, other.buttonRadius),
       inputRadius: l(inputRadius, other.inputRadius),
       dialogRadius: l(dialogRadius, other.dialogRadius),
+      sheetRadius: l(sheetRadius, other.sheetRadius),
     );
   }
 }

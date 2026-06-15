@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/di/injection_container.dart' as di;
 import 'package:getman/core/navigation/app_router.dart';
 import 'package:getman/core/navigation/intents.dart';
+import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -71,6 +72,46 @@ Future<SettingsEntity> _resumeWorkspaceAccess(SettingsEntity settings) async {
   return settings;
 }
 
+/// Digit keys for Cmd/Ctrl+1..9 → jump-to-tab (index 0..8).
+const List<LogicalKeyboardKey> _tabDigitKeys = [
+  LogicalKeyboardKey.digit1,
+  LogicalKeyboardKey.digit2,
+  LogicalKeyboardKey.digit3,
+  LogicalKeyboardKey.digit4,
+  LogicalKeyboardKey.digit5,
+  LogicalKeyboardKey.digit6,
+  LogicalKeyboardKey.digit7,
+  LogicalKeyboardKey.digit8,
+  LogicalKeyboardKey.digit9,
+];
+
+/// Global keyboard shortcuts. Built once (not const) so the Cmd/Ctrl+1..9
+/// jump-to-tab bindings can be generated in a loop. Actions are resolved at the
+/// root (new tab / command palette) and in `MainScreen` (tab/send/save/focus).
+@visibleForTesting
+final Map<ShortcutActivator, Intent> appShortcuts = {
+  const SingleActivator(LogicalKeyboardKey.keyN, control: true): const NewTabIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyN, meta: true): const NewTabIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyW, control: true): const CloseTabIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyW, meta: true): const CloseTabIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyS, control: true): const SaveRequestIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyS, meta: true): const SaveRequestIntent(),
+  const SingleActivator(LogicalKeyboardKey.enter, control: true): const SendRequestIntent(),
+  const SingleActivator(LogicalKeyboardKey.enter, meta: true): const SendRequestIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyB, control: true): const BeautifyJsonIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyB, meta: true): const BeautifyJsonIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyK, control: true): const CommandPaletteIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyK, meta: true): const CommandPaletteIntent(),
+  const SingleActivator(LogicalKeyboardKey.tab, control: true): const NextTabIntent(),
+  const SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true): const PrevTabIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyL, control: true): const FocusUrlIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyL, meta: true): const FocusUrlIntent(),
+  for (var i = 0; i < _tabDigitKeys.length; i++) ...{
+    SingleActivator(_tabDigitKeys[i], meta: true): JumpToTabIntent(i),
+    SingleActivator(_tabDigitKeys[i], control: true): JumpToTabIntent(i),
+  },
+};
+
 class MyApp extends StatelessWidget {
   final SettingsEntity initialSettings;
   const MyApp({super.key, required this.initialSettings});
@@ -80,6 +121,7 @@ class MyApp extends StatelessWidget {
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<TabDirtyChecker>.value(value: di.sl<TabDirtyChecker>()),
+        RepositoryProvider<UrlFocusRegistry>.value(value: di.sl<UrlFocusRegistry>()),
         RepositoryProvider<NetworkService>.value(value: di.sl<NetworkService>()),
         RepositoryProvider<CookieStore>.value(value: di.sl<CookieStore>()),
         RepositoryProvider<WorkspaceSyncService>.value(value: di.sl<WorkspaceSyncService>()),
@@ -107,20 +149,7 @@ class MyApp extends StatelessWidget {
         builder: (context, state) {
           final settings = state.settings;
           return Shortcuts(
-            shortcuts: const <ShortcutActivator, Intent>{
-              SingleActivator(LogicalKeyboardKey.keyN, control: true): NewTabIntent(),
-              SingleActivator(LogicalKeyboardKey.keyN, meta: true): NewTabIntent(),
-              SingleActivator(LogicalKeyboardKey.keyW, control: true): CloseTabIntent(),
-              SingleActivator(LogicalKeyboardKey.keyW, meta: true): CloseTabIntent(),
-              SingleActivator(LogicalKeyboardKey.keyS, control: true): SaveRequestIntent(),
-              SingleActivator(LogicalKeyboardKey.keyS, meta: true): SaveRequestIntent(),
-              SingleActivator(LogicalKeyboardKey.enter, control: true): SendRequestIntent(),
-              SingleActivator(LogicalKeyboardKey.enter, meta: true): SendRequestIntent(),
-              SingleActivator(LogicalKeyboardKey.keyB, control: true): BeautifyJsonIntent(),
-              SingleActivator(LogicalKeyboardKey.keyB, meta: true): BeautifyJsonIntent(),
-              SingleActivator(LogicalKeyboardKey.keyK, control: true): CommandPaletteIntent(),
-              SingleActivator(LogicalKeyboardKey.keyK, meta: true): CommandPaletteIntent(),
-            },
+            shortcuts: appShortcuts,
             child: Actions(
               actions: <Type, Action<Intent>>{
                 NewTabIntent: CallbackAction<NewTabIntent>(

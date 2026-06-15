@@ -107,4 +107,109 @@ void main() {
     expect(find.text('Authorization'), findsOneWidget);
     expect(find.text('Bearer x'), findsOneWidget);
   });
+
+  group('secret keys', () {
+    testWidgets('no lock toggle when secretKeys is null (params/headers mode)', (tester) async {
+      await pump(tester, const _EchoHarness(initial: {'Accept': '*/*'}));
+      expect(find.byIcon(Icons.lock_open_outlined), findsNothing);
+      expect(find.byIcon(Icons.lock_outline), findsNothing);
+    });
+
+    testWidgets('a secret variable obscures its value and offers a reveal toggle', (tester) async {
+      await pump(tester, const _SecretHarness(
+        initialVars: {'TOKEN': 'abc123'},
+        initialSecrets: {'TOKEN'},
+      ));
+
+      bool anyObscured() =>
+          tester.widgetList<TextField>(find.byType(TextField)).any((f) => f.obscureText);
+
+      expect(anyObscured(), isTrue);
+      expect(find.byIcon(Icons.visibility), findsOneWidget);
+      expect(find.byIcon(Icons.lock_outline), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.visibility));
+      await tester.pump();
+
+      expect(anyObscured(), isFalse, reason: 'reveal toggle un-obscures the value');
+      expect(find.byIcon(Icons.visibility_off), findsOneWidget);
+    });
+
+    testWidgets('re-marking a previously-revealed variable secret re-obscures it', (tester) async {
+      await pump(tester, const _SecretHarness(
+        initialVars: {'TOKEN': 'abc123'},
+        initialSecrets: {'TOKEN'},
+      ));
+
+      bool anyObscured() =>
+          tester.widgetList<TextField>(find.byType(TextField)).any((f) => f.obscureText);
+
+      // Reveal the secret value.
+      await tester.tap(find.byIcon(Icons.visibility));
+      await tester.pump();
+      expect(anyObscured(), isFalse);
+
+      // Unmark secret (lock -> open), then mark it secret again.
+      await tester.tap(find.byIcon(Icons.lock_outline));
+      await tester.pump();
+      await tester.tap(find.byIcon(Icons.lock_open_outlined).first);
+      await tester.pump();
+
+      // The re-marked secret must start obscured, not inherit the stale reveal.
+      expect(anyObscured(), isTrue);
+    });
+
+    testWidgets('tapping the lock reports the new secret set', (tester) async {
+      Set<String>? reported;
+      await pump(tester, _SecretHarness(
+        initialVars: const {'TOKEN': 'abc'},
+        initialSecrets: const {},
+        onSecrets: (s) => reported = s,
+      ));
+
+      // TOKEN row + trailing empty row both show an open lock; tap TOKEN's.
+      await tester.tap(find.byIcon(Icons.lock_open_outlined).first);
+      await tester.pump();
+
+      expect(reported, {'TOKEN'});
+    });
+  });
+}
+
+class _SecretHarness extends StatefulWidget {
+  final Map<String, String> initialVars;
+  final Set<String> initialSecrets;
+  final void Function(Set<String>)? onSecrets;
+  const _SecretHarness({
+    required this.initialVars,
+    required this.initialSecrets,
+    this.onSecrets,
+  });
+
+  @override
+  State<_SecretHarness> createState() => _SecretHarnessState();
+}
+
+class _SecretHarnessState extends State<_SecretHarness> {
+  late Map<String, String> vars = widget.initialVars;
+  late Set<String> secrets = widget.initialSecrets;
+
+  @override
+  Widget build(BuildContext context) {
+    return KeyValueListEditor<Map<String, String>>(
+      items: vars,
+      decode: (map) => [for (final e in map.entries) (e.key, e.value)],
+      encode: (rows) => {
+        for (final (key, value) in rows)
+          if (key.isNotEmpty) key: value,
+      },
+      equals: _mapEquality.equals,
+      secretKeys: secrets,
+      onChanged: (map) => setState(() => vars = map),
+      onSecretKeysChanged: (s) {
+        widget.onSecrets?.call(s);
+        setState(() => secrets = s);
+      },
+    );
+  }
 }

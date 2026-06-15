@@ -61,6 +61,12 @@ class InMemoryCookieStore implements CookieStore {
   List<NetworkCookie> all() => List.unmodifiable(_cookies);
 
   @override
+  Future<void> remove(NetworkCookie cookie) async {
+    _cookies.removeWhere((c) => c.key == cookie.key);
+    await persistence.remove(cookie.key);
+  }
+
+  @override
   Future<void> clear() async {
     _cookies.clear();
     await persistence.clearAll();

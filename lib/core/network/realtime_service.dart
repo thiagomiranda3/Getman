@@ -22,8 +22,11 @@ abstract class RealtimeConnection {
 /// response; on web the XHR adapter may buffer rather than stream incrementally.
 class RealtimeService {
   final Dio _dio;
+  final WebSocketChannel Function(Uri uri) _webSocketFactory;
 
-  RealtimeService({Dio? dio}) : _dio = dio ?? _buildSseDio();
+  RealtimeService({Dio? dio, WebSocketChannel Function(Uri uri)? webSocketFactory})
+      : _dio = dio ?? _buildSseDio(),
+        _webSocketFactory = webSocketFactory ?? WebSocketChannel.connect;
 
   // SSE is a long-lived stream — no receive timeout, or it would be killed.
   static Dio _buildSseDio() => Dio(BaseOptions(
@@ -32,7 +35,8 @@ class RealtimeService {
         responseType: ResponseType.stream,
       ));
 
-  RealtimeConnection connectWebSocket(String url) => _WebSocketConnection(url);
+  RealtimeConnection connectWebSocket(String url) =>
+      _WebSocketConnection(_webSocketFactory(Uri.parse(url)), url);
 
   RealtimeConnection connectSse(String url, {Map<String, String> headers = const {}}) =>
       _SseConnection(_dio, url, headers);
@@ -43,7 +47,7 @@ class _WebSocketConnection implements RealtimeConnection {
   final _controller = StreamController<RealtimeFrame>.broadcast();
   StreamSubscription<dynamic>? _sub;
 
-  _WebSocketConnection(String url) : _channel = WebSocketChannel.connect(Uri.parse(url)) {
+  _WebSocketConnection(this._channel, String url) {
     _emit(RealtimeFrame.open('Connecting to $url'));
     _sub = _channel.stream.listen(
       (msg) => _emit(RealtimeFrame.incoming(msg.toString())),

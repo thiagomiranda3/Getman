@@ -7,8 +7,8 @@ import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 /// Pushes network-related settings into the live [NetworkService] whenever they
 /// change. Keeps [SettingsBloc] free of any dependency on the network service
 /// (the coordinating widget holds both, per the project's bloc-coupling rule).
-/// `listenWhen` is gated to the six network fields so unrelated settings
-/// keystrokes never touch Dio.
+/// `listenWhen` is gated to the network fields so unrelated settings keystrokes
+/// never touch Dio.
 class NetworkSettingsListener extends StatelessWidget {
   final Widget child;
   const NetworkSettingsListener({super.key, required this.child});
@@ -23,8 +23,12 @@ class NetworkSettingsListener extends StatelessWidget {
             a.sendTimeoutMs != b.sendTimeoutMs ||
             a.receiveTimeoutMs != b.receiveTimeoutMs ||
             a.followRedirects != b.followRedirects ||
+            a.maxRedirects != b.maxRedirects ||
             a.verifySsl != b.verifySsl ||
-            a.proxyUrl != b.proxyUrl;
+            a.proxyUrl != b.proxyUrl ||
+            a.clientCertPath != b.clientCertPath ||
+            a.clientKeyPath != b.clientKeyPath ||
+            a.clientCertPassphrase != b.clientCertPassphrase;
       },
       listener: (context, state) =>
           context.read<NetworkService>().applyConfig(state.settings.toNetworkConfig()),

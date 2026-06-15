@@ -6,16 +6,31 @@ class NetworkConfig {
   final int sendTimeoutMs;
   final int receiveTimeoutMs;
   final bool followRedirects;
+
+  /// Max redirects to follow when [followRedirects] is true (Dio default: 5).
+  final int maxRedirects;
   final bool verifySsl;
   final String? proxyUrl;
+
+  // Client certificate (mTLS), expressed as plain data — never a dart:io
+  // SecurityContext, which would pull dart:io into core/web. The native adapter
+  // (dio_adapter_config_io) materializes a SecurityContext from these; web is a
+  // no-op (browsers own TLS). PEM cert + PEM key paths + optional passphrase.
+  final String? clientCertPath;
+  final String? clientKeyPath;
+  final String? clientCertPassphrase;
 
   const NetworkConfig({
     this.connectTimeoutMs = 30000,
     this.sendTimeoutMs = 30000,
     this.receiveTimeoutMs = 60000,
     this.followRedirects = true,
+    this.maxRedirects = 5,
     this.verifySsl = true,
     this.proxyUrl,
+    this.clientCertPath,
+    this.clientKeyPath,
+    this.clientCertPassphrase,
   });
 
   static const NetworkConfig defaults = NetworkConfig();

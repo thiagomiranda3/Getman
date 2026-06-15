@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
 
 class CollectionNodeEntity extends Equatable {
   final String id;
@@ -9,6 +10,13 @@ class CollectionNodeEntity extends Equatable {
   final HttpRequestConfigEntity? config;
   final bool isFavorite;
 
+  /// Free-text notes for a folder or request. Null/empty means "no description".
+  final String? description;
+
+  /// Saved request+response snapshots for a leaf (request) node. Kept separate
+  /// from [children] so tree-walk logic never treats an example as a tree node.
+  final List<SavedExampleEntity> examples;
+
   const CollectionNodeEntity({
     required this.id,
     required this.name,
@@ -16,6 +24,8 @@ class CollectionNodeEntity extends Equatable {
     this.children = const [],
     this.config,
     this.isFavorite = false,
+    this.description,
+    this.examples = const [],
   });
 
   CollectionNodeEntity copyWith({
@@ -24,6 +34,8 @@ class CollectionNodeEntity extends Equatable {
     List<CollectionNodeEntity>? children,
     HttpRequestConfigEntity? config,
     bool? isFavorite,
+    String? description,
+    List<SavedExampleEntity>? examples,
   }) {
     return CollectionNodeEntity(
       id: id,
@@ -32,6 +44,8 @@ class CollectionNodeEntity extends Equatable {
       children: children ?? this.children,
       config: config ?? this.config,
       isFavorite: isFavorite ?? this.isFavorite,
+      description: description ?? this.description,
+      examples: examples ?? this.examples,
     );
   }
 
@@ -43,5 +57,7 @@ class CollectionNodeEntity extends Equatable {
     children,
     config,
     isFavorite,
+    description,
+    examples,
   ];
 }

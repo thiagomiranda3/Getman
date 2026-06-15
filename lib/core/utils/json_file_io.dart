@@ -48,6 +48,7 @@ Future<void> saveJsonFileWithFeedback(
   required String jsonString,
   required String fileName,
   required String dialogTitle,
+  List<String> allowedExtensions = const ['json'],
 }) async {
   final messenger = ScaffoldMessenger.maybeOf(context);
   try {
@@ -55,7 +56,7 @@ Future<void> saveJsonFileWithFeedback(
       dialogTitle: dialogTitle,
       fileName: fileName,
       type: FileType.custom,
-      allowedExtensions: ['json'],
+      allowedExtensions: allowedExtensions,
       bytes: utf8.encode(jsonString),
     );
     if (path == null) return;

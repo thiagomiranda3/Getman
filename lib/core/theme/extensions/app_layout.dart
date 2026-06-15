@@ -30,6 +30,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
   final double dirtyStarSize;
   final bool isCompact;
   final double depthPaddingMultiplier;
+  final double treeRowExtent;
   final double sideMenuWidth;
   final double borderThin;
   final double borderThick;
@@ -68,6 +69,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
     required this.addIconSize,
     required this.dirtyStarSize,
     required this.depthPaddingMultiplier,
+    required this.treeRowExtent,
     required this.sideMenuWidth,
     required this.borderThin,
     required this.borderThick,
@@ -108,6 +110,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
     double? addIconSize,
     double? dirtyStarSize,
     double? depthPaddingMultiplier,
+    double? treeRowExtent,
     double? sideMenuWidth,
     double? borderThin,
     double? borderThick,
@@ -146,6 +149,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
       addIconSize: addIconSize ?? this.addIconSize,
       dirtyStarSize: dirtyStarSize ?? this.dirtyStarSize,
       depthPaddingMultiplier: depthPaddingMultiplier ?? this.depthPaddingMultiplier,
+      treeRowExtent: treeRowExtent ?? this.treeRowExtent,
       sideMenuWidth: sideMenuWidth ?? this.sideMenuWidth,
       borderThin: borderThin ?? this.borderThin,
       borderThick: borderThick ?? this.borderThick,
@@ -190,6 +194,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
       addIconSize: l(addIconSize, other.addIconSize),
       dirtyStarSize: l(dirtyStarSize, other.dirtyStarSize),
       depthPaddingMultiplier: l(depthPaddingMultiplier, other.depthPaddingMultiplier),
+      treeRowExtent: l(treeRowExtent, other.treeRowExtent),
       sideMenuWidth: l(sideMenuWidth, other.sideMenuWidth),
       borderThin: l(borderThin, other.borderThin),
       borderThick: l(borderThick, other.borderThick),
@@ -230,6 +235,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
     addIconSize: 24.0,
     dirtyStarSize: 16.0,
     depthPaddingMultiplier: 20.0,
+    treeRowExtent: 40.0,
     sideMenuWidth: 300.0,
     borderThin: 2.0,
     borderThick: 3.0,
@@ -269,6 +275,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
     addIconSize: 18.0,
     dirtyStarSize: 12.0,
     depthPaddingMultiplier: 12.0,
+    treeRowExtent: 32.0,
     sideMenuWidth: 240.0,
     borderThin: 2.0,
     borderThick: 3.0,

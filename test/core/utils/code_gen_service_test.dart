@@ -132,4 +132,80 @@ void main() {
       expect(out, isNot(contains("data = '''")));
     });
   });
+
+  group('Node.js axios', () {
+    test('emits an axios.request with method, url, headers and data', () {
+      final out = CodeGenService.generate(bearerJson, CodeGenTarget.nodeAxios);
+      expect(out, contains("require('axios')"));
+      expect(out, contains("method: 'POST'"));
+      expect(out, contains("url: 'https://{{host}}/login'"));
+      expect(out, contains("'Authorization': 'Bearer {{token}}'"));
+      expect(out, contains('data:'));
+      expect(out, contains('axios.request(options)'));
+    });
+
+    test('multipart spreads form.getHeaders and appends fields', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        method: 'POST',
+        url: 'https://api.dev/x',
+        bodyType: BodyType.multipart,
+        formFields: [MultipartFieldEntity(name: 'field', value: 'v')],
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.nodeAxios);
+      expect(out, contains("require('form-data')"));
+      expect(out, contains("form.append('field', 'v')"));
+      expect(out, contains('...form.getHeaders()'));
+      expect(out, contains('data: form'));
+    });
+  });
+
+  group('Go net/http', () {
+    test('emits a net/http request with method, url and headers', () {
+      final out = CodeGenService.generate(bearerJson, CodeGenTarget.goNetHttp);
+      expect(out, contains('package main'));
+      expect(out, contains('"net/http"'));
+      expect(out, contains('method := "POST"'));
+      expect(out, contains('url := "https://{{host}}/login"'));
+      expect(out, contains('req.Header.Add("Authorization", "Bearer {{token}}")'));
+      expect(out, contains('strings.NewReader'));
+    });
+
+    test('omits the strings import when there is no body', () {
+      const config = HttpRequestConfigEntity(id: 'c', url: 'https://api.dev/x');
+      final out = CodeGenService.generate(config, CodeGenTarget.goNetHttp);
+      expect(out, isNot(contains('"strings"')),
+          reason: 'unused imports are a compile error in Go');
+      expect(out, contains('http.NewRequest(method, url, nil)'));
+    });
+  });
+
+  group('Java OkHttp', () {
+    test('emits an OkHttp request with method, url and a typed body', () {
+      final out = CodeGenService.generate(bearerJson, CodeGenTarget.javaOkHttp);
+      expect(out, contains('OkHttpClient client = new OkHttpClient()'));
+      expect(out, contains('.url("https://{{host}}/login")'));
+      expect(out, contains('.method("POST", body)'));
+      expect(out, contains('MediaType.parse("application/json")'));
+      expect(out, contains('.addHeader("Authorization", "Bearer {{token}}")'));
+    });
+
+    test('does not duplicate the Content-Type header when the body carries it', () {
+      final out = CodeGenService.generate(bearerJson, CodeGenTarget.javaOkHttp);
+      expect(out, isNot(contains('.addHeader("Content-Type"')));
+    });
+
+    test('urlencoded body uses a FormBody builder', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        method: 'POST',
+        url: 'https://api.dev/x',
+        bodyType: BodyType.urlencoded,
+        formFields: [MultipartFieldEntity(name: 'a', value: '1')],
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.javaOkHttp);
+      expect(out, contains('new FormBody.Builder()'));
+      expect(out, contains('.add("a", "1")'));
+    });
+  });
 }

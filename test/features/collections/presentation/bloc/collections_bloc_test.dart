@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
 import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
@@ -53,6 +54,20 @@ void main() {
       expect(bloc.state.collections.where((n) => n.name == 'Auth' && n.isFolder), hasLength(1));
     });
 
+    test('UpdateNodeDescription sets and then clears a node description', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      await seed(bloc, [leaf('R', 'R')]);
+
+      bloc.add(const UpdateNodeDescription('R', 'auth endpoint'));
+      await bloc.stream.first;
+      expect(CollectionsTreeHelper.findNode(bloc.state.collections, 'R')?.description, 'auth endpoint');
+
+      bloc.add(const UpdateNodeDescription('R', ''));
+      await bloc.stream.first;
+      expect(CollectionsTreeHelper.findNode(bloc.state.collections, 'R')?.description, '');
+    });
+
     test('DeleteNode removes the node from the tree', () async {
       final bloc = build();
       addTearDown(bloc.close);
@@ -88,6 +103,65 @@ void main() {
       expect(bloc.state.collections.any((n) => n.id == 'R'), isFalse);
       final a = CollectionsTreeHelper.findNode(bloc.state.collections, 'A')!;
       expect(a.children.any((n) => n.id == 'R'), isTrue);
+    });
+  });
+
+  group('saved examples', () {
+    SavedExampleEntity example(String id, String name) => SavedExampleEntity(
+          id: id,
+          name: name,
+          capturedAt: DateTime.utc(2026, 6, 14),
+          config: const HttpRequestConfigEntity(id: 'R', statusCode: 200, responseBody: 'ok'),
+        );
+
+    test('SaveExampleToNode appends to the leaf', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      await seed(bloc, [leaf('R', 'R')]);
+
+      bloc.add(SaveExampleToNode('R', example('e1', 'First')));
+      await bloc.stream.first;
+
+      final node = CollectionsTreeHelper.findNode(bloc.state.collections, 'R')!;
+      expect(node.examples.map((e) => e.id), ['e1']);
+      expect(node.examples.single.config.statusCode, 200);
+    });
+
+    test('SaveExampleToNode is a no-op for a missing node', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      await seed(bloc, [leaf('R', 'R')]);
+
+      bloc.add(SaveExampleToNode('nope', example('e1', 'First')));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(CollectionsTreeHelper.findNode(bloc.state.collections, 'R')!.examples, isEmpty);
+    });
+
+    test('DeleteExample removes the example', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      await seed(bloc, [
+        leaf('R', 'R').copyWith(examples: [example('e1', 'First'), example('e2', 'Second')]),
+      ]);
+
+      bloc.add(const DeleteExample('R', 'e1'));
+      await bloc.stream.first;
+
+      expect(CollectionsTreeHelper.findNode(bloc.state.collections, 'R')!.examples.map((e) => e.id), ['e2']);
+    });
+
+    test('RenameExample renames the example', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      await seed(bloc, [
+        leaf('R', 'R').copyWith(examples: [example('e1', 'First')]),
+      ]);
+
+      bloc.add(const RenameExample('R', 'e1', 'Renamed'));
+      await bloc.stream.first;
+
+      expect(CollectionsTreeHelper.findNode(bloc.state.collections, 'R')!.examples.single.name, 'Renamed');
     });
   });
 

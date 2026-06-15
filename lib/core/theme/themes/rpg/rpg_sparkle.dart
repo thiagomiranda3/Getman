@@ -166,6 +166,12 @@ class _SparklePainter extends CustomPainter {
 
   _SparklePainter({required this.burst, required this.t});
 
+  // Reused across particles/frames — `.color` is the only per-draw mutation.
+  // The unit-size 4-point star path is built once and scaled via the canvas.
+  final Paint _glowPaint = Paint()..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+  final Paint _sparklePaint = Paint();
+  final Path _sparkleUnitPath = _buildSparkleUnitPath();
+
   @override
   void paint(Canvas canvas, Size size) {
     // Eased outward distance and scale-then-fade alpha curve.
@@ -184,26 +190,26 @@ class _SparklePainter extends CustomPainter {
       final halfSize = p.size * scale;
 
       // Soft glow halo.
-      final glow = Paint()
-        ..color = p.color.withValues(alpha: 0.35 * opacity)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
-      canvas.drawCircle(offset, halfSize * 1.8, glow);
+      _glowPaint.color = p.color.withValues(alpha: 0.35 * opacity);
+      canvas.drawCircle(offset, halfSize * 1.8, _glowPaint);
 
-      // Four-point sparkle.
+      // Four-point sparkle — draw the unit path scaled to halfSize.
       canvas.save();
       canvas.translate(offset.dx, offset.dy);
       canvas.rotate(rotation);
-      final sparkle = Paint()..color = p.color.withValues(alpha: opacity);
-      _drawSparkle(canvas, sparkle, halfSize);
+      canvas.scale(halfSize, halfSize);
+      _sparklePaint.color = p.color.withValues(alpha: opacity);
+      canvas.drawPath(_sparkleUnitPath, _sparklePaint);
       canvas.restore();
     }
   }
 
-  void _drawSparkle(Canvas canvas, Paint paint, double r) {
-    // Classic 4-point star: two crossed diamond shapes pinched at center.
+  /// Classic 4-point star at unit radius (r = 1.0): two crossed diamond shapes
+  /// pinched at center. Scaled per particle via a canvas transform.
+  static Path _buildSparkleUnitPath() {
     final path = Path();
-    final wide = r;
-    final thin = r * 0.18;
+    const wide = 1.0;
+    const thin = wide * 0.18;
     path.moveTo(0, -wide);
     path.lineTo(thin, -thin);
     path.lineTo(wide, 0);
@@ -213,7 +219,7 @@ class _SparklePainter extends CustomPainter {
     path.lineTo(-wide, 0);
     path.lineTo(-thin, -thin);
     path.close();
-    canvas.drawPath(path, paint);
+    return path;
   }
 
   @override

@@ -13,7 +13,7 @@ ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
   const Color accent = EditorialPalette.accent;
 
   final AppLayout layout = isCompact ? AppLayout.compact : AppLayout.normal;
-  const AppShape shape = AppShape(panelRadius: 0, buttonRadius: 0, inputRadius: 0, dialogRadius: 0);
+  const AppShape shape = AppShape(panelRadius: 0, buttonRadius: 0, inputRadius: 0, dialogRadius: 0, sheetRadius: 0);
 
   final fraunces = GoogleFonts.frauncesTextTheme();
   final inter = GoogleFonts.interTextTheme();

@@ -372,6 +372,20 @@ void main() {
     expect(find.text('Response copied'), findsOneWidget);
   });
 
+  testWidgets('save-to-file button is shown next to copy', (tester) async {
+    const tabId = 'tabSave';
+    final tab = _tabWithBody(tabId, '{"ok":true}');
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+    final controller = CodeLineEditingController();
+    addTearDown(controller.dispose);
+
+    await _pump(tester, bloc: bloc, tabId: tabId, controller: controller);
+
+    expect(find.byTooltip('Save response to file'), findsOneWidget);
+    expect(find.byTooltip('Copy response'), findsOneWidget);
+  });
+
   // -------------------------------------------------------------------------
   // Test 6: COOKIES tab lists cookies parsed from the set-cookie header
   // -------------------------------------------------------------------------

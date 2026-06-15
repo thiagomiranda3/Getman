@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 import 'package:getman/core/navigation/app_router.dart';
+import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/cookie_interceptor.dart';
 import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/in_memory_cookie_store.dart';
@@ -17,6 +18,7 @@ import 'package:getman/features/chaining/presentation/bloc/rules_bloc.dart';
 import 'package:getman/features/collections/data/datasources/collections_local_data_source.dart';
 import 'package:getman/features/collections/data/datasources/workspace_data_source_factory.dart';
 import 'package:getman/features/collections/data/models/collection_node_model.dart';
+import 'package:getman/features/collections/data/models/saved_example_model.dart';
 import 'package:getman/features/collections/data/repositories/collections_repository_impl.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
@@ -63,6 +65,7 @@ Future<SettingsEntity> init() async {
   Hive.registerAdapter(HttpRequestConfigAdapter());
   Hive.registerAdapter(HttpRequestTabModelAdapter());
   Hive.registerAdapter(CollectionNodeAdapter());
+  Hive.registerAdapter(SavedExampleModelAdapter());
   Hive.registerAdapter(EnvironmentModelAdapter());
   Hive.registerAdapter(MultipartFieldModelAdapter());
   Hive.registerAdapter(StoredCookieModelAdapter());
@@ -93,6 +96,10 @@ Future<SettingsEntity> init() async {
   // Re-key any legacy int-keyed environments by id so per-id put/delete writes
   // overwrite the same logical environment (no-op once keys are strings).
   await EnvironmentsLocalDataSourceImpl.migrateLegacyKeysIfNeeded();
+  // Same for collections: re-key the legacy auto-increment box by root id so
+  // per-root keyed writes overwrite the same logical root (L12). Runs before
+  // collections are first read.
+  await CollectionsLocalDataSourceImpl.migrateLegacyKeysIfNeeded();
 
   final initialSettings = settingsBox.get('current')?.toEntity() ?? const SettingsEntity();
   final initialEnvironments =
@@ -190,6 +197,8 @@ Future<SettingsEntity> init() async {
 
   // Features - Home
   sl.registerLazySingleton(() => const TabDirtyChecker());
+  // Lets the Cmd/Ctrl+L shortcut focus the active tab's URL field.
+  sl.registerLazySingleton(() => UrlFocusRegistry());
 
   // Core. The cookie box is already open (parallel wait above); hydrate the jar
   // before the network service can be used so the first send sees stored

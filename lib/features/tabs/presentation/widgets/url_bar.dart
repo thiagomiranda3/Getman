@@ -1,20 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:getman/core/domain/entities/request_config_entity.dart';
-import 'package:getman/core/network/http_methods.dart';
+import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/theme/app_theme.dart';
-import 'package:getman/core/ui/widgets/method_badge.dart';
 import 'package:getman/core/ui/widgets/variable_highlight_controller.dart';
 import 'package:getman/core/utils/curl_utils.dart';
-import 'package:getman/core/utils/environment_resolver.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/features/environments/domain/logic/active_environment_helper.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
-import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
-import 'package:getman/features/realtime/presentation/bloc/realtime_event.dart';
-import 'package:getman/features/realtime/presentation/bloc/realtime_state.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
@@ -23,6 +17,9 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/code_export_dialog.dart';
+import 'package:getman/features/tabs/presentation/widgets/realtime_button.dart';
+import 'package:getman/features/tabs/presentation/widgets/request_kind_method_selector.dart';
+import 'package:getman/features/tabs/presentation/widgets/url_overflow_menu.dart';
 
 void _setControllerPreservingEnd(TextEditingController controller, String text) {
   if (controller.text == text) return;
@@ -43,6 +40,8 @@ class UrlBar extends StatefulWidget {
 
 class _UrlBarState extends State<UrlBar> {
   late final VariableHighlightController _urlController;
+  late final FocusNode _urlFocusNode;
+  UrlFocusRegistry? _focusRegistry;
 
   @override
   void initState() {
@@ -50,6 +49,9 @@ class _UrlBarState extends State<UrlBar> {
     // Token colors come from AppPalette in didChangeDependencies — never
     // hardcode them here (CLAUDE.md §4.10).
     _urlController = VariableHighlightController();
+    // Register this tab's URL field so the Cmd/Ctrl+L shortcut can focus it.
+    _urlFocusNode = FocusNode(debugLabel: 'url_${widget.tabId}');
+    _focusRegistry = context.read<UrlFocusRegistry>()..register(widget.tabId, _urlFocusNode);
   }
 
   @override
@@ -82,6 +84,8 @@ class _UrlBarState extends State<UrlBar> {
 
   @override
   void dispose() {
+    _focusRegistry?.unregister(widget.tabId, _urlFocusNode);
+    _urlFocusNode.dispose();
     _urlController.dispose();
     super.dispose();
   }
@@ -145,77 +149,12 @@ class _UrlBarState extends State<UrlBar> {
 
                     return Row(
                       children: [
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: isNarrow ? 6 : (layout.isCompact ? 8 : 12)),
-                          decoration: BoxDecoration(
-                            border: Border(right: BorderSide(color: theme.dividerColor, width: layout.borderThick)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              DropdownButtonHideUnderline(
-                                child: DropdownButton<RequestKind>(
-                                  dropdownColor: theme.colorScheme.surface,
-                                  value: tab.config.kind,
-                                  style: TextStyle(
-                                    color: theme.colorScheme.onSurface,
-                                    fontWeight: context.appTypography.displayWeight,
-                                    fontSize: layout.fontSizeSmall,
-                                  ),
-                                  items: const [
-                                    DropdownMenuItem(value: RequestKind.http, child: Text('HTTP')),
-                                    DropdownMenuItem(value: RequestKind.webSocket, child: Text('WS')),
-                                    DropdownMenuItem(value: RequestKind.sse, child: Text('SSE')),
-                                  ],
-                                  onChanged: (k) {
-                                    if (k != null && tab.config.kind != k) {
-                                      context.read<TabsBloc>().add(UpdateTab(
-                                        tab.copyWith(config: tab.config.copyWith(kind: k)),
-                                      ));
-                                    }
-                                  },
-                                ),
-                              ),
-                              if (tab.config.kind == RequestKind.http) ...[
-                                SizedBox(width: smallGap),
-                                DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    dropdownColor: theme.colorScheme.surface,
-                                    value: tab.config.method,
-                                    style: TextStyle(
-                                      color: theme.colorScheme.onSurface,
-                                      fontWeight: context.appTypography.displayWeight,
-                                      fontSize: layout.fontSizeNormal,
-                                    ),
-                                    selectedItemBuilder: (context) {
-                                      return HttpMethods.all.map((m) => Center(child: MethodBadge(method: m))).toList();
-                                    },
-                                    items: HttpMethods.all
-                                        .map((m) => DropdownMenuItem(
-                                          value: m,
-                                          child: SizedBox(
-                                            width: isNarrow ? 64 : (layout.isCompact ? 80 : 100),
-                                            child: Center(child: MethodBadge(method: m)),
-                                          ),
-                                        ))
-                                        .toList(),
-                                    onChanged: (val) {
-                                      if (val != null && tab.config.method != val) {
-                                        context.read<TabsBloc>().add(UpdateTab(
-                                          tab.copyWith(config: tab.config.copyWith(method: val)),
-                                        ));
-                                      }
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
+                        RequestKindMethodSelector(tab: tab, isNarrow: isNarrow),
                         SizedBox(width: gap),
                         Expanded(
                           child: TextField(
                             controller: _urlController,
+                            focusNode: _urlFocusNode,
                             style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
                             decoration: const InputDecoration(
                               hintText: 'Enter URL or paste cURL...',
@@ -284,7 +223,7 @@ class _UrlBarState extends State<UrlBar> {
                           ),
                         )
                         else
-                          _RealtimeButton(
+                          RealtimeButton(
                             tabId: tab.tabId,
                             config: tab.config,
                             isNarrow: isNarrow,
@@ -292,7 +231,7 @@ class _UrlBarState extends State<UrlBar> {
                           ),
                         if (isNarrow) ...[
                           SizedBox(width: smallGap),
-                          _OverflowMenu(
+                          UrlOverflowMenu(
                             iconSize: iconSize,
                             isSaved: tab.collectionNodeId != null,
                             isVerticalLayout: settings.isVerticalLayout,
@@ -361,159 +300,5 @@ class _UrlBarState extends State<UrlBar> {
     tabsBloc.add(UpdateTab(
       latestTab.copyWith(config: latestTab.config.copyWith(body: prettified)),
     ));
-  }
-}
-
-/// CONNECT / DISCONNECT button for WebSocket & SSE requests, driven by the
-/// realtime connection status for this tab.
-class _RealtimeButton extends StatelessWidget {
-  final String tabId;
-  final HttpRequestConfigEntity config;
-  final bool isNarrow;
-  final Map<String, String> activeVars;
-
-  const _RealtimeButton({
-    required this.tabId,
-    required this.config,
-    required this.isNarrow,
-    required this.activeVars,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final layout = context.appLayout;
-    return BlocBuilder<RealtimeBloc, RealtimeState>(
-      buildWhen: (p, n) => p.sessionFor(tabId).connected != n.sessionFor(tabId).connected,
-      builder: (context, rt) {
-        final connected = rt.sessionFor(tabId).connected;
-        return context.appDecoration.wrapInteractive(
-          child: ElevatedButton(
-            onPressed: () {
-              final bloc = context.read<RealtimeBloc>();
-              if (connected) {
-                bloc.add(Disconnect(tabId));
-              } else {
-                bloc.add(Connect(
-                  tabId: tabId,
-                  kind: config.kind,
-                  url: EnvironmentResolver.resolve(config.url, activeVars),
-                  headers: EnvironmentResolver.resolveMap(config.headers, activeVars),
-                ));
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: connected ? theme.colorScheme.error : null,
-              foregroundColor: connected ? theme.colorScheme.onError : null,
-              padding: EdgeInsets.symmetric(
-                horizontal: isNarrow ? 12 : layout.buttonPaddingHorizontal,
-                vertical: isNarrow ? 10 : layout.buttonPaddingVertical,
-              ),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(
-              connected ? (isNarrow ? 'STOP' : 'DISCONNECT') : 'CONNECT',
-              style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.displayWeight),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-enum _OverflowAction { generateCode, save, toggleLayout }
-
-class _OverflowMenu extends StatelessWidget {
-  final double iconSize;
-  final bool isSaved;
-  final bool isVerticalLayout;
-  final VoidCallback onGenerateCode;
-  final VoidCallback onSave;
-  final VoidCallback onToggleLayout;
-
-  const _OverflowMenu({
-    required this.iconSize,
-    required this.isSaved,
-    required this.isVerticalLayout,
-    required this.onGenerateCode,
-    required this.onSave,
-    required this.onToggleLayout,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final layout = context.appLayout;
-
-    return PopupMenuButton<_OverflowAction>(
-      tooltip: 'More actions',
-      position: PopupMenuPosition.under,
-      color: theme.scaffoldBackgroundColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
-        side: BorderSide(color: theme.dividerColor, width: layout.borderThick),
-      ),
-      elevation: 0,
-      icon: Icon(Icons.more_vert, color: theme.colorScheme.onSurface, size: iconSize),
-      onSelected: (action) {
-        switch (action) {
-          case _OverflowAction.generateCode:
-            onGenerateCode();
-            break;
-          case _OverflowAction.save:
-            onSave();
-            break;
-          case _OverflowAction.toggleLayout:
-            onToggleLayout();
-            break;
-        }
-      },
-      itemBuilder: (popupContext) => [
-        PopupMenuItem(
-          value: _OverflowAction.save,
-          child: _menuRow(
-            context,
-            isSaved ? Icons.save : Icons.save_as,
-            isSaved ? 'UPDATE REQUEST' : 'SAVE TO COLLECTION',
-            theme.colorScheme.secondary,
-          ),
-        ),
-        PopupMenuItem(
-          value: _OverflowAction.generateCode,
-          child: _menuRow(context, Icons.code, 'GENERATE CODE', theme.colorScheme.secondary),
-        ),
-        PopupMenuItem(
-          value: _OverflowAction.toggleLayout,
-          child: _menuRow(
-            context,
-            isVerticalLayout ? Icons.view_column_rounded : Icons.view_agenda_rounded,
-            isVerticalLayout ? 'HORIZONTAL LAYOUT' : 'VERTICAL LAYOUT',
-            theme.colorScheme.onSurface,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _menuRow(BuildContext context, IconData icon, String label, Color iconColor) {
-    final theme = Theme.of(context);
-    final layout = context.appLayout;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: layout.smallIconSize, color: iconColor),
-        const SizedBox(width: 10),
-        Text(
-          label,
-          style: TextStyle(
-            fontWeight: context.appTypography.displayWeight,
-            fontSize: layout.fontSizeNormal,
-            color: theme.colorScheme.onSurface,
-          ),
-        ),
-      ],
-    );
   }
 }

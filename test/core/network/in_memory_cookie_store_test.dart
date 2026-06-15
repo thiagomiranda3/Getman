@@ -89,4 +89,21 @@ void main() {
     expect(store.all(), isEmpty);
     expect(persistence.cleared, isTrue);
   });
+
+  test('remove drops one cookie from memory and durable storage', () async {
+    store.storeFromSetCookie(Uri.parse('https://api.dev/'), 'a=1; Path=/');
+    store.storeFromSetCookie(Uri.parse('https://api.dev/'), 'b=2; Path=/');
+    final target = store.all().firstWhere((c) => c.name == 'a');
+
+    await store.remove(target);
+
+    expect(store.all().map((c) => c.name), ['b']);
+    expect(persistence.removed, contains('api.dev|/|a'));
+  });
+
+  test('remove of a non-stored cookie is a no-op', () async {
+    store.storeFromSetCookie(Uri.parse('https://api.dev/'), 'a=1; Path=/');
+    await store.remove(const NetworkCookie(name: 'ghost', value: '', domain: 'other.dev'));
+    expect(store.all(), hasLength(1));
+  });
 }

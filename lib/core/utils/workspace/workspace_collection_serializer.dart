@@ -10,6 +10,10 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 /// OMITS the response cache fields (responseBody/headers/statusCode/durationMs)
 /// — they would leak response data into git and create churny diffs. On read
 /// they default to null, exactly like a freshly-imported request.
+///
+/// Saved examples are likewise OMITTED: they carry captured responses (same
+/// leak/churn concern) and are a local convenience, not a git-tracked artifact.
+/// `requestFromJson` therefore reconstructs leaves with no examples.
 class WorkspaceCollectionSerializer {
   WorkspaceCollectionSerializer._();
 
