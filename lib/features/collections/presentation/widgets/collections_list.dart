@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/network/http_response.dart';
+import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
@@ -18,6 +19,9 @@ import 'package:getman/features/collections/presentation/bloc/collections_bloc.d
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
 import 'package:getman/features/collections/presentation/widgets/node_action_sheet.dart';
+import 'package:getman/features/collections/presentation/widgets/spec_import_dialog.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
@@ -124,6 +128,33 @@ class _CollectionsListState extends State<CollectionsList> {
     );
   }
 
+  /// Coordinator for the OpenAPI / Swagger importer. Reads both blocs +
+  /// [NetworkService] here (the dialog is bloc-agnostic), captures the
+  /// messenger before the dialog, then dispatches the import to both blocs on
+  /// commit — no bloc→bloc coupling.
+  void _importSpec(BuildContext context) {
+    final collectionsBloc = context.read<CollectionsBloc>();
+    final environmentsBloc = context.read<EnvironmentsBloc>();
+    final messenger = ScaffoldMessenger.of(context);
+    unawaited(
+      SpecImportDialog.show(
+        context,
+        networkService: context.read<NetworkService>(),
+        onImport: (result) {
+          collectionsBloc.add(ImportCollections([result.root]));
+          if (result.environments.isNotEmpty) {
+            environmentsBloc.add(ImportEnvironments(result.environments));
+          }
+          showAppSnackBarVia(messenger, 'Imported "${result.root.name}".');
+          for (final w in result.warnings.take(1)) {
+            // Surface the first warning so OAuth2/unsupported stays visible.
+            showAppSnackBarVia(messenger, w);
+          }
+        },
+      ),
+    );
+  }
+
   List<CollectionNodeEntity> _filterNodes(
     List<CollectionNodeEntity> nodes,
     String query,
@@ -201,14 +232,54 @@ class _CollectionsListState extends State<CollectionsList> {
                 ),
                 SizedBox(width: layout.tabSpacing),
                 context.appDecoration.wrapInteractive(
-                  child: IconButton(
+                  child: PopupMenuButton<String>(
                     icon: Icon(
                       Icons.file_upload,
                       size: layout.iconSize,
                       color: theme.colorScheme.onSurface,
                     ),
-                    tooltip: 'IMPORT FROM POSTMAN',
-                    onPressed: () => _importCollections(context),
+                    tooltip: 'IMPORT',
+                    color: theme.colorScheme.surface,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        context.appShape.panelRadius,
+                      ),
+                      side: BorderSide(
+                        color: theme.dividerColor,
+                        width: layout.borderThick,
+                      ),
+                    ),
+                    onSelected: (val) {
+                      switch (val) {
+                        case 'postman':
+                          unawaited(_importCollections(context));
+                        case 'openapi':
+                          _importSpec(context);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'postman',
+                        child: Text(
+                          'FROM POSTMAN',
+                          style: TextStyle(
+                            fontSize: layout.fontSizeSmall,
+                            fontWeight: context.appTypography.titleWeight,
+                          ),
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'openapi',
+                        child: Text(
+                          'FROM OPENAPI / SWAGGER',
+                          style: TextStyle(
+                            fontSize: layout.fontSizeSmall,
+                            fontWeight: context.appTypography.titleWeight,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
