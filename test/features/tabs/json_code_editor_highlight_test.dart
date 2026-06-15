@@ -92,6 +92,41 @@ void main() {
     controllerWithCapture.dispose();
   });
 
+  testWidgets('JsonCodeEditor renders a fold (collapse/expand) gutter', (
+    tester,
+  ) async {
+    // Wiring check: the gutter must include re_editor's chunk indicator so
+    // object/array regions get clickable fold chevrons. The fold engine itself
+    // runs in a re_editor isolate (not deterministic here); the structural
+    // presence of the indicator is what this guards against regressing.
+    const json = '{\n  "a": {\n    "b": 1\n  }\n}';
+    final controller = createJsonCodeController()..text = json;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: resolveThemeData('brutalist', Brightness.dark, isCompact: false),
+        home: Scaffold(
+          body: SizedBox(
+            width: 600,
+            height: 400,
+            child: JsonCodeEditor(
+              controller: controller,
+              readOnly: true,
+              autofocus: false,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(DefaultCodeChunkIndicator), findsOneWidget);
+    expect(find.byType(DefaultCodeLineNumber), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    controller.dispose();
+  });
+
   testWidgets('non-JSON content does not throw and still renders', (
     tester,
   ) async {

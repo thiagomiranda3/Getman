@@ -94,9 +94,23 @@ class JsonCodeEditor extends StatelessWidget {
           ),
         ),
         indicatorBuilder: (context, controller, chunkController, notifier) {
-          return DefaultCodeLineNumber(
-            controller: controller,
-            notifier: notifier,
+          // Line numbers + JSON fold markers. re_editor's
+          // DefaultCodeChunkAnalyzer (on by default) detects {}/[] regions; the
+          // chunk indicator paints the collapse/expand chevrons in the gutter
+          // and toggles them on tap.
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DefaultCodeLineNumber(
+                controller: controller,
+                notifier: notifier,
+              ),
+              DefaultCodeChunkIndicator(
+                width: context.appLayout.foldGutterWidth,
+                controller: chunkController,
+                notifier: notifier,
+              ),
+            ],
           );
         },
       ),

@@ -39,6 +39,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
     required this.dialogWidth,
     required this.splitterGrabSize,
     required this.splitterLineSize,
+    required this.foldGutterWidth,
   });
   final double pagePadding;
   final double sectionSpacing;
@@ -77,6 +78,10 @@ class AppLayout extends ThemeExtension<AppLayout> {
   final double dialogWidth;
   final double splitterGrabSize;
   final double splitterLineSize;
+
+  /// Width of the code editor's fold (collapse/expand) marker gutter, rendered
+  /// beside the line-number column in `JsonCodeEditor`.
+  final double foldGutterWidth;
 
   @override
   AppLayout copyWith({
@@ -117,6 +122,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
     double? dialogWidth,
     double? splitterGrabSize,
     double? splitterLineSize,
+    double? foldGutterWidth,
   }) {
     return AppLayout(
       isCompact: isCompact ?? this.isCompact,
@@ -161,6 +167,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
       dialogWidth: dialogWidth ?? this.dialogWidth,
       splitterGrabSize: splitterGrabSize ?? this.splitterGrabSize,
       splitterLineSize: splitterLineSize ?? this.splitterLineSize,
+      foldGutterWidth: foldGutterWidth ?? this.foldGutterWidth,
     );
   }
 
@@ -221,6 +228,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
       dialogWidth: l(dialogWidth, other.dialogWidth),
       splitterGrabSize: l(splitterGrabSize, other.splitterGrabSize),
       splitterLineSize: l(splitterLineSize, other.splitterLineSize),
+      foldGutterWidth: l(foldGutterWidth, other.foldGutterWidth),
     );
   }
 
@@ -262,6 +270,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
     dialogWidth: 400,
     splitterGrabSize: 40,
     splitterLineSize: 3,
+    foldGutterWidth: 20,
   );
 
   static const compact = AppLayout(
@@ -302,5 +311,6 @@ class AppLayout extends ThemeExtension<AppLayout> {
     dialogWidth: 320,
     splitterGrabSize: 28,
     splitterLineSize: 2,
+    foldGutterWidth: 16,
   );
 }
