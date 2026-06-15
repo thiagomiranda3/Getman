@@ -10,7 +10,8 @@ class SseParser {
     final events = <String>[];
     _carry += chunk;
     final parts = _carry.split('\n');
-    // The last element has no trailing newline yet — keep it for the next chunk.
+    // The last element has no trailing newline yet — keep it for the next
+    // chunk.
     _carry = parts.removeLast();
     for (final raw in parts) {
       _consumeLine(raw, events);

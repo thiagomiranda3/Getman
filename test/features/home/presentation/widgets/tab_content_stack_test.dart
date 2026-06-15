@@ -15,17 +15,17 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 // ---------------------------------------------------------------------------
 
 HttpRequestTabEntity _tab(String id) => HttpRequestTabEntity(
-      tabId: id,
-      config: HttpRequestConfigEntity(id: id),
-    );
+  tabId: id,
+  config: HttpRequestConfigEntity(id: id),
+);
 
 List<HttpRequestTabEntity> _tabs(List<String> ids) => ids.map(_tab).toList();
 
 /// A counter widget whose int state persists across rebuilds as long as the
 /// widget's State is alive (same element in the tree).
 class _CounterWidget extends StatefulWidget {
+  const _CounterWidget({required this.tabId, super.key});
   final String tabId;
-  const _CounterWidget({super.key, required this.tabId});
 
   @override
   State<_CounterWidget> createState() => _CounterWidgetState();
@@ -44,9 +44,9 @@ class _CounterWidgetState extends State<_CounterWidget> {
 
 /// A widget that records its own disposal via a callback.
 class _DisposeSpy extends StatefulWidget {
+  const _DisposeSpy({required this.tabId, required this.onDisposed, super.key});
   final String tabId;
   final VoidCallback onDisposed;
-  const _DisposeSpy({super.key, required this.tabId, required this.onDisposed});
 
   @override
   State<_DisposeSpy> createState() => _DisposeSpyState();
@@ -69,16 +69,15 @@ class _DisposeSpyState extends State<_DisposeSpy> {
 
 /// Mutable harness that lets us pump [TabContentStack] and change tabs/list.
 class _Harness extends StatefulWidget {
-  final List<HttpRequestTabEntity> initialTabs;
-  final int initialIndex;
-  final Widget Function(String tabId) builder;
-
   const _Harness({
-    super.key,
     required this.initialTabs,
     required this.initialIndex,
     required this.builder,
+    super.key,
   });
+  final List<HttpRequestTabEntity> initialTabs;
+  final int initialIndex;
+  final Widget Function(String tabId) builder;
 
   @override
   State<_Harness> createState() => _HarnessState();
@@ -137,52 +136,62 @@ Future<_HarnessState> _pumpHarness(
 
 void main() {
   // Test 1: Switching away and back preserves child State.
-  testWidgets('switching tabs preserves the State of a previously visited tab', (tester) async {
-    final state = await _pumpHarness(
-      tester,
-      tabs: _tabs(['a', 'b']),
-      activeIndex: 0,
-      builder: (id) => _CounterWidget(key: ValueKey('view_$id'), tabId: id),
-    );
+  testWidgets(
+    'switching tabs preserves the State of a previously visited tab',
+    (tester) async {
+      final state = await _pumpHarness(
+        tester,
+        tabs: _tabs(['a', 'b']),
+        activeIndex: 0,
+        builder: (id) => _CounterWidget(key: ValueKey('view_$id'), tabId: id),
+      );
 
-    // Increment the counter for tab 'a'.
-    final stateA = tester.state<_CounterWidgetState>(find.byKey(const ValueKey('view_a')));
-    stateA.increment();
-    await tester.pump();
+      // Increment the counter for tab 'a'.
+      tester
+          .state<_CounterWidgetState>(find.byKey(const ValueKey('view_a')))
+          .increment();
+      await tester.pump();
 
-    expect(find.text('a:1'), findsOneWidget);
+      expect(find.text('a:1'), findsOneWidget);
 
-    // Switch to tab 'b'.
-    state.update(newIndex: 1);
-    await tester.pump();
+      // Switch to tab 'b'.
+      state.update(newIndex: 1);
+      await tester.pump();
 
-    // Switch back to tab 'a' — State should still have count==1.
-    state.update(newIndex: 0);
-    await tester.pump();
+      // Switch back to tab 'a' — State should still have count==1.
+      state.update(newIndex: 0);
+      await tester.pump();
 
-    expect(find.text('a:1'), findsOneWidget);
-  });
+      expect(find.text('a:1'), findsOneWidget);
+    },
+  );
 
   // Test 2: Visiting 6 tabs evicts the LRU non-active one (5 remain).
-  testWidgets('visiting 6 tabs evicts the least-recently-used non-active tab', (tester) async {
+  testWidgets('visiting 6 tabs evicts the least-recently-used non-active tab', (
+    tester,
+  ) async {
     final disposed = <String>{};
 
     final state = await _pumpHarness(
       tester,
       tabs: _tabs(['a', 'b', 'c', 'd', 'e', 'f']),
       activeIndex: 0,
-      builder: (id) =>
-          _DisposeSpy(key: ValueKey('view_$id'), tabId: id, onDisposed: () => disposed.add(id)),
+      builder: (id) => _DisposeSpy(
+        key: ValueKey('view_$id'),
+        tabId: id,
+        onDisposed: () => disposed.add(id),
+      ),
     );
 
     // Visit tabs in order: a(0), b(1), c(2), d(3), e(4) — fills up to 5 slots.
-    for (int i = 1; i < 5; i++) {
+    for (var i = 1; i < 5; i++) {
       state.update(newIndex: i);
       await tester.pump();
     }
     expect(disposed, isEmpty);
 
-    // Now visit tab 'f' (index 5) — should evict 'a' (visited earliest, not active).
+    // Now visit tab 'f' (index 5) — should evict 'a' (visited earliest, not
+    // active).
     state.update(newIndex: 5);
     await tester.pump();
 
@@ -190,11 +199,16 @@ void main() {
     expect(disposed.length, 1);
 
     // Verify exactly 5 spy widgets remain in the tree (including offstage).
-    expect(find.byType(_DisposeSpy, skipOffstage: false), findsNWidgets(kMaxLiveTabViews));
+    expect(
+      find.byType(_DisposeSpy, skipOffstage: false),
+      findsNWidgets(kMaxLiveTabViews),
+    );
   });
 
   // Test 3: Closing a tab removes its child from the stack.
-  testWidgets('closing a tab removes its child widget from the stack', (tester) async {
+  testWidgets('closing a tab removes its child widget from the stack', (
+    tester,
+  ) async {
     final state = await _pumpHarness(
       tester,
       tabs: _tabs(['x', 'y', 'z']),
@@ -225,7 +239,9 @@ void main() {
   });
 
   // Test 4: ExcludeFocus — only the active child has excluding==false.
-  testWidgets('only the active child has ExcludeFocus.excluding set to false', (tester) async {
+  testWidgets('only the active child has ExcludeFocus.excluding set to false', (
+    tester,
+  ) async {
     final state = await _pumpHarness(
       tester,
       tabs: _tabs(['p', 'q', 'r']),
@@ -240,9 +256,13 @@ void main() {
     await tester.pump();
 
     // Active is index 2 → id 'r'. Verify the ExcludeFocus widgets.
-    // Use skipOffstage: false because non-active children are wrapped in Offstage.
-    final excludeFocusWidgets =
-        tester.widgetList<ExcludeFocus>(find.byType(ExcludeFocus, skipOffstage: false)).toList();
+    // Use skipOffstage: false because non-active children are wrapped in
+    // Offstage.
+    final excludeFocusWidgets = tester
+        .widgetList<ExcludeFocus>(
+          find.byType(ExcludeFocus, skipOffstage: false),
+        )
+        .toList();
     // Three live tabs means three ExcludeFocus nodes.
     expect(excludeFocusWidgets.length, 3);
 
@@ -254,13 +274,14 @@ void main() {
     final activeExclude = find.descendant(
       of: find.byKey(const ValueKey('offstage_r')),
       matching: find.byType(ExcludeFocus, skipOffstage: false),
-      matchRoot: false,
     );
     expect(tester.widget<ExcludeFocus>(activeExclude).excluding, isFalse);
   });
 
   // Test 5: Empty tabs list returns SizedBox.shrink without crashing.
-  testWidgets('empty tab list renders SizedBox.shrink without error', (tester) async {
+  testWidgets('empty tab list renders SizedBox.shrink without error', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(

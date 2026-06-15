@@ -5,18 +5,19 @@ import 'package:getman/features/chaining/domain/entities/request_rules_entity.da
 import 'package:getman/features/chaining/domain/repositories/request_rules_repository.dart';
 
 class RequestRulesRepositoryImpl implements RequestRulesRepository {
+  RequestRulesRepositoryImpl(this.localDataSource);
   final RequestRulesLocalDataSource localDataSource;
 
-  RequestRulesRepositoryImpl(this.localDataSource);
-
   @override
-  Future<RequestRulesEntity> getRules(String configId) => guardPersistence(() async {
+  Future<RequestRulesEntity> getRules(String configId) =>
+      guardPersistence(() async {
         final model = localDataSource.getRules(configId);
         return model?.toEntity() ?? RequestRulesEntity(configId: configId);
       });
 
   @override
-  Future<void> saveRules(RequestRulesEntity rules) => guardPersistence(() async {
+  Future<void> saveRules(RequestRulesEntity rules) =>
+      guardPersistence(() async {
         if (rules.isEmpty) {
           await localDataSource.deleteRules(rules.configId);
           return;

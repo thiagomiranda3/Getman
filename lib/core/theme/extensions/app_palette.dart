@@ -1,23 +1,6 @@
 import 'package:flutter/material.dart';
 
 class AppPalette extends ThemeExtension<AppPalette> {
-  final Map<String, Color> methodColors;
-  final Color methodFallback;
-  final Color statusSuccess;
-  final Color statusWarning;
-  final Color statusError;
-  final Color statusAccentSuccess;
-  final Color statusAccentWarning;
-  final Color statusAccentError;
-  final Color codeBackground;
-  final Color variableResolved;
-  final Color variableUnresolved;
-
-  /// Background for the active segment of a selector/toggle (body-type chips,
-  /// response Pretty/Raw toggle). Each theme maps it to its signature accent.
-  /// Pair with [Color]-derived contrast text via `ThemeData.estimateBrightnessForColor`.
-  final Color selectorActive;
-
   const AppPalette({
     required this.methodColors,
     required this.methodFallback,
@@ -32,6 +15,23 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.variableUnresolved,
     required this.selectorActive,
   });
+  final Map<String, Color> methodColors;
+  final Color methodFallback;
+  final Color statusSuccess;
+  final Color statusWarning;
+  final Color statusError;
+  final Color statusAccentSuccess;
+  final Color statusAccentWarning;
+  final Color statusAccentError;
+  final Color codeBackground;
+  final Color variableResolved;
+  final Color variableUnresolved;
+
+  /// Background for the active segment of a selector/toggle (body-type chips,
+  /// response Pretty/Raw toggle). Each theme maps it to its signature accent.
+  /// Pair with [Color]-derived contrast text via
+  /// `ThemeData.estimateBrightnessForColor`.
+  final Color selectorActive;
 
   Color methodColor(String method) =>
       methodColors[method.toUpperCase()] ?? methodFallback;
@@ -48,7 +48,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     return statusAccentWarning;
   }
 
-  /// Black or white — whichever yields the higher WCAG contrast on [background].
+  /// Black or white — whichever yields the higher WCAG contrast on
+  /// [background].
   /// (Flutter's estimateBrightnessForColor is threshold-based and picks the
   /// wrong one for some mid-tone colors; this direct comparison is optimal and
   /// guarantees >= ~4.58:1 for any background.) For text/icons on method- and
@@ -103,12 +104,32 @@ class AppPalette extends ThemeExtension<AppPalette> {
       statusSuccess: Color.lerp(statusSuccess, other.statusSuccess, t)!,
       statusWarning: Color.lerp(statusWarning, other.statusWarning, t)!,
       statusError: Color.lerp(statusError, other.statusError, t)!,
-      statusAccentSuccess: Color.lerp(statusAccentSuccess, other.statusAccentSuccess, t)!,
-      statusAccentWarning: Color.lerp(statusAccentWarning, other.statusAccentWarning, t)!,
-      statusAccentError: Color.lerp(statusAccentError, other.statusAccentError, t)!,
+      statusAccentSuccess: Color.lerp(
+        statusAccentSuccess,
+        other.statusAccentSuccess,
+        t,
+      )!,
+      statusAccentWarning: Color.lerp(
+        statusAccentWarning,
+        other.statusAccentWarning,
+        t,
+      )!,
+      statusAccentError: Color.lerp(
+        statusAccentError,
+        other.statusAccentError,
+        t,
+      )!,
       codeBackground: Color.lerp(codeBackground, other.codeBackground, t)!,
-      variableResolved: Color.lerp(variableResolved, other.variableResolved, t)!,
-      variableUnresolved: Color.lerp(variableUnresolved, other.variableUnresolved, t)!,
+      variableResolved: Color.lerp(
+        variableResolved,
+        other.variableResolved,
+        t,
+      )!,
+      variableUnresolved: Color.lerp(
+        variableUnresolved,
+        other.variableUnresolved,
+        t,
+      )!,
       selectorActive: Color.lerp(selectorActive, other.selectorActive, t)!,
     );
   }

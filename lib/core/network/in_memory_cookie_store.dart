@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/network_cookie.dart';
 
@@ -5,14 +7,13 @@ import 'package:getman/core/network/network_cookie.dart';
 /// the session source of truth; mutations flush to durable storage. Expired
 /// cookies are pruned on read. [now] is injectable for deterministic tests.
 class InMemoryCookieStore implements CookieStore {
-  final CookiePersistence persistence;
-  final int Function() now;
-  final List<NetworkCookie> _cookies = [];
-
   InMemoryCookieStore({
     required this.persistence,
     int Function()? now,
   }) : now = now ?? (() => DateTime.now().millisecondsSinceEpoch);
+  final CookiePersistence persistence;
+  final int Function() now;
+  final List<NetworkCookie> _cookies = [];
 
   /// Loads persisted cookies into memory (call once at boot).
   void hydrate() {
@@ -25,11 +26,12 @@ class InMemoryCookieStore implements CookieStore {
   @override
   String? cookieHeaderFor(Uri uri) {
     final n = now();
-    final matching = _cookies.where((c) => !c.isExpired(n) && c.matches(uri)).toList()
-      // RFC 6265 §5.4: cookies with longer paths sort before shorter ones, so a
-      // more-specific cookie wins for servers that read the first value of a
-      // duplicated name.
-      ..sort((a, b) => b.path.length.compareTo(a.path.length));
+    final matching =
+        _cookies.where((c) => !c.isExpired(n) && c.matches(uri)).toList()
+          // RFC 6265 §5.4: cookies with longer paths sort before shorter ones,
+          // so a more-specific cookie wins for servers that read the first
+          // value of a duplicated name.
+          ..sort((a, b) => b.path.length.compareTo(a.path.length));
     if (matching.isEmpty) return null;
     return matching.map((c) => '${c.name}=${c.value}').join('; ');
   }
@@ -49,10 +51,10 @@ class InMemoryCookieStore implements CookieStore {
       // put/delete per affected cookie, not a whole-jar rewrite. Best-effort:
       // never block the request path on a write.
       if (cookie.isExpired(now())) {
-        persistence.remove(cookie.key);
+        unawaited(persistence.remove(cookie.key));
       } else {
         _cookies.add(cookie);
-        persistence.upsert(cookie);
+        unawaited(persistence.upsert(cookie));
       }
     }
   }

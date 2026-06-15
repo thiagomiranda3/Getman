@@ -8,33 +8,36 @@ import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 /// A single row in the environments list: name + active marker + export/delete
 /// actions. Highlights when selected, and marks the active environment.
 class EnvironmentListTile extends StatelessWidget {
+  const EnvironmentListTile({
+    required this.environment,
+    required this.isSelected,
+    required this.onTap,
+    required this.onDelete,
+    required this.onExport,
+    super.key,
+  });
   final EnvironmentEntity environment;
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onExport;
 
-  const EnvironmentListTile({
-    super.key,
-    required this.environment,
-    required this.isSelected,
-    required this.onTap,
-    required this.onDelete,
-    required this.onExport,
-  });
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
     return BlocBuilder<SettingsBloc, SettingsState>(
-      buildWhen: (p, n) => p.settings.activeEnvironmentId != n.settings.activeEnvironmentId,
+      buildWhen: (p, n) =>
+          p.settings.activeEnvironmentId != n.settings.activeEnvironmentId,
       builder: (context, settingsState) {
-        final isActive = settingsState.settings.activeEnvironmentId == environment.id;
+        final isActive =
+            settingsState.settings.activeEnvironmentId == environment.id;
         return InkWell(
           onTap: onTap,
           child: Container(
-            color: isSelected ? theme.primaryColor.withValues(alpha: 0.3) : null,
+            color: isSelected
+                ? theme.primaryColor.withValues(alpha: 0.3)
+                : null,
             padding: EdgeInsets.symmetric(
               horizontal: layout.inputPadding,
               vertical: layout.inputPaddingVertical,
@@ -44,7 +47,11 @@ class EnvironmentListTile extends StatelessWidget {
                 if (isActive)
                   Padding(
                     padding: const EdgeInsets.only(right: 6),
-                    child: Icon(Icons.check_circle, size: layout.smallIconSize, color: theme.colorScheme.secondary),
+                    child: Icon(
+                      Icons.check_circle,
+                      size: layout.smallIconSize,
+                      color: theme.colorScheme.secondary,
+                    ),
                   ),
                 Expanded(
                   child: Text(
@@ -63,7 +70,10 @@ class EnvironmentListTile extends StatelessWidget {
                   iconSize: layout.smallIconSize,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  icon: Icon(Icons.file_download, color: theme.colorScheme.onSurface),
+                  icon: Icon(
+                    Icons.file_download,
+                    color: theme.colorScheme.onSurface,
+                  ),
                   tooltip: 'Export environment',
                   onPressed: onExport,
                 ),
@@ -72,7 +82,10 @@ class EnvironmentListTile extends StatelessWidget {
                   iconSize: layout.smallIconSize,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
+                  icon: Icon(
+                    Icons.delete_outline,
+                    color: theme.colorScheme.error,
+                  ),
                   tooltip: 'Delete environment',
                   onPressed: onDelete,
                 ),

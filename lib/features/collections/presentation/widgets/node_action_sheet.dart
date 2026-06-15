@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -12,7 +14,7 @@ import 'package:getman/features/collections/presentation/bloc/collections_bloc.d
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 
 /// Touch-first replacement for the three-dot context menu. Opened via long-
-/// press on a collection node when [BuildContext.isPhone] is true. Exposes
+/// press on a collection node when `BuildContext.isPhone` is true. Exposes
 /// the same actions (favorite, rename, add subfolder, export, delete) plus a
 /// Move-to picker that makes up for the lack of drag-drop on narrow screens.
 class NodeActionSheet {
@@ -23,7 +25,9 @@ class NodeActionSheet {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       useSafeArea: true,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(context.appShape.sheetRadius)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(context.appShape.sheetRadius),
+        ),
       ),
       builder: (sheetContext) => BlocProvider.value(
         value: collectionsBloc,
@@ -34,8 +38,8 @@ class NodeActionSheet {
 }
 
 class _SheetBody extends StatelessWidget {
-  final CollectionNodeEntity node;
   const _SheetBody({required this.node});
+  final CollectionNodeEntity node;
 
   @override
   Widget build(BuildContext context) {
@@ -48,11 +52,16 @@ class _SheetBody extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: layout.inputPadding, vertical: layout.headerPaddingVertical),
+            padding: EdgeInsets.symmetric(
+              horizontal: layout.inputPadding,
+              vertical: layout.headerPaddingVertical,
+            ),
             child: Row(
               children: [
                 Icon(
-                  node.isFolder ? (node.isFavorite ? Icons.star : Icons.folder) : Icons.link,
+                  node.isFolder
+                      ? (node.isFavorite ? Icons.star : Icons.folder)
+                      : Icons.link,
                   color: theme.colorScheme.secondary,
                 ),
                 const SizedBox(width: 12),
@@ -71,7 +80,11 @@ class _SheetBody extends StatelessWidget {
               ],
             ),
           ),
-          Divider(color: theme.dividerColor, height: 0, thickness: layout.borderThick),
+          Divider(
+            color: theme.dividerColor,
+            height: 0,
+            thickness: layout.borderThick,
+          ),
           if (node.isFolder && node.config == null)
             _Action(
               icon: node.isFavorite ? Icons.star_border : Icons.star,
@@ -87,11 +100,13 @@ class _SheetBody extends StatelessWidget {
             onTap: () {
               final bloc = context.read<CollectionsBloc>();
               Navigator.of(context).pop();
-              NamePromptDialog.show(
-                context,
-                title: 'RENAME',
-                initialText: node.name,
-                onConfirm: (name) => bloc.add(RenameNode(node.id, name)),
+              unawaited(
+                NamePromptDialog.show(
+                  context,
+                  title: 'RENAME',
+                  initialText: node.name,
+                  onConfirm: (name) => bloc.add(RenameNode(node.id, name)),
+                ),
               );
             },
           ),
@@ -101,14 +116,18 @@ class _SheetBody extends StatelessWidget {
             onTap: () {
               final bloc = context.read<CollectionsBloc>();
               Navigator.of(context).pop();
-              NamePromptDialog.show(
-                context,
-                title: 'DESCRIPTION',
-                initialText: node.description ?? '',
-                hintText: 'Notes for this ${node.isFolder ? 'folder' : 'request'}',
-                allowEmpty: true,
-                multiline: true,
-                onConfirm: (text) => bloc.add(UpdateNodeDescription(node.id, text.trim())),
+              unawaited(
+                NamePromptDialog.show(
+                  context,
+                  title: 'DESCRIPTION',
+                  initialText: node.description ?? '',
+                  hintText:
+                      'Notes for this ${node.isFolder ? 'folder' : 'request'}',
+                  allowEmpty: true,
+                  multiline: true,
+                  onConfirm: (text) =>
+                      bloc.add(UpdateNodeDescription(node.id, text.trim())),
+                ),
               );
             },
           ),
@@ -119,11 +138,14 @@ class _SheetBody extends StatelessWidget {
               onTap: () {
                 final bloc = context.read<CollectionsBloc>();
                 Navigator.of(context).pop();
-                NamePromptDialog.show(
-                  context,
-                  title: 'ADD SUBFOLDER',
-                  confirmLabel: 'ADD',
-                  onConfirm: (name) => bloc.add(AddFolder(name, parentId: node.id)),
+                unawaited(
+                  NamePromptDialog.show(
+                    context,
+                    title: 'ADD SUBFOLDER',
+                    confirmLabel: 'ADD',
+                    onConfirm: (name) =>
+                        bloc.add(AddFolder(name, parentId: node.id)),
+                  ),
                 );
               },
             ),
@@ -133,7 +155,7 @@ class _SheetBody extends StatelessWidget {
             onTap: () {
               final bloc = context.read<CollectionsBloc>();
               Navigator.of(context).pop();
-              _MoveToSheet.show(context, node, bloc);
+              unawaited(_MoveToSheet.show(context, node, bloc));
             },
           ),
           _Action(
@@ -141,7 +163,7 @@ class _SheetBody extends StatelessWidget {
             label: 'EXPORT TO POSTMAN',
             onTap: () {
               Navigator.of(context).pop();
-              _exportNode(context, node);
+              unawaited(_exportNode(context, node));
             },
           ),
           _Action(
@@ -149,17 +171,20 @@ class _SheetBody extends StatelessWidget {
             label: 'DELETE',
             isDestructive: true,
             onTap: () {
-              ConfirmDialog.show(
-                context,
-                title: node.isFolder ? 'Delete folder?' : 'Delete request?',
-                message: node.isFolder
-                    ? 'Deletes "${node.name}" and everything inside it. This cannot be undone.'
-                    : 'Deletes "${node.name}". This cannot be undone.',
-                onConfirm: () {
-                  context.read<CollectionsBloc>().add(DeleteNode(node.id));
-                  showAppSnackBar(context, 'Deleted "${node.name}"');
-                  Navigator.of(context).pop(); // close the action sheet
-                },
+              unawaited(
+                ConfirmDialog.show(
+                  context,
+                  title: node.isFolder ? 'Delete folder?' : 'Delete request?',
+                  message: node.isFolder
+                      ? 'Deletes "${node.name}" and everything inside it. '
+                            'This cannot be undone.'
+                      : 'Deletes "${node.name}". This cannot be undone.',
+                  onConfirm: () {
+                    context.read<CollectionsBloc>().add(DeleteNode(node.id));
+                    showAppSnackBar(context, 'Deleted "${node.name}"');
+                    Navigator.of(context).pop(); // close the action sheet
+                  },
+                ),
               );
             },
           ),
@@ -171,29 +196,33 @@ class _SheetBody extends StatelessWidget {
 }
 
 class _Action extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool isDestructive;
-
   const _Action({
     required this.icon,
     required this.label,
     required this.onTap,
     this.isDestructive = false,
   });
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool isDestructive;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
-    final color = isDestructive ? theme.colorScheme.error : theme.colorScheme.onSurface;
+    final color = isDestructive
+        ? theme.colorScheme.error
+        : theme.colorScheme.onSurface;
 
     return InkWell(
       onTap: onTap,
       child: Container(
         constraints: BoxConstraints(minHeight: context.touchTargetMin),
-        padding: EdgeInsets.symmetric(horizontal: layout.inputPadding, vertical: layout.inputPadding),
+        padding: EdgeInsets.symmetric(
+          horizontal: layout.inputPadding,
+          vertical: layout.inputPadding,
+        ),
         child: Row(
           children: [
             Icon(icon, color: color, size: layout.iconSize),
@@ -226,7 +255,9 @@ class _MoveToSheet {
       useSafeArea: true,
       isScrollControlled: true,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(context.appShape.sheetRadius)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(context.appShape.sheetRadius),
+        ),
       ),
       builder: (sheetContext) {
         final theme = Theme.of(sheetContext);
@@ -255,7 +286,11 @@ class _MoveToSheet {
                     ],
                   ),
                 ),
-                Divider(color: theme.dividerColor, height: 0, thickness: layout.borderThick),
+                Divider(
+                  color: theme.dividerColor,
+                  height: 0,
+                  thickness: layout.borderThick,
+                ),
                 Expanded(
                   child: ListView(
                     children: [
@@ -270,7 +305,8 @@ class _MoveToSheet {
                       for (final f in folders)
                         _Action(
                           icon: Icons.folder,
-                          label: '${'  ' * f.depth}${f.node.name.toUpperCase()}',
+                          label:
+                              '${'  ' * f.depth}${f.node.name.toUpperCase()}',
                           onTap: () {
                             bloc.add(MoveNode(source.id, f.node.id));
                             Navigator.of(sheetContext).pop();
@@ -296,17 +332,20 @@ class _MoveToSheet {
     for (final node in nodes) {
       if (!node.isFolder) continue;
       if (node.id == exclude) continue;
-      result.add(_FolderEntry(node: node, depth: depth));
-      result.addAll(_flattenFolders(node.children, exclude: exclude, depth: depth + 1));
+      result
+        ..add(_FolderEntry(node: node, depth: depth))
+        ..addAll(
+          _flattenFolders(node.children, exclude: exclude, depth: depth + 1),
+        );
     }
     return result;
   }
 }
 
 class _FolderEntry {
+  const _FolderEntry({required this.node, required this.depth});
   final CollectionNodeEntity node;
   final int depth;
-  const _FolderEntry({required this.node, required this.depth});
 }
 
 Future<void> _exportNode(BuildContext context, CollectionNodeEntity node) {

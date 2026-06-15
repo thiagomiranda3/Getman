@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/auth_config.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart'
+    show HttpRequestConfigEntity;
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/ui/widgets/key_value_list_editor.dart'
+    show KeyValueListEditor;
 import 'package:getman/core/utils/equality.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
@@ -10,11 +14,12 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 
 /// AUTH tab — a fixed-field form over [HttpRequestConfigEntity.auth]. Holds its
 /// own controllers and suppresses echoes of its own emissions (mirrors
-/// [KeyValueListEditor]) so typing never loses focus across the bloc round-trip.
-/// Field values may contain `{{env vars}}`; they resolve at send time.
+/// [KeyValueListEditor]) so typing never loses focus across the bloc
+/// round-trip. Field values may contain `{{env vars}}`; they resolve at send
+/// time.
 class AuthTabView extends StatefulWidget {
+  const AuthTabView({required this.tabId, super.key});
   final String tabId;
-  const AuthTabView({super.key, required this.tabId});
 
   @override
   State<AuthTabView> createState() => _AuthTabViewState();
@@ -53,7 +58,13 @@ class _AuthTabViewState extends State<AuthTabView> {
   }
 
   AuthConfig _currentAuth() =>
-      context.read<TabsBloc>().state.tabs.byId(widget.tabId)?.config.authConfig ??
+      context
+          .read<TabsBloc>()
+          .state
+          .tabs
+          .byId(widget.tabId)
+          ?.config
+          .authConfig ??
       AuthConfig.none;
 
   @override
@@ -81,14 +92,14 @@ class _AuthTabViewState extends State<AuthTabView> {
   }
 
   AuthConfig _build() => AuthConfig(
-        type: _type,
-        token: _token.text,
-        username: _username.text,
-        password: _password.text,
-        apiKeyName: _apiKeyName.text,
-        apiKeyValue: _apiKeyValue.text,
-        apiKeyLocation: _apiKeyLocation,
-      );
+    type: _type,
+    token: _token.text,
+    username: _username.text,
+    password: _password.text,
+    apiKeyName: _apiKeyName.text,
+    apiKeyValue: _apiKeyValue.text,
+    apiKeyLocation: _apiKeyLocation,
+  );
 
   void _emit() {
     final bloc = context.read<TabsBloc>();
@@ -96,7 +107,9 @@ class _AuthTabViewState extends State<AuthTabView> {
     if (current == null) return;
     final map = _build().toMap();
     _lastEmitted = map;
-    bloc.add(UpdateTab(current.copyWith(config: current.config.copyWith(auth: map))));
+    bloc.add(
+      UpdateTab(current.copyWith(config: current.config.copyWith(auth: map))),
+    );
   }
 
   @override
@@ -112,7 +125,8 @@ class _AuthTabViewState extends State<AuthTabView> {
         final auth = state.tabs.byId(widget.tabId)?.config.auth ?? const {};
         // Ignore the echo of our own emission — it would reset controllers
         // mid-type and steal focus.
-        if (_lastEmitted != null && stringMapEquality.equals(auth, _lastEmitted)) {
+        if (_lastEmitted != null &&
+            stringMapEquality.equals(auth, _lastEmitted)) {
           return;
         }
         setState(() => _syncFrom(AuthConfig.fromMap(auth)));
@@ -165,8 +179,14 @@ class _AuthTabViewState extends State<AuthTabView> {
             value: _apiKeyLocation,
             isExpanded: true,
             items: const [
-              DropdownMenuItem(value: ApiKeyLocation.header, child: Text('HEADER')),
-              DropdownMenuItem(value: ApiKeyLocation.query, child: Text('QUERY PARAM')),
+              DropdownMenuItem(
+                value: ApiKeyLocation.header,
+                child: Text('HEADER'),
+              ),
+              DropdownMenuItem(
+                value: ApiKeyLocation.query,
+                child: Text('QUERY PARAM'),
+              ),
             ],
             onChanged: (next) {
               if (next == null) return;
@@ -179,22 +199,22 @@ class _AuthTabViewState extends State<AuthTabView> {
   }
 
   Widget _label(BuildContext context, String text) => Text(
-        text,
-        style: TextStyle(
-          fontSize: context.appLayout.fontSizeSmall,
-          fontWeight: context.appTypography.titleWeight,
-          color: Theme.of(context).colorScheme.onSurface,
-        ),
-      );
+    text,
+    style: TextStyle(
+      fontSize: context.appLayout.fontSizeSmall,
+      fontWeight: context.appTypography.titleWeight,
+      color: Theme.of(context).colorScheme.onSurface,
+    ),
+  );
 
   Widget _hint(BuildContext context, String text) => Text(
-        text,
-        style: TextStyle(
-          fontSize: context.appLayout.fontSizeNormal,
-          fontWeight: context.appTypography.bodyWeight,
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-        ),
-      );
+    text,
+    style: TextStyle(
+      fontSize: context.appLayout.fontSizeNormal,
+      fontWeight: context.appTypography.bodyWeight,
+      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+    ),
+  );
 
   Widget _field(
     BuildContext context,
@@ -215,7 +235,6 @@ class _AuthTabViewState extends State<AuthTabView> {
             obscureText: obscure,
             autocorrect: false,
             enableSuggestions: false,
-            textCapitalization: TextCapitalization.none,
             style: TextStyle(
               fontSize: layout.fontSizeNormal,
               fontWeight: context.appTypography.titleWeight,

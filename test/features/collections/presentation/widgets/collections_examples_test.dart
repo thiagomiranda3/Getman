@@ -37,17 +37,21 @@ void main() {
   setUpAll(() {
     registerFallbackValue(<CollectionNodeEntity>[]);
     registerFallbackValue(_FakeConfig());
-    registerFallbackValue(const HttpRequestTabEntity(
-      tabId: 'fallback',
-      config: HttpRequestConfigEntity(id: 'fallback'),
-    ));
+    registerFallbackValue(
+      const HttpRequestTabEntity(
+        tabId: 'fallback',
+        config: HttpRequestConfigEntity(id: 'fallback'),
+      ),
+    );
   });
 
   setUp(() {
     collectionsRepo = MockCollectionsRepository();
     tabsRepo = MockTabsRepository();
     sendUseCase = MockSendRequestUseCase();
-    when(() => collectionsRepo.getCollections()).thenAnswer((_) async => const []);
+    when(
+      () => collectionsRepo.getCollections(),
+    ).thenAnswer((_) async => const []);
     when(() => collectionsRepo.saveCollections(any())).thenAnswer((_) async {});
     when(() => tabsRepo.getTabs()).thenAnswer((_) async => const []);
     when(() => tabsRepo.saveTabs(any())).thenAnswer((_) async {});
@@ -69,25 +73,34 @@ void main() {
     ),
   );
 
-  Future<({CollectionsBloc collections, TabsBloc tabs})> pump(WidgetTester tester) async {
-    final collectionsBloc = CollectionsBloc(
-      getCollectionsUseCase: GetCollectionsUseCase(collectionsRepo),
-      saveCollectionsUseCase: SaveCollectionsUseCase(collectionsRepo),
-      saveDebounce: const Duration(milliseconds: 5),
-    );
-    collectionsBloc.add(ReplaceCollections([
-      CollectionNodeEntity(
-        id: 'R',
-        name: 'GetUsers',
-        isFolder: false,
-        config: const HttpRequestConfigEntity(id: 'R', url: 'https://api/users'),
-        examples: [example],
-      ),
-    ]));
+  Future<({CollectionsBloc collections, TabsBloc tabs})> pump(
+    WidgetTester tester,
+  ) async {
+    final collectionsBloc =
+        CollectionsBloc(
+          getCollectionsUseCase: GetCollectionsUseCase(collectionsRepo),
+          saveCollectionsUseCase: SaveCollectionsUseCase(collectionsRepo),
+          saveDebounce: const Duration(milliseconds: 5),
+        )..add(
+          ReplaceCollections([
+            CollectionNodeEntity(
+              id: 'R',
+              name: 'GetUsers',
+              isFolder: false,
+              config: const HttpRequestConfigEntity(
+                id: 'R',
+                url: 'https://api/users',
+              ),
+              examples: [example],
+            ),
+          ]),
+        );
     await collectionsBloc.stream.first;
 
-    final tabsBloc = TabsBloc(repository: tabsRepo, sendRequestUseCase: sendUseCase);
-    tabsBloc.add(const LoadTabs());
+    final tabsBloc = TabsBloc(
+      repository: tabsRepo,
+      sendRequestUseCase: sendUseCase,
+    )..add(const LoadTabs());
     await tabsBloc.stream.firstWhere((s) => !s.isLoading);
 
     addTearDown(collectionsBloc.close);
@@ -111,7 +124,9 @@ void main() {
     return (collections: collectionsBloc, tabs: tabsBloc);
   }
 
-  testWidgets('a request with examples is collapsed by default, then expands', (tester) async {
+  testWidgets('a request with examples is collapsed by default, then expands', (
+    tester,
+  ) async {
     await pump(tester);
 
     // The count badge shows; the example row is hidden until expanded.
@@ -126,7 +141,9 @@ void main() {
     expect(find.text('My Example'), findsOneWidget);
   });
 
-  testWidgets('tapping an example opens it as a tab with its response', (tester) async {
+  testWidgets('tapping an example opens it as a tab with its response', (
+    tester,
+  ) async {
     final blocs = await pump(tester);
 
     await tester.tap(find.byIcon(Icons.keyboard_arrow_right));

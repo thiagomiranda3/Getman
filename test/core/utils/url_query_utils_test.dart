@@ -59,17 +59,23 @@ void main() {
 
     test('percent-decodes values', () {
       final parts = UrlQueryUtils.parse('https://x/a?q=hello%20world');
-      expect(parts.params, [const QueryParamEntity(key: 'q', value: 'hello world')]);
+      expect(parts.params, [
+        const QueryParamEntity(key: 'q', value: 'hello world'),
+      ]);
     });
 
     test('percent-decodes special characters in values', () {
       final parts = UrlQueryUtils.parse('https://x/a?q=foo%26bar%3Dbaz');
-      expect(parts.params, [const QueryParamEntity(key: 'q', value: 'foo&bar=baz')]);
+      expect(parts.params, [
+        const QueryParamEntity(key: 'q', value: 'foo&bar=baz'),
+      ]);
     });
 
     test('preserves {{var}} tokens verbatim on parse', () {
       final parts = UrlQueryUtils.parse('https://x/a?id={{userId}}');
-      expect(parts.params, [const QueryParamEntity(key: 'id', value: '{{userId}}')]);
+      expect(parts.params, [
+        const QueryParamEntity(key: 'id', value: '{{userId}}'),
+      ]);
     });
 
     test('only splits on the first ? and first # after it', () {

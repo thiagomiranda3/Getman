@@ -22,7 +22,10 @@ void main() {
   late InMemoryCookieStore store;
 
   setUp(() {
-    store = InMemoryCookieStore(persistence: _FakePersistence(), now: () => 1000);
+    store = InMemoryCookieStore(
+      persistence: _FakePersistence(),
+      now: () => 1000,
+    );
   });
 
   Future<void> pumpAndOpen(WidgetTester tester) async {
@@ -47,8 +50,12 @@ void main() {
   }
 
   testWidgets('lists stored cookies', (tester) async {
-    store.storeFromSetCookie(Uri.parse('https://api.dev/'), 'sid=abc; Path=/');
-    store.storeFromSetCookie(Uri.parse('https://api.dev/'), 'theme=dark; Path=/');
+    store
+      ..storeFromSetCookie(Uri.parse('https://api.dev/'), 'sid=abc; Path=/')
+      ..storeFromSetCookie(
+        Uri.parse('https://api.dev/'),
+        'theme=dark; Path=/',
+      );
 
     await pumpAndOpen(tester);
 
@@ -62,9 +69,15 @@ void main() {
     expect(find.text('NO COOKIES STORED'), findsOneWidget);
   });
 
-  testWidgets('deleting a cookie removes it from the store after confirming', (tester) async {
-    store.storeFromSetCookie(Uri.parse('https://api.dev/'), 'sid=abc; Path=/');
-    store.storeFromSetCookie(Uri.parse('https://api.dev/'), 'theme=dark; Path=/');
+  testWidgets('deleting a cookie removes it from the store after confirming', (
+    tester,
+  ) async {
+    store
+      ..storeFromSetCookie(Uri.parse('https://api.dev/'), 'sid=abc; Path=/')
+      ..storeFromSetCookie(
+        Uri.parse('https://api.dev/'),
+        'theme=dark; Path=/',
+      );
 
     await pumpAndOpen(tester);
     expect(store.all(), hasLength(2));

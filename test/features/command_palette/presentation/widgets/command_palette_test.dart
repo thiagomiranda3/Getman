@@ -45,23 +45,33 @@ void main() {
     environments = MockEnvironmentsBloc();
     settings = MockSettingsBloc();
 
-    when(() => collections.state).thenReturn(CollectionsState(collections: const [
-      CollectionNodeEntity(
-        id: 'f1',
-        name: 'Auth',
-        isFolder: true,
-        children: [
+    when(() => collections.state).thenReturn(
+      CollectionsState(
+        collections: const [
           CollectionNodeEntity(
-            id: 'r1',
-            name: 'Login',
-            isFolder: false,
-            config: HttpRequestConfigEntity(id: 'c1', method: 'POST', url: 'https://api.dev/login'),
+            id: 'f1',
+            name: 'Auth',
+            children: [
+              CollectionNodeEntity(
+                id: 'r1',
+                name: 'Login',
+                isFolder: false,
+                config: HttpRequestConfigEntity(
+                  id: 'c1',
+                  method: 'POST',
+                  url: 'https://api.dev/login',
+                ),
+              ),
+            ],
           ),
         ],
       ),
-    ]));
+    );
     when(() => environments.state).thenReturn(
-        EnvironmentsState(environments: [EnvironmentEntity(id: 'e1', name: 'Production')]));
+      EnvironmentsState(
+        environments: [EnvironmentEntity(id: 'e1', name: 'Production')],
+      ),
+    );
     when(() => tabs.add(any())).thenReturn(null);
     when(() => settings.add(any())).thenReturn(null);
   });
@@ -93,14 +103,17 @@ void main() {
   testWidgets('typing filters the list', (tester) async {
     await pump(tester);
     await tester.enterText(find.byType(TextField), 'login');
-    // Search is debounced (~220ms) — advance past the window so the query lands.
+    // Search is debounced (~220ms) — advance past the window so the query
+    // lands.
     await tester.pump(const Duration(milliseconds: 250));
     await tester.pumpAndSettle();
     expect(find.text('Login'), findsOneWidget);
     expect(find.text('Production'), findsNothing);
   });
 
-  testWidgets('Enter submits the top match without waiting for the debounce', (tester) async {
+  testWidgets('Enter submits the top match without waiting for the debounce', (
+    tester,
+  ) async {
     await pump(tester);
     await tester.enterText(find.byType(TextField), 'login');
     // No debounce wait — onSubmitted recomputes synchronously.
@@ -109,9 +122,12 @@ void main() {
     verify(() => tabs.add(any(that: isA<AddTab>()))).called(1);
   });
 
-  testWidgets('arrow keys move the highlight; Enter runs the highlighted row', (tester) async {
+  testWidgets('arrow keys move the highlight; Enter runs the highlighted row', (
+    tester,
+  ) async {
     await pump(tester);
-    // With an empty query the order is: Login (request), No Environment, Production, themes…
+    // With an empty query the order is: Login (request), No Environment,
+    // Production, themes…
     // ArrowDown once highlights "No Environment", so Enter must switch the
     // environment, NOT open the top request as a tab.
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
@@ -119,7 +135,9 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
 
-    verify(() => settings.add(any(that: isA<UpdateActiveEnvironmentId>()))).called(1);
+    verify(
+      () => settings.add(any(that: isA<UpdateActiveEnvironmentId>())),
+    ).called(1);
     verifyNever(() => tabs.add(any()));
   });
 
@@ -134,6 +152,8 @@ void main() {
     await pump(tester);
     await tester.tap(find.text('Production'));
     await tester.pumpAndSettle();
-    verify(() => settings.add(any(that: isA<UpdateActiveEnvironmentId>()))).called(1);
+    verify(
+      () => settings.add(any(that: isA<UpdateActiveEnvironmentId>())),
+    ).called(1);
   });
 }

@@ -24,10 +24,12 @@ void main() {
   late TabsRepositoryImpl repository;
 
   setUpAll(() {
-    registerFallbackValue(HttpRequestTabModel(
-      config: HttpRequestConfig(id: 'fallback'),
-      tabId: 'fallback',
-    ));
+    registerFallbackValue(
+      HttpRequestTabModel(
+        config: HttpRequestConfig(id: 'fallback'),
+        tabId: 'fallback',
+      ),
+    );
   });
 
   setUp(() {
@@ -40,15 +42,15 @@ void main() {
   });
 
   HttpRequestTabEntity tabWithBody(String body) => HttpRequestTabEntity(
-        tabId: 't',
-        config: const HttpRequestConfigEntity(id: 't', url: 'https://t.dev'),
-        response: HttpResponseEntity(
-          statusCode: 200,
-          body: body,
-          headers: const {'content-type': 'application/json'},
-          durationMs: 42,
-        ),
-      );
+    tabId: 't',
+    config: const HttpRequestConfigEntity(id: 't', url: 'https://t.dev'),
+    response: HttpResponseEntity(
+      statusCode: 200,
+      body: body,
+      headers: const {'content-type': 'application/json'},
+      durationMs: 42,
+    ),
+  );
 
   group('response-body persistence cap', () {
     test('putTab replaces an over-limit body with the placeholder', () async {
@@ -58,7 +60,8 @@ void main() {
       await repository.putTab(tab);
 
       final model =
-          verify(() => dataSource.putTab(captureAny())).captured.single as HttpRequestTabModel;
+          verify(() => dataSource.putTab(captureAny())).captured.single
+              as HttpRequestTabModel;
       expect(model.responseBody, kResponseBodyTooLargePlaceholder);
       // Status, headers and duration survive the cap.
       expect(model.statusCode, 200);
@@ -73,7 +76,8 @@ void main() {
       await repository.putTab(tabWithBody(body));
 
       final model =
-          verify(() => dataSource.putTab(captureAny())).captured.single as HttpRequestTabModel;
+          verify(() => dataSource.putTab(captureAny())).captured.single
+              as HttpRequestTabModel;
       expect(model.responseBody, body);
     });
 
@@ -87,7 +91,8 @@ void main() {
       await repository.putTab(tab);
 
       final model =
-          verify(() => dataSource.putTab(captureAny())).captured.single as HttpRequestTabModel;
+          verify(() => dataSource.putTab(captureAny())).captured.single
+              as HttpRequestTabModel;
       expect(model.responseBody, isNull);
       expect(model.statusCode, isNull);
     });
@@ -98,36 +103,46 @@ void main() {
 
       await repository.saveTabs([tab]);
 
-      final models = verify(() => dataSource.saveTabs(captureAny())).captured.single
-          as List<HttpRequestTabModel>;
+      final models =
+          verify(() => dataSource.saveTabs(captureAny())).captured.single
+              as List<HttpRequestTabModel>;
       expect(models.single.responseBody, kResponseBodyTooLargePlaceholder);
     });
   });
 
   group('sendRequest auth injection', () {
-    const response =
-        HttpResponseEntity(statusCode: 200, body: '', headers: {}, durationMs: 1);
+    const response = HttpResponseEntity(
+      statusCode: 200,
+      body: '',
+      headers: {},
+      durationMs: 1,
+    );
 
     void stubRequest() {
-      when(() => networkService.request(
-            url: any(named: 'url'),
-            method: any(named: 'method'),
-            queryParameters: any(named: 'queryParameters'),
-            data: any(named: 'data'),
-            headers: any(named: 'headers'),
-            cancelHandle: any(named: 'cancelHandle'),
-          )).thenAnswer((_) async => response);
+      when(
+        () => networkService.request(
+          url: any(named: 'url'),
+          method: any(named: 'method'),
+          queryParameters: any(named: 'queryParameters'),
+          data: any<dynamic>(named: 'data'),
+          headers: any(named: 'headers'),
+          cancelHandle: any(named: 'cancelHandle'),
+        ),
+      ).thenAnswer((_) async => response);
     }
 
     Map<String, dynamic> capturedHeaders() {
-      return verify(() => networkService.request(
-            url: any(named: 'url'),
-            method: any(named: 'method'),
-            queryParameters: any(named: 'queryParameters'),
-            data: any(named: 'data'),
-            headers: captureAny(named: 'headers'),
-            cancelHandle: any(named: 'cancelHandle'),
-          )).captured.single as Map<String, dynamic>;
+      return verify(
+            () => networkService.request(
+              url: any(named: 'url'),
+              method: any(named: 'method'),
+              queryParameters: any(named: 'queryParameters'),
+              data: any<dynamic>(named: 'data'),
+              headers: captureAny(named: 'headers'),
+              cancelHandle: any(named: 'cancelHandle'),
+            ),
+          ).captured.single
+          as Map<String, dynamic>;
     }
 
     test('injects a Bearer Authorization header, resolving env vars', () async {
@@ -157,52 +172,69 @@ void main() {
       const config = HttpRequestConfigEntity(
         id: 'c',
         url: 'https://api.dev/x',
-        auth: {'type': 'apikey', 'key': 'api_key', 'value': 'v', 'addTo': 'query'},
+        auth: {
+          'type': 'apikey',
+          'key': 'api_key',
+          'value': 'v',
+          'addTo': 'query',
+        },
       );
 
       await repository.sendRequest(config);
 
-      final query = verify(() => networkService.request(
-            url: any(named: 'url'),
-            method: any(named: 'method'),
-            queryParameters: captureAny(named: 'queryParameters'),
-            data: any(named: 'data'),
-            headers: any(named: 'headers'),
-            cancelHandle: any(named: 'cancelHandle'),
-          )).captured.single as Map<String, List<String>>;
+      final query =
+          verify(
+                () => networkService.request(
+                  url: any(named: 'url'),
+                  method: any(named: 'method'),
+                  queryParameters: captureAny(named: 'queryParameters'),
+                  data: any<dynamic>(named: 'data'),
+                  headers: any(named: 'headers'),
+                  cancelHandle: any(named: 'cancelHandle'),
+                ),
+              ).captured.single
+              as Map<String, List<String>>;
       expect(query['api_key'], ['v']);
     });
   });
 
   group('sendRequest body assembly failures', () {
-    test('a multipart body with a missing file fails as NetworkFailure, not FileSystemException', () async {
-      const config = HttpRequestConfigEntity(
-        id: 'c',
-        method: 'POST',
-        url: 'https://api.dev/upload',
-        bodyType: BodyType.multipart,
-        formFields: [
-          MultipartFieldEntity(
-            name: 'file',
-            isFile: true,
-            filePath: '/no/such/getman_missing_file_xyz.bin',
-          ),
-        ],
-      );
+    test(
+      'a multipart body with a missing file fails as NetworkFailure, '
+      'not FileSystemException',
+      () async {
+        const config = HttpRequestConfigEntity(
+          id: 'c',
+          method: 'POST',
+          url: 'https://api.dev/upload',
+          bodyType: BodyType.multipart,
+          formFields: [
+            MultipartFieldEntity(
+              name: 'file',
+              isFile: true,
+              filePath: '/no/such/getman_missing_file_xyz.bin',
+            ),
+          ],
+        );
 
-      await expectLater(
-        () => repository.sendRequest(config),
-        throwsA(isA<NetworkFailure>().having((f) => f.statusCode, 'statusCode', 0)),
-      );
-      verifyNever(() => networkService.request(
+        await expectLater(
+          () => repository.sendRequest(config),
+          throwsA(
+            isA<NetworkFailure>().having((f) => f.statusCode, 'statusCode', 0),
+          ),
+        );
+        verifyNever(
+          () => networkService.request(
             url: any(named: 'url'),
             method: any(named: 'method'),
             queryParameters: any(named: 'queryParameters'),
-            data: any(named: 'data'),
+            data: any<dynamic>(named: 'data'),
             headers: any(named: 'headers'),
             cancelHandle: any(named: 'cancelHandle'),
-          ));
-    });
+          ),
+        );
+      },
+    );
   });
 
   group('forwarding and failure translation', () {
@@ -218,13 +250,28 @@ void main() {
     });
 
     test('translates PersistenceException into PersistenceFailure', () async {
-      when(() => dataSource.putTab(any())).thenThrow(PersistenceException('boom'));
-      when(() => dataSource.deleteTabs(any())).thenThrow(PersistenceException('boom'));
-      when(() => dataSource.saveOrder(any())).thenThrow(PersistenceException('boom'));
+      when(
+        () => dataSource.putTab(any()),
+      ).thenThrow(PersistenceException('boom'));
+      when(
+        () => dataSource.deleteTabs(any()),
+      ).thenThrow(PersistenceException('boom'));
+      when(
+        () => dataSource.saveOrder(any()),
+      ).thenThrow(PersistenceException('boom'));
 
-      expect(() => repository.putTab(tabWithBody('x')), throwsA(isA<PersistenceFailure>()));
-      expect(() => repository.deleteTabs(['a']), throwsA(isA<PersistenceFailure>()));
-      expect(() => repository.saveTabOrder(['a']), throwsA(isA<PersistenceFailure>()));
+      expect(
+        () => repository.putTab(tabWithBody('x')),
+        throwsA(isA<PersistenceFailure>()),
+      );
+      expect(
+        () => repository.deleteTabs(['a']),
+        throwsA(isA<PersistenceFailure>()),
+      );
+      expect(
+        () => repository.saveTabOrder(['a']),
+        throwsA(isA<PersistenceFailure>()),
+      );
     });
   });
 }

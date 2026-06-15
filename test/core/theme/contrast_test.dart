@@ -24,20 +24,29 @@ void main() {
 
   for (final descriptor in appThemes.values) {
     for (final brightness in [Brightness.light, Brightness.dark]) {
-      final palette =
-          resolveThemeData(descriptor.id, brightness, isCompact: false).extension<AppPalette>()!;
+      final palette = resolveThemeData(
+        descriptor.id,
+        brightness,
+        isCompact: false,
+      ).extension<AppPalette>()!;
 
       group('${descriptor.id} (${brightness.name}) on-color contrast', () {
         palette.methodColors.forEach((method, color) {
           test('method "$method" text is legible', () {
-            expect(_contrast(color, palette.onColor(color)), greaterThanOrEqualTo(_minRatio));
+            expect(
+              _contrast(color, palette.onColor(color)),
+              greaterThanOrEqualTo(_minRatio),
+            );
           });
         });
 
         for (final code in [204, 301, 404]) {
           test('status $code text is legible', () {
             final bg = palette.statusColor(code);
-            expect(_contrast(bg, palette.onColor(bg)), greaterThanOrEqualTo(_minRatio));
+            expect(
+              _contrast(bg, palette.onColor(bg)),
+              greaterThanOrEqualTo(_minRatio),
+            );
           });
         }
       });

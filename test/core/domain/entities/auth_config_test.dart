@@ -11,7 +11,10 @@ void main() {
     });
 
     test('unknown type falls back to none', () {
-      expect(AuthConfig.fromMap(const {'type': 'spaceship'}).type, AuthType.none);
+      expect(
+        AuthConfig.fromMap(const {'type': 'spaceship'}).type,
+        AuthType.none,
+      );
     });
 
     test('decodes bearer', () {
@@ -31,7 +34,12 @@ void main() {
 
     test('decodes apikey with header/query location', () {
       final header = AuthConfig.fromMap(
-        const {'type': 'apikey', 'key': 'X-Key', 'value': 'v', 'addTo': 'header'},
+        const {
+          'type': 'apikey',
+          'key': 'X-Key',
+          'value': 'v',
+          'addTo': 'header',
+        },
       );
       expect(header.type, AuthType.apiKey);
       expect(header.apiKeyName, 'X-Key');
@@ -96,8 +104,10 @@ void main() {
 
     test('basic credentials base64 as username:password', () {
       // Documents the exact wire encoding the serializer relies on.
-      expect(base64.encode(utf8.encode('aladdin:opensesame')),
-          'YWxhZGRpbjpvcGVuc2VzYW1l');
+      expect(
+        base64.encode(utf8.encode('aladdin:opensesame')),
+        'YWxhZGRpbjpvcGVuc2VzYW1l',
+      );
     });
   });
 }

@@ -3,17 +3,22 @@ import 'dart:math';
 import 'package:uuid/uuid.dart';
 
 class VariableMatch {
+  const VariableMatch({
+    required this.start,
+    required this.end,
+    required this.name,
+  });
   final int start;
   final int end;
   final String name;
-
-  const VariableMatch({required this.start, required this.end, required this.name});
 }
 
 class EnvironmentResolver {
   // Names may carry a leading `$` for built-in dynamic variables
   // ({{$timestamp}}, {{$guid}}, …); plain names map to environment variables.
-  static final RegExp _pattern = RegExp(r'\{\{\s*(\$?[A-Za-z0-9_\-\.]+)\s*\}\}');
+  static final RegExp _pattern = RegExp(
+    r'\{\{\s*(\$?[A-Za-z0-9_\-\.]+)\s*\}\}',
+  );
 
   static const _uuid = Uuid();
   static final Random _random = Random();
@@ -60,7 +65,10 @@ class EnvironmentResolver {
     });
   }
 
-  static Map<String, String> resolveMap(Map<String, String> input, Map<String, String> variables) {
+  static Map<String, String> resolveMap(
+    Map<String, String> input,
+    Map<String, String> variables,
+  ) {
     if (input.isEmpty) return input;
     return input.map((key, value) => MapEntry(key, resolve(value, variables)));
   }

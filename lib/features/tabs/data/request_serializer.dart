@@ -4,6 +4,7 @@ import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/error/exceptions.dart';
+import 'package:getman/core/network/network_service.dart' show NetworkService;
 import 'package:getman/core/utils/environment_resolver.dart';
 import 'package:getman/core/utils/header_utils.dart';
 import 'package:getman/core/utils/io/file_reader.dart';
@@ -70,13 +71,20 @@ class RequestSerializer {
       case BodyType.raw:
         return config.body.isEmpty ? null : r(config.body);
       case BodyType.urlencoded:
-        HeaderUtils.setHeader(headers, 'Content-Type', 'application/x-www-form-urlencoded');
+        HeaderUtils.setHeader(
+          headers,
+          'Content-Type',
+          'application/x-www-form-urlencoded',
+        );
         return <String, String>{
           for (final f in config.formFields)
             if (!f.isFile && f.name.isNotEmpty) r(f.name): r(f.value),
         };
       case BodyType.multipart:
-        HeaderUtils.removeHeader(headers, 'content-type'); // Dio adds it with the boundary.
+        HeaderUtils.removeHeader(
+          headers,
+          'content-type',
+        ); // Dio adds it with the boundary.
         final form = FormData();
         for (final f in config.formFields) {
           if (f.name.isEmpty) continue;
@@ -84,14 +92,16 @@ class RequestSerializer {
           if (f.isFile) {
             final path = f.filePath;
             if (path == null || path.isEmpty) continue;
-            form.files.add(MapEntry(
-              name,
-              MultipartFile.fromBytes(
-                await _readBytes(path),
-                filename: _basename(path),
-                contentType: _parseMediaType(f.contentType),
+            form.files.add(
+              MapEntry(
+                name,
+                MultipartFile.fromBytes(
+                  await _readBytes(path),
+                  filename: _basename(path),
+                  contentType: _parseMediaType(f.contentType),
+                ),
               ),
-            ));
+            );
           } else {
             form.fields.add(MapEntry(name, r(f.value)));
           }
@@ -101,9 +111,13 @@ class RequestSerializer {
         final path = config.bodyFilePath;
         if (path == null || path.isEmpty) return null;
         if (!HeaderUtils.hasCustomContentType(headers)) {
-          HeaderUtils.setHeader(headers, 'Content-Type', 'application/octet-stream');
+          HeaderUtils.setHeader(
+            headers,
+            'Content-Type',
+            'application/octet-stream',
+          );
         }
-        return await _readBytes(path);
+        return _readBytes(path);
     }
   }
 
@@ -128,7 +142,7 @@ class RequestSerializer {
     if (value == null || value.trim().isEmpty) return null;
     try {
       return DioMediaType.parse(value.trim());
-    } catch (_) {
+    } on Object catch (_) {
       return null;
     }
   }

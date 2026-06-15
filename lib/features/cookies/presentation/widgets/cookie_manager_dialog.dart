@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/network/cookie_store.dart';
@@ -57,29 +59,35 @@ class _CookieManagerDialogState extends State<CookieManagerDialog> {
   }
 
   void _confirmDelete(NetworkCookie cookie) {
-    ConfirmDialog.show(
-      context,
-      title: 'Delete cookie?',
-      message: 'Removes ${cookie.name} for ${cookie.domain}. This cannot be undone.',
-      confirmLabel: 'DELETE',
-      onConfirm: () => _delete(cookie),
+    unawaited(
+      ConfirmDialog.show(
+        context,
+        title: 'Delete cookie?',
+        message:
+            'Removes ${cookie.name} for ${cookie.domain}. '
+            'This cannot be undone.',
+        onConfirm: () => _delete(cookie),
+      ),
     );
   }
 
   void _confirmClear() {
     final store = context.read<CookieStore>();
-    ConfirmDialog.show(
-      context,
-      title: 'Clear cookies?',
-      message: 'Removes every stored cookie from the jar. This cannot be undone.',
-      confirmLabel: 'CLEAR',
-      onConfirm: () async {
-        final messenger = ScaffoldMessenger.of(context);
-        await store.clear();
-        if (!mounted) return;
-        showAppSnackBarVia(messenger, 'Cookie jar cleared');
-        setState(() {});
-      },
+    unawaited(
+      ConfirmDialog.show(
+        context,
+        title: 'Clear cookies?',
+        message:
+            'Removes every stored cookie from the jar. This cannot be undone.',
+        confirmLabel: 'CLEAR',
+        onConfirm: () async {
+          final messenger = ScaffoldMessenger.of(context);
+          await store.clear();
+          if (!mounted) return;
+          showAppSnackBarVia(messenger, 'Cookie jar cleared');
+          setState(() {});
+        },
+      ),
     );
   }
 
@@ -131,7 +139,10 @@ class _CookieManagerDialogState extends State<CookieManagerDialog> {
     );
   }
 
-  Widget _buildList(BuildContext context, Map<String, List<NetworkCookie>> grouped) {
+  Widget _buildList(
+    BuildContext context,
+    Map<String, List<NetworkCookie>> grouped,
+  ) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
     final entries = grouped.entries.toList();
@@ -145,7 +156,10 @@ class _CookieManagerDialogState extends State<CookieManagerDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: EdgeInsets.only(top: layout.tabSpacing, bottom: layout.tabSpacing / 2),
+              padding: EdgeInsets.only(
+                top: layout.tabSpacing,
+                bottom: layout.tabSpacing / 2,
+              ),
               child: Text(
                 domain.toUpperCase(),
                 style: TextStyle(
@@ -193,7 +207,11 @@ class _CookieManagerDialogState extends State<CookieManagerDialog> {
         ),
       ),
       trailing: IconButton(
-        icon: Icon(Icons.delete_outline, size: layout.iconSize, color: theme.colorScheme.error),
+        icon: Icon(
+          Icons.delete_outline,
+          size: layout.iconSize,
+          color: theme.colorScheme.error,
+        ),
         tooltip: 'Delete cookie',
         onPressed: () => _confirmDelete(cookie),
       ),

@@ -15,13 +15,18 @@ void main() {
   test('handles events split across chunks', () {
     final p = SseParser();
     expect(p.addChunk('data: par'), isEmpty);
-    expect(p.addChunk('tial\n'), isEmpty); // line complete, event not dispatched yet
+    expect(
+      p.addChunk('tial\n'),
+      isEmpty,
+    ); // line complete, event not dispatched yet
     expect(p.addChunk('\n'), ['partial']);
   });
 
   test('ignores event/id/comment lines', () {
     final p = SseParser();
-    expect(p.addChunk(': comment\nevent: ping\nid: 1\ndata: payload\n\n'), ['payload']);
+    expect(p.addChunk(': comment\nevent: ping\nid: 1\ndata: payload\n\n'), [
+      'payload',
+    ]);
   });
 
   test('tolerates CRLF line endings', () {
@@ -36,13 +41,19 @@ void main() {
 
   test('flush emits a final event that never got a trailing blank line', () {
     final p = SseParser();
-    expect(p.addChunk('data: last\n'), isEmpty); // line complete, no blank line yet
+    expect(
+      p.addChunk('data: last\n'),
+      isEmpty,
+    ); // line complete, no blank line yet
     expect(p.flush(), ['last']);
   });
 
   test('flush folds a trailing data line with no newline at all', () {
     final p = SseParser();
-    expect(p.addChunk('data: tail'), isEmpty); // no newline -> buffered in carry
+    expect(
+      p.addChunk('data: tail'),
+      isEmpty,
+    ); // no newline -> buffered in carry
     expect(p.flush(), ['tail']);
   });
 

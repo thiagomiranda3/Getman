@@ -1,10 +1,12 @@
 import 'package:flutter/widgets.dart';
+import 'package:getman/features/tabs/presentation/widgets/url_bar.dart'
+    show UrlBar;
 
 /// Lets a global keyboard shortcut (Cmd/Ctrl+L) focus the active tab's URL
 /// field without the dispatcher (`MainScreen`) holding a reference to the
 /// deeply-nested [UrlBar].
 ///
-/// Up to [kMaxLiveTabViews] request views are kept alive at once
+/// Up to `kMaxLiveTabViews` request views are kept alive at once
 /// (`TabContentStack`), so each [UrlBar] registers its [FocusNode] keyed by tab
 /// id. The focus action resolves the *active* id (known to `MainScreen`) and
 /// focuses that node — inactive views are wrapped in `ExcludeFocus`, so even a

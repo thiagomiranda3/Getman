@@ -8,18 +8,22 @@ import 'package:google_fonts/google_fonts.dart';
 /// Arcane Quest — an RPG-flavoured theme with sparkle-on-tap, animated
 /// starfield background, glowing gold panels, and carved-stone typography.
 ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
-  final bool isDark = brightness == Brightness.dark;
-  final Color background = isDark ? RpgPalette.backgroundDark : RpgPalette.backgroundLight;
-  final Color surface = isDark ? RpgPalette.surfaceDark : RpgPalette.surfaceLight;
-  final Color surfaceRaised = isDark ? RpgPalette.surfaceRaisedDark : RpgPalette.surfaceRaisedLight;
-  final Color text = isDark ? RpgPalette.textDark : RpgPalette.textLight;
-  final Color textSoft = isDark ? RpgPalette.textSoftDark : RpgPalette.textSoftLight;
-  final Color border = isDark ? RpgPalette.borderDark : RpgPalette.borderLight;
-  const Color gold = RpgPalette.gold;
-  const Color emerald = RpgPalette.emerald;
+  final isDark = brightness == Brightness.dark;
+  final background = isDark
+      ? RpgPalette.backgroundDark
+      : RpgPalette.backgroundLight;
+  final surface = isDark ? RpgPalette.surfaceDark : RpgPalette.surfaceLight;
+  final surfaceRaised = isDark
+      ? RpgPalette.surfaceRaisedDark
+      : RpgPalette.surfaceRaisedLight;
+  final text = isDark ? RpgPalette.textDark : RpgPalette.textLight;
+  final textSoft = isDark ? RpgPalette.textSoftDark : RpgPalette.textSoftLight;
+  final border = isDark ? RpgPalette.borderDark : RpgPalette.borderLight;
+  const gold = RpgPalette.gold;
+  const emerald = RpgPalette.emerald;
 
-  final AppLayout layout = isCompact ? AppLayout.compact : AppLayout.normal;
-  const AppShape shape = AppShape(
+  final layout = isCompact ? AppLayout.compact : AppLayout.normal;
+  const shape = AppShape(
     panelRadius: 6,
     buttonRadius: 6,
     inputRadius: 4,
@@ -27,59 +31,62 @@ ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
     sheetRadius: 12,
   );
 
-  // Fonts: Cinzel Decorative for display, Spectral for body, Fira Code for code.
+  // Fonts: Cinzel Decorative for display, Spectral for body, Fira Code for
+  // code.
   final cinzelDecorative = GoogleFonts.cinzelDecorative().fontFamily!;
   final cinzel = GoogleFonts.cinzel().fontFamily!;
   final spectral = GoogleFonts.spectralTextTheme();
   final codeFamily = GoogleFonts.firaCode().fontFamily!;
 
-  final baseTextTheme = spectral.apply(bodyColor: text, displayColor: text).copyWith(
-    displayLarge: TextStyle(
-      fontFamily: cinzelDecorative,
-      fontSize: 32,
-      fontWeight: FontWeight.w900,
-      letterSpacing: 1.2,
-      color: text,
-    ),
-    displayMedium: TextStyle(
-      fontFamily: cinzelDecorative,
-      fontSize: 24,
-      fontWeight: FontWeight.w900,
-      letterSpacing: 1.0,
-      color: text,
-    ),
-    titleLarge: TextStyle(
-      fontFamily: cinzel,
-      fontSize: 20,
-      fontWeight: FontWeight.w700,
-      letterSpacing: 0.8,
-      color: text,
-    ),
-    titleMedium: TextStyle(
-      fontFamily: cinzel,
-      fontSize: 16,
-      fontWeight: FontWeight.w700,
-      letterSpacing: 0.6,
-      color: text,
-    ),
-    bodyMedium: spectral.bodyMedium?.copyWith(
-      fontSize: layout.fontSizeTitle,
-      fontWeight: FontWeight.w500,
-      color: text,
-    ),
-    bodySmall: spectral.bodySmall?.copyWith(
-      fontSize: layout.fontSizeNormal,
-      fontWeight: FontWeight.w500,
-      color: text,
-    ),
-    labelSmall: TextStyle(
-      fontFamily: cinzel,
-      fontSize: 11,
-      fontWeight: FontWeight.w700,
-      letterSpacing: 1.8,
-      color: textSoft,
-    ),
-  );
+  final baseTextTheme = spectral
+      .apply(bodyColor: text, displayColor: text)
+      .copyWith(
+        displayLarge: TextStyle(
+          fontFamily: cinzelDecorative,
+          fontSize: 32,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 1.2,
+          color: text,
+        ),
+        displayMedium: TextStyle(
+          fontFamily: cinzelDecorative,
+          fontSize: 24,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 1,
+          color: text,
+        ),
+        titleLarge: TextStyle(
+          fontFamily: cinzel,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+          color: text,
+        ),
+        titleMedium: TextStyle(
+          fontFamily: cinzel,
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.6,
+          color: text,
+        ),
+        bodyMedium: spectral.bodyMedium?.copyWith(
+          fontSize: layout.fontSizeTitle,
+          fontWeight: FontWeight.w500,
+          color: text,
+        ),
+        bodySmall: spectral.bodySmall?.copyWith(
+          fontSize: layout.fontSizeNormal,
+          fontWeight: FontWeight.w500,
+          color: text,
+        ),
+        labelSmall: TextStyle(
+          fontFamily: cinzel,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.8,
+          color: textSoft,
+        ),
+      );
 
   final typography = AppTypography(
     base: baseTextTheme,
@@ -98,7 +105,9 @@ ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
     statusAccentSuccess: RpgPalette.statusAccentSuccess,
     statusAccentWarning: RpgPalette.statusAccentWarning,
     statusAccentError: RpgPalette.statusAccentError,
-    codeBackground: isDark ? RpgPalette.codeBackgroundDark : RpgPalette.codeBackgroundLight,
+    codeBackground: isDark
+        ? RpgPalette.codeBackgroundDark
+        : RpgPalette.codeBackgroundLight,
     variableResolved: RpgPalette.statusSuccess,
     variableUnresolved: RpgPalette.statusError,
     selectorActive: RpgPalette.gold,
@@ -150,7 +159,6 @@ ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
             onSecondary: Colors.white,
             onSurface: text,
             error: RpgPalette.ruby,
-            onError: Colors.white,
           ),
     textTheme: baseTextTheme,
     appBarTheme: AppBarTheme(
@@ -163,9 +171,11 @@ ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
         fontSize: layout.fontSizeSubtitle,
         color: text,
         fontWeight: FontWeight.w900,
-        letterSpacing: 1.0,
+        letterSpacing: 1,
       ),
-      shape: Border(bottom: BorderSide(color: border, width: layout.borderThin)),
+      shape: Border(
+        bottom: BorderSide(color: border, width: layout.borderThin),
+      ),
     ),
     tabBarTheme: TabBarThemeData(
       dividerColor: Colors.transparent,
@@ -184,43 +194,49 @@ ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
       unselectedLabelStyle: cinzelUppercase.copyWith(color: textSoft),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: gold,
-        foregroundColor: RpgPalette.backgroundDark,
-        elevation: 0,
-        shadowColor: gold.withValues(alpha: 0.6),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(shape.buttonRadius),
-          side: BorderSide(color: RpgPalette.goldDeep, width: layout.borderThin),
-        ),
-        padding: EdgeInsets.symmetric(
-          horizontal: layout.buttonPaddingHorizontal,
-          vertical: layout.buttonPaddingVertical,
-        ),
-        textStyle: TextStyle(
-          fontFamily: cinzel,
-          fontSize: layout.fontSizeTitle,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1.2,
-          color: RpgPalette.backgroundDark,
-        ),
-      ).copyWith(
-        overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
-          if (states.contains(WidgetState.hovered)) {
-            return Colors.white.withValues(alpha: 0.18);
-          }
-          if (states.contains(WidgetState.pressed)) {
-            return Colors.black.withValues(alpha: 0.12);
-          }
-          return null;
-        }),
-      ),
+      style:
+          ElevatedButton.styleFrom(
+            backgroundColor: gold,
+            foregroundColor: RpgPalette.backgroundDark,
+            elevation: 0,
+            shadowColor: gold.withValues(alpha: 0.6),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(shape.buttonRadius),
+              side: BorderSide(
+                color: RpgPalette.goldDeep,
+                width: layout.borderThin,
+              ),
+            ),
+            padding: EdgeInsets.symmetric(
+              horizontal: layout.buttonPaddingHorizontal,
+              vertical: layout.buttonPaddingVertical,
+            ),
+            textStyle: TextStyle(
+              fontFamily: cinzel,
+              fontSize: layout.fontSizeTitle,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.2,
+              color: RpgPalette.backgroundDark,
+            ),
+          ).copyWith(
+            overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
+              if (states.contains(WidgetState.hovered)) {
+                return Colors.white.withValues(alpha: 0.18);
+              }
+              if (states.contains(WidgetState.pressed)) {
+                return Colors.black.withValues(alpha: 0.12);
+              }
+              return null;
+            }),
+          ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: gold,
         side: BorderSide(color: gold, width: layout.borderThin),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(shape.buttonRadius)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(shape.buttonRadius),
+        ),
         padding: EdgeInsets.symmetric(
           horizontal: layout.buttonPaddingHorizontal,
           vertical: layout.buttonPaddingVertical,
@@ -259,8 +275,16 @@ ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
         borderSide: BorderSide(color: gold, width: layout.borderThin + 0.5),
         borderRadius: BorderRadius.circular(shape.inputRadius),
       ),
-      labelStyle: TextStyle(color: textSoft, fontWeight: FontWeight.w700, fontFamily: cinzel, letterSpacing: 1.0),
-      hintStyle: TextStyle(color: textSoft.withValues(alpha: 0.6), fontFamily: spectral.bodyMedium?.fontFamily),
+      labelStyle: TextStyle(
+        color: textSoft,
+        fontWeight: FontWeight.w700,
+        fontFamily: cinzel,
+        letterSpacing: 1,
+      ),
+      hintStyle: TextStyle(
+        color: textSoft.withValues(alpha: 0.6),
+        fontFamily: spectral.bodyMedium?.fontFamily,
+      ),
       contentPadding: EdgeInsets.symmetric(
         horizontal: layout.inputPadding,
         vertical: layout.inputPaddingVertical,
@@ -286,7 +310,7 @@ ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
         color: text,
         fontSize: layout.fontSizeSubtitle,
         fontWeight: FontWeight.w900,
-        letterSpacing: 1.0,
+        letterSpacing: 1,
       ),
       contentTextStyle: TextStyle(
         fontFamily: spectral.bodyMedium?.fontFamily,
@@ -324,12 +348,14 @@ ThemeData rpgTheme(Brightness brightness, {bool isCompact = false}) {
     ),
   );
 
-  return base.copyWith(extensions: [
-    layout,
-    palette,
-    shape,
-    typography,
-    decoration,
-    const AppCopy(emptyResponse: 'CAST SEND TO SUMMON A RESPONSE'),
-  ]);
+  return base.copyWith(
+    extensions: [
+      layout,
+      palette,
+      shape,
+      typography,
+      decoration,
+      const AppCopy(emptyResponse: 'CAST SEND TO SUMMON A RESPONSE'),
+    ],
+  );
 }

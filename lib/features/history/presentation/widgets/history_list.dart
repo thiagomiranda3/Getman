@@ -51,18 +51,40 @@ class _HistoryListState extends State<HistoryList> {
         return Column(
           children: [
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: const EdgeInsets.all(8),
               child: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
                   hintText: 'SEARCH HISTORY...',
-                  hintStyle: TextStyle(fontSize: layout.fontSizeSmall, fontWeight: context.appTypography.displayWeight, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
-                  prefixIcon: Icon(Icons.search, size: layout.iconSize, color: theme.colorScheme.onSurface),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(context.appShape.panelRadius), borderSide: BorderSide(color: theme.dividerColor, width: layout.borderThin)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  hintStyle: TextStyle(
+                    fontSize: layout.fontSizeSmall,
+                    fontWeight: context.appTypography.displayWeight,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    size: layout.iconSize,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(
+                      context.appShape.panelRadius,
+                    ),
+                    borderSide: BorderSide(
+                      color: theme.dividerColor,
+                      width: layout.borderThin,
+                    ),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   isDense: true,
                 ),
-                style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
+                style: TextStyle(
+                  fontSize: layout.fontSizeNormal,
+                  fontWeight: context.appTypography.titleWeight,
+                ),
               ),
             ),
             Expanded(
@@ -70,7 +92,8 @@ class _HistoryListState extends State<HistoryList> {
                   ? const Center(child: CircularProgressIndicator())
                   : ValueListenableBuilder<String>(
                       valueListenable: _query,
-                      builder: (context, query, _) => _buildList(context, state.history, query),
+                      builder: (context, query, _) =>
+                          _buildList(context, state.history, query),
                     ),
             ),
           ],
@@ -79,23 +102,33 @@ class _HistoryListState extends State<HistoryList> {
     );
   }
 
-  Widget _buildList(BuildContext context, List<HttpRequestConfigEntity> history, String rawQuery) {
+  Widget _buildList(
+    BuildContext context,
+    List<HttpRequestConfigEntity> history,
+    String rawQuery,
+  ) {
     final query = rawQuery.toLowerCase();
     final items = query.isEmpty
         ? history
-        : history.where((item) =>
-            item.url.toLowerCase().contains(query) ||
-            (item.statusCode?.toString().contains(query) ?? false) ||
-            item.method.toLowerCase().contains(query)
-          ).toList();
+        : history
+              .where(
+                (item) =>
+                    item.url.toLowerCase().contains(query) ||
+                    (item.statusCode?.toString().contains(query) ?? false) ||
+                    item.method.toLowerCase().contains(query),
+              )
+              .toList();
 
     if (items.isEmpty) {
       return Center(
-        child: Text('NO RESULTS FOUND', style: TextStyle(
-          fontSize: context.appLayout.fontSizeNormal,
-          fontWeight: context.appTypography.displayWeight,
-          color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
-        )),
+        child: Text(
+          'NO RESULTS FOUND',
+          style: TextStyle(
+            fontSize: context.appLayout.fontSizeNormal,
+            fontWeight: context.appTypography.displayWeight,
+            color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+          ),
+        ),
       );
     }
 
@@ -117,9 +150,13 @@ class _HistoryListState extends State<HistoryList> {
 }
 
 class _HistoryItemWidget extends StatelessWidget {
+  const _HistoryItemWidget({
+    required this.config,
+    required this.onTap,
+    super.key,
+  });
   final HttpRequestConfigEntity config;
   final VoidCallback onTap;
-  const _HistoryItemWidget({super.key, required this.config, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -132,26 +169,35 @@ class _HistoryItemWidget extends StatelessWidget {
     return HoverHighlight(
       decoration: (hovered) => BoxDecoration(
         color: hovered ? theme.hoverColor : Colors.transparent,
-        border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1), width: 1)),
+        border: Border(
+          bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+        ),
       ),
       child: ListTile(
         dense: true,
         onTap: onTap,
-        title: Text(config.url.isEmpty ? '(NO URL)' : config.url,
+        title: Text(
+          config.url.isEmpty ? '(NO URL)' : config.url,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
+          style: TextStyle(
+            fontSize: layout.fontSizeNormal,
+            fontWeight: context.appTypography.titleWeight,
+          ),
         ),
         subtitle: Row(
           children: [
             MethodBadge(method: config.method, small: true),
             if (config.statusCode != null) ...[
               const SizedBox(width: 8),
-              Text(config.statusCode.toString(), style: TextStyle(
-                color: context.appPalette.statusColor(config.statusCode!),
-                fontWeight: context.appTypography.displayWeight,
-                fontSize: layout.fontSizeNormal,
-              )),
+              Text(
+                config.statusCode.toString(),
+                style: TextStyle(
+                  color: context.appPalette.statusColor(config.statusCode!),
+                  fontWeight: context.appTypography.displayWeight,
+                  fontSize: layout.fontSizeNormal,
+                ),
+              ),
             ],
           ],
         ),

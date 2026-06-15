@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -12,20 +14,19 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 
 class TabWidget extends StatefulWidget {
-  final String tabId;
-  final int index;
-  final bool isActive;
-  final VoidCallback onTap;
-  final Future<bool> Function() onClose;
-
   const TabWidget({
-    super.key,
     required this.tabId,
     required this.index,
     required this.isActive,
     required this.onTap,
     required this.onClose,
+    super.key,
   });
+  final String tabId;
+  final int index;
+  final bool isActive;
+  final VoidCallback onTap;
+  final Future<bool> Function() onClose;
 
   @override
   State<TabWidget> createState() => _TabWidgetState();
@@ -48,7 +49,7 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
       parent: _sizeController,
       curve: Curves.easeOutCubic,
     );
-    _sizeController.forward();
+    unawaited(_sizeController.forward());
   }
 
   @override
@@ -93,17 +94,20 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
 
         final dirtyChecker = context.read<TabDirtyChecker>();
         return BlocSelector<CollectionsBloc, CollectionsState, bool>(
-          selector: (collState) => dirtyChecker(tab: tab, savedConfigs: collState.configById),
+          selector: (collState) =>
+              dirtyChecker(tab: tab, savedConfigs: collState.configById),
           builder: (context, isDirty) {
             final title = tab.displayTitle;
-            final displayTitle = (title.length > layout.tabTitleMaxLength
-                ? '${title.substring(0, layout.tabTitleMaxLength)}...'
-                : title).toUpperCase();
+            final displayTitle =
+                (title.length > layout.tabTitleMaxLength
+                        ? '${title.substring(0, layout.tabTitleMaxLength)}...'
+                        : title)
+                    .toUpperCase();
 
             return SizeTransition(
               sizeFactor: _sizeAnimation,
               axis: Axis.horizontal,
-              axisAlignment: -1.0,
+              axisAlignment: -1,
               child: ReorderableDragStartListener(
                 index: widget.index,
                 child: MouseRegion(
@@ -113,7 +117,8 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
                   child: GestureDetector(
                     onTap: widget.onTap,
                     onTertiaryTapUp: (_) => _handleClose(),
-                    onSecondaryTapDown: (details) => _showContextMenu(context, details.globalPosition, tab),
+                    onSecondaryTapDown: (details) =>
+                        _showContextMenu(context, details.globalPosition, tab),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       height: layout.tabBarHeight,
@@ -121,7 +126,9 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
                         minWidth: layout.isCompact ? 80 : 120,
                         maxWidth: layout.isCompact ? 150 : 250,
                       ),
-                      padding: EdgeInsets.symmetric(horizontal: layout.tabPaddingHorizontal),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: layout.tabPaddingHorizontal,
+                      ),
                       decoration: context.appDecoration.tabShape(
                         context,
                         active: widget.isActive,
@@ -138,27 +145,44 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
                               style: TextStyle(
                                 fontSize: layout.tabFontSize,
                                 color: widget.isActive
-                                    ? (theme.tabBarTheme.labelColor ?? theme.colorScheme.onSurface)
-                                    : (theme.tabBarTheme.unselectedLabelColor ?? theme.colorScheme.onSurface),
-                                fontWeight: isDirty ? context.appTypography.displayWeight : (widget.isActive ? context.appTypography.displayWeight : context.appTypography.bodyWeight),
+                                    ? (theme.tabBarTheme.labelColor ??
+                                          theme.colorScheme.onSurface)
+                                    : (theme.tabBarTheme.unselectedLabelColor ??
+                                          theme.colorScheme.onSurface),
+                                fontWeight: isDirty
+                                    ? context.appTypography.displayWeight
+                                    : (widget.isActive
+                                          ? context.appTypography.displayWeight
+                                          : context.appTypography.bodyWeight),
                               ),
                             ),
                           ),
                           if (isDirty)
                             Padding(
                               padding: const EdgeInsets.only(left: 6),
-                              child: Text('*',
-                                  style: TextStyle(
-                                      color: theme.colorScheme.secondary,
-                                      fontSize: layout.dirtyStarSize,
-                                      fontWeight: context.appTypography.displayWeight)),
+                              child: Text(
+                                '*',
+                                style: TextStyle(
+                                  color: theme.colorScheme.secondary,
+                                  fontSize: layout.dirtyStarSize,
+                                  fontWeight:
+                                      context.appTypography.displayWeight,
+                                ),
+                              ),
                             ),
                           SizedBox(width: layout.tabSpacing),
                           IconButton(
-                            icon: Icon(Icons.close, size: layout.tabCloseIconSize, color: theme.dividerColor),
+                            icon: Icon(
+                              Icons.close,
+                              size: layout.tabCloseIconSize,
+                              color: theme.dividerColor,
+                            ),
                             onPressed: _handleClose,
                             padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                            constraints: const BoxConstraints(
+                              minWidth: 24,
+                              minHeight: 24,
+                            ),
                           ),
                         ],
                       ),
@@ -173,54 +197,71 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
     );
   }
 
-  void _showContextMenu(BuildContext context, Offset position, HttpRequestTabEntity tab) {
+  void _showContextMenu(
+    BuildContext context,
+    Offset position,
+    HttpRequestTabEntity tab,
+  ) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
     final tabsBloc = context.read<TabsBloc>();
 
-    showMenu(
-      context: context,
-      position: RelativeRect.fromLTRB(
-        position.dx,
-        position.dy,
-        position.dx + 1,
-        position.dy + 1,
+    unawaited(
+      showMenu<void>(
+        context: context,
+        position: RelativeRect.fromLTRB(
+          position.dx,
+          position.dy,
+          position.dx + 1,
+          position.dy + 1,
+        ),
+        color: theme.scaffoldBackgroundColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+          side: BorderSide(
+            color: theme.dividerColor,
+            width: layout.borderThick,
+          ),
+        ),
+        elevation: 0,
+        items: <PopupMenuEntry<void>>[
+          PopupMenuItem(
+            onTap: _handleClose,
+            child: _buildMenuItem(context, Icons.close, 'CLOSE'),
+          ),
+          PopupMenuItem(
+            onTap: () => tabsBloc.add(CloseOtherTabs(tab.tabId)),
+            child: _buildMenuItem(
+              context,
+              Icons.tab_unselected,
+              'CLOSE OTHERS',
+            ),
+          ),
+          PopupMenuItem(
+            onTap: () => tabsBloc.add(CloseTabsToTheRight(tab.tabId)),
+            child: _buildMenuItem(
+              context,
+              Icons.keyboard_double_arrow_right,
+              'CLOSE TO THE RIGHT',
+            ),
+          ),
+          const PopupMenuDivider(),
+          PopupMenuItem(
+            onTap: () {
+              tabsBloc.add(DuplicateTab(tab.tabId));
+              showAppSnackBar(context, 'Tab duplicated');
+            },
+            child: _buildMenuItem(context, Icons.copy, 'DUPLICATE'),
+          ),
+          PopupMenuItem(
+            onTap: () {
+              unawaited(Clipboard.setData(ClipboardData(text: tab.config.url)));
+              showAppSnackBar(context, 'URL copied');
+            },
+            child: _buildMenuItem(context, Icons.link, 'COPY URL'),
+          ),
+        ],
       ),
-      color: theme.scaffoldBackgroundColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
-        side: BorderSide(color: theme.dividerColor, width: layout.borderThick),
-      ),
-      elevation: 0,
-      items: <PopupMenuEntry>[
-        PopupMenuItem(
-          onTap: _handleClose,
-          child: _buildMenuItem(context, Icons.close, 'CLOSE'),
-        ),
-        PopupMenuItem(
-          onTap: () => tabsBloc.add(CloseOtherTabs(tab.tabId)),
-          child: _buildMenuItem(context, Icons.tab_unselected, 'CLOSE OTHERS'),
-        ),
-        PopupMenuItem(
-          onTap: () => tabsBloc.add(CloseTabsToTheRight(tab.tabId)),
-          child: _buildMenuItem(context, Icons.keyboard_double_arrow_right, 'CLOSE TO THE RIGHT'),
-        ),
-        const PopupMenuDivider(),
-        PopupMenuItem(
-          onTap: () {
-            tabsBloc.add(DuplicateTab(tab.tabId));
-            showAppSnackBar(context, 'Tab duplicated');
-          },
-          child: _buildMenuItem(context, Icons.copy, 'DUPLICATE'),
-        ),
-        PopupMenuItem(
-          onTap: () {
-            Clipboard.setData(ClipboardData(text: tab.config.url));
-            showAppSnackBar(context, 'URL copied');
-          },
-          child: _buildMenuItem(context, Icons.link, 'COPY URL'),
-        ),
-      ],
     );
   }
 
@@ -230,7 +271,13 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
       children: [
         Icon(icon, size: 18, color: theme.colorScheme.onSurface),
         const SizedBox(width: 12),
-        Text(text, style: TextStyle(fontWeight: context.appTypography.displayWeight, fontSize: context.appLayout.fontSizeNormal)),
+        Text(
+          text,
+          style: TextStyle(
+            fontWeight: context.appTypography.displayWeight,
+            fontSize: context.appLayout.fontSizeNormal,
+          ),
+        ),
       ],
     );
   }

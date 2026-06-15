@@ -10,14 +10,17 @@ void main() {
         name: 'Staging',
         variables: const {'host': 'staging.api', 'token': 'abc'},
       );
-      final decoded = jsonDecode(PostmanEnvironmentMapper.toJson(env)) as Map<String, dynamic>;
+      final decoded =
+          jsonDecode(PostmanEnvironmentMapper.toJson(env))
+              as Map<String, dynamic>;
       expect(decoded['name'], 'Staging');
       expect(decoded['_postman_variable_scope'], 'environment');
       expect(decoded['id'], isA<String>());
       final values = decoded['values'] as List;
       expect(values, hasLength(2));
       expect(values.every((v) => (v as Map)['enabled'] == true), isTrue);
-      final hostEntry = values.firstWhere((v) => (v as Map)['key'] == 'host') as Map;
+      final hostEntry =
+          values.firstWhere((v) => (v as Map)['key'] == 'host') as Map;
       expect(hostEntry['value'], 'staging.api');
     });
 
@@ -27,15 +30,25 @@ void main() {
         variables: const {'host': 'staging.api', 'token': 's3cr3t'},
         secretKeys: const {'token'},
       );
-      final decoded = jsonDecode(PostmanEnvironmentMapper.toJson(env)) as Map<String, dynamic>;
+      final decoded =
+          jsonDecode(PostmanEnvironmentMapper.toJson(env))
+              as Map<String, dynamic>;
       final values = (decoded['values'] as List).cast<Map<String, dynamic>>();
 
       final tokenEntry = values.firstWhere((v) => v['key'] == 'token');
-      expect(tokenEntry['value'], '', reason: 'secret value is redacted on export');
+      expect(
+        tokenEntry['value'],
+        '',
+        reason: 'secret value is redacted on export',
+      );
       expect(tokenEntry['type'], 'secret');
 
       final hostEntry = values.firstWhere((v) => v['key'] == 'host');
-      expect(hostEntry['value'], 'staging.api', reason: 'non-secret values are unchanged');
+      expect(
+        hostEntry['value'],
+        'staging.api',
+        reason: 'non-secret values are unchanged',
+      );
       expect(hostEntry['type'], 'default');
     });
   });
@@ -44,7 +57,8 @@ void main() {
     test('emits a JSON array when given multiple envs', () {
       final a = EnvironmentEntity(name: 'A', variables: const {'x': '1'});
       final b = EnvironmentEntity(name: 'B', variables: const {'y': '2'});
-      final decoded = jsonDecode(PostmanEnvironmentMapper.toJsonAll([a, b])) as List;
+      final decoded =
+          jsonDecode(PostmanEnvironmentMapper.toJsonAll([a, b])) as List;
       expect(decoded, hasLength(2));
       expect((decoded[0] as Map)['name'], 'A');
       expect((decoded[1] as Map)['name'], 'B');
@@ -68,8 +82,11 @@ void main() {
       final env = envs.first;
       expect(env.name, 'Prod');
       expect(env.variables, {'API_HOST': 'https://api.prod'});
-      expect(env.id, isNot('orig-id'),
-          reason: 'imported envs must get fresh UUIDs to avoid collisions');
+      expect(
+        env.id,
+        isNot('orig-id'),
+        reason: 'imported envs must get fresh UUIDs to avoid collisions',
+      );
     });
 
     test('parses a JSON array of envs', () {
@@ -86,12 +103,22 @@ void main() {
     });
 
     test('throws FormatException on malformed input', () {
-      expect(() => PostmanEnvironmentMapper.fromJson('nope'), throwsFormatException);
+      expect(
+        () => PostmanEnvironmentMapper.fromJson('nope'),
+        throwsFormatException,
+      );
     });
 
-    test('throws FormatException when the top-level value is not an object or array', () {
-      expect(() => PostmanEnvironmentMapper.fromJson('42'), throwsFormatException);
-    });
+    test(
+      'throws FormatException when the top-level value is not an object '
+      'or array',
+      () {
+        expect(
+          () => PostmanEnvironmentMapper.fromJson('42'),
+          throwsFormatException,
+        );
+      },
+    );
   });
 
   group('round-trip', () {

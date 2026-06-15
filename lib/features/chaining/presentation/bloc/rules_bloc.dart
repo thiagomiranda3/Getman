@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart';
+import 'dart:developer';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/error/failures.dart';
 import 'package:getman/features/chaining/domain/usecases/request_rules_usecases.dart';
@@ -9,24 +10,25 @@ import 'package:getman/features/chaining/presentation/bloc/rules_state.dart';
 /// editor is mounted at a time (the active tab's), so a single loaded entity
 /// is sufficient; switching tabs re-dispatches [LoadRules].
 class RulesBloc extends Bloc<RulesEvent, RulesState> {
-  final GetRequestRulesUseCase getRequestRulesUseCase;
-  final SaveRequestRulesUseCase saveRequestRulesUseCase;
-
   RulesBloc({
-    required this.getRequestRulesUseCase,
-    required this.saveRequestRulesUseCase,
-  }) : super(const RulesState()) {
+    required GetRequestRulesUseCase getRequestRulesUseCase,
+    required SaveRequestRulesUseCase saveRequestRulesUseCase,
+  }) : _getRequestRulesUseCase = getRequestRulesUseCase,
+       _saveRequestRulesUseCase = saveRequestRulesUseCase,
+       super(const RulesState()) {
     on<LoadRules>(_onLoad);
     on<SaveRules>(_onSave);
   }
+  final GetRequestRulesUseCase _getRequestRulesUseCase;
+  final SaveRequestRulesUseCase _saveRequestRulesUseCase;
 
   Future<void> _onLoad(LoadRules event, Emitter<RulesState> emit) async {
     emit(state.copyWith(isLoading: true));
     try {
-      final rules = await getRequestRulesUseCase(event.configId);
+      final rules = await _getRequestRulesUseCase(event.configId);
       emit(RulesState(rules: rules));
     } on PersistenceFailure catch (f) {
-      debugPrint('LoadRules failed: ${f.message}');
+      log('LoadRules failed: ${f.message}', name: 'RulesBloc');
       emit(const RulesState());
     }
   }
@@ -35,9 +37,9 @@ class RulesBloc extends Bloc<RulesEvent, RulesState> {
     // Reflect immediately; persist best-effort.
     emit(RulesState(rules: event.rules));
     try {
-      await saveRequestRulesUseCase(event.rules);
+      await _saveRequestRulesUseCase(event.rules);
     } on PersistenceFailure catch (f) {
-      debugPrint('SaveRules failed: ${f.message}');
+      log('SaveRules failed: ${f.message}', name: 'RulesBloc');
     }
   }
 }

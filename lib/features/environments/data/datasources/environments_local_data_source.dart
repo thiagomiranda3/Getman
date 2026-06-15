@@ -1,7 +1,7 @@
 import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/features/environments/data/models/environment_model.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_flutter.dart';
 
 abstract class EnvironmentsLocalDataSource {
   Future<List<EnvironmentModel>> getEnvironments();
@@ -18,7 +18,8 @@ abstract class EnvironmentsLocalDataSource {
 }
 
 class EnvironmentsLocalDataSourceImpl implements EnvironmentsLocalDataSource {
-  static Box<EnvironmentModel> _box() => Hive.box<EnvironmentModel>(HiveBoxes.environments);
+  static Box<EnvironmentModel> _box() =>
+      Hive.box<EnvironmentModel>(HiveBoxes.environments);
 
   @override
   Future<List<EnvironmentModel>> getEnvironments() async {

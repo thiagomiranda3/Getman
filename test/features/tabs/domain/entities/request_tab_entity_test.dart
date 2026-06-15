@@ -3,7 +3,8 @@ import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 
 void main() {
-  HttpRequestTabEntity tab({String? collectionName, String url = ''}) => HttpRequestTabEntity(
+  HttpRequestTabEntity tab({String? collectionName, String url = ''}) =>
+      HttpRequestTabEntity(
         tabId: 't1',
         collectionName: collectionName,
         config: HttpRequestConfigEntity(id: 'c1', url: url),
@@ -11,7 +12,10 @@ void main() {
 
   group('displayTitle', () {
     test('prefers the saved collection name', () {
-      expect(tab(collectionName: 'Login', url: 'https://x.dev').displayTitle, 'Login');
+      expect(
+        tab(collectionName: 'Login', url: 'https://x.dev').displayTitle,
+        'Login',
+      );
     });
 
     test('falls back to the URL', () {

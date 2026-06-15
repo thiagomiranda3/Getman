@@ -25,7 +25,9 @@ class _ClientCertificateTileState extends State<ClientCertificateTile> {
   void initState() {
     super.initState();
     final s = context.read<SettingsBloc>().state.settings;
-    _passphraseController = TextEditingController(text: s.clientCertPassphrase ?? '');
+    _passphraseController = TextEditingController(
+      text: s.clientCertPassphrase ?? '',
+    );
   }
 
   @override
@@ -40,16 +42,20 @@ class _ClientCertificateTileState extends State<ClientCertificateTile> {
     final settings = context.read<SettingsBloc>();
     final current = settings.state.settings;
     final result = await FilePicker.platform.pickFiles(
-      dialogTitle: isCert ? 'Choose certificate (PEM)' : 'Choose private key (PEM)',
+      dialogTitle: isCert
+          ? 'Choose certificate (PEM)'
+          : 'Choose private key (PEM)',
     );
     if (result == null || result.files.isEmpty) return;
     final path = result.files.first.path;
     if (path == null) return;
-    settings.add(UpdateClientCertificate(
-      certPath: isCert ? path : current.clientCertPath,
-      keyPath: isCert ? current.clientKeyPath : path,
-      passphrase: current.clientCertPassphrase,
-    ));
+    settings.add(
+      UpdateClientCertificate(
+        certPath: isCert ? path : current.clientCertPath,
+        keyPath: isCert ? current.clientKeyPath : path,
+        passphrase: current.clientCertPassphrase,
+      ),
+    );
   }
 
   void _clear(BuildContext context) {
@@ -83,34 +89,46 @@ class _ClientCertificateTileState extends State<ClientCertificateTile> {
                 children: [
                   Icon(Icons.verified_user_outlined, size: layout.iconSize),
                   SizedBox(width: layout.tabSpacing),
-                  Text('CLIENT CERTIFICATE (mTLS)',
-                      style: TextStyle(
-                          fontSize: layout.fontSizeNormal,
-                          fontWeight: context.appTypography.titleWeight)),
+                  Text(
+                    'CLIENT CERTIFICATE (mTLS)',
+                    style: TextStyle(
+                      fontSize: layout.fontSizeNormal,
+                      fontWeight: context.appTypography.titleWeight,
+                    ),
+                  ),
                 ],
               ),
               SizedBox(height: layout.tabSpacing),
               if (kIsWeb)
-                Text('Available in the desktop/mobile app.',
-                    style: TextStyle(
-                        fontSize: layout.fontSizeSmall,
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6)))
+                Text(
+                  'Available in the desktop/mobile app.',
+                  style: TextStyle(
+                    fontSize: layout.fontSizeSmall,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                )
               else ...[
                 Text(
-                  certPath == null ? 'Cert: not set' : 'Cert: ${_fileName(certPath)}',
+                  certPath == null
+                      ? 'Cert: not set'
+                      : 'Cert: ${_fileName(certPath)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                      fontSize: layout.fontSizeSmall,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.75)),
+                    fontSize: layout.fontSizeSmall,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
+                  ),
                 ),
                 Text(
-                  keyPath == null ? 'Key: not set' : 'Key: ${_fileName(keyPath)}',
+                  keyPath == null
+                      ? 'Key: not set'
+                      : 'Key: ${_fileName(keyPath)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                      fontSize: layout.fontSizeSmall,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.75)),
+                    fontSize: layout.fontSizeSmall,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
+                  ),
                 ),
                 SizedBox(height: layout.tabSpacing),
                 TextField(
@@ -128,11 +146,13 @@ class _ClientCertificateTileState extends State<ClientCertificateTile> {
                   ),
                   onChanged: (val) {
                     final trimmed = val.trim();
-                    context.read<SettingsBloc>().add(UpdateClientCertificate(
-                          certPath: certPath,
-                          keyPath: keyPath,
-                          passphrase: trimmed.isEmpty ? null : trimmed,
-                        ));
+                    context.read<SettingsBloc>().add(
+                      UpdateClientCertificate(
+                        certPath: certPath,
+                        keyPath: keyPath,
+                        passphrase: trimmed.isEmpty ? null : trimmed,
+                      ),
+                    );
                   },
                 ),
                 SizedBox(height: layout.tabSpacing),

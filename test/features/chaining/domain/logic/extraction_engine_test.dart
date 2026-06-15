@@ -13,7 +13,7 @@ void main() {
 
   test('jsonPath rule captures a body value', () {
     final results = ExtractionEngine.run(const [
-      ExtractionRule(id: '1', kind: ExtractionKind.jsonPath, expression: 'token', targetVariable: 'tok'),
+      ExtractionRule(id: '1', expression: 'token', targetVariable: 'tok'),
     ], response);
     expect(results.single.variable, 'tok');
     expect(results.single.value, 'abc123');
@@ -22,28 +22,38 @@ void main() {
 
   test('jsonPath stringifies non-string values', () {
     final results = ExtractionEngine.run(const [
-      ExtractionRule(id: '1', kind: ExtractionKind.jsonPath, expression: 'user.id', targetVariable: 'uid'),
+      ExtractionRule(id: '1', expression: 'user.id', targetVariable: 'uid'),
     ], response);
     expect(results.single.value, '7');
   });
 
   test('header rule is case-insensitive', () {
     final results = ExtractionEngine.run(const [
-      ExtractionRule(id: '1', kind: ExtractionKind.header, expression: 'x-request-id', targetVariable: 'rid'),
+      ExtractionRule(
+        id: '1',
+        kind: ExtractionKind.header,
+        expression: 'x-request-id',
+        targetVariable: 'rid',
+      ),
     ], response);
     expect(results.single.value, 'req-9');
   });
 
   test('regex rule returns group 1 when present', () {
     final results = ExtractionEngine.run(const [
-      ExtractionRule(id: '1', kind: ExtractionKind.regex, expression: r'"token":"([^"]+)"', targetVariable: 'tok'),
+      ExtractionRule(
+        id: '1',
+        kind: ExtractionKind.regex,
+        expression: '"token":"([^"]+)"',
+        targetVariable: 'tok',
+      ),
     ], response);
     expect(results.single.value, 'abc123');
   });
 
   test('a miss yields matched=false / null value', () {
     final results = ExtractionEngine.run(const [
-      ExtractionRule(id: '1', kind: ExtractionKind.jsonPath, expression: 'nope', targetVariable: 'x'),
+      ExtractionRule(id: '1', expression: 'nope', targetVariable: 'x'),
     ], response);
     expect(results.single.matched, isFalse);
     expect(results.single.value, isNull);
@@ -51,15 +61,25 @@ void main() {
 
   test('disabled rules and empty targets are skipped', () {
     final results = ExtractionEngine.run(const [
-      ExtractionRule(id: '1', expression: 'token', targetVariable: 'tok', enabled: false),
-      ExtractionRule(id: '2', expression: 'token', targetVariable: ''),
+      ExtractionRule(
+        id: '1',
+        expression: 'token',
+        targetVariable: 'tok',
+        enabled: false,
+      ),
+      ExtractionRule(id: '2', expression: 'token'),
     ], response);
     expect(results, isEmpty);
   });
 
   test('invalid regex is a miss, not a throw', () {
     final results = ExtractionEngine.run(const [
-      ExtractionRule(id: '1', kind: ExtractionKind.regex, expression: '([', targetVariable: 'x'),
+      ExtractionRule(
+        id: '1',
+        kind: ExtractionKind.regex,
+        expression: '([',
+        targetVariable: 'x',
+      ),
     ], response);
     expect(results.single.matched, isFalse);
   });

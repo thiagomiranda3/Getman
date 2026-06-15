@@ -1,7 +1,7 @@
 import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/features/collections/data/models/collection_node_model.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_flutter.dart';
 
 abstract class CollectionsLocalDataSource {
   Future<List<CollectionNode>> getCollections();
@@ -21,7 +21,8 @@ abstract class CollectionsLocalDataSource {
 /// the whole forest (L12). Root order is not stored — the BLoC re-sorts on load
 /// (favorites → folders → leaves, alphabetical), so `box.values` order is moot.
 class CollectionsLocalDataSourceImpl implements CollectionsLocalDataSource {
-  static Box<CollectionNode> _box() => Hive.box<CollectionNode>(HiveBoxes.collections);
+  static Box<CollectionNode> _box() =>
+      Hive.box<CollectionNode>(HiveBoxes.collections);
 
   @override
   Future<List<CollectionNode>> getCollections() async {

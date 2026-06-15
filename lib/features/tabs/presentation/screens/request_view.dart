@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/navigation/intents.dart';
@@ -28,11 +30,12 @@ const double _splitMin = 0.1;
 const double _splitMax = 0.9;
 const int _splitFlexUnits = 1000;
 
-int _ratioToFlex(double ratio) => (ratio.clamp(_splitMin, _splitMax) * _splitFlexUnits).toInt();
+int _ratioToFlex(double ratio) =>
+    (ratio.clamp(_splitMin, _splitMax) * _splitFlexUnits).toInt();
 
 class RequestView extends StatefulWidget {
+  const RequestView({required this.tabId, super.key});
   final String tabId;
-  const RequestView({super.key, required this.tabId});
 
   @override
   State<RequestView> createState() => _RequestViewState();
@@ -44,7 +47,8 @@ class _RequestViewState extends State<RequestView> {
   // Live drag ratio. A ValueNotifier (not setState) so dragging the splitter
   // only re-runs the Flex layout — the captured request/response panes (and
   // their code editors) are not rebuilt frame-by-frame. Committed to the
-  // SettingsBloc on drag end, then reset to null so the bloc value drives again.
+  // SettingsBloc on drag end, then reset to null so the bloc value drives
+  // again.
   final ValueNotifier<double?> _localSplitRatio = ValueNotifier<double?>(null);
 
   @override
@@ -71,15 +75,18 @@ class _RequestViewState extends State<RequestView> {
     final newText = _bodyController.text;
     if (tab.config.body == newText) return;
 
-    tabsBloc.add(UpdateTab(
-      tab.copyWith(config: tab.config.copyWith(body: newText)),
-    ));
+    tabsBloc.add(
+      UpdateTab(
+        tab.copyWith(config: tab.config.copyWith(body: newText)),
+      ),
+    );
   }
 
   @override
   void dispose() {
-    _bodyController.removeListener(_onBodyChanged);
-    _bodyController.dispose();
+    _bodyController
+      ..removeListener(_onBodyChanged)
+      ..dispose();
     _responseController.dispose();
     _localSplitRatio.dispose();
     super.dispose();
@@ -127,7 +134,9 @@ class _RequestViewState extends State<RequestView> {
                 ),
                 BeautifyJsonIntent: CallbackAction<BeautifyJsonIntent>(
                   onInvoke: (_) async {
-                    final prettified = await JsonUtils.prettify(_bodyController.text);
+                    final prettified = await JsonUtils.prettify(
+                      _bodyController.text,
+                    );
                     _bodyController.text = prettified;
                     return null;
                   },
@@ -136,63 +145,94 @@ class _RequestViewState extends State<RequestView> {
               child: Focus(
                 autofocus: true,
                 child: Padding(
-                    padding: EdgeInsets.all(layout.pagePadding),
-                    child: Column(
-                      children: [
-                        UrlBar(tabId: widget.tabId, onSave: () => _handleSave(context)),
-                        SizedBox(height: layout.sectionSpacing),
-                        Expanded(
-                          child: context.useUnifiedRequestTabs
-                              ? UnifiedRequestPanel(
-                                  tabId: widget.tabId,
-                                  bodyController: _bodyController,
-                                  responseController: _responseController,
-                                )
-                              : LayoutBuilder(
-                                  builder: (context, constraints) {
-                                    final totalSize = settings.isVerticalLayout ? constraints.maxHeight : constraints.maxWidth;
-                                    // Build the panes once; only the Flex (below)
-                                    // rebuilds on drag, so the editors relayout
-                                    // rather than rebuild.
-                                    final requestPane = RequestConfigSection(tabId: widget.tabId, bodyController: _bodyController);
-                                    final responsePane = ResponseArea(tabId: widget.tabId, responseController: _responseController);
-                                    final splitter = Splitter(
-                                      isVertical: settings.isVerticalLayout,
-                                      onUpdate: (delta) {
-                                        final base = _localSplitRatio.value ?? settings.splitRatio;
-                                        _localSplitRatio.value = (base + delta / totalSize).clamp(_splitMin, _splitMax);
-                                      },
-                                      onEnd: () {
-                                        final committed = _localSplitRatio.value;
-                                        if (committed == null) return;
-                                        context.read<SettingsBloc>().add(UpdateSplitRatio(committed));
-                                        _localSplitRatio.value = null;
-                                      },
-                                    );
+                  padding: EdgeInsets.all(layout.pagePadding),
+                  child: Column(
+                    children: [
+                      UrlBar(
+                        tabId: widget.tabId,
+                        onSave: () => _handleSave(context),
+                      ),
+                      SizedBox(height: layout.sectionSpacing),
+                      Expanded(
+                        child: context.useUnifiedRequestTabs
+                            ? UnifiedRequestPanel(
+                                tabId: widget.tabId,
+                                bodyController: _bodyController,
+                                responseController: _responseController,
+                              )
+                            : LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final totalSize = settings.isVerticalLayout
+                                      ? constraints.maxHeight
+                                      : constraints.maxWidth;
+                                  // Build the panes once; only the Flex (below)
+                                  // rebuilds on drag, so the editors relayout
+                                  // rather than rebuild.
+                                  final requestPane = RequestConfigSection(
+                                    tabId: widget.tabId,
+                                    bodyController: _bodyController,
+                                  );
+                                  final responsePane = ResponseArea(
+                                    tabId: widget.tabId,
+                                    responseController: _responseController,
+                                  );
+                                  final splitter = Splitter(
+                                    isVertical: settings.isVerticalLayout,
+                                    onUpdate: (delta) {
+                                      final base =
+                                          _localSplitRatio.value ??
+                                          settings.splitRatio;
+                                      _localSplitRatio.value =
+                                          (base + delta / totalSize).clamp(
+                                            _splitMin,
+                                            _splitMax,
+                                          );
+                                    },
+                                    onEnd: () {
+                                      final committed = _localSplitRatio.value;
+                                      if (committed == null) return;
+                                      context.read<SettingsBloc>().add(
+                                        UpdateSplitRatio(committed),
+                                      );
+                                      _localSplitRatio.value = null;
+                                    },
+                                  );
 
-                                    return ValueListenableBuilder<double?>(
-                                      valueListenable: _localSplitRatio,
-                                      builder: (context, local, _) {
-                                        final currentRatio = local ?? settings.splitRatio;
-                                        return Flex(
-                                          direction: settings.isVerticalLayout ? Axis.vertical : Axis.horizontal,
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Flexible(flex: _ratioToFlex(currentRatio), child: requestPane),
-                                            splitter,
-                                            Flexible(flex: _ratioToFlex(1 - currentRatio), child: responsePane),
-                                          ],
-                                        );
-                                      },
-                                    );
-                                  }
-                                ),
-                        ),
-                      ],
-                    ),
+                                  return ValueListenableBuilder<double?>(
+                                    valueListenable: _localSplitRatio,
+                                    builder: (context, local, _) {
+                                      final currentRatio =
+                                          local ?? settings.splitRatio;
+                                      return Flex(
+                                        direction: settings.isVerticalLayout
+                                            ? Axis.vertical
+                                            : Axis.horizontal,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Flexible(
+                                            flex: _ratioToFlex(currentRatio),
+                                            child: requestPane,
+                                          ),
+                                          splitter,
+                                          Flexible(
+                                            flex: _ratioToFlex(
+                                              1 - currentRatio,
+                                            ),
+                                            child: responsePane,
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
                   ),
                 ),
-              );
+              ),
+            );
           },
         );
       },
@@ -208,23 +248,34 @@ class _RequestViewState extends State<RequestView> {
 
     final savedNode = tab.collectionNodeId == null
         ? null
-        : CollectionsTreeHelper.findNode(collectionsBloc.state.collections, tab.collectionNodeId!);
+        : CollectionsTreeHelper.findNode(
+            collectionsBloc.state.collections,
+            tab.collectionNodeId!,
+          );
 
     if (savedNode != null) {
-      collectionsBloc.add(UpdateNodeRequest(
-        tab.collectionNodeId!,
-        tab.config.copyWith(),
-      ));
-      showAppSnackBar(context, 'REQUEST UPDATED!', duration: const Duration(seconds: 1));
+      collectionsBloc.add(
+        UpdateNodeRequest(
+          tab.collectionNodeId!,
+          tab.config.copyWith(),
+        ),
+      );
+      showAppSnackBar(
+        context,
+        'REQUEST UPDATED!',
+        duration: const Duration(seconds: 1),
+      );
       return;
     }
 
     if (tab.collectionNodeId != null) {
       // Node was deleted while the tab was open — drop the stale link
       // (copyWith's sentinel pattern lets `null` actually clear the fields).
-      tabsBloc.add(UpdateTab(
-        tab.copyWith(collectionNodeId: null, collectionName: null),
-      ));
+      tabsBloc.add(
+        UpdateTab(
+          tab.copyWith(collectionNodeId: null, collectionName: null),
+        ),
+      );
     }
     _showSaveDialog(context, tab);
   }
@@ -232,15 +283,19 @@ class _RequestViewState extends State<RequestView> {
   void _showSaveDialog(BuildContext context, HttpRequestTabEntity tab) {
     final collectionsBloc = context.read<CollectionsBloc>();
     final tabsBloc = context.read<TabsBloc>();
-    NamePromptDialog.show(
-      context,
-      title: 'SAVE TO COLLECTION',
-      initialText: 'NEW REQUEST',
-      hintText: 'REQUEST NAME',
-      onConfirm: (name) {
-        collectionsBloc.add(SaveRequestToCollection(name, tab.config.copyWith()));
-        tabsBloc.add(UpdateTab(tab.copyWith(collectionName: name)));
-      },
+    unawaited(
+      NamePromptDialog.show(
+        context,
+        title: 'SAVE TO COLLECTION',
+        initialText: 'NEW REQUEST',
+        hintText: 'REQUEST NAME',
+        onConfirm: (name) {
+          collectionsBloc.add(
+            SaveRequestToCollection(name, tab.config.copyWith()),
+          );
+          tabsBloc.add(UpdateTab(tab.copyWith(collectionName: name)));
+        },
+      ),
     );
   }
 }

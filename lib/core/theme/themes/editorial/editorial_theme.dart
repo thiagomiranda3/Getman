@@ -6,49 +6,61 @@ import 'package:getman/core/theme/themes/editorial/editorial_palette.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
-  final bool isDark = brightness == Brightness.dark;
-  final Color paper = isDark ? EditorialPalette.paperDark : EditorialPalette.paperLight;
-  final Color ink = isDark ? EditorialPalette.inkDark : EditorialPalette.inkLight;
-  final Color inkSoft = isDark ? EditorialPalette.inkSoftDark : EditorialPalette.inkSoftLight;
-  const Color accent = EditorialPalette.accent;
+  final isDark = brightness == Brightness.dark;
+  final paper = isDark
+      ? EditorialPalette.paperDark
+      : EditorialPalette.paperLight;
+  final ink = isDark ? EditorialPalette.inkDark : EditorialPalette.inkLight;
+  final inkSoft = isDark
+      ? EditorialPalette.inkSoftDark
+      : EditorialPalette.inkSoftLight;
+  const accent = EditorialPalette.accent;
 
-  final AppLayout layout = isCompact ? AppLayout.compact : AppLayout.normal;
-  const AppShape shape = AppShape(panelRadius: 0, buttonRadius: 0, inputRadius: 0, dialogRadius: 0, sheetRadius: 0);
+  final layout = isCompact ? AppLayout.compact : AppLayout.normal;
+  const shape = AppShape(
+    panelRadius: 0,
+    buttonRadius: 0,
+    inputRadius: 0,
+    dialogRadius: 0,
+    sheetRadius: 0,
+  );
 
   final fraunces = GoogleFonts.frauncesTextTheme();
   final inter = GoogleFonts.interTextTheme();
   final plexMonoFamily = GoogleFonts.ibmPlexMono().fontFamily!;
 
-  final baseTextTheme = fraunces.apply(bodyColor: ink, displayColor: ink).copyWith(
-    bodyMedium: inter.bodyMedium?.copyWith(
-      fontSize: layout.fontSizeTitle,
-      fontWeight: FontWeight.w400,
-      color: ink,
-    ),
-    bodySmall: inter.bodySmall?.copyWith(
-      fontSize: layout.fontSizeNormal,
-      fontWeight: FontWeight.w400,
-      color: ink,
-    ),
-    titleMedium: fraunces.titleMedium?.copyWith(
-      fontSize: 18,
-      fontWeight: FontWeight.w600,
-      color: ink,
-    ),
-    titleLarge: fraunces.titleLarge?.copyWith(
-      fontSize: 22,
-      fontWeight: FontWeight.w600,
-      letterSpacing: -0.2,
-      color: ink,
-    ),
-    labelSmall: TextStyle(
-      fontFamily: plexMonoFamily,
-      fontSize: 11,
-      fontWeight: FontWeight.w400,
-      letterSpacing: 2.8,
-      color: inkSoft,
-    ),
-  );
+  final baseTextTheme = fraunces
+      .apply(bodyColor: ink, displayColor: ink)
+      .copyWith(
+        bodyMedium: inter.bodyMedium?.copyWith(
+          fontSize: layout.fontSizeTitle,
+          fontWeight: FontWeight.w400,
+          color: ink,
+        ),
+        bodySmall: inter.bodySmall?.copyWith(
+          fontSize: layout.fontSizeNormal,
+          fontWeight: FontWeight.w400,
+          color: ink,
+        ),
+        titleMedium: fraunces.titleMedium?.copyWith(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: ink,
+        ),
+        titleLarge: fraunces.titleLarge?.copyWith(
+          fontSize: 22,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.2,
+          color: ink,
+        ),
+        labelSmall: TextStyle(
+          fontFamily: plexMonoFamily,
+          fontSize: 11,
+          fontWeight: FontWeight.w400,
+          letterSpacing: 2.8,
+          color: inkSoft,
+        ),
+      );
 
   final typography = AppTypography(
     base: baseTextTheme,
@@ -67,7 +79,9 @@ ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
     statusAccentSuccess: EditorialPalette.statusAccentSuccess,
     statusAccentWarning: EditorialPalette.statusAccentWarning,
     statusAccentError: EditorialPalette.statusAccentError,
-    codeBackground: isDark ? EditorialPalette.codeBackgroundDark : EditorialPalette.codeBackgroundLight,
+    codeBackground: isDark
+        ? EditorialPalette.codeBackgroundDark
+        : EditorialPalette.codeBackgroundLight,
     variableResolved: EditorialPalette.statusAccentSuccess,
     variableUnresolved: EditorialPalette.statusAccentError,
     selectorActive: EditorialPalette.accent,
@@ -131,7 +145,7 @@ ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
         color: ink,
         fontWeight: FontWeight.w600,
       ),
-      shape: Border(bottom: BorderSide(color: ink, width: 1)),
+      shape: Border(bottom: BorderSide(color: ink)),
     ),
     tabBarTheme: TabBarThemeData(
       dividerColor: Colors.transparent,
@@ -139,7 +153,9 @@ ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
       unselectedLabelColor: inkSoft,
       indicatorSize: TabBarIndicatorSize.tab,
       indicator: BoxDecoration(
-        border: Border(bottom: BorderSide(color: ink, width: layout.borderThick)),
+        border: Border(
+          bottom: BorderSide(color: ink, width: layout.borderThick),
+        ),
       ),
       labelStyle: plexUppercase.copyWith(color: ink),
       unselectedLabelStyle: plexUppercase.copyWith(color: inkSoft),
@@ -150,7 +166,6 @@ ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
         foregroundColor: paper,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.zero,
           side: BorderSide(color: ink, width: layout.borderThin),
         ),
         padding: EdgeInsets.symmetric(
@@ -164,7 +179,7 @@ ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
       style: OutlinedButton.styleFrom(
         foregroundColor: ink,
         side: BorderSide(color: ink, width: layout.borderThin),
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        shape: const RoundedRectangleBorder(),
         padding: EdgeInsets.symmetric(
           horizontal: layout.buttonPaddingHorizontal,
           vertical: layout.buttonPaddingVertical,
@@ -203,7 +218,6 @@ ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
       color: paper,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.zero,
         side: BorderSide(color: ink, width: layout.borderThin),
       ),
     ),
@@ -211,7 +225,6 @@ ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
       backgroundColor: paper,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.zero,
         side: BorderSide(color: ink, width: layout.borderThin),
       ),
       titleTextStyle: TextStyle(
@@ -244,12 +257,14 @@ ThemeData editorialTheme(Brightness brightness, {bool isCompact = false}) {
     ),
   );
 
-  return base.copyWith(extensions: [
-    layout,
-    palette,
-    shape,
-    typography,
-    decoration,
-    const AppCopy(emptyResponse: 'Awaiting the first response'),
-  ]);
+  return base.copyWith(
+    extensions: [
+      layout,
+      palette,
+      shape,
+      typography,
+      decoration,
+      const AppCopy(emptyResponse: 'Awaiting the first response'),
+    ],
+  );
 }

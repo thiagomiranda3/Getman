@@ -5,10 +5,11 @@ enum AssertionTarget {
   statusCode('statusCode'),
   responseTime('responseTime'),
   bodyJsonPath('bodyJsonPath'),
-  header('header');
+  header('header')
+  ;
 
-  final String wire;
   const AssertionTarget(this.wire);
+  final String wire;
 
   static AssertionTarget fromWire(String? value) {
     for (final t in AssertionTarget.values) {
@@ -26,10 +27,11 @@ enum AssertionComparator {
   lessThan('lessThan'),
   greaterThan('greaterThan'),
   inRange('inRange'),
-  exists('exists');
+  exists('exists')
+  ;
 
-  final String wire;
   const AssertionComparator(this.wire);
+  final String wire;
 
   static AssertionComparator fromWire(String? value) {
     for (final c in AssertionComparator.values) {
@@ -45,13 +47,6 @@ enum AssertionComparator {
 /// (for [AssertionTarget.header]); unused for status/time. [expected] is the
 /// comparison value (for [AssertionComparator.inRange] use `"lo-hi"`).
 class Assertion extends Equatable {
-  final String id;
-  final AssertionTarget target;
-  final AssertionComparator comparator;
-  final String path;
-  final String expected;
-  final bool enabled;
-
   const Assertion({
     required this.id,
     this.target = AssertionTarget.statusCode,
@@ -60,6 +55,12 @@ class Assertion extends Equatable {
     this.expected = '',
     this.enabled = true,
   });
+  final String id;
+  final AssertionTarget target;
+  final AssertionComparator comparator;
+  final String path;
+  final String expected;
+  final bool enabled;
 
   Assertion copyWith({
     AssertionTarget? target,

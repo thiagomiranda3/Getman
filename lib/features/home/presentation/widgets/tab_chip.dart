@@ -9,14 +9,13 @@ import 'package:getman/features/tabs/presentation/widgets/tab_switcher_sheet.dar
 /// Compact tab indicator for narrow layouts: shows "active/total" + the active
 /// tab title, and opens the [TabSwitcherSheet] on tap.
 class TabChip extends StatelessWidget {
+  const TabChip({required this.onRequestClose, super.key});
   final Future<bool> Function(BuildContext, String) onRequestClose;
-
-  const TabChip({super.key, required this.onRequestClose});
 
   static HttpRequestTabEntity? _activeTab(TabsState state) =>
       (state.activeIndex >= 0 && state.activeIndex < state.tabs.length)
-          ? state.tabs[state.activeIndex]
-          : null;
+      ? state.tabs[state.activeIndex]
+      : null;
 
   @override
   Widget build(BuildContext context) {
@@ -39,19 +38,27 @@ class TabChip extends StatelessWidget {
           onTap: tabs.isEmpty
               ? null
               : () => TabSwitcherSheet.show(
-                    context,
-                    onRequestClose: (tabId) => onRequestClose(context, tabId),
-                  ),
+                  context,
+                  onRequestClose: (tabId) => onRequestClose(context, tabId),
+                ),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: theme.primaryColor,
-                    border: Border.all(color: theme.dividerColor, width: layout.borderThin),
-                    borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+                    border: Border.all(
+                      color: theme.dividerColor,
+                      width: layout.borderThin,
+                    ),
+                    borderRadius: BorderRadius.circular(
+                      context.appShape.panelRadius,
+                    ),
                   ),
                   child: Text(
                     tabs.isEmpty ? '0' : '${activeIndex + 1}/${tabs.length} ▾',

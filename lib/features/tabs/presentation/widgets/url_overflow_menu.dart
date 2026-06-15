@@ -6,22 +6,21 @@ enum _OverflowAction { generateCode, save, toggleLayout }
 /// Narrow-layout overflow menu for the URL bar, collapsing the
 /// generate-code / save / layout-toggle actions behind a single button.
 class UrlOverflowMenu extends StatelessWidget {
-  final double iconSize;
-  final bool isSaved;
-  final bool isVerticalLayout;
-  final VoidCallback onGenerateCode;
-  final VoidCallback onSave;
-  final VoidCallback onToggleLayout;
-
   const UrlOverflowMenu({
-    super.key,
     required this.iconSize,
     required this.isSaved,
     required this.isVerticalLayout,
     required this.onGenerateCode,
     required this.onSave,
     required this.onToggleLayout,
+    super.key,
   });
+  final double iconSize;
+  final bool isSaved;
+  final bool isVerticalLayout;
+  final VoidCallback onGenerateCode;
+  final VoidCallback onSave;
+  final VoidCallback onToggleLayout;
 
   @override
   Widget build(BuildContext context) {
@@ -37,18 +36,19 @@ class UrlOverflowMenu extends StatelessWidget {
         side: BorderSide(color: theme.dividerColor, width: layout.borderThick),
       ),
       elevation: 0,
-      icon: Icon(Icons.more_vert, color: theme.colorScheme.onSurface, size: iconSize),
+      icon: Icon(
+        Icons.more_vert,
+        color: theme.colorScheme.onSurface,
+        size: iconSize,
+      ),
       onSelected: (action) {
         switch (action) {
           case _OverflowAction.generateCode:
             onGenerateCode();
-            break;
           case _OverflowAction.save:
             onSave();
-            break;
           case _OverflowAction.toggleLayout:
             onToggleLayout();
-            break;
         }
       },
       itemBuilder: (popupContext) => [
@@ -63,13 +63,20 @@ class UrlOverflowMenu extends StatelessWidget {
         ),
         PopupMenuItem(
           value: _OverflowAction.generateCode,
-          child: _menuRow(context, Icons.code, 'GENERATE CODE', theme.colorScheme.secondary),
+          child: _menuRow(
+            context,
+            Icons.code,
+            'GENERATE CODE',
+            theme.colorScheme.secondary,
+          ),
         ),
         PopupMenuItem(
           value: _OverflowAction.toggleLayout,
           child: _menuRow(
             context,
-            isVerticalLayout ? Icons.view_column_rounded : Icons.view_agenda_rounded,
+            isVerticalLayout
+                ? Icons.view_column_rounded
+                : Icons.view_agenda_rounded,
             isVerticalLayout ? 'HORIZONTAL LAYOUT' : 'VERTICAL LAYOUT',
             theme.colorScheme.onSurface,
           ),
@@ -78,7 +85,12 @@ class UrlOverflowMenu extends StatelessWidget {
     );
   }
 
-  Widget _menuRow(BuildContext context, IconData icon, String label, Color iconColor) {
+  Widget _menuRow(
+    BuildContext context,
+    IconData icon,
+    String label,
+    Color iconColor,
+  ) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
     return Row(

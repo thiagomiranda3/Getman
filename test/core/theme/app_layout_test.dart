@@ -4,7 +4,10 @@ import 'package:getman/core/theme/app_theme.dart';
 void main() {
   group('AppLayout', () {
     test('normal and compact constants differ on pagePadding', () {
-      expect(AppLayout.normal.pagePadding, isNot(AppLayout.compact.pagePadding));
+      expect(
+        AppLayout.normal.pagePadding,
+        isNot(AppLayout.compact.pagePadding),
+      );
     });
 
     test('includes fontSizeCode and fontSizeSubtitle', () {
@@ -15,7 +18,7 @@ void main() {
     });
 
     test('copyWith preserves non-overridden fields', () {
-      final copy = AppLayout.normal.copyWith(pagePadding: 99.0);
+      final copy = AppLayout.normal.copyWith(pagePadding: 99);
       expect(copy.pagePadding, 99.0);
       expect(copy.sectionSpacing, AppLayout.normal.sectionSpacing);
       expect(copy.fontSizeCode, AppLayout.normal.fontSizeCode);
@@ -25,7 +28,10 @@ void main() {
       final mid = AppLayout.normal.lerp(AppLayout.compact, 0.5);
       expect(
         mid.pagePadding,
-        closeTo((AppLayout.normal.pagePadding + AppLayout.compact.pagePadding) / 2, 0.001),
+        closeTo(
+          (AppLayout.normal.pagePadding + AppLayout.compact.pagePadding) / 2,
+          0.001,
+        ),
       );
       expect(mid.isCompact, AppLayout.compact.isCompact);
       expect(mid.tabTitleMaxLength, AppLayout.compact.tabTitleMaxLength);

@@ -17,42 +17,40 @@ void main() {
     void walk(InlineSpan s) {
       if (s is TextSpan) {
         colors.add(s.style?.color?.toARGB32());
-        for (final c in s.children ?? const <InlineSpan>[]) {
-          walk(c);
-        }
+        (s.children ?? const <InlineSpan>[]).forEach(walk);
       }
     }
 
-    for (final s in spans) {
-      walk(s);
-    }
+    spans.forEach(walk);
     return colors;
   }
 
-  testWidgets('JsonCodeEditor paints more than one colour for JSON',
-      (tester) async {
+  testWidgets('JsonCodeEditor paints more than one colour for JSON', (
+    tester,
+  ) async {
     final captured = <TextSpan>[];
     final controller = createJsonCodeController();
     // Decorate the real highlighting span builder so we can observe what the
     // editor actually hands to the paint path.
     final controllerWithCapture = CodeLineEditingController(
-      spanBuilder: ({
-        required BuildContext context,
-        required int index,
-        required CodeLine codeLine,
-        required TextSpan textSpan,
-        required TextStyle style,
-      }) {
-        final span = jsonHighlightSpanBuilder(
-          context: context,
-          index: index,
-          codeLine: codeLine,
-          textSpan: textSpan,
-          style: style,
-        );
-        captured.add(span);
-        return span;
-      },
+      spanBuilder:
+          ({
+            required context,
+            required index,
+            required codeLine,
+            required textSpan,
+            required style,
+          }) {
+            final span = jsonHighlightSpanBuilder(
+              context: context,
+              index: index,
+              codeLine: codeLine,
+              textSpan: textSpan,
+              style: style,
+            );
+            captured.add(span);
+            return span;
+          },
     );
     controller.dispose();
     controllerWithCapture.text =
@@ -65,8 +63,11 @@ void main() {
           body: SizedBox(
             width: 600,
             height: 400,
-            child:
-                JsonCodeEditor(controller: controllerWithCapture, readOnly: true, autofocus: false),
+            child: JsonCodeEditor(
+              controller: controllerWithCapture,
+              readOnly: true,
+              autofocus: false,
+            ),
           ),
         ),
       ),
@@ -74,10 +75,16 @@ void main() {
     await tester.pump();
 
     final colors = collectColors(captured);
-    expect(captured, isNotEmpty,
-        reason: 'editor should have built spans for the visible lines');
-    expect(colors.length, greaterThan(1),
-        reason: 'JSON keys/strings/numbers must render in distinct colours');
+    expect(
+      captured,
+      isNotEmpty,
+      reason: 'editor should have built spans for the visible lines',
+    );
+    expect(
+      colors.length,
+      greaterThan(1),
+      reason: 'JSON keys/strings/numbers must render in distinct colours',
+    );
 
     // Dispose the editor so its cursor-blink timer is cancelled before the
     // test ends (re_editor autofocuses and starts a periodic blink timer).
@@ -85,38 +92,47 @@ void main() {
     controllerWithCapture.dispose();
   });
 
-  testWidgets('non-JSON content does not throw and still renders',
-      (tester) async {
+  testWidgets('non-JSON content does not throw and still renders', (
+    tester,
+  ) async {
     final captured = <TextSpan>[];
     final controller = CodeLineEditingController(
-      spanBuilder: ({
-        required BuildContext context,
-        required int index,
-        required CodeLine codeLine,
-        required TextSpan textSpan,
-        required TextStyle style,
-      }) {
-        final span = jsonHighlightSpanBuilder(
-          context: context,
-          index: index,
-          codeLine: codeLine,
-          textSpan: textSpan,
-          style: style,
-        );
-        captured.add(span);
-        return span;
-      },
-    );
-    controller.text = '<html>\n  <body>not json</body>\n</html>';
+      spanBuilder:
+          ({
+            required context,
+            required index,
+            required codeLine,
+            required textSpan,
+            required style,
+          }) {
+            final span = jsonHighlightSpanBuilder(
+              context: context,
+              index: index,
+              codeLine: codeLine,
+              textSpan: textSpan,
+              style: style,
+            );
+            captured.add(span);
+            return span;
+          },
+    )..text = '<html>\n  <body>not json</body>\n</html>';
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: resolveThemeData('brutalist', Brightness.light, isCompact: false),
+        theme: resolveThemeData(
+          'brutalist',
+          Brightness.light,
+          isCompact: false,
+        ),
         home: Scaffold(
           body: SizedBox(
             width: 600,
             height: 400,
-            child: JsonCodeEditor(controller: controller, readOnly: true, autofocus: false),
+            child: JsonCodeEditor(
+              controller: controller,
+              readOnly: true,
+              autofocus: false,
+            ),
           ),
         ),
       ),

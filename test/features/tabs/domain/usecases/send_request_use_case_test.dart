@@ -51,16 +51,20 @@ void main() {
       addToHistoryUseCase: addToHistory,
       getSettingsUseCase: getSettings,
     );
-    when(() => getSettings.call()).thenAnswer((_) async => const SettingsEntity());
+    when(
+      () => getSettings.call(),
+    ).thenAnswer((_) async => const SettingsEntity());
     when(() => addToHistory.call(any(), any())).thenAnswer((_) async {});
   });
 
   void stubSendSuccess() {
-    when(() => repository.sendRequest(
-          any(),
-          envVars: any(named: 'envVars'),
-          cancelHandle: any(named: 'cancelHandle'),
-        )).thenAnswer((_) async => response);
+    when(
+      () => repository.sendRequest(
+        any(),
+        envVars: any(named: 'envVars'),
+        cancelHandle: any(named: 'cancelHandle'),
+      ),
+    ).thenAnswer((_) async => response);
   }
 
   test('returns the repository response and records history', () async {
@@ -72,58 +76,82 @@ void main() {
     verify(() => addToHistory.call(any(), any())).called(1);
   });
 
-  test('records the TEMPLATED config — env vars must never be resolved into history', () async {
-    stubSendSuccess();
+  test(
+    'records the TEMPLATED config — env vars must never be resolved into '
+    'history',
+    () async {
+      stubSendSuccess();
 
-    await useCase(config: config, envVars: envVars);
+      await useCase(config: config, envVars: envVars);
 
-    final recorded =
-        verify(() => addToHistory.call(captureAny(), any())).captured.single as HttpRequestConfigEntity;
-    expect(recorded.url, 'https://{{host}}/login',
-        reason: 're-sending a history entry under a different environment must work');
-    expect(recorded.body, '{"user":"{{user}}"}');
-  });
+      final recorded =
+          verify(() => addToHistory.call(captureAny(), any())).captured.single
+              as HttpRequestConfigEntity;
+      expect(
+        recorded.url,
+        'https://{{host}}/login',
+        reason:
+            're-sending a history entry under a different environment must '
+            'work',
+      );
+      expect(recorded.body, '{"user":"{{user}}"}');
+    },
+  );
 
   test('respects historyLimit from settings', () async {
     stubSendSuccess();
-    when(() => getSettings.call())
-        .thenAnswer((_) async => const SettingsEntity(historyLimit: 7));
+    when(
+      () => getSettings.call(),
+    ).thenAnswer((_) async => const SettingsEntity(historyLimit: 7));
 
     await useCase(config: config, envVars: envVars);
 
     verify(() => addToHistory.call(any(), 7)).called(1);
   });
 
-  test('snapshots the response into history only when saveResponseInHistory is on', () async {
-    stubSendSuccess();
-    when(() => getSettings.call())
-        .thenAnswer((_) async => const SettingsEntity(saveResponseInHistory: true));
+  test(
+    'snapshots the response into history only when saveResponseInHistory is on',
+    () async {
+      stubSendSuccess();
+      when(() => getSettings.call()).thenAnswer(
+        (_) async => const SettingsEntity(saveResponseInHistory: true),
+      );
 
-    await useCase(config: config, envVars: envVars);
+      await useCase(config: config, envVars: envVars);
 
-    final recorded =
-        verify(() => addToHistory.call(captureAny(), any())).captured.single as HttpRequestConfigEntity;
-    expect(recorded.statusCode, 201);
-    expect(recorded.responseBody, '{"token":"x"}');
-  });
+      final recorded =
+          verify(() => addToHistory.call(captureAny(), any())).captured.single
+              as HttpRequestConfigEntity;
+      expect(recorded.statusCode, 201);
+      expect(recorded.responseBody, '{"token":"x"}');
+    },
+  );
 
-  test('omits the response snapshot when saveResponseInHistory is off', () async {
-    stubSendSuccess();
+  test(
+    'omits the response snapshot when saveResponseInHistory is off',
+    () async {
+      stubSendSuccess();
 
-    await useCase(config: config, envVars: envVars);
+      await useCase(config: config, envVars: envVars);
 
-    final recorded =
-        verify(() => addToHistory.call(captureAny(), any())).captured.single as HttpRequestConfigEntity;
-    expect(recorded.statusCode, isNull);
-    expect(recorded.responseBody, isNull);
-  });
+      final recorded =
+          verify(() => addToHistory.call(captureAny(), any())).captured.single
+              as HttpRequestConfigEntity;
+      expect(recorded.statusCode, isNull);
+      expect(recorded.responseBody, isNull);
+    },
+  );
 
   test('records failed requests and rethrows', () async {
-    when(() => repository.sendRequest(
-          any(),
-          envVars: any(named: 'envVars'),
-          cancelHandle: any(named: 'cancelHandle'),
-        )).thenThrow(const NetworkFailure('boom', type: NetworkFailureType.connection));
+    when(
+      () => repository.sendRequest(
+        any(),
+        envVars: any(named: 'envVars'),
+        cancelHandle: any(named: 'cancelHandle'),
+      ),
+    ).thenThrow(
+      const NetworkFailure('boom', type: NetworkFailureType.connection),
+    );
 
     await expectLater(
       () => useCase(config: config, envVars: envVars),
@@ -132,38 +160,55 @@ void main() {
     verify(() => addToHistory.call(any(), any())).called(1);
   });
 
-  test('records failed requests with saveResponseInHistory on (typed empty headers)', () async {
-    // Regression: on the failure path `response` is null, so the recorded
-    // config gets an empty header map. The fallback must be typed
-    // (`Map<String, String>`) or copyWith's cast throws and history is dropped.
-    when(() => repository.sendRequest(
+  test(
+    'records failed requests with saveResponseInHistory on '
+    '(typed empty headers)',
+    () async {
+      // Regression: on the failure path `response` is null, so the recorded
+      // config gets an empty header map. The fallback must be typed
+      // (`Map<String, String>`) or copyWith's cast throws and history is
+      // dropped.
+      when(
+        () => repository.sendRequest(
           any(),
           envVars: any(named: 'envVars'),
           cancelHandle: any(named: 'cancelHandle'),
-        )).thenThrow(
-        const NetworkFailure('boom', type: NetworkFailureType.connection, statusCode: 500));
-    when(() => getSettings.call())
-        .thenAnswer((_) async => const SettingsEntity(saveResponseInHistory: true));
+        ),
+      ).thenThrow(
+        const NetworkFailure(
+          'boom',
+          type: NetworkFailureType.connection,
+          statusCode: 500,
+        ),
+      );
+      when(() => getSettings.call()).thenAnswer(
+        (_) async => const SettingsEntity(saveResponseInHistory: true),
+      );
 
-    await expectLater(
-      () => useCase(config: config, envVars: envVars),
-      throwsA(isA<NetworkFailure>()),
-    );
+      await expectLater(
+        () => useCase(config: config, envVars: envVars),
+        throwsA(isA<NetworkFailure>()),
+      );
 
-    final recorded =
-        verify(() => addToHistory.call(captureAny(), any())).captured.single
-            as HttpRequestConfigEntity;
-    expect(recorded.statusCode, 500);
-    expect(recorded.responseBody, 'boom');
-    expect(recorded.responseHeaders, isEmpty);
-  });
+      final recorded =
+          verify(() => addToHistory.call(captureAny(), any())).captured.single
+              as HttpRequestConfigEntity;
+      expect(recorded.statusCode, 500);
+      expect(recorded.responseBody, 'boom');
+      expect(recorded.responseHeaders, isEmpty);
+    },
+  );
 
   test('does NOT record cancelled requests', () async {
-    when(() => repository.sendRequest(
-          any(),
-          envVars: any(named: 'envVars'),
-          cancelHandle: any(named: 'cancelHandle'),
-        )).thenThrow(const NetworkFailure('cancelled', type: NetworkFailureType.cancelled));
+    when(
+      () => repository.sendRequest(
+        any(),
+        envVars: any(named: 'envVars'),
+        cancelHandle: any(named: 'cancelHandle'),
+      ),
+    ).thenThrow(
+      const NetworkFailure('cancelled', type: NetworkFailureType.cancelled),
+    );
 
     await expectLater(
       () => useCase(config: config, envVars: envVars),
@@ -174,8 +219,9 @@ void main() {
 
   test('a history write failure never fails the request', () async {
     stubSendSuccess();
-    when(() => addToHistory.call(any(), any()))
-        .thenThrow(const PersistenceFailure('disk full'));
+    when(
+      () => addToHistory.call(any(), any()),
+    ).thenThrow(const PersistenceFailure('disk full'));
 
     final result = await useCase(config: config, envVars: envVars);
 
@@ -185,11 +231,13 @@ void main() {
   group('response body cap (6c)', () {
     test('response body within limit is stored verbatim', () async {
       const smallBody = '{"ok":true}';
-      when(() => repository.sendRequest(
-            any(),
-            envVars: any(named: 'envVars'),
-            cancelHandle: any(named: 'cancelHandle'),
-          )).thenAnswer(
+      when(
+        () => repository.sendRequest(
+          any(),
+          envVars: any(named: 'envVars'),
+          cancelHandle: any(named: 'cancelHandle'),
+        ),
+      ).thenAnswer(
         (_) async => const HttpResponseEntity(
           statusCode: 200,
           body: smallBody,
@@ -197,8 +245,9 @@ void main() {
           durationMs: 5,
         ),
       );
-      when(() => getSettings.call())
-          .thenAnswer((_) async => const SettingsEntity(saveResponseInHistory: true));
+      when(() => getSettings.call()).thenAnswer(
+        (_) async => const SettingsEntity(saveResponseInHistory: true),
+      );
 
       await useCase(config: config, envVars: envVars);
 
@@ -211,11 +260,13 @@ void main() {
     test('response body over limit is replaced with the placeholder', () async {
       // Build a body that exceeds kMaxPersistedResponseBodyChars.
       final largeBody = 'x' * (kMaxPersistedResponseBodyChars + 1);
-      when(() => repository.sendRequest(
-            any(),
-            envVars: any(named: 'envVars'),
-            cancelHandle: any(named: 'cancelHandle'),
-          )).thenAnswer(
+      when(
+        () => repository.sendRequest(
+          any(),
+          envVars: any(named: 'envVars'),
+          cancelHandle: any(named: 'cancelHandle'),
+        ),
+      ).thenAnswer(
         (_) async => HttpResponseEntity(
           statusCode: 200,
           body: largeBody,
@@ -223,8 +274,9 @@ void main() {
           durationMs: 5,
         ),
       );
-      when(() => getSettings.call())
-          .thenAnswer((_) async => const SettingsEntity(saveResponseInHistory: true));
+      when(() => getSettings.call()).thenAnswer(
+        (_) async => const SettingsEntity(saveResponseInHistory: true),
+      );
 
       await useCase(config: config, envVars: envVars);
 

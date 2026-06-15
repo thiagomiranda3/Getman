@@ -11,9 +11,8 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 /// compact-phone viewports. Each open tab is a row with method badge, title,
 /// close button, and drag handle for reorder. Tap a row to switch tabs.
 class TabSwitcherSheet extends StatelessWidget {
+  const TabSwitcherSheet({required this.onRequestClose, super.key});
   final Future<bool> Function(String tabId) onRequestClose;
-
-  const TabSwitcherSheet({super.key, required this.onRequestClose});
 
   static Future<void> show(
     BuildContext context, {
@@ -26,7 +25,9 @@ class TabSwitcherSheet extends StatelessWidget {
       useSafeArea: true,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(context.appShape.sheetRadius)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(context.appShape.sheetRadius),
+        ),
       ),
       builder: (sheetContext) => BlocProvider.value(
         value: tabsBloc,
@@ -54,7 +55,12 @@ class TabSwitcherSheet extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               color: theme.scaffoldBackgroundColor,
-              border: Border(top: BorderSide(color: theme.dividerColor, width: layout.borderThick)),
+              border: Border(
+                top: BorderSide(
+                  color: theme.dividerColor,
+                  width: layout.borderThick,
+                ),
+              ),
             ),
             child: Column(
               children: [
@@ -75,8 +81,9 @@ class TabSwitcherSheet extends StatelessWidget {
                           padding: EdgeInsets.all(layout.pagePadding / 2),
                           itemCount: tabs.length,
                           buildDefaultDragHandles: false,
-                          onReorder: (oldIndex, newIndex) =>
-                              context.read<TabsBloc>().add(ReorderTabs(oldIndex, newIndex)),
+                          onReorder: (oldIndex, newIndex) => context
+                              .read<TabsBloc>()
+                              .add(ReorderTabs(oldIndex, newIndex)),
                           itemBuilder: (_, index) {
                             final tab = tabs[index];
                             return _TabRow(
@@ -85,13 +92,19 @@ class TabSwitcherSheet extends StatelessWidget {
                               index: index,
                               isActive: index == activeIndex,
                               onTap: () {
-                                context.read<TabsBloc>().add(SetActiveIndex(index));
+                                context.read<TabsBloc>().add(
+                                  SetActiveIndex(index),
+                                );
                                 Navigator.of(context).pop();
                               },
                               onClose: () async {
-                                final confirmed = await onRequestClose(tab.tabId);
+                                final confirmed = await onRequestClose(
+                                  tab.tabId,
+                                );
                                 if (!confirmed || !context.mounted) return;
-                                context.read<TabsBloc>().add(RemoveTab(tab.tabId));
+                                context.read<TabsBloc>().add(
+                                  RemoveTab(tab.tabId),
+                                );
                               },
                             );
                           },
@@ -114,17 +127,25 @@ class TabSwitcherSheet extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  final int count;
   const _Header({required this.count});
+  final int count;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: layout.inputPadding, vertical: layout.headerPaddingVertical),
+      padding: EdgeInsets.symmetric(
+        horizontal: layout.inputPadding,
+        vertical: layout.headerPaddingVertical,
+      ),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.dividerColor, width: layout.borderThick)),
+        border: Border(
+          bottom: BorderSide(
+            color: theme.dividerColor,
+            width: layout.borderThick,
+          ),
+        ),
       ),
       child: Row(
         children: [
@@ -153,20 +174,19 @@ class _Header extends StatelessWidget {
 }
 
 class _TabRow extends StatelessWidget {
-  final HttpRequestTabEntity tab;
-  final int index;
-  final bool isActive;
-  final VoidCallback onTap;
-  final VoidCallback onClose;
-
   const _TabRow({
-    super.key,
     required this.tab,
     required this.index,
     required this.isActive,
     required this.onTap,
     required this.onClose,
+    super.key,
   });
+  final HttpRequestTabEntity tab;
+  final int index;
+  final bool isActive;
+  final VoidCallback onTap;
+  final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -186,7 +206,10 @@ class _TabRow extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(context.appShape.panelRadius),
           child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: layout.isCompact ? 10 : 12),
+            padding: EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: layout.isCompact ? 10 : 12,
+            ),
             child: Row(
               children: [
                 MethodBadge(method: tab.config.method),
@@ -199,7 +222,9 @@ class _TabRow extends StatelessWidget {
                     style: TextStyle(
                       fontSize: layout.fontSizeNormal,
                       fontWeight: context.appTypography.titleWeight,
-                      color: isActive ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
+                      color: isActive
+                          ? theme.colorScheme.onPrimary
+                          : theme.colorScheme.onSurface,
                     ),
                   ),
                 ),
@@ -207,12 +232,17 @@ class _TabRow extends StatelessWidget {
                   icon: Icon(
                     Icons.close,
                     size: layout.iconSize,
-                    color: isActive ? theme.colorScheme.onPrimary : theme.colorScheme.error,
+                    color: isActive
+                        ? theme.colorScheme.onPrimary
+                        : theme.colorScheme.error,
                   ),
                   onPressed: onClose,
                   tooltip: 'CLOSE',
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
                 ),
                 const SizedBox(width: 4),
                 ReorderableDragStartListener(
@@ -220,7 +250,9 @@ class _TabRow extends StatelessWidget {
                   child: Icon(
                     Icons.drag_handle,
                     size: layout.iconSize,
-                    color: isActive ? theme.colorScheme.onPrimary : theme.dividerColor,
+                    color: isActive
+                        ? theme.colorScheme.onPrimary
+                        : theme.dividerColor,
                   ),
                 ),
               ],
@@ -233,9 +265,9 @@ class _TabRow extends StatelessWidget {
 }
 
 class _Footer extends StatelessWidget {
+  const _Footer({required this.onNewTab, required this.onDismiss});
   final VoidCallback onNewTab;
   final VoidCallback onDismiss;
-  const _Footer({required this.onNewTab, required this.onDismiss});
 
   @override
   Widget build(BuildContext context) {
@@ -244,7 +276,9 @@ class _Footer extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(layout.pagePadding / 2),
       decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: theme.dividerColor, width: layout.borderThick)),
+        border: Border(
+          top: BorderSide(color: theme.dividerColor, width: layout.borderThick),
+        ),
       ),
       child: Row(
         children: [

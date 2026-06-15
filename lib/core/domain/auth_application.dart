@@ -12,6 +12,8 @@ import 'package:getman/core/utils/header_utils.dart';
 /// decision here stops those two callers from drifting and gives a future
 /// OAuth2 type a single place to grow into.
 class AuthApplication {
+  const AuthApplication({this.headers = const {}, this.queryParam});
+
   /// Header(s) to add. Already respects "an explicit header wins": empty when
   /// the relevant header is already set or the credential is blank.
   final Map<String, String> headers;
@@ -20,8 +22,6 @@ class AuthApplication {
   /// value are resolved but NOT URL-encoded — a caller targeting a URL string
   /// must encode them (the Dio query map encodes on its own).
   final MapEntry<String, String>? queryParam;
-
-  const AuthApplication({this.headers = const {}, this.queryParam});
 
   static const AuthApplication none = AuthApplication();
 }

@@ -4,10 +4,11 @@ import 'package:equatable/equatable.dart';
 enum ExtractionKind {
   jsonPath('jsonPath'),
   header('header'),
-  regex('regex');
+  regex('regex')
+  ;
 
-  final String wire;
   const ExtractionKind(this.wire);
+  final String wire;
 
   static ExtractionKind fromWire(String? value) {
     for (final k in ExtractionKind.values) {
@@ -25,12 +26,6 @@ enum ExtractionKind {
 /// - [ExtractionKind.regex]: [expression] is a regex over the body (group 1,
 ///   else group 0).
 class ExtractionRule extends Equatable {
-  final String id;
-  final ExtractionKind kind;
-  final String expression;
-  final String targetVariable;
-  final bool enabled;
-
   const ExtractionRule({
     required this.id,
     this.kind = ExtractionKind.jsonPath,
@@ -38,6 +33,11 @@ class ExtractionRule extends Equatable {
     this.targetVariable = '',
     this.enabled = true,
   });
+  final String id;
+  final ExtractionKind kind;
+  final String expression;
+  final String targetVariable;
+  final bool enabled;
 
   ExtractionRule copyWith({
     ExtractionKind? kind,

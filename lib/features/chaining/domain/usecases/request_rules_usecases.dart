@@ -2,15 +2,16 @@ import 'package:getman/features/chaining/domain/entities/request_rules_entity.da
 import 'package:getman/features/chaining/domain/repositories/request_rules_repository.dart';
 
 class GetRequestRulesUseCase {
-  final RequestRulesRepository repository;
   GetRequestRulesUseCase(this.repository);
+  final RequestRulesRepository repository;
 
-  Future<RequestRulesEntity> call(String configId) => repository.getRules(configId);
+  Future<RequestRulesEntity> call(String configId) =>
+      repository.getRules(configId);
 }
 
 class SaveRequestRulesUseCase {
-  final RequestRulesRepository repository;
   SaveRequestRulesUseCase(this.repository);
+  final RequestRulesRepository repository;
 
   Future<void> call(RequestRulesEntity rules) => repository.saveRules(rules);
 }

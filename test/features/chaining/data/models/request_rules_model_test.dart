@@ -9,7 +9,12 @@ void main() {
     const entity = RequestRulesEntity(
       configId: 'c1',
       extractionRules: [
-        ExtractionRule(id: 'e1', kind: ExtractionKind.regex, expression: r'(\d+)', targetVariable: 'n'),
+        ExtractionRule(
+          id: 'e1',
+          kind: ExtractionKind.regex,
+          expression: r'(\d+)',
+          targetVariable: 'n',
+        ),
       ],
       assertions: [
         Assertion(

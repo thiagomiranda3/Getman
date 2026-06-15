@@ -2,11 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/theme/app_theme.dart';
 
-BoxDecoration _noopPanel(BuildContext ctx, {Color? color, double? borderWidth, double? offset, BorderRadius? borderRadius}) =>
-    const BoxDecoration();
-BoxDecoration _noopTab(BuildContext ctx, {required bool active, required bool hovered, required bool isFirst}) =>
-    const BoxDecoration();
-Widget _noopWrap({required Widget child, VoidCallback? onTap, double? scaleDown}) => child;
+BoxDecoration _noopPanel(
+  BuildContext ctx, {
+  Color? color,
+  double? borderWidth,
+  double? offset,
+  BorderRadius? borderRadius,
+}) => const BoxDecoration();
+BoxDecoration _noopTab(
+  BuildContext ctx, {
+  required bool active,
+  required bool hovered,
+  required bool isFirst,
+}) => const BoxDecoration();
+Widget _noopWrap({
+  required Widget child,
+  VoidCallback? onTap,
+  double? scaleDown,
+}) => child;
 Widget _noopScaffoldBg(BuildContext ctx, {required Widget child}) => child;
 
 void main() {
@@ -19,8 +32,13 @@ void main() {
     );
 
     test('copyWith swaps provided closures and keeps others', () {
-      BoxDecoration newPanel(BuildContext ctx, {Color? color, double? borderWidth, double? offset, BorderRadius? borderRadius}) =>
-          const BoxDecoration(color: Colors.red);
+      BoxDecoration newPanel(
+        BuildContext ctx, {
+        Color? color,
+        double? borderWidth,
+        double? offset,
+        BorderRadius? borderRadius,
+      }) => const BoxDecoration(color: Colors.red);
       final copy = a.copyWith(panelBox: newPanel);
       expect(identical(copy.panelBox, newPanel), isTrue);
       expect(identical(copy.tabShape, a.tabShape), isTrue);

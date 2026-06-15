@@ -7,12 +7,12 @@ import 'package:getman/features/environments/data/repositories/environments_repo
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 
 class _FakeEnvironmentsDataSource implements EnvironmentsLocalDataSource {
+  _FakeEnvironmentsDataSource([this.stored = const []]);
   List<EnvironmentModel> stored;
   EnvironmentModel? putModel;
   String? deletedId;
   List<EnvironmentModel>? savedList;
   bool throwOnGet = false;
-  _FakeEnvironmentsDataSource([this.stored = const []]);
 
   @override
   Future<List<EnvironmentModel>> getEnvironments() async {
@@ -21,7 +21,8 @@ class _FakeEnvironmentsDataSource implements EnvironmentsLocalDataSource {
   }
 
   @override
-  Future<void> putEnvironment(EnvironmentModel environment) async => putModel = environment;
+  Future<void> putEnvironment(EnvironmentModel environment) async =>
+      putModel = environment;
 
   @override
   Future<void> deleteEnvironment(String id) async => deletedId = id;
@@ -34,7 +35,9 @@ class _FakeEnvironmentsDataSource implements EnvironmentsLocalDataSource {
 void main() {
   test('getEnvironments maps each model to an entity', () async {
     final ds = _FakeEnvironmentsDataSource([
-      EnvironmentModel.fromEntity(EnvironmentEntity(id: 'e1', name: 'Prod', variables: const {'k': 'v'})),
+      EnvironmentModel.fromEntity(
+        EnvironmentEntity(id: 'e1', name: 'Prod', variables: const {'k': 'v'}),
+      ),
     ]);
     final repo = EnvironmentsRepositoryImpl(ds);
 

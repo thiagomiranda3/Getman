@@ -16,6 +16,10 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/form_data_editor.dart';
 import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart';
+import 'package:getman/features/tabs/presentation/widgets/request_config_section.dart'
+    show RequestConfigSection;
+import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.dart'
+    show UnifiedRequestPanel;
 import 'package:re_editor/re_editor.dart';
 
 /// The three request-editor tab bodies (PARAMS / HEADERS / BODY), shared by
@@ -28,8 +32,8 @@ const ListEquality<QueryParamEntity> _queryParamListEquality =
 /// Ordered query-param editor. Duplicate keys allowed, order preserved —
 /// the URL is the single source of truth, so edits round-trip through it.
 class ParamsTabView extends StatelessWidget {
+  const ParamsTabView({required this.tabId, super.key});
   final String tabId;
-  const ParamsTabView({super.key, required this.tabId});
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +41,8 @@ class ParamsTabView extends StatelessWidget {
       buildWhen: (prev, next) {
         // URL carries the query — a single equality check captures any params
         // change that would affect this tab.
-        return prev.tabs.byId(tabId)?.config.url != next.tabs.byId(tabId)?.config.url;
+        return prev.tabs.byId(tabId)?.config.url !=
+            next.tabs.byId(tabId)?.config.url;
       },
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
@@ -54,7 +59,11 @@ class ParamsTabView extends StatelessWidget {
             final bloc = context.read<TabsBloc>();
             final current = bloc.state.tabs.byId(tabId);
             if (current == null) return;
-            bloc.add(UpdateTab(current.copyWith(config: current.config.copyWith(params: list))));
+            bloc.add(
+              UpdateTab(
+                current.copyWith(config: current.config.copyWith(params: list)),
+              ),
+            );
           },
         );
       },
@@ -65,8 +74,8 @@ class ParamsTabView extends StatelessWidget {
 /// Header editor keyed as `Map<String, String>` — duplicates are not a real
 /// concern for headers in this UI; last-write-wins is fine.
 class HeadersTabView extends StatelessWidget {
+  const HeadersTabView({required this.tabId, super.key});
   final String tabId;
-  const HeadersTabView({super.key, required this.tabId});
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +89,9 @@ class HeadersTabView extends StatelessWidget {
         if (tab == null) return const SizedBox.shrink();
         return KeyValueListEditor<Map<String, String>>(
           items: tab.config.headers,
-          decode: (headers) => [for (final e in headers.entries) (e.key, e.value)],
+          decode: (headers) => [
+            for (final e in headers.entries) (e.key, e.value),
+          ],
           encode: (rows) => {
             for (final (key, value) in rows)
               if (key.isNotEmpty) key: value,
@@ -90,7 +101,11 @@ class HeadersTabView extends StatelessWidget {
             final bloc = context.read<TabsBloc>();
             final current = bloc.state.tabs.byId(tabId);
             if (current == null) return;
-            bloc.add(UpdateTab(current.copyWith(config: current.config.copyWith(headers: map))));
+            bloc.add(
+              UpdateTab(
+                current.copyWith(config: current.config.copyWith(headers: map)),
+              ),
+            );
           },
         );
       },
@@ -103,15 +118,16 @@ class HeadersTabView extends StatelessWidget {
 /// [FormDataEditor]; binary picks a file. The selector + sub-editor are shared
 /// by both the split-pane and unified phone layouts.
 class BodyTabView extends StatelessWidget {
+  const BodyTabView({required this.tabId, required this.controller, super.key});
   final String tabId;
   final CodeLineEditingController controller;
-  const BodyTabView({super.key, required this.tabId, required this.controller});
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<TabsBloc, TabsState>(
       buildWhen: (prev, next) =>
-          prev.tabs.byId(tabId)?.config.bodyType != next.tabs.byId(tabId)?.config.bodyType,
+          prev.tabs.byId(tabId)?.config.bodyType !=
+          next.tabs.byId(tabId)?.config.bodyType,
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
         if (tab == null) return const SizedBox.shrink();
@@ -144,9 +160,9 @@ class BodyTabView extends StatelessWidget {
 }
 
 class _BodyTypeSelector extends StatelessWidget {
+  const _BodyTypeSelector({required this.tabId, required this.active});
   final String tabId;
   final BodyType active;
-  const _BodyTypeSelector({required this.tabId, required this.active});
 
   static const Map<BodyType, String> _labels = {
     BodyType.none: 'NONE',
@@ -176,7 +192,11 @@ class _BodyTypeSelector extends StatelessWidget {
                 final bloc = context.read<TabsBloc>();
                 final tab = bloc.state.tabs.byId(tabId);
                 if (tab == null || tab.config.bodyType == type) return;
-                bloc.add(UpdateTab(tab.copyWith(config: tab.config.copyWith(bodyType: type))));
+                bloc.add(
+                  UpdateTab(
+                    tab.copyWith(config: tab.config.copyWith(bodyType: type)),
+                  ),
+                );
               },
             ),
         ],
@@ -186,19 +206,27 @@ class _BodyTypeSelector extends StatelessWidget {
 }
 
 class _BodyTypeChip extends StatelessWidget {
+  const _BodyTypeChip({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
   final String label;
   final bool active;
   final VoidCallback onTap;
-  const _BodyTypeChip({required this.label, required this.active, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
     final activeBg = context.appPalette.selectorActive;
-    final onActive = ThemeData.estimateBrightnessForColor(activeBg) == Brightness.dark
-        ? Colors.white
-        : Colors.black;
+    final activeIsDark =
+        ThemeData.estimateBrightnessForColor(activeBg) == Brightness.dark;
+    // Deliberate contrast: a readable foreground picked from the dynamic,
+    // theme-derived `activeBg` brightness (CLAUDE.md §4.8 exception) — not a
+    // themeable surface color.
+    // ignore: avoid_hardcoded_brand_colors
+    final onActive = activeIsDark ? Colors.white : Colors.black;
     return context.appDecoration.wrapInteractive(
       onTap: onTap,
       child: Container(
@@ -208,7 +236,10 @@ class _BodyTypeChip extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: active ? activeBg : Colors.transparent,
-          border: Border.all(color: theme.dividerColor, width: layout.borderThin),
+          border: Border.all(
+            color: theme.dividerColor,
+            width: layout.borderThin,
+          ),
           borderRadius: BorderRadius.circular(context.appShape.buttonRadius),
         ),
         child: Text(
@@ -225,8 +256,8 @@ class _BodyTypeChip extends StatelessWidget {
 }
 
 class _RawBodyEditor extends StatelessWidget {
-  final CodeLineEditingController controller;
   const _RawBodyEditor({required this.controller});
+  final CodeLineEditingController controller;
 
   @override
   Widget build(BuildContext context) {
@@ -240,8 +271,11 @@ class _RawBodyEditor extends StatelessWidget {
           right: 8,
           child: context.appDecoration.wrapInteractive(
             child: IconButton(
-              icon: Icon(Icons.auto_fix_high,
-                  color: theme.colorScheme.secondary, size: layout.isCompact ? 20 : 24),
+              icon: Icon(
+                Icons.auto_fix_high,
+                color: theme.colorScheme.secondary,
+                size: layout.isCompact ? 20 : 24,
+              ),
               tooltip: 'Beautify JSON',
               onPressed: () async {
                 final messenger = ScaffoldMessenger.of(context);
@@ -251,7 +285,10 @@ class _RawBodyEditor extends StatelessWidget {
                   controller.text = prettified;
                   showAppSnackBarVia(messenger, 'JSON formatted');
                 } else {
-                  showAppSnackBarVia(messenger, 'Already formatted or not valid JSON');
+                  showAppSnackBarVia(
+                    messenger,
+                    'Already formatted or not valid JSON',
+                  );
                 }
               },
             ),
@@ -283,8 +320,8 @@ class _EmptyBodyHint extends StatelessWidget {
 }
 
 class _BinaryBodyPicker extends StatelessWidget {
-  final String tabId;
   const _BinaryBodyPicker({required this.tabId});
+  final String tabId;
 
   Future<void> _pick(BuildContext context) async {
     final result = await FilePicker.platform.pickFiles();
@@ -292,7 +329,10 @@ class _BinaryBodyPicker extends StatelessWidget {
     final picked = result.files.single;
     if (picked.path == null) {
       if (context.mounted) {
-        showAppSnackBar(context, 'Binary bodies need the desktop or mobile app.');
+        showAppSnackBar(
+          context,
+          'Binary bodies need the desktop or mobile app.',
+        );
       }
       return;
     }
@@ -300,7 +340,11 @@ class _BinaryBodyPicker extends StatelessWidget {
     final bloc = context.read<TabsBloc>();
     final tab = bloc.state.tabs.byId(tabId);
     if (tab == null) return;
-    bloc.add(UpdateTab(tab.copyWith(config: tab.config.copyWith(bodyFilePath: picked.path))));
+    bloc.add(
+      UpdateTab(
+        tab.copyWith(config: tab.config.copyWith(bodyFilePath: picked.path)),
+      ),
+    );
   }
 
   @override
@@ -309,7 +353,8 @@ class _BinaryBodyPicker extends StatelessWidget {
     final layout = context.appLayout;
     return BlocBuilder<TabsBloc, TabsState>(
       buildWhen: (prev, next) =>
-          prev.tabs.byId(tabId)?.config.bodyFilePath != next.tabs.byId(tabId)?.config.bodyFilePath,
+          prev.tabs.byId(tabId)?.config.bodyFilePath !=
+          next.tabs.byId(tabId)?.config.bodyFilePath,
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
         if (tab == null) return const SizedBox.shrink();
@@ -321,8 +366,11 @@ class _BinaryBodyPicker extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.insert_drive_file_outlined,
-                    size: layout.isCompact ? 40 : 56, color: theme.colorScheme.secondary),
+                Icon(
+                  Icons.insert_drive_file_outlined,
+                  size: layout.isCompact ? 40 : 56,
+                  color: theme.colorScheme.secondary,
+                ),
                 SizedBox(height: layout.sectionSpacing),
                 Text(
                   name ?? 'NO FILE SELECTED',

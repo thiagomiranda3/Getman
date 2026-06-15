@@ -1,7 +1,7 @@
 // Widget test for the "Save as example" capture affordance in the response
 // BODY view: it appears only when the tab is linked to a collection node and a
-// response exists, and dispatches SaveExampleToNode (with the response snapshot)
-// on confirm.
+// response exists, and dispatches SaveExampleToNode (with the response
+// snapshot) on confirm.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -38,16 +38,16 @@ class MockCollectionsRepository extends Mock implements CollectionsRepository {}
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 
 HttpRequestTabEntity _tab({String? collectionNodeId}) => HttpRequestTabEntity(
-      tabId: 'tab1',
-      config: const HttpRequestConfigEntity(id: 'node1', url: 'https://api/users'),
-      collectionNodeId: collectionNodeId,
-      response: const HttpResponseEntity(
-        statusCode: 200,
-        body: '{"ok":true}',
-        headers: {'content-type': 'application/json'},
-        durationMs: 42,
-      ),
-    );
+  tabId: 'tab1',
+  config: const HttpRequestConfigEntity(id: 'node1', url: 'https://api/users'),
+  collectionNodeId: collectionNodeId,
+  response: const HttpResponseEntity(
+    statusCode: 200,
+    body: '{"ok":true}',
+    headers: {'content-type': 'application/json'},
+    durationMs: 42,
+  ),
+);
 
 void main() {
   late MockTabsRepository tabsRepo;
@@ -57,10 +57,12 @@ void main() {
   setUpAll(() {
     registerFallbackValue(_FakeConfig());
     registerFallbackValue(<CollectionNodeEntity>[]);
-    registerFallbackValue(const HttpRequestTabEntity(
-      tabId: 'fallback',
-      config: HttpRequestConfigEntity(id: 'fallback'),
-    ));
+    registerFallbackValue(
+      const HttpRequestTabEntity(
+        tabId: 'fallback',
+        config: HttpRequestConfigEntity(id: 'fallback'),
+      ),
+    );
     registerFallbackValue(const SettingsEntity());
   });
 
@@ -72,7 +74,9 @@ void main() {
     when(() => tabsRepo.putTab(any())).thenAnswer((_) async {});
     when(() => tabsRepo.deleteTabs(any())).thenAnswer((_) async {});
     when(() => tabsRepo.saveTabOrder(any())).thenAnswer((_) async {});
-    when(() => collectionsRepo.getCollections()).thenAnswer((_) async => const []);
+    when(
+      () => collectionsRepo.getCollections(),
+    ).thenAnswer((_) async => const []);
     when(() => collectionsRepo.saveCollections(any())).thenAnswer((_) async {});
   });
 
@@ -81,23 +85,27 @@ void main() {
     HttpRequestTabEntity tab,
   ) async {
     when(() => tabsRepo.getTabs()).thenAnswer((_) async => [tab]);
-    final tabsBloc = TabsBloc(repository: tabsRepo, sendRequestUseCase: sendUseCase);
-    tabsBloc.add(const LoadTabs());
+    final tabsBloc = TabsBloc(
+      repository: tabsRepo,
+      sendRequestUseCase: sendUseCase,
+    )..add(const LoadTabs());
     await tabsBloc.stream.firstWhere((s) => !s.isLoading && s.tabs.isNotEmpty);
 
-    final collectionsBloc = CollectionsBloc(
-      getCollectionsUseCase: GetCollectionsUseCase(collectionsRepo),
-      saveCollectionsUseCase: SaveCollectionsUseCase(collectionsRepo),
-      saveDebounce: const Duration(milliseconds: 5),
-    );
-    collectionsBloc.add(const ReplaceCollections([
-      CollectionNodeEntity(
-        id: 'node1',
-        name: 'GetUsers',
-        isFolder: false,
-        config: HttpRequestConfigEntity(id: 'node1'),
-      ),
-    ]));
+    final collectionsBloc =
+        CollectionsBloc(
+          getCollectionsUseCase: GetCollectionsUseCase(collectionsRepo),
+          saveCollectionsUseCase: SaveCollectionsUseCase(collectionsRepo),
+          saveDebounce: const Duration(milliseconds: 5),
+        )..add(
+          const ReplaceCollections([
+            CollectionNodeEntity(
+              id: 'node1',
+              name: 'GetUsers',
+              isFolder: false,
+              config: HttpRequestConfigEntity(id: 'node1'),
+            ),
+          ]),
+        );
     await collectionsBloc.stream.first;
 
     final settingsSave = MockSaveSettingsUseCase();
@@ -132,17 +140,23 @@ void main() {
         ),
       ),
     );
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 300)),
+    );
     await tester.pumpAndSettle();
     return (tabs: tabsBloc, collections: collectionsBloc);
   }
 
-  testWidgets('hidden when the tab is not linked to a collection node', (tester) async {
-    await pump(tester, _tab(collectionNodeId: null));
+  testWidgets('hidden when the tab is not linked to a collection node', (
+    tester,
+  ) async {
+    await pump(tester, _tab());
     expect(find.byIcon(Icons.bookmark_add_outlined), findsNothing);
   });
 
-  testWidgets('captures the request+response as an example on confirm', (tester) async {
+  testWidgets('captures the request+response as an example on confirm', (
+    tester,
+  ) async {
     final blocs = await pump(tester, _tab(collectionNodeId: 'node1'));
 
     expect(find.byIcon(Icons.bookmark_add_outlined), findsOneWidget);
@@ -154,12 +168,17 @@ void main() {
     await tester.tap(find.text('SAVE'));
     await tester.pumpAndSettle();
 
-    final node = CollectionsTreeHelper.findNode(blocs.collections.state.collections, 'node1')!;
+    final node = CollectionsTreeHelper.findNode(
+      blocs.collections.state.collections,
+      'node1',
+    )!;
     expect(node.examples, hasLength(1));
     final example = node.examples.single;
     expect(example.config.statusCode, 200);
     expect(example.config.responseBody, '{"ok":true}');
-    expect(example.config.responseHeaders, {'content-type': 'application/json'});
+    expect(example.config.responseHeaders, {
+      'content-type': 'application/json',
+    });
     expect(example.config.durationMs, 42);
   });
 }

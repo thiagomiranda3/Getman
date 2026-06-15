@@ -37,7 +37,10 @@ void main() {
 
   test('onRequest merges with an existing Cookie header', () {
     final store = _FakeStore()..header = 'a=1';
-    final options = RequestOptions(path: 'https://api.dev/x', headers: {'Cookie': 'x=0'});
+    final options = RequestOptions(
+      path: 'https://api.dev/x',
+      headers: {'Cookie': 'x=0'},
+    );
 
     CookieInterceptor(store).onRequest(options, RequestInterceptorHandler());
 

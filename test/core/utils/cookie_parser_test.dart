@@ -11,7 +11,11 @@ void main() {
     test('parses a single cookie with attributes', () {
       final cookies = CookieParser.parse('sid=abc123; Path=/; HttpOnly');
       expect(cookies, [
-        const ParsedCookie(name: 'sid', value: 'abc123', attributes: 'Path=/; HttpOnly'),
+        const ParsedCookie(
+          name: 'sid',
+          value: 'abc123',
+          attributes: 'Path=/; HttpOnly',
+        ),
       ]);
     });
 
@@ -28,7 +32,10 @@ void main() {
       expect(cookies, hasLength(2));
       expect(cookies[0].name, 'sid');
       expect(cookies[0].value, 'abc');
-      expect(cookies[0].attributes, contains('Expires=Wed, 21 Oct 2025 07:28:00 GMT'));
+      expect(
+        cookies[0].attributes,
+        contains('Expires=Wed, 21 Oct 2025 07:28:00 GMT'),
+      );
       expect(cookies[1].name, 'other');
       expect(cookies[1].value, '2');
     });

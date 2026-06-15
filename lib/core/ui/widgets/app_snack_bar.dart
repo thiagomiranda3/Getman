@@ -10,8 +10,13 @@ void showAppSnackBar(
   Color? backgroundColor,
   Duration duration = const Duration(seconds: 2),
 }) {
-  _showVia(ScaffoldMessenger.of(context), context, message,
-      backgroundColor: backgroundColor, duration: duration);
+  _showVia(
+    ScaffoldMessenger.of(context),
+    context,
+    message,
+    backgroundColor: backgroundColor,
+    duration: duration,
+  );
 }
 
 /// Like [showAppSnackBar] but takes a captured [ScaffoldMessengerState], for
@@ -24,8 +29,13 @@ void showAppSnackBarVia(
   Color? backgroundColor,
   Duration duration = const Duration(seconds: 2),
 }) {
-  _showVia(messenger, messenger.context, message,
-      backgroundColor: backgroundColor, duration: duration);
+  _showVia(
+    messenger,
+    messenger.context,
+    message,
+    backgroundColor: backgroundColor,
+    duration: duration,
+  );
 }
 
 void _showVia(

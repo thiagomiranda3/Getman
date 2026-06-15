@@ -1,0 +1,7 @@
+# `custom_lint_core` 0.8.x still types its public surface with the analyzer's
+# pre-rename aliases (`ErrorReporter`, `ErrorSeverity`) — the LintCode ctor and
+# the LintRule.run() signature. This plugin must match that surface, so these
+# deprecation hints are unavoidable and not actionable on our side.
+analyzer:
+  errors:
+    deprecated_member_use: ignore

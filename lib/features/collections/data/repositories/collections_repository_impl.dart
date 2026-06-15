@@ -5,9 +5,8 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
 
 class CollectionsRepositoryImpl implements CollectionsRepository {
-  final CollectionsLocalDataSource localDataSource;
-
   CollectionsRepositoryImpl(this.localDataSource);
+  final CollectionsLocalDataSource localDataSource;
 
   /// Snapshot of the roots last written to disk, by id. Lets [saveCollections]
   /// rewrite only the roots whose subtree changed (and delete removed ones)
@@ -17,31 +16,35 @@ class CollectionsRepositoryImpl implements CollectionsRepository {
   Map<String, CollectionNodeEntity>? _persisted;
 
   @override
-  Future<List<CollectionNodeEntity>> getCollections() => guardPersistence(() async {
-    final models = await localDataSource.getCollections();
-    final entities = models.map((m) => m.toEntity()).toList();
-    _persisted = {for (final e in entities) e.id: e};
-    return entities;
-  });
+  Future<List<CollectionNodeEntity>> getCollections() =>
+      guardPersistence(() async {
+        final models = await localDataSource.getCollections();
+        final entities = models.map((m) => m.toEntity()).toList();
+        _persisted = {for (final e in entities) e.id: e};
+        return entities;
+      });
 
   @override
-  Future<void> saveCollections(List<CollectionNodeEntity> collections) =>
-      guardPersistence(() async {
+  Future<void> saveCollections(
+    List<CollectionNodeEntity> collections,
+  ) => guardPersistence(() async {
     final snapshot = _persisted;
     if (snapshot == null) {
       // Disk state unknown → full keyed replace (also covers import/replace).
       await localDataSource.saveCollections(
-        collections.map((e) => CollectionNode.fromEntity(e)).toList(),
+        collections.map(CollectionNode.fromEntity).toList(),
       );
     } else {
       final currentIds = {for (final e in collections) e.id};
       // A root's entity is non-equal (Equatable) iff anything in its subtree
       // changed, so only touched roots are re-serialized + written.
       final changed = collections.where((e) => snapshot[e.id] != e).toList();
-      final removed = snapshot.keys.where((id) => !currentIds.contains(id)).toList();
+      final removed = snapshot.keys
+          .where((id) => !currentIds.contains(id))
+          .toList();
       if (changed.isNotEmpty) {
         await localDataSource.putRoots(
-          changed.map((e) => CollectionNode.fromEntity(e)).toList(),
+          changed.map(CollectionNode.fromEntity).toList(),
         );
       }
       if (removed.isNotEmpty) {

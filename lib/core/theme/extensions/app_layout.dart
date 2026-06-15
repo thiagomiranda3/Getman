@@ -1,44 +1,6 @@
 import 'package:flutter/material.dart';
 
 class AppLayout extends ThemeExtension<AppLayout> {
-  final double pagePadding;
-  final double sectionSpacing;
-  final double verticalDividerWidth;
-  final double iconSize;
-  final double smallIconSize;
-  final double badgePaddingHorizontal;
-  final double badgePaddingVertical;
-  final double fontSizeTitle;
-  final double fontSizeSmall;
-  final double fontSizeNormal;
-  final double fontSizeCode;
-  final double fontSizeSubtitle;
-  final double buttonPaddingHorizontal;
-  final double buttonPaddingVertical;
-  final double inputPadding;
-  final double inputPaddingVertical;
-  final double cardOffset;
-  final double headerPaddingVertical;
-  final double headerFontSize;
-  final double tabBarHeight;
-  final double tabCloseIconSize;
-  final double tabPaddingHorizontal;
-  final double tabFontSize;
-  final int tabTitleMaxLength;
-  final double tabSpacing;
-  final double addIconSize;
-  final double dirtyStarSize;
-  final bool isCompact;
-  final double depthPaddingMultiplier;
-  final double treeRowExtent;
-  final double sideMenuWidth;
-  final double borderThin;
-  final double borderThick;
-  final double borderHeavy;
-  final double dialogWidth;
-  final double splitterGrabSize;
-  final double splitterLineSize;
-
   const AppLayout({
     required this.isCompact,
     required this.pagePadding,
@@ -78,6 +40,43 @@ class AppLayout extends ThemeExtension<AppLayout> {
     required this.splitterGrabSize,
     required this.splitterLineSize,
   });
+  final double pagePadding;
+  final double sectionSpacing;
+  final double verticalDividerWidth;
+  final double iconSize;
+  final double smallIconSize;
+  final double badgePaddingHorizontal;
+  final double badgePaddingVertical;
+  final double fontSizeTitle;
+  final double fontSizeSmall;
+  final double fontSizeNormal;
+  final double fontSizeCode;
+  final double fontSizeSubtitle;
+  final double buttonPaddingHorizontal;
+  final double buttonPaddingVertical;
+  final double inputPadding;
+  final double inputPaddingVertical;
+  final double cardOffset;
+  final double headerPaddingVertical;
+  final double headerFontSize;
+  final double tabBarHeight;
+  final double tabCloseIconSize;
+  final double tabPaddingHorizontal;
+  final double tabFontSize;
+  final int tabTitleMaxLength;
+  final double tabSpacing;
+  final double addIconSize;
+  final double dirtyStarSize;
+  final bool isCompact;
+  final double depthPaddingMultiplier;
+  final double treeRowExtent;
+  final double sideMenuWidth;
+  final double borderThin;
+  final double borderThick;
+  final double borderHeavy;
+  final double dialogWidth;
+  final double splitterGrabSize;
+  final double splitterLineSize;
 
   @override
   AppLayout copyWith({
@@ -126,19 +125,23 @@ class AppLayout extends ThemeExtension<AppLayout> {
       verticalDividerWidth: verticalDividerWidth ?? this.verticalDividerWidth,
       iconSize: iconSize ?? this.iconSize,
       smallIconSize: smallIconSize ?? this.smallIconSize,
-      badgePaddingHorizontal: badgePaddingHorizontal ?? this.badgePaddingHorizontal,
+      badgePaddingHorizontal:
+          badgePaddingHorizontal ?? this.badgePaddingHorizontal,
       badgePaddingVertical: badgePaddingVertical ?? this.badgePaddingVertical,
       fontSizeTitle: fontSizeTitle ?? this.fontSizeTitle,
       fontSizeSmall: fontSizeSmall ?? this.fontSizeSmall,
       fontSizeNormal: fontSizeNormal ?? this.fontSizeNormal,
       fontSizeCode: fontSizeCode ?? this.fontSizeCode,
       fontSizeSubtitle: fontSizeSubtitle ?? this.fontSizeSubtitle,
-      buttonPaddingHorizontal: buttonPaddingHorizontal ?? this.buttonPaddingHorizontal,
-      buttonPaddingVertical: buttonPaddingVertical ?? this.buttonPaddingVertical,
+      buttonPaddingHorizontal:
+          buttonPaddingHorizontal ?? this.buttonPaddingHorizontal,
+      buttonPaddingVertical:
+          buttonPaddingVertical ?? this.buttonPaddingVertical,
       inputPadding: inputPadding ?? this.inputPadding,
       inputPaddingVertical: inputPaddingVertical ?? this.inputPaddingVertical,
       cardOffset: cardOffset ?? this.cardOffset,
-      headerPaddingVertical: headerPaddingVertical ?? this.headerPaddingVertical,
+      headerPaddingVertical:
+          headerPaddingVertical ?? this.headerPaddingVertical,
       headerFontSize: headerFontSize ?? this.headerFontSize,
       tabBarHeight: tabBarHeight ?? this.tabBarHeight,
       tabCloseIconSize: tabCloseIconSize ?? this.tabCloseIconSize,
@@ -148,7 +151,8 @@ class AppLayout extends ThemeExtension<AppLayout> {
       tabSpacing: tabSpacing ?? this.tabSpacing,
       addIconSize: addIconSize ?? this.addIconSize,
       dirtyStarSize: dirtyStarSize ?? this.dirtyStarSize,
-      depthPaddingMultiplier: depthPaddingMultiplier ?? this.depthPaddingMultiplier,
+      depthPaddingMultiplier:
+          depthPaddingMultiplier ?? this.depthPaddingMultiplier,
       treeRowExtent: treeRowExtent ?? this.treeRowExtent,
       sideMenuWidth: sideMenuWidth ?? this.sideMenuWidth,
       borderThin: borderThin ?? this.borderThin,
@@ -171,19 +175,31 @@ class AppLayout extends ThemeExtension<AppLayout> {
       verticalDividerWidth: l(verticalDividerWidth, other.verticalDividerWidth),
       iconSize: l(iconSize, other.iconSize),
       smallIconSize: l(smallIconSize, other.smallIconSize),
-      badgePaddingHorizontal: l(badgePaddingHorizontal, other.badgePaddingHorizontal),
+      badgePaddingHorizontal: l(
+        badgePaddingHorizontal,
+        other.badgePaddingHorizontal,
+      ),
       badgePaddingVertical: l(badgePaddingVertical, other.badgePaddingVertical),
       fontSizeTitle: l(fontSizeTitle, other.fontSizeTitle),
       fontSizeSmall: l(fontSizeSmall, other.fontSizeSmall),
       fontSizeNormal: l(fontSizeNormal, other.fontSizeNormal),
       fontSizeCode: l(fontSizeCode, other.fontSizeCode),
       fontSizeSubtitle: l(fontSizeSubtitle, other.fontSizeSubtitle),
-      buttonPaddingHorizontal: l(buttonPaddingHorizontal, other.buttonPaddingHorizontal),
-      buttonPaddingVertical: l(buttonPaddingVertical, other.buttonPaddingVertical),
+      buttonPaddingHorizontal: l(
+        buttonPaddingHorizontal,
+        other.buttonPaddingHorizontal,
+      ),
+      buttonPaddingVertical: l(
+        buttonPaddingVertical,
+        other.buttonPaddingVertical,
+      ),
       inputPadding: l(inputPadding, other.inputPadding),
       inputPaddingVertical: l(inputPaddingVertical, other.inputPaddingVertical),
       cardOffset: l(cardOffset, other.cardOffset),
-      headerPaddingVertical: l(headerPaddingVertical, other.headerPaddingVertical),
+      headerPaddingVertical: l(
+        headerPaddingVertical,
+        other.headerPaddingVertical,
+      ),
       headerFontSize: l(headerFontSize, other.headerFontSize),
       tabBarHeight: l(tabBarHeight, other.tabBarHeight),
       tabCloseIconSize: l(tabCloseIconSize, other.tabCloseIconSize),
@@ -193,7 +209,10 @@ class AppLayout extends ThemeExtension<AppLayout> {
       tabSpacing: l(tabSpacing, other.tabSpacing),
       addIconSize: l(addIconSize, other.addIconSize),
       dirtyStarSize: l(dirtyStarSize, other.dirtyStarSize),
-      depthPaddingMultiplier: l(depthPaddingMultiplier, other.depthPaddingMultiplier),
+      depthPaddingMultiplier: l(
+        depthPaddingMultiplier,
+        other.depthPaddingMultiplier,
+      ),
       treeRowExtent: l(treeRowExtent, other.treeRowExtent),
       sideMenuWidth: l(sideMenuWidth, other.sideMenuWidth),
       borderThin: l(borderThin, other.borderThin),
@@ -207,81 +226,81 @@ class AppLayout extends ThemeExtension<AppLayout> {
 
   static const normal = AppLayout(
     isCompact: false,
-    pagePadding: 24.0,
-    sectionSpacing: 24.0,
-    verticalDividerWidth: 48.0,
-    iconSize: 24.0,
-    smallIconSize: 16.0,
-    badgePaddingHorizontal: 10.0,
-    badgePaddingVertical: 2.0,
-    fontSizeTitle: 14.0,
-    fontSizeSmall: 10.0,
-    fontSizeNormal: 12.0,
-    fontSizeCode: 13.0,
-    fontSizeSubtitle: 18.0,
-    buttonPaddingHorizontal: 24.0,
-    buttonPaddingVertical: 16.0,
-    inputPadding: 16.0,
-    inputPaddingVertical: 8.0,
-    cardOffset: 6.0,
-    headerPaddingVertical: 20.0,
-    headerFontSize: 24.0,
-    tabBarHeight: 60.0,
-    tabCloseIconSize: 16.0,
-    tabPaddingHorizontal: 16.0,
-    tabFontSize: 11.0,
+    pagePadding: 24,
+    sectionSpacing: 24,
+    verticalDividerWidth: 48,
+    iconSize: 24,
+    smallIconSize: 16,
+    badgePaddingHorizontal: 10,
+    badgePaddingVertical: 2,
+    fontSizeTitle: 14,
+    fontSizeSmall: 10,
+    fontSizeNormal: 12,
+    fontSizeCode: 13,
+    fontSizeSubtitle: 18,
+    buttonPaddingHorizontal: 24,
+    buttonPaddingVertical: 16,
+    inputPadding: 16,
+    inputPaddingVertical: 8,
+    cardOffset: 6,
+    headerPaddingVertical: 20,
+    headerFontSize: 24,
+    tabBarHeight: 60,
+    tabCloseIconSize: 16,
+    tabPaddingHorizontal: 16,
+    tabFontSize: 11,
     tabTitleMaxLength: 25,
-    tabSpacing: 8.0,
-    addIconSize: 24.0,
-    dirtyStarSize: 16.0,
-    depthPaddingMultiplier: 20.0,
-    treeRowExtent: 40.0,
-    sideMenuWidth: 300.0,
-    borderThin: 2.0,
-    borderThick: 3.0,
-    borderHeavy: 4.0,
-    dialogWidth: 400.0,
-    splitterGrabSize: 40.0,
-    splitterLineSize: 3.0,
+    tabSpacing: 8,
+    addIconSize: 24,
+    dirtyStarSize: 16,
+    depthPaddingMultiplier: 20,
+    treeRowExtent: 40,
+    sideMenuWidth: 300,
+    borderThin: 2,
+    borderThick: 3,
+    borderHeavy: 4,
+    dialogWidth: 400,
+    splitterGrabSize: 40,
+    splitterLineSize: 3,
   );
 
   static const compact = AppLayout(
     isCompact: true,
-    pagePadding: 12.0,
-    sectionSpacing: 12.0,
-    verticalDividerWidth: 24.0,
-    iconSize: 18.0,
-    smallIconSize: 14.0,
-    badgePaddingHorizontal: 6.0,
-    badgePaddingVertical: 1.0,
-    fontSizeTitle: 12.0,
-    fontSizeSmall: 9.0,
-    fontSizeNormal: 11.0,
-    fontSizeCode: 12.0,
-    fontSizeSubtitle: 14.0,
-    buttonPaddingHorizontal: 16.0,
-    buttonPaddingVertical: 12.0,
-    inputPadding: 10.0,
-    inputPaddingVertical: 6.0,
-    cardOffset: 3.0,
-    headerPaddingVertical: 12.0,
-    headerFontSize: 18.0,
-    tabBarHeight: 40.0,
-    tabCloseIconSize: 12.0,
-    tabPaddingHorizontal: 8.0,
-    tabFontSize: 9.0,
+    pagePadding: 12,
+    sectionSpacing: 12,
+    verticalDividerWidth: 24,
+    iconSize: 18,
+    smallIconSize: 14,
+    badgePaddingHorizontal: 6,
+    badgePaddingVertical: 1,
+    fontSizeTitle: 12,
+    fontSizeSmall: 9,
+    fontSizeNormal: 11,
+    fontSizeCode: 12,
+    fontSizeSubtitle: 14,
+    buttonPaddingHorizontal: 16,
+    buttonPaddingVertical: 12,
+    inputPadding: 10,
+    inputPaddingVertical: 6,
+    cardOffset: 3,
+    headerPaddingVertical: 12,
+    headerFontSize: 18,
+    tabBarHeight: 40,
+    tabCloseIconSize: 12,
+    tabPaddingHorizontal: 8,
+    tabFontSize: 9,
     tabTitleMaxLength: 15,
-    tabSpacing: 4.0,
-    addIconSize: 18.0,
-    dirtyStarSize: 12.0,
-    depthPaddingMultiplier: 12.0,
-    treeRowExtent: 32.0,
-    sideMenuWidth: 240.0,
-    borderThin: 2.0,
-    borderThick: 3.0,
-    borderHeavy: 4.0,
-    dialogWidth: 320.0,
-    splitterGrabSize: 28.0,
-    splitterLineSize: 2.0,
+    tabSpacing: 4,
+    addIconSize: 18,
+    dirtyStarSize: 12,
+    depthPaddingMultiplier: 12,
+    treeRowExtent: 32,
+    sideMenuWidth: 240,
+    borderThin: 2,
+    borderThick: 3,
+    borderHeavy: 4,
+    dialogWidth: 320,
+    splitterGrabSize: 28,
+    splitterLineSize: 2,
   );
 }

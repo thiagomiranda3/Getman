@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -90,22 +92,38 @@ const List<LogicalKeyboardKey> _tabDigitKeys = [
 /// root (new tab / command palette) and in `MainScreen` (tab/send/save/focus).
 @visibleForTesting
 final Map<ShortcutActivator, Intent> appShortcuts = {
-  const SingleActivator(LogicalKeyboardKey.keyN, control: true): const NewTabIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyN, meta: true): const NewTabIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyW, control: true): const CloseTabIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyW, meta: true): const CloseTabIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyS, control: true): const SaveRequestIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyS, meta: true): const SaveRequestIntent(),
-  const SingleActivator(LogicalKeyboardKey.enter, control: true): const SendRequestIntent(),
-  const SingleActivator(LogicalKeyboardKey.enter, meta: true): const SendRequestIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyB, control: true): const BeautifyJsonIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyB, meta: true): const BeautifyJsonIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyK, control: true): const CommandPaletteIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyK, meta: true): const CommandPaletteIntent(),
-  const SingleActivator(LogicalKeyboardKey.tab, control: true): const NextTabIntent(),
-  const SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true): const PrevTabIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyL, control: true): const FocusUrlIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyL, meta: true): const FocusUrlIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyN, control: true):
+      const NewTabIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyN, meta: true):
+      const NewTabIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyW, control: true):
+      const CloseTabIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyW, meta: true):
+      const CloseTabIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyS, control: true):
+      const SaveRequestIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyS, meta: true):
+      const SaveRequestIntent(),
+  const SingleActivator(LogicalKeyboardKey.enter, control: true):
+      const SendRequestIntent(),
+  const SingleActivator(LogicalKeyboardKey.enter, meta: true):
+      const SendRequestIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyB, control: true):
+      const BeautifyJsonIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyB, meta: true):
+      const BeautifyJsonIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyK, control: true):
+      const CommandPaletteIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyK, meta: true):
+      const CommandPaletteIntent(),
+  const SingleActivator(LogicalKeyboardKey.tab, control: true):
+      const NextTabIntent(),
+  const SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true):
+      const PrevTabIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyL, control: true):
+      const FocusUrlIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyL, meta: true):
+      const FocusUrlIntent(),
   for (var i = 0; i < _tabDigitKeys.length; i++) ...{
     SingleActivator(_tabDigitKeys[i], meta: true): JumpToTabIntent(i),
     SingleActivator(_tabDigitKeys[i], control: true): JumpToTabIntent(i),
@@ -113,84 +131,116 @@ final Map<ShortcutActivator, Intent> appShortcuts = {
 };
 
 class MyApp extends StatelessWidget {
+  const MyApp({required this.initialSettings, super.key});
+
+  // Part of the public constructor consumed by widget tests; the boot settings
+  // are applied via SettingsBloc seeding in di.init(), so the field itself is
+  // not read inside build().
+  // ignore: unreachable_from_main
   final SettingsEntity initialSettings;
-  const MyApp({super.key, required this.initialSettings});
 
   @override
   Widget build(BuildContext context) {
     return MultiRepositoryProvider(
       providers: [
-        RepositoryProvider<TabDirtyChecker>.value(value: di.sl<TabDirtyChecker>()),
-        RepositoryProvider<UrlFocusRegistry>.value(value: di.sl<UrlFocusRegistry>()),
-        RepositoryProvider<NetworkService>.value(value: di.sl<NetworkService>()),
+        RepositoryProvider<TabDirtyChecker>.value(
+          value: di.sl<TabDirtyChecker>(),
+        ),
+        RepositoryProvider<UrlFocusRegistry>.value(
+          value: di.sl<UrlFocusRegistry>(),
+        ),
+        RepositoryProvider<NetworkService>.value(
+          value: di.sl<NetworkService>(),
+        ),
         RepositoryProvider<CookieStore>.value(value: di.sl<CookieStore>()),
-        RepositoryProvider<WorkspaceSyncService>.value(value: di.sl<WorkspaceSyncService>()),
+        RepositoryProvider<WorkspaceSyncService>.value(
+          value: di.sl<WorkspaceSyncService>(),
+        ),
       ],
       child: MultiBlocProvider(
-      providers: [
-        BlocProvider(create: (_) => di.sl<SettingsBloc>()),
-        // HistoryBloc loads itself by subscribing to watchHistory().
-        BlocProvider(create: (_) => di.sl<HistoryBloc>()),
-        BlocProvider(create: (_) => di.sl<CollectionsBloc>()..add(const LoadCollections())),
-        BlocProvider(create: (_) => di.sl<TabsBloc>()..add(const LoadTabs())),
-        BlocProvider(create: (_) => di.sl<EnvironmentsBloc>()..add(const LoadEnvironments())),
-        BlocProvider(create: (_) => di.sl<RulesBloc>()),
-        BlocProvider(create: (_) => di.sl<RealtimeBloc>()),
-      ],
-      child: NetworkSettingsListener(
-        child: WorkspaceSyncListener(
-        child: BlocBuilder<SettingsBloc, SettingsState>(
-        // Rebuilding here re-runs the theme builder and rebuilds the entire
-        // MaterialApp — gate it to the three settings that actually feed it.
-        buildWhen: (prev, next) =>
-            prev.settings.themeId != next.settings.themeId ||
-            prev.settings.isDarkMode != next.settings.isDarkMode ||
-            prev.settings.isCompactMode != next.settings.isCompactMode,
-        builder: (context, state) {
-          final settings = state.settings;
-          return Shortcuts(
-            shortcuts: appShortcuts,
-            child: Actions(
-              actions: <Type, Action<Intent>>{
-                NewTabIntent: CallbackAction<NewTabIntent>(
-                  onInvoke: (intent) => context.read<TabsBloc>().add(const AddTab()),
-                ),
-                CommandPaletteIntent: CallbackAction<CommandPaletteIntent>(
-                  onInvoke: (intent) {
-                    CommandPalette.show(context);
-                    return null;
-                  },
-                ),
-              },
-              child: MaterialApp.router(
-                title: 'GETMAN',
-                debugShowCheckedModeBanner: false,
-                // Lerping ThemeData triggers ~12 full-tree rebuilds per theme
-                // change. The app's widget tree is too heavy for that; a single
-                // instant rebuild is both faster and visually cleaner.
-                themeAnimationDuration: Duration.zero,
-                theme: resolveThemeData(settings.themeId, Brightness.light, isCompact: settings.isCompactMode),
-                darkTheme: resolveThemeData(settings.themeId, Brightness.dark, isCompact: settings.isCompactMode),
-                themeMode: settings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-                routerConfig: di.sl<AppRouter>().router,
-                builder: (context, child) {
-                  return Focus(
-                    autofocus: true,
-                    child: context.appDecoration.scaffoldBackground(
-                      context,
-                      child: child ?? const SizedBox.shrink(),
+        providers: [
+          BlocProvider(create: (_) => di.sl<SettingsBloc>()),
+          // HistoryBloc loads itself by subscribing to watchHistory().
+          BlocProvider(create: (_) => di.sl<HistoryBloc>()),
+          BlocProvider(
+            create: (_) =>
+                di.sl<CollectionsBloc>()..add(const LoadCollections()),
+          ),
+          BlocProvider(create: (_) => di.sl<TabsBloc>()..add(const LoadTabs())),
+          BlocProvider(
+            create: (_) =>
+                di.sl<EnvironmentsBloc>()..add(const LoadEnvironments()),
+          ),
+          BlocProvider(create: (_) => di.sl<RulesBloc>()),
+          BlocProvider(create: (_) => di.sl<RealtimeBloc>()),
+        ],
+        child: NetworkSettingsListener(
+          child: WorkspaceSyncListener(
+            child: BlocBuilder<SettingsBloc, SettingsState>(
+              // Rebuilding here re-runs the theme builder and rebuilds the
+              // entire MaterialApp — gate it to the three settings that
+              // actually feed it.
+              buildWhen: (prev, next) =>
+                  prev.settings.themeId != next.settings.themeId ||
+                  prev.settings.isDarkMode != next.settings.isDarkMode ||
+                  prev.settings.isCompactMode != next.settings.isCompactMode,
+              builder: (context, state) {
+                final settings = state.settings;
+                return Shortcuts(
+                  shortcuts: appShortcuts,
+                  child: Actions(
+                    actions: <Type, Action<Intent>>{
+                      NewTabIntent: CallbackAction<NewTabIntent>(
+                        onInvoke: (intent) =>
+                            context.read<TabsBloc>().add(const AddTab()),
+                      ),
+                      CommandPaletteIntent:
+                          CallbackAction<CommandPaletteIntent>(
+                            onInvoke: (intent) {
+                              unawaited(CommandPalette.show(context));
+                              return null;
+                            },
+                          ),
+                    },
+                    child: MaterialApp.router(
+                      title: 'GETMAN',
+                      debugShowCheckedModeBanner: false,
+                      // Lerping ThemeData triggers ~12 full-tree rebuilds per
+                      // theme change. The app's widget tree is too heavy for
+                      // that; a single instant rebuild is both faster and
+                      // visually cleaner.
+                      themeAnimationDuration: Duration.zero,
+                      theme: resolveThemeData(
+                        settings.themeId,
+                        Brightness.light,
+                        isCompact: settings.isCompactMode,
+                      ),
+                      darkTheme: resolveThemeData(
+                        settings.themeId,
+                        Brightness.dark,
+                        isCompact: settings.isCompactMode,
+                      ),
+                      themeMode: settings.isDarkMode
+                          ? ThemeMode.dark
+                          : ThemeMode.light,
+                      routerConfig: di.sl<AppRouter>().router,
+                      builder: (context, child) {
+                        return Focus(
+                          autofocus: true,
+                          child: context.appDecoration.scaffoldBackground(
+                            context,
+                            child: child ?? const SizedBox.shrink(),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
-          );
-        },
-      ),
-      ),
-      ),
+          ),
+        ),
       ),
     );
   }
 }
-

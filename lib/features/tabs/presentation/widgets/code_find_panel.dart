@@ -3,20 +3,20 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:re_editor/re_editor.dart';
 
 class CodeFindPanel extends StatefulWidget implements PreferredSizeWidget {
-  final CodeFindController controller;
-  final bool readOnly;
-
   const CodeFindPanel({
-    super.key,
     required this.controller,
     required this.readOnly,
+    super.key,
   });
+  final CodeFindController controller;
+  final bool readOnly;
 
   @override
   State<CodeFindPanel> createState() => _CodeFindPanelState();
 
   @override
-  Size get preferredSize => controller.value == null ? Size.zero : const Size.fromHeight(54);
+  Size get preferredSize =>
+      controller.value == null ? Size.zero : const Size.fromHeight(54);
 }
 
 class _CodeFindPanelState extends State<CodeFindPanel> {
@@ -49,7 +49,12 @@ class _CodeFindPanelState extends State<CodeFindPanel> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        border: Border(bottom: BorderSide(color: theme.dividerColor, width: layout.borderThick)),
+        border: Border(
+          bottom: BorderSide(
+            color: theme.dividerColor,
+            width: layout.borderThick,
+          ),
+        ),
       ),
       child: Row(
         children: [
@@ -62,10 +67,14 @@ class _CodeFindPanelState extends State<CodeFindPanel> {
                 hintText: 'FIND...',
                 isDense: true,
                 prefixIcon: Icon(Icons.search, size: layout.iconSize),
-                suffixText: (widget.controller.value?.result?.matches.length ?? 0) > 0
-                  ? '${(widget.controller.value?.result?.index ?? 0) + 1}/${widget.controller.value?.result?.matches.length}'
-                  : '0/0',
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                suffixText:
+                    (widget.controller.value?.result?.matches.length ?? 0) > 0
+                    ? '${(widget.controller.value?.result?.index ?? 0) + 1}/${widget.controller.value?.result?.matches.length}'
+                    : '0/0',
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
               ),
               onSubmitted: (value) => widget.controller.nextMatch(),
             ),

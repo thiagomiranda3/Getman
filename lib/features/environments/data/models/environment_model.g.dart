@@ -8,7 +8,7 @@ part of 'environment_model.dart';
 
 class EnvironmentModelAdapter extends TypeAdapter<EnvironmentModel> {
   @override
-  final int typeId = 4;
+  final typeId = 4;
 
   @override
   EnvironmentModel read(BinaryReader reader) {
@@ -17,8 +17,8 @@ class EnvironmentModelAdapter extends TypeAdapter<EnvironmentModel> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return EnvironmentModel(
-      id: fields[0] as String?,
       name: fields[1] as String,
+      id: fields[0] as String?,
       variables: (fields[2] as Map?)?.cast<String, String>(),
       secretKeys: fields[3] == null ? [] : (fields[3] as List?)?.cast<String>(),
     );

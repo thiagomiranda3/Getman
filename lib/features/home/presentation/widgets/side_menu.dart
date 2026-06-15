@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -29,7 +31,10 @@ class SideMenu extends StatelessWidget {
             Container(
               decoration: BoxDecoration(
                 border: Border(
-                  bottom: BorderSide(color: theme.dividerColor, width: layout.borderThick),
+                  bottom: BorderSide(
+                    color: theme.dividerColor,
+                    width: layout.borderThick,
+                  ),
                 ),
               ),
               child: const BrandedTabBar(
@@ -62,7 +67,10 @@ class _SideMenuHeader extends StatelessWidget {
     final layout = context.appLayout;
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: layout.inputPadding, vertical: layout.headerPaddingVertical),
+      padding: EdgeInsets.symmetric(
+        horizontal: layout.inputPadding,
+        vertical: layout.headerPaddingVertical,
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -76,7 +84,7 @@ class _SideMenuHeader extends StatelessWidget {
                   fontWeight: context.appTypography.displayWeight,
                   fontSize: layout.headerFontSize,
                   color: theme.colorScheme.onSurface,
-                  letterSpacing: -1
+                  letterSpacing: -1,
                 ),
               ),
             ),
@@ -87,14 +95,22 @@ class _SideMenuHeader extends StatelessWidget {
             children: [
               context.appDecoration.wrapInteractive(
                 child: IconButton(
-                  icon: Icon(Icons.create_new_folder, color: theme.colorScheme.onSurface, size: layout.iconSize),
+                  icon: Icon(
+                    Icons.create_new_folder,
+                    color: theme.colorScheme.onSurface,
+                    size: layout.iconSize,
+                  ),
                   tooltip: 'NEW FOLDER',
                   onPressed: () => _showNewFolderDialog(context),
                 ),
               ),
               context.appDecoration.wrapInteractive(
                 child: IconButton(
-                  icon: Icon(Icons.settings, color: theme.colorScheme.onSurface, size: layout.iconSize),
+                  icon: Icon(
+                    Icons.settings,
+                    color: theme.colorScheme.onSurface,
+                    size: layout.iconSize,
+                  ),
                   tooltip: 'SETTINGS',
                   onPressed: () => _showSettingsDialog(context),
                 ),
@@ -108,16 +124,18 @@ class _SideMenuHeader extends StatelessWidget {
 
   void _showNewFolderDialog(BuildContext context) {
     final bloc = context.read<CollectionsBloc>();
-    NamePromptDialog.show(
-      context,
-      title: 'NEW FOLDER',
-      hintText: 'FOLDER NAME',
-      confirmLabel: 'CREATE',
-      onConfirm: (name) => bloc.add(AddFolder(name)),
+    unawaited(
+      NamePromptDialog.show(
+        context,
+        title: 'NEW FOLDER',
+        hintText: 'FOLDER NAME',
+        confirmLabel: 'CREATE',
+        onConfirm: (name) => bloc.add(AddFolder(name)),
+      ),
     );
   }
 
   void _showSettingsDialog(BuildContext context) {
-    SettingsDialog.show(context);
+    unawaited(SettingsDialog.show(context));
   }
 }

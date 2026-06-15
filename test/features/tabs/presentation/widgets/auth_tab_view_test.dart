@@ -27,8 +27,8 @@ Future<TabsBloc> _loadedBloc(
   HttpRequestTabEntity tab,
 ) async {
   when(() => repository.getTabs()).thenAnswer((_) async => [tab]);
-  final bloc = TabsBloc(repository: repository, sendRequestUseCase: useCase);
-  bloc.add(const LoadTabs());
+  final bloc = TabsBloc(repository: repository, sendRequestUseCase: useCase)
+    ..add(const LoadTabs());
   await bloc.stream.firstWhere((s) => !s.isLoading && s.tabs.isNotEmpty);
   return bloc;
 }
@@ -54,10 +54,12 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(_FakeConfig());
-    registerFallbackValue(const HttpRequestTabEntity(
-      tabId: 'fallback',
-      config: HttpRequestConfigEntity(id: 'fallback'),
-    ));
+    registerFallbackValue(
+      const HttpRequestTabEntity(
+        tabId: 'fallback',
+        config: HttpRequestConfigEntity(id: 'fallback'),
+      ),
+    );
   });
 
   setUp(() {
@@ -77,7 +79,10 @@ void main() {
 
   testWidgets('defaults to NO AUTH with no credential fields', (tester) async {
     final bloc = await _loadedBloc(
-        repository, sendRequestUseCase, tabWithAuth('t', const {}));
+      repository,
+      sendRequestUseCase,
+      tabWithAuth('t', const {}),
+    );
     addTearDown(bloc.close);
 
     await _pump(tester, bloc, 't');
@@ -86,10 +91,14 @@ void main() {
     expect(find.byType(TextField), findsNothing);
   });
 
-  testWidgets('selecting Bearer reveals the token field and edits round-trip',
-      (tester) async {
+  testWidgets('selecting Bearer reveals the token field and edits round-trip', (
+    tester,
+  ) async {
     final bloc = await _loadedBloc(
-        repository, sendRequestUseCase, tabWithAuth('t', const {}));
+      repository,
+      sendRequestUseCase,
+      tabWithAuth('t', const {}),
+    );
     addTearDown(bloc.close);
 
     await _pump(tester, bloc, 't');
@@ -132,7 +141,10 @@ void main() {
 
   testWidgets('api key in query mode round-trips addTo=query', (tester) async {
     final bloc = await _loadedBloc(
-        repository, sendRequestUseCase, tabWithAuth('t', const {}));
+      repository,
+      sendRequestUseCase,
+      tabWithAuth('t', const {}),
+    );
     addTearDown(bloc.close);
 
     await _pump(tester, bloc, 't');

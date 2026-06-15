@@ -22,7 +22,7 @@ void main() {
     });
 
     test('copyWith overrides themeId but keeps other fields', () {
-      final original = SettingsModel(themeId: 'brutalist', historyLimit: 50);
+      final original = SettingsModel(historyLimit: 50);
       final copy = original.copyWith(themeId: 'editorial');
       expect(copy.themeId, 'editorial');
       expect(copy.historyLimit, 50);
@@ -42,7 +42,7 @@ void main() {
     });
 
     test('entity roundtrip preserves null', () {
-      const entity = SettingsEntity(activeEnvironmentId: null);
+      const entity = SettingsEntity();
       final back = SettingsModel.fromEntity(entity).toEntity();
       expect(back.activeEnvironmentId, isNull);
     });
@@ -149,27 +149,33 @@ void main() {
       expect(config.clientCertPassphrase, 'secret');
     });
 
-    test('copyWith clears proxyUrl / workspacePath / cert fields via the sentinel', () {
-      const entity = SettingsEntity(
-        proxyUrl: 'p:1',
-        workspacePath: '/ws',
-        clientCertPath: '/c.pem',
-        clientKeyPath: '/k.pem',
-        clientCertPassphrase: 'secret',
-      );
-      expect(entity.copyWith(proxyUrl: null).proxyUrl, isNull);
-      expect(entity.copyWith(workspacePath: null).workspacePath, isNull);
-      expect(entity.copyWith(clientCertPath: null).clientCertPath, isNull);
-      expect(entity.copyWith(clientKeyPath: null).clientKeyPath, isNull);
-      expect(entity.copyWith(clientCertPassphrase: null).clientCertPassphrase, isNull);
-      // Omitting keeps them.
-      final kept = entity.copyWith(verifySsl: false);
-      expect(kept.proxyUrl, 'p:1');
-      expect(kept.workspacePath, '/ws');
-      expect(kept.clientCertPath, '/c.pem');
-      expect(kept.clientKeyPath, '/k.pem');
-      expect(kept.clientCertPassphrase, 'secret');
-    });
+    test(
+      'copyWith clears proxyUrl / workspacePath / cert fields via the sentinel',
+      () {
+        const entity = SettingsEntity(
+          proxyUrl: 'p:1',
+          workspacePath: '/ws',
+          clientCertPath: '/c.pem',
+          clientKeyPath: '/k.pem',
+          clientCertPassphrase: 'secret',
+        );
+        expect(entity.copyWith(proxyUrl: null).proxyUrl, isNull);
+        expect(entity.copyWith(workspacePath: null).workspacePath, isNull);
+        expect(entity.copyWith(clientCertPath: null).clientCertPath, isNull);
+        expect(entity.copyWith(clientKeyPath: null).clientKeyPath, isNull);
+        expect(
+          entity.copyWith(clientCertPassphrase: null).clientCertPassphrase,
+          isNull,
+        );
+        // Omitting keeps them.
+        final kept = entity.copyWith(verifySsl: false);
+        expect(kept.proxyUrl, 'p:1');
+        expect(kept.workspacePath, '/ws');
+        expect(kept.clientCertPath, '/c.pem');
+        expect(kept.clientKeyPath, '/k.pem');
+        expect(kept.clientCertPassphrase, 'secret');
+      },
+    );
   });
 
   group('SettingsModel workspaceBookmark (macOS security-scoped bookmark)', () {
@@ -179,22 +185,37 @@ void main() {
     });
 
     test('json roundtrip preserves the bookmark', () {
-      final model = SettingsModel(workspacePath: '/ws', workspaceBookmark: 'Ym9va21hcms=');
+      final model = SettingsModel(
+        workspacePath: '/ws',
+        workspaceBookmark: 'Ym9va21hcms=',
+      );
       final back = SettingsModel.fromJson(model.toJson());
       expect(back.workspacePath, '/ws');
       expect(back.workspaceBookmark, 'Ym9va21hcms=');
     });
 
     test('entity roundtrip preserves the bookmark', () {
-      const entity = SettingsEntity(workspacePath: '/ws', workspaceBookmark: 'Ym9va21hcms=');
+      const entity = SettingsEntity(
+        workspacePath: '/ws',
+        workspaceBookmark: 'Ym9va21hcms=',
+      );
       final back = SettingsModel.fromEntity(entity).toEntity();
       expect(back.workspaceBookmark, 'Ym9va21hcms=');
     });
 
-    test('copyWith clears the bookmark via the sentinel; omitting keeps it', () {
-      const entity = SettingsEntity(workspacePath: '/ws', workspaceBookmark: 'b');
-      expect(entity.copyWith(workspaceBookmark: null).workspaceBookmark, isNull);
-      expect(entity.copyWith(verifySsl: false).workspaceBookmark, 'b');
-    });
+    test(
+      'copyWith clears the bookmark via the sentinel; omitting keeps it',
+      () {
+        const entity = SettingsEntity(
+          workspacePath: '/ws',
+          workspaceBookmark: 'b',
+        );
+        expect(
+          entity.copyWith(workspaceBookmark: null).workspaceBookmark,
+          isNull,
+        );
+        expect(entity.copyWith(verifySsl: false).workspaceBookmark, 'b');
+      },
+    );
   });
 }

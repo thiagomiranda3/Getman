@@ -1,4 +1,4 @@
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 /// Replaces the contents of [box] with [items] (clear + addAll).
 ///
@@ -15,11 +15,11 @@ Future<void> replaceAllInBox<T>(Box<T> box, Iterable<T> items) async {
   await box.clear();
   try {
     await box.addAll(materialized);
-  } catch (_) {
+  } on Object catch (_) {
     try {
       await box.clear();
       await box.addAll(snapshot);
-    } catch (_) {
+    } on Object catch (_) {
       // Nothing more we can safely do; surface the original failure below.
     }
     rethrow;

@@ -4,14 +4,20 @@ import 'package:getman/core/ui/widgets/branded_tab_bar.dart';
 import 'package:getman/features/chaining/presentation/widgets/rules_tab_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/auth_tab_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_editor_tabs.dart';
+import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.dart'
+    show UnifiedRequestPanel;
 import 'package:re_editor/re_editor.dart';
 
 /// Split-pane request editor: PARAMS / HEADERS / BODY tab strip. The phone
 /// layout's [UnifiedRequestPanel] composes the same tab views plus RESPONSE.
 class RequestConfigSection extends StatelessWidget {
+  const RequestConfigSection({
+    required this.tabId,
+    required this.bodyController,
+    super.key,
+  });
   final String tabId;
   final CodeLineEditingController bodyController;
-  const RequestConfigSection({super.key, required this.tabId, required this.bodyController});
 
   @override
   Widget build(BuildContext context) {

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 /// Collapses a burst of calls into a single deferred action: each [run] cancels
-/// the previous pending timer and reschedules, so the [action] fires only once
+/// the previous pending timer and reschedules, so the action fires only once
 /// the caller stops invoking for [duration]. Used to keep per-keystroke work
 /// (search filtering, tree rebuilds) off the typing hot path.
 ///
@@ -12,7 +12,7 @@ class Debouncer {
   final Duration duration;
   Timer? _timer;
 
-  /// (Re)schedules [action] to run after [duration], cancelling any pending one.
+  /// (Re)schedules [action] after [duration], cancelling any pending one.
   void run(void Function() action) {
     _timer?.cancel();
     _timer = Timer(duration, action);

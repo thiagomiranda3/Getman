@@ -14,6 +14,12 @@ class LoadTabs extends TabsEvent {
 }
 
 class AddTab extends TabsEvent {
+  const AddTab({
+    this.config,
+    this.collectionNodeId,
+    this.collectionName,
+    this.response,
+  });
   final HttpRequestConfigEntity? config;
   final String? collectionNodeId;
   final String? collectionName;
@@ -21,57 +27,61 @@ class AddTab extends TabsEvent {
   /// Pre-populates the new tab's response pane — used when opening a saved
   /// example so its captured response shows immediately. Null for a fresh tab.
   final HttpResponseEntity? response;
-  const AddTab({this.config, this.collectionNodeId, this.collectionName, this.response});
   @override
-  List<Object?> get props => [config, collectionNodeId, collectionName, response];
+  List<Object?> get props => [
+    config,
+    collectionNodeId,
+    collectionName,
+    response,
+  ];
 }
 
 class RemoveTab extends TabsEvent {
-  final String tabId;
   const RemoveTab(this.tabId);
+  final String tabId;
   @override
   List<Object?> get props => [tabId];
 }
 
 class SetActiveIndex extends TabsEvent {
-  final int index;
   const SetActiveIndex(this.index);
+  final int index;
   @override
   List<Object?> get props => [index];
 }
 
 class ReorderTabs extends TabsEvent {
+  const ReorderTabs(this.oldIndex, this.newIndex);
   final int oldIndex;
   final int newIndex;
-  const ReorderTabs(this.oldIndex, this.newIndex);
   @override
   List<Object?> get props => [oldIndex, newIndex];
 }
 
 class UpdateTab extends TabsEvent {
-  final HttpRequestTabEntity tab;
   const UpdateTab(this.tab);
+  final HttpRequestTabEntity tab;
   @override
   List<Object?> get props => [tab];
 }
 
 class CloseOtherTabs extends TabsEvent {
-  final String tabId;
   const CloseOtherTabs(this.tabId);
+  final String tabId;
   @override
   List<Object?> get props => [tabId];
 }
 
 class CloseTabsToTheRight extends TabsEvent {
-  final String tabId;
   const CloseTabsToTheRight(this.tabId);
+  final String tabId;
   @override
   List<Object?> get props => [tabId];
 }
 
 class DuplicateTab extends TabsEvent {
-  final String tabId;
   const DuplicateTab(this.tabId);
+  final String tabId;
   @override
   List<Object?> get props => [tabId];
 }
@@ -82,16 +92,16 @@ class DuplicateTab extends TabsEvent {
 /// `ActiveEnvironmentHelper.variablesFor(...)` — an empty map sends `{{var}}`
 /// placeholders to the network verbatim.
 class SendRequest extends TabsEvent {
+  const SendRequest({required this.tabId, this.envVars = const {}});
   final String tabId;
   final Map<String, String> envVars;
-  const SendRequest({required this.tabId, this.envVars = const {}});
   @override
   List<Object?> get props => [tabId, envVars];
 }
 
 class CancelRequest extends TabsEvent {
-  final String tabId;
   const CancelRequest(this.tabId);
+  final String tabId;
   @override
   List<Object?> get props => [tabId];
 }

@@ -8,7 +8,11 @@ void main() {
   // SingleActivator has no value equality (Shortcuts indexes by trigger +
   // accepts, not map-key ==), so scan the entries by trigger/modifiers rather
   // than looking up with a freshly-constructed activator.
-  JumpToTabIntent? jumpFor(LogicalKeyboardKey key, {bool meta = false, bool control = false}) {
+  JumpToTabIntent? jumpFor(
+    LogicalKeyboardKey key, {
+    bool meta = false,
+    bool control = false,
+  }) {
     for (final entry in appShortcuts.entries) {
       final a = entry.key;
       if (a is SingleActivator &&
@@ -25,11 +29,18 @@ void main() {
   group('appShortcuts', () {
     test('Ctrl+Tab / Ctrl+Shift+Tab map to next / previous tab', () {
       expect(
-        appShortcuts[const SingleActivator(LogicalKeyboardKey.tab, control: true)],
+        appShortcuts[const SingleActivator(
+          LogicalKeyboardKey.tab,
+          control: true,
+        )],
         isA<NextTabIntent>(),
       );
       expect(
-        appShortcuts[const SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true)],
+        appShortcuts[const SingleActivator(
+          LogicalKeyboardKey.tab,
+          control: true,
+          shift: true,
+        )],
         isA<PrevTabIntent>(),
       );
     });
@@ -43,7 +54,10 @@ void main() {
 
     test('existing bindings still resolve', () {
       expect(
-        appShortcuts[const SingleActivator(LogicalKeyboardKey.keyN, meta: true)],
+        appShortcuts[const SingleActivator(
+          LogicalKeyboardKey.keyN,
+          meta: true,
+        )],
         isA<NewTabIntent>(),
       );
     });

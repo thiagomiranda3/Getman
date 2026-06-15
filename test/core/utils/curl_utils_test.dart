@@ -52,34 +52,49 @@ void main() {
     });
 
     test('-u becomes a Basic Authorization header', () {
-      final config = CurlUtils.parse('curl https://api.dev -u user:pass', id: 'a');
+      final config = CurlUtils.parse(
+        'curl https://api.dev -u user:pass',
+        id: 'a',
+      );
       // base64('user:pass') == 'dXNlcjpwYXNz'
       expect(config!.headers['Authorization'], 'Basic dXNlcjpwYXNz');
     });
 
     test('--data-urlencode encodes the value and upgrades to POST', () {
-      final config = CurlUtils.parse("curl https://api.dev --data-urlencode 'q=a b'", id: 'a');
+      final config = CurlUtils.parse(
+        "curl https://api.dev --data-urlencode 'q=a b'",
+        id: 'a',
+      );
       expect(config!.method, 'POST');
       expect(config.body, 'q=a%20b');
     });
 
     test('-G moves accumulated data into the query string and stays GET', () {
-      final config =
-          CurlUtils.parse("curl https://api.dev/search -G -d 'q=term' -d 'p=2'", id: 'a');
+      final config = CurlUtils.parse(
+        "curl https://api.dev/search -G -d 'q=term' -d 'p=2'",
+        id: 'a',
+      );
       expect(config!.method, 'GET');
       expect(config.url, 'https://api.dev/search?q=term&p=2');
       expect(config.body, isEmpty);
     });
 
-    test('skips an unhandled value flag so its value is not mistaken for the URL', () {
-      final config = CurlUtils.parse('curl -e https://ref.example https://api.dev/real', id: 'a');
-      expect(config!.url, 'https://api.dev/real');
-    });
+    test(
+      'skips an unhandled value flag so its value is not mistaken for the URL',
+      () {
+        final config = CurlUtils.parse(
+          'curl -e https://ref.example https://api.dev/real',
+          id: 'a',
+        );
+        expect(config!.url, 'https://api.dev/real');
+      },
+    );
   });
 
   group('CurlUtils.generate', () {
     test('emits a command that parses back to the same request', () {
-      const original = 'curl --request POST \\\n'
+      const original =
+          'curl --request POST \\\n'
           "  --url 'https://api.dev/login' \\\n"
           "  --header 'Accept: */*' \\\n"
           "  --data '{\"a\":1}'";

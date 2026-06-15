@@ -16,7 +16,7 @@ class MockSaveSettingsUseCase extends Mock implements SaveSettingsUseCase {}
 
 void main() {
   setUpAll(() {
-    registerFallbackValue(const NetworkConfig());
+    registerFallbackValue(NetworkConfig.defaults);
     registerFallbackValue(const SettingsEntity());
   });
 
@@ -27,7 +27,10 @@ void main() {
     network = MockNetworkService();
     final save = MockSaveSettingsUseCase();
     when(() => save.call(any())).thenAnswer((_) async {});
-    bloc = SettingsBloc(saveSettingsUseCase: save, initialSettings: const SettingsEntity());
+    bloc = SettingsBloc(
+      saveSettingsUseCase: save,
+      initialSettings: const SettingsEntity(),
+    );
   });
 
   tearDown(() => bloc.close());
@@ -70,12 +73,18 @@ void main() {
     verify(() => network.applyConfig(any())).called(1);
   });
 
-  testWidgets('applies config when the client certificate changes', (tester) async {
+  testWidgets('applies config when the client certificate changes', (
+    tester,
+  ) async {
     await pump(tester);
 
     await tester.runAsync(() async {
-      bloc.add(const UpdateClientCertificate(certPath: '/c.pem', keyPath: '/k.pem'));
-      await bloc.stream.firstWhere((s) => s.settings.clientCertPath == '/c.pem');
+      bloc.add(
+        const UpdateClientCertificate(certPath: '/c.pem', keyPath: '/k.pem'),
+      );
+      await bloc.stream.firstWhere(
+        (s) => s.settings.clientCertPath == '/c.pem',
+      );
     });
     await tester.pump();
 
@@ -86,7 +95,7 @@ void main() {
     await pump(tester);
 
     await tester.runAsync(() async {
-      bloc.add(const UpdateDarkMode(true));
+      bloc.add(const UpdateDarkMode(isDarkMode: true));
       await bloc.stream.firstWhere((s) => s.settings.isDarkMode);
     });
     await tester.pump();

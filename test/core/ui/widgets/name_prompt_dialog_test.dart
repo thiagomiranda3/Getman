@@ -4,7 +4,11 @@ import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 
 void main() {
-  Future<void> pump(WidgetTester tester, {required ValueChanged<String> onConfirm, String? initial}) async {
+  Future<void> pump(
+    WidgetTester tester, {
+    required ValueChanged<String> onConfirm,
+    String? initial,
+  }) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: brutalistTheme(Brightness.light),
@@ -38,7 +42,9 @@ void main() {
 
     await tester.enterText(find.byType(TextField), 'My Folder');
     await tester.pump();
-    final enabled = tester.widget<TextButton>(find.widgetWithText(TextButton, 'SAVE'));
+    final enabled = tester.widget<TextButton>(
+      find.widgetWithText(TextButton, 'SAVE'),
+    );
     expect(enabled.onPressed, isNotNull, reason: 'non-empty -> enabled');
 
     await tester.tap(find.widgetWithText(TextButton, 'SAVE'));
@@ -50,7 +56,9 @@ void main() {
     await pump(tester, onConfirm: (_) {});
     await tester.enterText(find.byType(TextField), '   ');
     await tester.pump();
-    final saveButton = tester.widget<TextButton>(find.widgetWithText(TextButton, 'SAVE'));
+    final saveButton = tester.widget<TextButton>(
+      find.widgetWithText(TextButton, 'SAVE'),
+    );
     expect(saveButton.onPressed, isNull);
   });
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
@@ -10,10 +12,13 @@ import 'package:getman/core/utils/code_gen_service.dart';
 /// "Generate code" dialog: pick a target language and copy a request snippet.
 /// The snippet keeps `{{env vars}}` verbatim (it's a template).
 class CodeExportDialog extends StatefulWidget {
+  const CodeExportDialog({required this.config, super.key});
   final HttpRequestConfigEntity config;
-  const CodeExportDialog({super.key, required this.config});
 
-  static Future<void> show(BuildContext context, HttpRequestConfigEntity config) {
+  static Future<void> show(
+    BuildContext context,
+    HttpRequestConfigEntity config,
+  ) {
     return showResponsiveDialog(
       context,
       builder: (_) => CodeExportDialog(config: config),
@@ -60,8 +65,13 @@ class _CodeExportDialogState extends State<CodeExportDialog> {
                 padding: EdgeInsets.all(layout.pagePadding),
                 decoration: BoxDecoration(
                   color: context.appPalette.codeBackground,
-                  border: Border.all(color: theme.dividerColor, width: layout.borderThin),
-                  borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+                  border: Border.all(
+                    color: theme.dividerColor,
+                    width: layout.borderThin,
+                  ),
+                  borderRadius: BorderRadius.circular(
+                    context.appShape.panelRadius,
+                  ),
                 ),
                 child: SingleChildScrollView(
                   child: SelectableText(
@@ -81,20 +91,24 @@ class _CodeExportDialogState extends State<CodeExportDialog> {
       actions: [
         TextButton(
           onPressed: () {
-            Clipboard.setData(ClipboardData(text: code));
+            unawaited(Clipboard.setData(ClipboardData(text: code)));
             showAppSnackBar(
               context,
               'Code copied to clipboard',
               backgroundColor: theme.colorScheme.secondary,
             );
           },
-          child: Text('COPY',
-              style: TextStyle(fontWeight: context.appTypography.titleWeight)),
+          child: Text(
+            'COPY',
+            style: TextStyle(fontWeight: context.appTypography.titleWeight),
+          ),
         ),
         TextButton(
           onPressed: () => Navigator.of(context).maybePop(),
-          child: Text('CLOSE',
-              style: TextStyle(fontWeight: context.appTypography.titleWeight)),
+          child: Text(
+            'CLOSE',
+            style: TextStyle(fontWeight: context.appTypography.titleWeight),
+          ),
         ),
       ],
     );

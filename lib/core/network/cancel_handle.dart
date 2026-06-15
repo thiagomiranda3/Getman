@@ -1,3 +1,5 @@
+import 'package:getman/core/network/network_service.dart' show NetworkService;
+
 /// Pure-Dart cancellation handle carried across the send pipeline.
 ///
 /// Holds **no** networking dependency: [NetworkService] binds it to a Dio
@@ -19,9 +21,9 @@ class NetworkCancelHandle {
     _onCancel?.call(reason);
   }
 
-  /// Bridges this handle to a concrete canceller (e.g. Dio's `CancelToken.cancel`).
-  /// If the handle was already cancelled, [onCancel] fires immediately with the
-  /// original reason.
+  /// Bridges this handle to a concrete canceller (e.g. Dio's
+  /// `CancelToken.cancel`). If the handle was already cancelled, [onCancel]
+  /// fires immediately with the original reason.
   void bindCancel(void Function(String reason) onCancel) {
     _onCancel = onCancel;
     if (_cancelled) onCancel(_reason);

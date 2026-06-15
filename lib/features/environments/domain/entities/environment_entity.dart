@@ -2,6 +2,12 @@ import 'package:equatable/equatable.dart';
 import 'package:uuid/uuid.dart';
 
 class EnvironmentEntity extends Equatable {
+  EnvironmentEntity({
+    required this.name,
+    String? id,
+    this.variables = const {},
+    this.secretKeys = const {},
+  }) : id = id ?? const Uuid().v4();
   final String id;
   final String name;
   final Map<String, String> variables;
@@ -9,13 +15,6 @@ class EnvironmentEntity extends Equatable {
   /// Names of variables flagged secret: rendered masked in the editor and
   /// masked on export. Resolution at send time is unaffected.
   final Set<String> secretKeys;
-
-  EnvironmentEntity({
-    String? id,
-    required this.name,
-    this.variables = const {},
-    this.secretKeys = const {},
-  }) : id = id ?? const Uuid().v4();
 
   EnvironmentEntity copyWith({
     String? name,

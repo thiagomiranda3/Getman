@@ -30,14 +30,17 @@ Future<TabsBloc> _loadedBloc(
   HttpRequestTabEntity tab,
 ) async {
   when(() => repository.getTabs()).thenAnswer((_) async => [tab]);
-  final bloc = TabsBloc(repository: repository, sendRequestUseCase: useCase);
-  bloc.add(const LoadTabs());
+  final bloc = TabsBloc(repository: repository, sendRequestUseCase: useCase)
+    ..add(const LoadTabs());
   await bloc.stream.firstWhere((s) => !s.isLoading && s.tabs.isNotEmpty);
   return bloc;
 }
 
 Future<CodeLineEditingController> _pump(
-    WidgetTester tester, TabsBloc bloc, String tabId) async {
+  WidgetTester tester,
+  TabsBloc bloc,
+  String tabId,
+) async {
   final controller = CodeLineEditingController();
   await tester.pumpWidget(
     MaterialApp(
@@ -60,10 +63,12 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(_FakeConfig());
-    registerFallbackValue(const HttpRequestTabEntity(
-      tabId: 'fallback',
-      config: HttpRequestConfigEntity(id: 'fallback'),
-    ));
+    registerFallbackValue(
+      const HttpRequestTabEntity(
+        tabId: 'fallback',
+        config: HttpRequestConfigEntity(id: 'fallback'),
+      ),
+    );
   });
 
   setUp(() {
@@ -75,14 +80,24 @@ void main() {
     when(() => repository.saveTabOrder(any())).thenAnswer((_) async {});
   });
 
-  HttpRequestTabEntity tab(BodyType type, {List<MultipartFieldEntity> fields = const []}) =>
-      HttpRequestTabEntity(
-        tabId: 't',
-        config: HttpRequestConfigEntity(id: 't', bodyType: type, formFields: fields),
-      );
+  HttpRequestTabEntity tab(
+    BodyType type, {
+    List<MultipartFieldEntity> fields = const [],
+  }) => HttpRequestTabEntity(
+    tabId: 't',
+    config: HttpRequestConfigEntity(
+      id: 't',
+      bodyType: type,
+      formFields: fields,
+    ),
+  );
 
   testWidgets('defaults to RAW with the JSON code editor', (tester) async {
-    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab(BodyType.raw));
+    final bloc = await _loadedBloc(
+      repository,
+      sendRequestUseCase,
+      tab(BodyType.raw),
+    );
     addTearDown(bloc.close);
 
     final controller = await _pump(tester, bloc, 't');
@@ -93,9 +108,14 @@ void main() {
     expect(find.byType(FormDataEditor), findsNothing);
   });
 
-  testWidgets('tapping FORM switches the body type and shows FormDataEditor',
-      (tester) async {
-    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab(BodyType.raw));
+  testWidgets('tapping FORM switches the body type and shows FormDataEditor', (
+    tester,
+  ) async {
+    final bloc = await _loadedBloc(
+      repository,
+      sendRequestUseCase,
+      tab(BodyType.raw),
+    );
     addTearDown(bloc.close);
 
     final controller = await _pump(tester, bloc, 't');
@@ -111,10 +131,14 @@ void main() {
     await tester.pump(const Duration(seconds: 11));
   });
 
-  testWidgets('urlencoded form rows round-trip into config.formFields',
-      (tester) async {
+  testWidgets('urlencoded form rows round-trip into config.formFields', (
+    tester,
+  ) async {
     final bloc = await _loadedBloc(
-        repository, sendRequestUseCase, tab(BodyType.urlencoded));
+      repository,
+      sendRequestUseCase,
+      tab(BodyType.urlencoded),
+    );
     addTearDown(bloc.close);
 
     final controller = await _pump(tester, bloc, 't');
@@ -137,7 +161,10 @@ void main() {
 
   testWidgets('multipart shows the file-toggle affordance', (tester) async {
     final bloc = await _loadedBloc(
-        repository, sendRequestUseCase, tab(BodyType.multipart));
+      repository,
+      sendRequestUseCase,
+      tab(BodyType.multipart),
+    );
     addTearDown(bloc.close);
 
     final controller = await _pump(tester, bloc, 't');

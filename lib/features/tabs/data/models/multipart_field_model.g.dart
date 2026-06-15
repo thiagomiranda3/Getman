@@ -8,7 +8,7 @@ part of 'multipart_field_model.dart';
 
 class MultipartFieldModelAdapter extends TypeAdapter<MultipartFieldModel> {
   @override
-  final int typeId = 5;
+  final typeId = 5;
 
   @override
   MultipartFieldModel read(BinaryReader reader) {

@@ -8,7 +8,7 @@ part of 'extraction_rule_model.dart';
 
 class ExtractionRuleModelAdapter extends TypeAdapter<ExtractionRuleModel> {
   @override
-  final int typeId = 7;
+  final typeId = 7;
 
   @override
   ExtractionRuleModel read(BinaryReader reader) {

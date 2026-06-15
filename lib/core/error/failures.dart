@@ -1,8 +1,8 @@
 import 'package:equatable/equatable.dart';
 
 abstract class Failure extends Equatable implements Exception {
-  final String message;
   const Failure(this.message);
+  final String message;
 
   @override
   List<Object?> get props => [message];
@@ -23,10 +23,9 @@ enum NetworkFailureType {
 }
 
 class NetworkFailure extends Failure {
+  const NetworkFailure(super.message, {required this.type, this.statusCode});
   final NetworkFailureType type;
   final int? statusCode;
-
-  const NetworkFailure(super.message, {required this.type, this.statusCode});
 
   @override
   List<Object?> get props => [message, type, statusCode];

@@ -5,6 +5,30 @@ import 'package:getman/core/theme/theme_ids.dart';
 const Object _unchanged = Object();
 
 class SettingsEntity extends Equatable {
+  const SettingsEntity({
+    this.historyLimit = 100,
+    this.saveResponseInHistory = false,
+    this.alwaysPrettifyLargeResponses = false,
+    this.isDarkMode = false,
+    this.isCompactMode = false,
+    this.isVerticalLayout = false,
+    this.splitRatio = 0.5,
+    this.sideMenuWidth = 300.0,
+    this.themeId = kBrutalistThemeId,
+    this.activeEnvironmentId,
+    this.connectTimeoutMs = 30000,
+    this.sendTimeoutMs = 30000,
+    this.receiveTimeoutMs = 60000,
+    this.followRedirects = true,
+    this.maxRedirects = 5,
+    this.verifySsl = true,
+    this.proxyUrl,
+    this.clientCertPath,
+    this.clientKeyPath,
+    this.clientCertPassphrase,
+    this.workspacePath,
+    this.workspaceBookmark,
+  });
   final int historyLimit;
   final bool saveResponseInHistory;
 
@@ -50,31 +74,6 @@ class SettingsEntity extends Equatable {
   /// platforms / when no workspace is connected.
   final String? workspaceBookmark;
 
-  const SettingsEntity({
-    this.historyLimit = 100,
-    this.saveResponseInHistory = false,
-    this.alwaysPrettifyLargeResponses = false,
-    this.isDarkMode = false,
-    this.isCompactMode = false,
-    this.isVerticalLayout = false,
-    this.splitRatio = 0.5,
-    this.sideMenuWidth = 300.0,
-    this.themeId = kBrutalistThemeId,
-    this.activeEnvironmentId,
-    this.connectTimeoutMs = 30000,
-    this.sendTimeoutMs = 30000,
-    this.receiveTimeoutMs = 60000,
-    this.followRedirects = true,
-    this.maxRedirects = 5,
-    this.verifySsl = true,
-    this.proxyUrl,
-    this.clientCertPath,
-    this.clientKeyPath,
-    this.clientCertPassphrase,
-    this.workspacePath,
-    this.workspaceBookmark,
-  });
-
   SettingsEntity copyWith({
     int? historyLimit,
     bool? saveResponseInHistory,
@@ -101,7 +100,8 @@ class SettingsEntity extends Equatable {
   }) {
     return SettingsEntity(
       historyLimit: historyLimit ?? this.historyLimit,
-      saveResponseInHistory: saveResponseInHistory ?? this.saveResponseInHistory,
+      saveResponseInHistory:
+          saveResponseInHistory ?? this.saveResponseInHistory,
       alwaysPrettifyLargeResponses:
           alwaysPrettifyLargeResponses ?? this.alwaysPrettifyLargeResponses,
       isDarkMode: isDarkMode ?? this.isDarkMode,
@@ -119,16 +119,21 @@ class SettingsEntity extends Equatable {
       followRedirects: followRedirects ?? this.followRedirects,
       maxRedirects: maxRedirects ?? this.maxRedirects,
       verifySsl: verifySsl ?? this.verifySsl,
-      proxyUrl: identical(proxyUrl, _unchanged) ? this.proxyUrl : proxyUrl as String?,
-      clientCertPath:
-          identical(clientCertPath, _unchanged) ? this.clientCertPath : clientCertPath as String?,
-      clientKeyPath:
-          identical(clientKeyPath, _unchanged) ? this.clientKeyPath : clientKeyPath as String?,
+      proxyUrl: identical(proxyUrl, _unchanged)
+          ? this.proxyUrl
+          : proxyUrl as String?,
+      clientCertPath: identical(clientCertPath, _unchanged)
+          ? this.clientCertPath
+          : clientCertPath as String?,
+      clientKeyPath: identical(clientKeyPath, _unchanged)
+          ? this.clientKeyPath
+          : clientKeyPath as String?,
       clientCertPassphrase: identical(clientCertPassphrase, _unchanged)
           ? this.clientCertPassphrase
           : clientCertPassphrase as String?,
-      workspacePath:
-          identical(workspacePath, _unchanged) ? this.workspacePath : workspacePath as String?,
+      workspacePath: identical(workspacePath, _unchanged)
+          ? this.workspacePath
+          : workspacePath as String?,
       workspaceBookmark: identical(workspaceBookmark, _unchanged)
           ? this.workspaceBookmark
           : workspaceBookmark as String?,
@@ -137,17 +142,17 @@ class SettingsEntity extends Equatable {
 
   /// Maps the network-related settings to the transport-layer [NetworkConfig].
   NetworkConfig toNetworkConfig() => NetworkConfig(
-        connectTimeoutMs: connectTimeoutMs,
-        sendTimeoutMs: sendTimeoutMs,
-        receiveTimeoutMs: receiveTimeoutMs,
-        followRedirects: followRedirects,
-        maxRedirects: maxRedirects,
-        verifySsl: verifySsl,
-        proxyUrl: proxyUrl,
-        clientCertPath: clientCertPath,
-        clientKeyPath: clientKeyPath,
-        clientCertPassphrase: clientCertPassphrase,
-      );
+    connectTimeoutMs: connectTimeoutMs,
+    sendTimeoutMs: sendTimeoutMs,
+    receiveTimeoutMs: receiveTimeoutMs,
+    followRedirects: followRedirects,
+    maxRedirects: maxRedirects,
+    verifySsl: verifySsl,
+    proxyUrl: proxyUrl,
+    clientCertPath: clientCertPath,
+    clientKeyPath: clientKeyPath,
+    clientCertPassphrase: clientCertPassphrase,
+  );
 
   @override
   List<Object?> get props => [

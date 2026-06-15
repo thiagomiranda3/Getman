@@ -4,19 +4,23 @@ import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 
 void main() {
-  testWidgets('shows a floating, theme-styled snackbar with the message', (tester) async {
+  testWidgets('shows a floating, theme-styled snackbar with the message', (
+    tester,
+  ) async {
     final theme = brutalistTheme(Brightness.light);
-    await tester.pumpWidget(MaterialApp(
-      theme: theme,
-      home: Scaffold(
-        body: Builder(
-          builder: (context) => ElevatedButton(
-            onPressed: () => showAppSnackBar(context, 'REQUEST UPDATED!'),
-            child: const Text('GO'),
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme,
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () => showAppSnackBar(context, 'REQUEST UPDATED!'),
+              child: const Text('GO'),
+            ),
           ),
         ),
       ),
-    ));
+    );
 
     await tester.tap(find.text('GO'));
     await tester.pump();
@@ -29,21 +33,23 @@ void main() {
 
   testWidgets('accepts a background override', (tester) async {
     final theme = brutalistTheme(Brightness.light);
-    await tester.pumpWidget(MaterialApp(
-      theme: theme,
-      home: Scaffold(
-        body: Builder(
-          builder: (context) => ElevatedButton(
-            onPressed: () => showAppSnackBar(
-              context,
-              'copied',
-              backgroundColor: theme.colorScheme.secondary,
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme,
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () => showAppSnackBar(
+                context,
+                'copied',
+                backgroundColor: theme.colorScheme.secondary,
+              ),
+              child: const Text('GO'),
             ),
-            child: const Text('GO'),
           ),
         ),
       ),
-    ));
+    );
 
     await tester.tap(find.text('GO'));
     await tester.pump();

@@ -15,8 +15,8 @@ import 'package:uuid/uuid.dart';
 /// Loads/saves through [RulesBloc] keyed by the request's config id. Mount with
 /// a per-tab key so switching tabs reloads the right rules.
 class RulesTabView extends StatefulWidget {
+  const RulesTabView({required this.tabId, super.key});
   final String tabId;
-  const RulesTabView({super.key, required this.tabId});
 
   @override
   State<RulesTabView> createState() => _RulesTabViewState();
@@ -44,7 +44,8 @@ class _RulesTabViewState extends State<RulesTabView> {
 
   void _updateExtraction(ExtractionRule rule) {
     final list = [
-      for (final r in _draft.extractionRules) if (r.id == rule.id) rule else r,
+      for (final r in _draft.extractionRules)
+        if (r.id == rule.id) rule else r,
     ];
     setState(() => _draft = _draft.copyWith(extractionRules: list));
     _emit();
@@ -52,7 +53,8 @@ class _RulesTabViewState extends State<RulesTabView> {
 
   void _updateAssertion(Assertion a) {
     final list = [
-      for (final x in _draft.assertions) if (x.id == a.id) a else x,
+      for (final x in _draft.assertions)
+        if (x.id == a.id) a else x,
     ];
     setState(() => _draft = _draft.copyWith(assertions: list));
     _emit();
@@ -79,17 +81,27 @@ class _RulesTabViewState extends State<RulesTabView> {
               rule: rule,
               onChanged: _updateExtraction,
               onDelete: () {
-                setState(() => _draft = _draft.copyWith(
-                    extractionRules:
-                        _draft.extractionRules.where((r) => r.id != rule.id).toList()));
+                setState(
+                  () => _draft = _draft.copyWith(
+                    extractionRules: _draft.extractionRules
+                        .where((r) => r.id != rule.id)
+                        .toList(),
+                  ),
+                );
                 _emit();
               },
             ),
           _AddButton(
             label: 'ADD EXTRACTION',
             onTap: () {
-              setState(() => _draft = _draft.copyWith(
-                  extractionRules: [..._draft.extractionRules, ExtractionRule(id: _uuid.v4())]));
+              setState(
+                () => _draft = _draft.copyWith(
+                  extractionRules: [
+                    ..._draft.extractionRules,
+                    ExtractionRule(id: _uuid.v4()),
+                  ],
+                ),
+              );
               _emit();
             },
           ),
@@ -101,16 +113,27 @@ class _RulesTabViewState extends State<RulesTabView> {
               assertion: a,
               onChanged: _updateAssertion,
               onDelete: () {
-                setState(() => _draft = _draft.copyWith(
-                    assertions: _draft.assertions.where((x) => x.id != a.id).toList()));
+                setState(
+                  () => _draft = _draft.copyWith(
+                    assertions: _draft.assertions
+                        .where((x) => x.id != a.id)
+                        .toList(),
+                  ),
+                );
                 _emit();
               },
             ),
           _AddButton(
             label: 'ADD ASSERTION',
             onTap: () {
-              setState(() => _draft =
-                  _draft.copyWith(assertions: [..._draft.assertions, Assertion(id: _uuid.v4())]));
+              setState(
+                () => _draft = _draft.copyWith(
+                  assertions: [
+                    ..._draft.assertions,
+                    Assertion(id: _uuid.v4()),
+                  ],
+                ),
+              );
               _emit();
             },
           ),
@@ -121,8 +144,8 @@ class _RulesTabViewState extends State<RulesTabView> {
 }
 
 class _Header extends StatelessWidget {
-  final String label;
   const _Header({required this.label});
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -142,9 +165,9 @@ class _Header extends StatelessWidget {
 }
 
 class _AddButton extends StatelessWidget {
+  const _AddButton({required this.label, required this.onTap});
   final String label;
   final VoidCallback onTap;
-  const _AddButton({required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -165,15 +188,15 @@ class _AddButton extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _ExtractionRuleRow extends StatefulWidget {
-  final ExtractionRule rule;
-  final ValueChanged<ExtractionRule> onChanged;
-  final VoidCallback onDelete;
   const _ExtractionRuleRow({
-    super.key,
     required this.rule,
     required this.onChanged,
     required this.onDelete,
+    super.key,
   });
+  final ExtractionRule rule;
+  final ValueChanged<ExtractionRule> onChanged;
+  final VoidCallback onDelete;
 
   @override
   State<_ExtractionRuleRow> createState() => _ExtractionRuleRowState();
@@ -188,10 +211,12 @@ class _ExtractionRuleRowState extends State<_ExtractionRuleRow> {
 
   late ExtractionKind _kind = widget.rule.kind;
   late bool _enabled = widget.rule.enabled;
-  late final TextEditingController _expression =
-      TextEditingController(text: widget.rule.expression);
-  late final TextEditingController _target =
-      TextEditingController(text: widget.rule.targetVariable);
+  late final TextEditingController _expression = TextEditingController(
+    text: widget.rule.expression,
+  );
+  late final TextEditingController _target = TextEditingController(
+    text: widget.rule.targetVariable,
+  );
 
   @override
   void dispose() {
@@ -200,13 +225,15 @@ class _ExtractionRuleRowState extends State<_ExtractionRuleRow> {
     super.dispose();
   }
 
-  void _emit() => widget.onChanged(ExtractionRule(
-        id: widget.rule.id,
-        kind: _kind,
-        expression: _expression.text,
-        targetVariable: _target.text,
-        enabled: _enabled,
-      ));
+  void _emit() => widget.onChanged(
+    ExtractionRule(
+      id: widget.rule.id,
+      kind: _kind,
+      expression: _expression.text,
+      targetVariable: _target.text,
+      enabled: _enabled,
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -233,7 +260,11 @@ class _ExtractionRuleRowState extends State<_ExtractionRuleRow> {
           },
         ),
         SizedBox(height: layout.tabSpacing),
-        _field(context, _expression, _kind == ExtractionKind.header ? 'HEADER NAME' : 'EXPRESSION'),
+        _field(
+          context,
+          _expression,
+          _kind == ExtractionKind.header ? 'HEADER NAME' : 'EXPRESSION',
+        ),
         SizedBox(height: layout.tabSpacing),
         _field(context, _target, 'TARGET VARIABLE'),
       ],
@@ -246,8 +277,15 @@ class _ExtractionRuleRowState extends State<_ExtractionRuleRow> {
       controller: c,
       autocorrect: false,
       enableSuggestions: false,
-      style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
-      decoration: InputDecoration(hintText: hint, isDense: true, contentPadding: EdgeInsets.all(layout.isCompact ? 8 : 12)),
+      style: TextStyle(
+        fontSize: layout.fontSizeNormal,
+        fontWeight: context.appTypography.titleWeight,
+      ),
+      decoration: InputDecoration(
+        hintText: hint,
+        isDense: true,
+        contentPadding: EdgeInsets.all(layout.isCompact ? 8 : 12),
+      ),
       onChanged: (_) => _emit(),
     );
   }
@@ -258,15 +296,15 @@ class _ExtractionRuleRowState extends State<_ExtractionRuleRow> {
 // ---------------------------------------------------------------------------
 
 class _AssertionRow extends StatefulWidget {
-  final Assertion assertion;
-  final ValueChanged<Assertion> onChanged;
-  final VoidCallback onDelete;
   const _AssertionRow({
-    super.key,
     required this.assertion,
     required this.onChanged,
     required this.onDelete,
+    super.key,
   });
+  final Assertion assertion;
+  final ValueChanged<Assertion> onChanged;
+  final VoidCallback onDelete;
 
   @override
   State<_AssertionRow> createState() => _AssertionRowState();
@@ -292,11 +330,16 @@ class _AssertionRowState extends State<_AssertionRow> {
   late AssertionTarget _target = widget.assertion.target;
   late AssertionComparator _comparator = widget.assertion.comparator;
   late bool _enabled = widget.assertion.enabled;
-  late final TextEditingController _path = TextEditingController(text: widget.assertion.path);
-  late final TextEditingController _expected = TextEditingController(text: widget.assertion.expected);
+  late final TextEditingController _path = TextEditingController(
+    text: widget.assertion.path,
+  );
+  late final TextEditingController _expected = TextEditingController(
+    text: widget.assertion.expected,
+  );
 
   bool get _needsPath =>
-      _target == AssertionTarget.bodyJsonPath || _target == AssertionTarget.header;
+      _target == AssertionTarget.bodyJsonPath ||
+      _target == AssertionTarget.header;
   bool get _needsExpected => _comparator != AssertionComparator.exists;
 
   @override
@@ -306,14 +349,16 @@ class _AssertionRowState extends State<_AssertionRow> {
     super.dispose();
   }
 
-  void _emit() => widget.onChanged(Assertion(
-        id: widget.assertion.id,
-        target: _target,
-        comparator: _comparator,
-        path: _path.text,
-        expected: _expected.text,
-        enabled: _enabled,
-      ));
+  void _emit() => widget.onChanged(
+    Assertion(
+      id: widget.assertion.id,
+      target: _target,
+      comparator: _comparator,
+      path: _path.text,
+      expected: _expected.text,
+      enabled: _enabled,
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -361,11 +406,21 @@ class _AssertionRowState extends State<_AssertionRow> {
         ),
         if (_needsPath) ...[
           SizedBox(height: layout.tabSpacing),
-          _field(context, _path, _target == AssertionTarget.header ? 'HEADER NAME' : 'JSONPath'),
+          _field(
+            context,
+            _path,
+            _target == AssertionTarget.header ? 'HEADER NAME' : 'JSONPath',
+          ),
         ],
         if (_needsExpected) ...[
           SizedBox(height: layout.tabSpacing),
-          _field(context, _expected, _comparator == AssertionComparator.inRange ? 'EXPECTED (lo-hi)' : 'EXPECTED'),
+          _field(
+            context,
+            _expected,
+            _comparator == AssertionComparator.inRange
+                ? 'EXPECTED (lo-hi)'
+                : 'EXPECTED',
+          ),
         ],
       ],
     );
@@ -377,8 +432,15 @@ class _AssertionRowState extends State<_AssertionRow> {
       controller: c,
       autocorrect: false,
       enableSuggestions: false,
-      style: TextStyle(fontSize: layout.fontSizeNormal, fontWeight: context.appTypography.titleWeight),
-      decoration: InputDecoration(hintText: hint, isDense: true, contentPadding: EdgeInsets.all(layout.isCompact ? 8 : 12)),
+      style: TextStyle(
+        fontSize: layout.fontSizeNormal,
+        fontWeight: context.appTypography.titleWeight,
+      ),
+      decoration: InputDecoration(
+        hintText: hint,
+        isDense: true,
+        contentPadding: EdgeInsets.all(layout.isCompact ? 8 : 12),
+      ),
       onChanged: (_) => _emit(),
     );
   }
@@ -386,16 +448,16 @@ class _AssertionRowState extends State<_AssertionRow> {
 
 /// Shared card chrome for a rule/assertion row: enable toggle + delete.
 class _RuleCard extends StatelessWidget {
-  final bool enabled;
-  final ValueChanged<bool> onToggle;
-  final VoidCallback onDelete;
-  final List<Widget> children;
   const _RuleCard({
     required this.enabled,
     required this.onToggle,
     required this.onDelete,
     required this.children,
   });
+  final bool enabled;
+  final ValueChanged<bool> onToggle;
+  final VoidCallback onDelete;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
@@ -413,7 +475,12 @@ class _RuleCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: children,
+                ),
+              ),
               SizedBox(width: layout.tabSpacing),
               Column(
                 children: [
@@ -425,7 +492,11 @@ class _RuleCard extends StatelessWidget {
                   ),
                   context.appDecoration.wrapInteractive(
                     child: IconButton(
-                      icon: Icon(Icons.delete_outline, color: theme.colorScheme.error, size: layout.iconSize),
+                      icon: Icon(
+                        Icons.delete_outline,
+                        color: theme.colorScheme.error,
+                        size: layout.iconSize,
+                      ),
                       onPressed: onDelete,
                     ),
                   ),

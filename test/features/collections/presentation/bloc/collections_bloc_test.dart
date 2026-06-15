@@ -22,25 +22,32 @@ void main() {
     when(() => repo.saveCollections(any())).thenAnswer((_) async {});
   });
 
-  CollectionsBloc build({Duration debounce = const Duration(milliseconds: 5)}) =>
-      CollectionsBloc(
-        getCollectionsUseCase: GetCollectionsUseCase(repo),
-        saveCollectionsUseCase: SaveCollectionsUseCase(repo),
-        saveDebounce: debounce,
-      );
+  CollectionsBloc build({
+    Duration debounce = const Duration(milliseconds: 5),
+  }) => CollectionsBloc(
+    getCollectionsUseCase: GetCollectionsUseCase(repo),
+    saveCollectionsUseCase: SaveCollectionsUseCase(repo),
+    saveDebounce: debounce,
+  );
 
-  CollectionNodeEntity folder(String id, String name, {List<CollectionNodeEntity> children = const []}) =>
-      CollectionNodeEntity(id: id, name: name, isFolder: true, children: children);
+  CollectionNodeEntity folder(
+    String id,
+    String name, {
+    List<CollectionNodeEntity> children = const [],
+  }) => CollectionNodeEntity(id: id, name: name, children: children);
 
   CollectionNodeEntity leaf(String id, String name) => CollectionNodeEntity(
-        id: id,
-        name: name,
-        isFolder: false,
-        config: HttpRequestConfigEntity(id: id),
-      );
+    id: id,
+    name: name,
+    isFolder: false,
+    config: HttpRequestConfigEntity(id: id),
+  );
 
   /// Seeds the tree and waits for the (immediate) replace emit.
-  Future<void> seed(CollectionsBloc bloc, List<CollectionNodeEntity> nodes) async {
+  Future<void> seed(
+    CollectionsBloc bloc,
+    List<CollectionNodeEntity> nodes,
+  ) async {
     bloc.add(ReplaceCollections(nodes));
     await bloc.stream.first;
   }
@@ -51,22 +58,40 @@ void main() {
       addTearDown(bloc.close);
       bloc.add(const AddFolder('Auth'));
       await bloc.stream.first;
-      expect(bloc.state.collections.where((n) => n.name == 'Auth' && n.isFolder), hasLength(1));
+      expect(
+        bloc.state.collections.where((n) => n.name == 'Auth' && n.isFolder),
+        hasLength(1),
+      );
     });
 
-    test('UpdateNodeDescription sets and then clears a node description', () async {
-      final bloc = build();
-      addTearDown(bloc.close);
-      await seed(bloc, [leaf('R', 'R')]);
+    test(
+      'UpdateNodeDescription sets and then clears a node description',
+      () async {
+        final bloc = build();
+        addTearDown(bloc.close);
+        await seed(bloc, [leaf('R', 'R')]);
 
-      bloc.add(const UpdateNodeDescription('R', 'auth endpoint'));
-      await bloc.stream.first;
-      expect(CollectionsTreeHelper.findNode(bloc.state.collections, 'R')?.description, 'auth endpoint');
+        bloc.add(const UpdateNodeDescription('R', 'auth endpoint'));
+        await bloc.stream.first;
+        expect(
+          CollectionsTreeHelper.findNode(
+            bloc.state.collections,
+            'R',
+          )?.description,
+          'auth endpoint',
+        );
 
-      bloc.add(const UpdateNodeDescription('R', ''));
-      await bloc.stream.first;
-      expect(CollectionsTreeHelper.findNode(bloc.state.collections, 'R')?.description, '');
-    });
+        bloc.add(const UpdateNodeDescription('R', ''));
+        await bloc.stream.first;
+        expect(
+          CollectionsTreeHelper.findNode(
+            bloc.state.collections,
+            'R',
+          )?.description,
+          '',
+        );
+      },
+    );
 
     test('DeleteNode removes the node from the tree', () async {
       final bloc = build();
@@ -76,8 +101,14 @@ void main() {
       bloc.add(const DeleteNode('R'));
       await bloc.stream.first;
 
-      expect(CollectionsTreeHelper.findNode(bloc.state.collections, 'R'), isNull);
-      expect(CollectionsTreeHelper.findNode(bloc.state.collections, 'A'), isNotNull);
+      expect(
+        CollectionsTreeHelper.findNode(bloc.state.collections, 'R'),
+        isNull,
+      );
+      expect(
+        CollectionsTreeHelper.findNode(bloc.state.collections, 'A'),
+        isNotNull,
+      );
     });
 
     test('RenameNode renames in place', () async {
@@ -88,7 +119,10 @@ void main() {
       bloc.add(const RenameNode('A', 'Renamed'));
       await bloc.stream.first;
 
-      expect(CollectionsTreeHelper.findNode(bloc.state.collections, 'A')!.name, 'Renamed');
+      expect(
+        CollectionsTreeHelper.findNode(bloc.state.collections, 'A')!.name,
+        'Renamed',
+      );
     });
 
     test('MoveNode relocates a leaf into a folder', () async {
@@ -108,11 +142,15 @@ void main() {
 
   group('saved examples', () {
     SavedExampleEntity example(String id, String name) => SavedExampleEntity(
-          id: id,
-          name: name,
-          capturedAt: DateTime.utc(2026, 6, 14),
-          config: const HttpRequestConfigEntity(id: 'R', statusCode: 200, responseBody: 'ok'),
-        );
+      id: id,
+      name: name,
+      capturedAt: DateTime.utc(2026, 6, 14),
+      config: const HttpRequestConfigEntity(
+        id: 'R',
+        statusCode: 200,
+        responseBody: 'ok',
+      ),
+    );
 
     test('SaveExampleToNode appends to the leaf', () async {
       final bloc = build();
@@ -135,20 +173,32 @@ void main() {
       bloc.add(SaveExampleToNode('nope', example('e1', 'First')));
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
-      expect(CollectionsTreeHelper.findNode(bloc.state.collections, 'R')!.examples, isEmpty);
+      expect(
+        CollectionsTreeHelper.findNode(bloc.state.collections, 'R')!.examples,
+        isEmpty,
+      );
     });
 
     test('DeleteExample removes the example', () async {
       final bloc = build();
       addTearDown(bloc.close);
       await seed(bloc, [
-        leaf('R', 'R').copyWith(examples: [example('e1', 'First'), example('e2', 'Second')]),
+        leaf(
+          'R',
+          'R',
+        ).copyWith(examples: [example('e1', 'First'), example('e2', 'Second')]),
       ]);
 
       bloc.add(const DeleteExample('R', 'e1'));
       await bloc.stream.first;
 
-      expect(CollectionsTreeHelper.findNode(bloc.state.collections, 'R')!.examples.map((e) => e.id), ['e2']);
+      expect(
+        CollectionsTreeHelper.findNode(
+          bloc.state.collections,
+          'R',
+        )!.examples.map((e) => e.id),
+        ['e2'],
+      );
     });
 
     test('RenameExample renames the example', () async {
@@ -161,26 +211,40 @@ void main() {
       bloc.add(const RenameExample('R', 'e1', 'Renamed'));
       await bloc.stream.first;
 
-      expect(CollectionsTreeHelper.findNode(bloc.state.collections, 'R')!.examples.single.name, 'Renamed');
+      expect(
+        CollectionsTreeHelper.findNode(
+          bloc.state.collections,
+          'R',
+        )!.examples.single.name,
+        'Renamed',
+      );
     });
   });
 
   group('move safety', () {
-    test('rejects moving a node into its own descendant (no orphaning)', () async {
-      final bloc = build();
-      addTearDown(bloc.close);
-      // A contains B.
-      await seed(bloc, [folder('A', 'A', children: [folder('B', 'B')])]);
+    test(
+      'rejects moving a node into its own descendant (no orphaning)',
+      () async {
+        final bloc = build();
+        addTearDown(bloc.close);
+        // A contains B.
+        await seed(bloc, [
+          folder('A', 'A', children: [folder('B', 'B')]),
+        ]);
 
-      bloc.add(const MoveNode('A', 'B')); // would strip the whole subtree
-      // The handler returns without emitting, so give the event loop a turn.
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+        bloc.add(const MoveNode('A', 'B')); // would strip the whole subtree
+        // The handler returns without emitting, so give the event loop a turn.
+        await Future<void>.delayed(const Duration(milliseconds: 20));
 
-      final a = CollectionsTreeHelper.findNode(bloc.state.collections, 'A');
-      expect(a, isNotNull, reason: 'A must survive the rejected move');
-      expect(CollectionsTreeHelper.findNode(bloc.state.collections, 'B'), isNotNull);
-      expect(a!.children.any((n) => n.id == 'B'), isTrue);
-    });
+        final a = CollectionsTreeHelper.findNode(bloc.state.collections, 'A');
+        expect(a, isNotNull, reason: 'A must survive the rejected move');
+        expect(
+          CollectionsTreeHelper.findNode(bloc.state.collections, 'B'),
+          isNotNull,
+        );
+        expect(a!.children.any((n) => n.id == 'B'), isTrue);
+      },
+    );
 
     test('rejects moving a node onto itself', () async {
       final bloc = build();
@@ -190,7 +254,10 @@ void main() {
       bloc.add(const MoveNode('A', 'A'));
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
-      expect(CollectionsTreeHelper.findNode(bloc.state.collections, 'A'), isNotNull);
+      expect(
+        CollectionsTreeHelper.findNode(bloc.state.collections, 'A'),
+        isNotNull,
+      );
     });
   });
 
@@ -199,9 +266,10 @@ void main() {
       final bloc = build(debounce: const Duration(milliseconds: 30));
       addTearDown(bloc.close);
 
-      bloc.add(const AddFolder('One'));
-      bloc.add(const AddFolder('Two'));
-      bloc.add(const AddFolder('Three'));
+      bloc
+        ..add(const AddFolder('One'))
+        ..add(const AddFolder('Two'))
+        ..add(const AddFolder('Three'));
       await untilCalled(() => repo.saveCollections(any()));
       // Let any stray timers fire.
       await Future<void>.delayed(const Duration(milliseconds: 60));
@@ -211,8 +279,8 @@ void main() {
 
     test('close() flushes a pending debounced save', () async {
       // Long debounce so the timer can't fire before close.
-      final bloc = build(debounce: const Duration(seconds: 10));
-      bloc.add(const AddFolder('Pending'));
+      final bloc = build(debounce: const Duration(seconds: 10))
+        ..add(const AddFolder('Pending'));
       await bloc.stream.first; // ensure the edit landed
 
       await bloc.close();
@@ -228,7 +296,10 @@ void main() {
       await untilCalled(() => repo.saveCollections(any()));
 
       verify(() => repo.saveCollections(any())).called(1);
-      expect(CollectionsTreeHelper.findNode(bloc.state.collections, 'I'), isNotNull);
+      expect(
+        CollectionsTreeHelper.findNode(bloc.state.collections, 'I'),
+        isNotNull,
+      );
     });
   });
 }

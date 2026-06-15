@@ -1,4 +1,6 @@
 import 'package:equatable/equatable.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart'
+    show HttpRequestConfigEntity;
 
 /// Authentication scheme for a request. Persisted as a discriminator string in
 /// the raw `auth` map carried by [HttpRequestConfigEntity] (Hive field 6).
@@ -7,10 +9,12 @@ enum AuthType {
   inherit('inherit'),
   bearer('bearer'),
   basic('basic'),
-  apiKey('apikey');
+  apiKey('apikey')
+  ;
+
+  const AuthType(this.wire);
 
   final String wire;
-  const AuthType(this.wire);
 
   static AuthType fromWire(String? value) {
     for (final t in AuthType.values) {
@@ -23,10 +27,12 @@ enum AuthType {
 /// Where an API-key credential is placed on the outgoing request.
 enum ApiKeyLocation {
   header('header'),
-  query('query');
+  query('query')
+  ;
+
+  const ApiKeyLocation(this.wire);
 
   final String wire;
-  const ApiKeyLocation(this.wire);
 
   static ApiKeyLocation fromWire(String? value) =>
       value == 'query' ? ApiKeyLocation.query : ApiKeyLocation.header;
@@ -40,13 +46,7 @@ enum ApiKeyLocation {
 /// An empty map decodes to [AuthType.none], so every pre-existing record (whose
 /// `auth` defaulted to `{}`) reads back as "No auth" with zero migration.
 class AuthConfig extends Equatable {
-  final AuthType type;
-  final String token; // bearer
-  final String username; // basic
-  final String password; // basic
-  final String apiKeyName; // apiKey
-  final String apiKeyValue; // apiKey
-  final ApiKeyLocation apiKeyLocation; // apiKey
+  // apiKey
 
   const AuthConfig({
     this.type = AuthType.none,
@@ -57,8 +57,6 @@ class AuthConfig extends Equatable {
     this.apiKeyValue = '',
     this.apiKeyLocation = ApiKeyLocation.header,
   });
-
-  static const AuthConfig none = AuthConfig();
 
   factory AuthConfig.fromMap(Map<String, String> map) {
     if (map.isEmpty) return none;
@@ -72,6 +70,15 @@ class AuthConfig extends Equatable {
       apiKeyLocation: ApiKeyLocation.fromWire(map['addTo']),
     );
   }
+  final AuthType type;
+  final String token; // bearer
+  final String username; // basic
+  final String password; // basic
+  final String apiKeyName; // apiKey
+  final String apiKeyValue; // apiKey
+  final ApiKeyLocation apiKeyLocation;
+
+  static const AuthConfig none = AuthConfig();
 
   /// Serializes back to the raw map persisted on the entity. Returns an empty
   /// map for [AuthType.none] so persisted records stay tidy and dedup-stable.
@@ -117,12 +124,12 @@ class AuthConfig extends Equatable {
 
   @override
   List<Object?> get props => [
-        type,
-        token,
-        username,
-        password,
-        apiKeyName,
-        apiKeyValue,
-        apiKeyLocation,
-      ];
+    type,
+    token,
+    username,
+    password,
+    apiKeyName,
+    apiKeyValue,
+    apiKeyLocation,
+  ];
 }

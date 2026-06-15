@@ -8,7 +8,7 @@ part of 'collection_node_model.dart';
 
 class CollectionNodeAdapter extends TypeAdapter<CollectionNode> {
   @override
-  final int typeId = 3;
+  final typeId = 3;
 
   @override
   CollectionNode read(BinaryReader reader) {
@@ -17,12 +17,12 @@ class CollectionNodeAdapter extends TypeAdapter<CollectionNode> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return CollectionNode(
-      id: fields[0] as String?,
       name: fields[1] as String,
-      isFolder: fields[2] as bool,
+      id: fields[0] as String?,
+      isFolder: fields[2] == null ? true : fields[2] as bool,
       children: (fields[3] as List?)?.cast<CollectionNode>(),
       config: fields[4] as HttpRequestConfig?,
-      isFavorite: fields[5] as bool,
+      isFavorite: fields[5] == null ? false : fields[5] as bool,
       description: fields[6] as String?,
       examples: (fields[7] as List?)?.cast<SavedExampleModel>(),
     );

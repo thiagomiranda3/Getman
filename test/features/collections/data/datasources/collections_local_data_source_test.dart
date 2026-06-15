@@ -7,7 +7,7 @@ import 'package:getman/features/collections/data/models/collection_node_model.da
 import 'package:getman/features/collections/data/models/saved_example_model.dart';
 import 'package:getman/features/history/data/models/request_config_model.dart';
 import 'package:getman/features/tabs/data/models/multipart_field_model.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 void main() {
   late Directory tempDir;
@@ -15,12 +15,22 @@ void main() {
   late CollectionsLocalDataSourceImpl dataSource;
 
   setUp(() async {
-    tempDir = await Directory.systemTemp.createTemp('getman_collections_ds_test');
+    tempDir = await Directory.systemTemp.createTemp(
+      'getman_collections_ds_test',
+    );
     Hive.init(tempDir.path);
-    if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(HttpRequestConfigAdapter());
-    if (!Hive.isAdapterRegistered(3)) Hive.registerAdapter(CollectionNodeAdapter());
-    if (!Hive.isAdapterRegistered(5)) Hive.registerAdapter(MultipartFieldModelAdapter());
-    if (!Hive.isAdapterRegistered(10)) Hive.registerAdapter(SavedExampleModelAdapter());
+    if (!Hive.isAdapterRegistered(1)) {
+      Hive.registerAdapter(HttpRequestConfigAdapter());
+    }
+    if (!Hive.isAdapterRegistered(3)) {
+      Hive.registerAdapter(CollectionNodeAdapter());
+    }
+    if (!Hive.isAdapterRegistered(5)) {
+      Hive.registerAdapter(MultipartFieldModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(10)) {
+      Hive.registerAdapter(SavedExampleModelAdapter());
+    }
     box = await Hive.openBox<CollectionNode>(HiveBoxes.collections);
     dataSource = CollectionsLocalDataSourceImpl();
   });
@@ -30,13 +40,17 @@ void main() {
     if (tempDir.existsSync()) await tempDir.delete(recursive: true);
   });
 
-  CollectionNode node(String id, String name) => CollectionNode(id: id, name: name);
+  CollectionNode node(String id, String name) =>
+      CollectionNode(id: id, name: name);
 
   test('saveCollections writes each root keyed by id', () async {
     await dataSource.saveCollections([node('a', 'A'), node('b', 'B')]);
 
     expect(box.keys.toSet(), {'a', 'b'});
-    expect((await dataSource.getCollections()).map((n) => n.id).toSet(), {'a', 'b'});
+    expect((await dataSource.getCollections()).map((n) => n.id).toSet(), {
+      'a',
+      'b',
+    });
   });
 
   test('saveCollections clears roots that are no longer present', () async {
@@ -56,13 +70,18 @@ void main() {
   });
 
   test('deleteRoots removes only the given ids', () async {
-    await dataSource.saveCollections([node('a', 'A'), node('b', 'B'), node('c', 'C')]);
+    await dataSource.saveCollections([
+      node('a', 'A'),
+      node('b', 'B'),
+      node('c', 'C'),
+    ]);
     await dataSource.deleteRoots(['a', 'c']);
 
     expect(box.keys.toSet(), {'b'});
   });
 
-  test('migrateLegacyKeysIfNeeded re-keys int-keyed roots by node id', () async {
+  test('migrateLegacyKeysIfNeeded re-keys int-keyed roots by node '
+      'id', () async {
     await box.addAll([node('a', 'A'), node('b', 'B')]); // legacy auto int keys
     expect(box.keys.every((k) => k is int), isTrue);
 

@@ -19,62 +19,82 @@ void main() {
     if (tmp.existsSync()) tmp.deleteSync(recursive: true);
   });
 
-  test('write then read round-trips a nested tree and drops response fields', () async {
-    final forest = [
-      const CollectionNodeEntity(
-        id: 'f1',
-        name: 'Auth',
-        isFolder: true,
-        children: [
-          CollectionNodeEntity(
-            id: 'r1',
-            name: 'Login',
-            isFolder: false,
-            config: HttpRequestConfigEntity(
-              id: 'c1',
-              method: 'POST',
-              url: 'https://api.dev/login',
-              responseBody: 'SECRET',
-              statusCode: 200,
+  test(
+    'write then read round-trips a nested tree and drops response fields',
+    () async {
+      final forest = [
+        const CollectionNodeEntity(
+          id: 'f1',
+          name: 'Auth',
+          children: [
+            CollectionNodeEntity(
+              id: 'r1',
+              name: 'Login',
+              isFolder: false,
+              config: HttpRequestConfigEntity(
+                id: 'c1',
+                method: 'POST',
+                url: 'https://api.dev/login',
+                responseBody: 'SECRET',
+                statusCode: 200,
+              ),
             ),
+          ],
+        ),
+        const CollectionNodeEntity(
+          id: 'r2',
+          name: 'Ping',
+          isFolder: false,
+          config: HttpRequestConfigEntity(
+            id: 'c2',
+            url: 'https://api.dev/ping',
           ),
-        ],
-      ),
-      const CollectionNodeEntity(
-        id: 'r2',
-        name: 'Ping',
-        isFolder: false,
-        config: HttpRequestConfigEntity(id: 'c2', url: 'https://api.dev/ping'),
-      ),
-    ];
+        ),
+      ];
 
-    await ds.write(tmp.path, forest);
+      await ds.write(tmp.path, forest);
 
-    // Response fields never reach disk.
-    final loginFile = File('${tmp.path}/auth/login.req.json');
-    expect(loginFile.existsSync(), isTrue);
-    expect(loginFile.readAsStringSync(), isNot(contains('SECRET')));
+      // Response fields never reach disk.
+      final loginFile = File('${tmp.path}/auth/login.req.json');
+      expect(loginFile.existsSync(), isTrue);
+      expect(loginFile.readAsStringSync(), isNot(contains('SECRET')));
 
-    final back = await ds.read(tmp.path);
-    expect(back, hasLength(2));
-    final auth = back.firstWhere((n) => n.name == 'Auth');
-    expect(auth.isFolder, isTrue);
-    expect(auth.children.single.name, 'Login');
-    expect(auth.children.single.config!.method, 'POST');
-    expect(auth.children.single.config!.responseBody, isNull);
-    final ping = back.firstWhere((n) => n.name == 'Ping');
-    expect(ping.config!.url, 'https://api.dev/ping');
-  });
+      final back = await ds.read(tmp.path);
+      expect(back, hasLength(2));
+      final auth = back.firstWhere((n) => n.name == 'Auth');
+      expect(auth.isFolder, isTrue);
+      expect(auth.children.single.name, 'Login');
+      expect(auth.children.single.config!.method, 'POST');
+      expect(auth.children.single.config!.responseBody, isNull);
+      final ping = back.firstWhere((n) => n.name == 'Ping');
+      expect(ping.config!.url, 'https://api.dev/ping');
+    },
+  );
 
   test('reconcile deletes orphaned request files on the next write', () async {
     await ds.write(tmp.path, const [
-      CollectionNodeEntity(id: 'r1', name: 'Keep', isFolder: false, config: HttpRequestConfigEntity(id: 'c1')),
-      CollectionNodeEntity(id: 'r2', name: 'Drop', isFolder: false, config: HttpRequestConfigEntity(id: 'c2')),
+      CollectionNodeEntity(
+        id: 'r1',
+        name: 'Keep',
+        isFolder: false,
+        config: HttpRequestConfigEntity(id: 'c1'),
+      ),
+      CollectionNodeEntity(
+        id: 'r2',
+        name: 'Drop',
+        isFolder: false,
+        config: HttpRequestConfigEntity(id: 'c2'),
+      ),
     ]);
     expect(File('${tmp.path}/drop.req.json').existsSync(), isTrue);
 
     await ds.write(tmp.path, const [
-      CollectionNodeEntity(id: 'r1', name: 'Keep', isFolder: false, config: HttpRequestConfigEntity(id: 'c1')),
+      CollectionNodeEntity(
+        id: 'r1',
+        name: 'Keep',
+        isFolder: false,
+        config: HttpRequestConfigEntity(id: 'c1'),
+      ),
     ]);
     expect(File('${tmp.path}/drop.req.json').existsSync(), isFalse);
     expect(File('${tmp.path}/keep.req.json').existsSync(), isTrue);

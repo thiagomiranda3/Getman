@@ -25,31 +25,37 @@ class _FakeHistoryDataSource implements HistoryLocalDataSource {
 }
 
 void main() {
-  test('watchHistory coalesces a burst of watch events into one re-read', () async {
-    final ds = _FakeHistoryDataSource()
-      ..data = [HttpRequestConfig(id: 'a', method: 'GET', url: 'https://a.dev')];
-    final repo = HistoryRepositoryImpl(ds);
+  test(
+    'watchHistory coalesces a burst of watch events into one re-read',
+    () async {
+      final ds = _FakeHistoryDataSource()
+        ..data = [HttpRequestConfig(id: 'a', url: 'https://a.dev')];
+      final repo = HistoryRepositoryImpl(ds);
 
-    final emissions = <List<HttpRequestConfigEntity>>[];
-    final sub = repo.watchHistory().listen(emissions.add);
-    await Future<void>.delayed(Duration.zero); // initial snapshot
+      final emissions = <List<HttpRequestConfigEntity>>[];
+      final sub = repo.watchHistory().listen(emissions.add);
+      await Future<void>.delayed(Duration.zero); // initial snapshot
 
-    // One addToHistory fires ~3 box events (dedup delete + add + batched trim).
-    ds.controller.add(null);
-    ds.controller.add(null);
-    ds.controller.add(null);
-    await Future<void>.delayed(const Duration(milliseconds: 150)); // past coalesce window
-    await sub.cancel();
+      // One addToHistory fires ~3 box events (dedup delete + add + batched
+      // trim).
+      ds.controller.add(null);
+      ds.controller.add(null);
+      ds.controller.add(null);
+      await Future<void>.delayed(
+        const Duration(milliseconds: 150),
+      ); // past coalesce window
+      await sub.cancel();
 
-    // Initial read + a single coalesced read — NOT 1 + 3.
-    expect(ds.reads, 2);
-    expect(emissions, hasLength(2));
-    expect(emissions.last.single.url, 'https://a.dev');
-  });
+      // Initial read + a single coalesced read — NOT 1 + 3.
+      expect(ds.reads, 2);
+      expect(emissions, hasLength(2));
+      expect(emissions.last.single.url, 'https://a.dev');
+    },
+  );
 
   test('watchHistory emits an initial snapshot on subscribe', () async {
     final ds = _FakeHistoryDataSource()
-      ..data = [HttpRequestConfig(id: 'a', method: 'GET', url: 'https://a.dev')];
+      ..data = [HttpRequestConfig(id: 'a', url: 'https://a.dev')];
     final repo = HistoryRepositoryImpl(ds);
 
     final first = await repo.watchHistory().first;

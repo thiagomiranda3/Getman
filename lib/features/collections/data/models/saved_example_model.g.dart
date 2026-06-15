@@ -8,7 +8,7 @@ part of 'saved_example_model.dart';
 
 class SavedExampleModelAdapter extends TypeAdapter<SavedExampleModel> {
   @override
-  final int typeId = 10;
+  final typeId = 10;
 
   @override
   SavedExampleModel read(BinaryReader reader) {
@@ -17,10 +17,10 @@ class SavedExampleModelAdapter extends TypeAdapter<SavedExampleModel> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return SavedExampleModel(
-      id: fields[0] as String?,
       name: fields[1] as String,
-      capturedAtMs: fields[2] as int,
+      capturedAtMs: (fields[2] as num).toInt(),
       config: fields[3] as HttpRequestConfig,
+      id: fields[0] as String?,
     );
   }
 

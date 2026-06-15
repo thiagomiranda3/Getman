@@ -5,13 +5,17 @@ import 'package:getman/core/ui/widgets/branded_tab_bar.dart';
 
 void main() {
   Future<void> pump(WidgetTester tester, Widget child) {
-    return tester.pumpWidget(MaterialApp(
-      theme: brutalistTheme(Brightness.light),
-      home: Scaffold(body: child),
-    ));
+    return tester.pumpWidget(
+      MaterialApp(
+        theme: brutalistTheme(Brightness.light),
+        home: Scaffold(body: child),
+      ),
+    );
   }
 
-  testWidgets('renders all labels inside a DefaultTabController', (tester) async {
+  testWidgets('renders all labels inside a DefaultTabController', (
+    tester,
+  ) async {
     await pump(
       tester,
       const DefaultTabController(
@@ -39,7 +43,9 @@ void main() {
     expect(controller.index, 1);
   });
 
-  testWidgets('styles the indicator from the theme, not hardcoded colors', (tester) async {
+  testWidgets('styles the indicator from the theme, not hardcoded colors', (
+    tester,
+  ) async {
     await pump(
       tester,
       const DefaultTabController(

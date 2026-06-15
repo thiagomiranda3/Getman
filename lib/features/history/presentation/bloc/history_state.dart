@@ -2,13 +2,12 @@ import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 
 class HistoryState extends Equatable {
-  final List<HttpRequestConfigEntity> history;
-  final bool isLoading;
-
   const HistoryState({
     this.history = const [],
     this.isLoading = false,
   });
+  final List<HttpRequestConfigEntity> history;
+  final bool isLoading;
 
   @override
   List<Object?> get props => [history, isLoading];

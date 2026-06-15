@@ -6,10 +6,30 @@ import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
 
-// Sentinel used by copyWith to distinguish "not provided" from "explicitly null".
+// Sentinel used by copyWith to distinguish "not provided" from "explicitly
+// null".
 const Object _unset = Object();
 
 class HttpRequestConfigEntity extends Equatable {
+  const HttpRequestConfigEntity({
+    required this.id,
+    this.method = 'GET',
+    this.url = '',
+    this.headers = const {
+      'Content-Type': 'application/json',
+      'Accept': '*/*',
+    },
+    this.body = '',
+    this.auth = const {},
+    this.bodyType = BodyType.raw,
+    this.formFields = const [],
+    this.bodyFilePath,
+    this.kind = RequestKind.http,
+    this.responseBody,
+    this.responseHeaders,
+    this.statusCode,
+    this.durationMs,
+  });
   final String id;
   final String method;
   final String url;
@@ -33,26 +53,6 @@ class HttpRequestConfigEntity extends Equatable {
   final Map<String, String>? responseHeaders;
   final int? statusCode;
   final int? durationMs;
-
-  const HttpRequestConfigEntity({
-    required this.id,
-    this.method = 'GET',
-    this.url = '',
-    this.headers = const {
-      'Content-Type': 'application/json',
-      'Accept': '*/*',
-    },
-    this.body = '',
-    this.auth = const {},
-    this.bodyType = BodyType.raw,
-    this.formFields = const [],
-    this.bodyFilePath,
-    this.kind = RequestKind.http,
-    this.responseBody,
-    this.responseHeaders,
-    this.statusCode,
-    this.durationMs,
-  });
 
   /// Derived view of the query params embedded in [url]. URL is the single
   /// source of truth — params are never stored separately. Duplicates are
@@ -81,7 +81,8 @@ class HttpRequestConfigEntity extends Equatable {
     Object? statusCode = _unset,
     Object? durationMs = _unset,
   }) {
-    final resolvedUrl = url ??
+    final resolvedUrl =
+        url ??
         (params != null
             ? UrlQueryUtils.replaceQuery(this.url, params)
             : this.url);
@@ -94,14 +95,22 @@ class HttpRequestConfigEntity extends Equatable {
       auth: auth ?? Map.from(this.auth),
       bodyType: bodyType ?? this.bodyType,
       formFields: formFields ?? this.formFields,
-      bodyFilePath: identical(bodyFilePath, _unset) ? this.bodyFilePath : bodyFilePath as String?,
+      bodyFilePath: identical(bodyFilePath, _unset)
+          ? this.bodyFilePath
+          : bodyFilePath as String?,
       kind: kind ?? this.kind,
-      responseBody: identical(responseBody, _unset) ? this.responseBody : responseBody as String?,
+      responseBody: identical(responseBody, _unset)
+          ? this.responseBody
+          : responseBody as String?,
       responseHeaders: identical(responseHeaders, _unset)
           ? this.responseHeaders
           : responseHeaders as Map<String, String>?,
-      statusCode: identical(statusCode, _unset) ? this.statusCode : statusCode as int?,
-      durationMs: identical(durationMs, _unset) ? this.durationMs : durationMs as int?,
+      statusCode: identical(statusCode, _unset)
+          ? this.statusCode
+          : statusCode as int?,
+      durationMs: identical(durationMs, _unset)
+          ? this.durationMs
+          : durationMs as int?,
     );
   }
 

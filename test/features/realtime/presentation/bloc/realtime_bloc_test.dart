@@ -46,7 +46,9 @@ void main() {
   tearDown(() => bloc.close());
 
   Future<void> connect() async {
-    bloc.add(const Connect(tabId: 't1', kind: RequestKind.webSocket, url: 'wss://x'));
+    bloc.add(
+      const Connect(tabId: 't1', kind: RequestKind.webSocket, url: 'wss://x'),
+    );
     await bloc.stream.firstWhere((s) => s.sessionFor('t1').connected);
   }
 
@@ -59,7 +61,9 @@ void main() {
   test('incoming frames are appended to the session log', () async {
     await connect();
     fake.controller.add(RealtimeFrame.incoming('hello'));
-    await bloc.stream.firstWhere((s) => s.sessionFor('t1').frames.any((f) => f.text == 'hello'));
+    await bloc.stream.firstWhere(
+      (s) => s.sessionFor('t1').frames.any((f) => f.text == 'hello'),
+    );
     expect(bloc.state.sessionFor('t1').frames.last.text, 'hello');
   });
 
@@ -67,7 +71,11 @@ void main() {
     await connect();
     bloc.add(const SendRealtimeMessage('t1', 'ping'));
     await bloc.stream.firstWhere(
-        (s) => s.sessionFor('t1').frames.any((f) => f.direction == RealtimeDirection.outgoing));
+      (s) => s
+          .sessionFor('t1')
+          .frames
+          .any((f) => f.direction == RealtimeDirection.outgoing),
+    );
     expect(fake.sent, ['ping']);
   });
 
@@ -85,33 +93,46 @@ void main() {
     expect(bloc.state.sessionFor('t1').connected, isFalse);
   });
 
-  test('coalesces a burst of frames into far fewer state emissions, in order', () async {
-    await connect();
-    final emissions = <int>[];
-    final sub = bloc.stream.listen((s) => emissions.add(s.sessionFor('t1').frames.length));
+  test(
+    'coalesces a burst of frames into far fewer state emissions, in order',
+    () async {
+      await connect();
+      final emissions = <int>[];
+      final sub = bloc.stream.listen(
+        (s) => emissions.add(s.sessionFor('t1').frames.length),
+      );
 
-    for (var i = 0; i < 20; i++) {
-      fake.controller.add(RealtimeFrame.incoming('m$i'));
-    }
-    await bloc.stream.firstWhere((s) => s.sessionFor('t1').frames.length == 20);
-    await Future<void>.delayed(const Duration(milliseconds: 30));
-    await sub.cancel();
+      for (var i = 0; i < 20; i++) {
+        fake.controller.add(RealtimeFrame.incoming('m$i'));
+      }
+      await bloc.stream.firstWhere(
+        (s) => s.sessionFor('t1').frames.length == 20,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      await sub.cancel();
 
-    expect(
-      bloc.state.sessionFor('t1').frames.map((f) => f.text).toList(),
-      List.generate(20, (i) => 'm$i'),
-      reason: 'all frames preserved in arrival order',
-    );
-    expect(emissions.length, lessThan(20),
-        reason: 'a synchronous burst collapses to far fewer emissions than frames');
-  });
+      expect(
+        bloc.state.sessionFor('t1').frames.map((f) => f.text).toList(),
+        List.generate(20, (i) => 'm$i'),
+        reason: 'all frames preserved in arrival order',
+      );
+      expect(
+        emissions.length,
+        lessThan(20),
+        reason:
+            'a synchronous burst collapses to far fewer emissions than frames',
+      );
+    },
+  );
 
   test('enforces the 500-frame cap, keeping the newest', () async {
     await connect();
     for (var i = 0; i < 600; i++) {
       fake.controller.add(RealtimeFrame.incoming('m$i'));
     }
-    await bloc.stream.firstWhere((s) => s.sessionFor('t1').frames.length >= 500);
+    await bloc.stream.firstWhere(
+      (s) => s.sessionFor('t1').frames.length >= 500,
+    );
     await Future<void>.delayed(const Duration(milliseconds: 30));
 
     final frames = bloc.state.sessionFor('t1').frames;
@@ -123,10 +144,14 @@ void main() {
   test('does not emit buffered frames after disconnect', () async {
     await connect();
     fake.controller.add(RealtimeFrame.incoming('late'));
-    await Future<void>.delayed(Duration.zero); // let the buffer arm its flush timer
+    await Future<void>.delayed(
+      Duration.zero,
+    ); // let the buffer arm its flush timer
     bloc.add(const Disconnect('t1'));
     await bloc.stream.firstWhere((s) => !s.sessionFor('t1').connected);
-    await Future<void>.delayed(const Duration(milliseconds: 30)); // past the coalesce window
+    await Future<void>.delayed(
+      const Duration(milliseconds: 30),
+    ); // past the coalesce window
     expect(bloc.state.sessionFor('t1').frames, isEmpty);
   });
 }

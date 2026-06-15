@@ -9,16 +9,16 @@ abstract class RulesEvent extends Equatable {
 
 /// Load the rules for a request config (the active request editor's config id).
 class LoadRules extends RulesEvent {
-  final String configId;
   const LoadRules(this.configId);
+  final String configId;
   @override
   List<Object?> get props => [configId];
 }
 
 /// Persist + reflect edited rules.
 class SaveRules extends RulesEvent {
-  final RequestRulesEntity rules;
   const SaveRules(this.rules);
+  final RequestRulesEntity rules;
   @override
   List<Object?> get props => [rules];
 }

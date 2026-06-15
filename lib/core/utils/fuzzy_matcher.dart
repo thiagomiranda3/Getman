@@ -34,7 +34,11 @@ class FuzzyMatcher {
   }
 
   /// Filters + ranks [items] by [query] against [label]. Stable for ties.
-  static List<T> filter<T>(String query, Iterable<T> items, String Function(T) label) {
+  static List<T> filter<T>(
+    String query,
+    Iterable<T> items,
+    String Function(T) label,
+  ) {
     if (query.trim().isEmpty) return items.toList();
     final scored = <({int score, int index, T item})>[];
     var i = 0;

@@ -10,8 +10,8 @@ import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 /// [WorkspaceSyncService] — keeping CollectionsBloc unaware of the filesystem
 /// (the coordinating widget holds all three, per the bloc-coupling rule).
 class WorkspaceSyncListener extends StatelessWidget {
+  const WorkspaceSyncListener({required this.child, super.key});
   final Widget child;
-  const WorkspaceSyncListener({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +20,10 @@ class WorkspaceSyncListener extends StatelessWidget {
       listener: (context, state) {
         final path = context.read<SettingsBloc>().state.settings.workspacePath;
         if (path != null && path.isNotEmpty) {
-          context.read<WorkspaceSyncService>().scheduleMirror(path, state.collections);
+          context.read<WorkspaceSyncService>().scheduleMirror(
+            path,
+            state.collections,
+          );
         }
       },
       child: child,

@@ -4,26 +4,32 @@ import 'package:getman/core/navigation/url_focus_registry.dart';
 
 void main() {
   group('UrlFocusRegistry', () {
-    testWidgets('focus() focuses the node registered for the given tab', (tester) async {
+    testWidgets('focus() focuses the node registered for the given tab', (
+      tester,
+    ) async {
       final registry = UrlFocusRegistry();
       final nodeA = FocusNode();
       final nodeB = FocusNode();
       addTearDown(nodeA.dispose);
       addTearDown(nodeB.dispose);
 
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: Column(children: [
-            TextField(focusNode: nodeA),
-            TextField(focusNode: nodeB),
-          ]),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                TextField(focusNode: nodeA),
+                TextField(focusNode: nodeB),
+              ],
+            ),
+          ),
         ),
-      ));
+      );
 
-      registry.register('a', nodeA);
-      registry.register('b', nodeB);
-
-      registry.focus('b');
+      registry
+        ..register('a', nodeA)
+        ..register('b', nodeB)
+        ..focus('b');
       await tester.pump();
 
       expect(nodeB.hasFocus, isTrue);
@@ -35,22 +41,28 @@ void main() {
       expect(() => registry.focus('missing'), returnsNormally);
     });
 
-    test('unregister only drops the node when it is still the registered one', () {
-      final registry = UrlFocusRegistry();
-      final oldNode = FocusNode();
-      final newNode = FocusNode();
-      addTearDown(oldNode.dispose);
-      addTearDown(newNode.dispose);
+    test(
+      'unregister only drops the node when it is still the registered one',
+      () {
+        final registry = UrlFocusRegistry();
+        final oldNode = FocusNode();
+        final newNode = FocusNode();
+        addTearDown(oldNode.dispose);
+        addTearDown(newNode.dispose);
 
-      registry.register('a', oldNode);
-      // A fresh UrlBar for the same id registered before the old one's dispose.
-      registry.register('a', newNode);
-      // The old one's dispose must not clobber the new registration.
-      registry.unregister('a', oldNode);
+        registry
+          ..register('a', oldNode)
+          // A fresh UrlBar for the same id registered before the old one's
+          // dispose.
+          ..register('a', newNode)
+          // The old one's dispose must not clobber the new registration.
+          ..unregister('a', oldNode);
 
-      expect(() => registry.focus('a'), returnsNormally);
-      // Re-registering newNode is a no-op overwrite; unregister with it clears.
-      registry.unregister('a', newNode);
-    });
+        expect(() => registry.focus('a'), returnsNormally);
+        // Re-registering newNode is a no-op overwrite; unregister with it
+        // clears.
+        registry.unregister('a', newNode);
+      },
+    );
   });
 }

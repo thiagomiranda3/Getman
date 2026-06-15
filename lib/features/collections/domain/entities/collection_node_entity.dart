@@ -3,6 +3,16 @@ import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
 
 class CollectionNodeEntity extends Equatable {
+  const CollectionNodeEntity({
+    required this.id,
+    required this.name,
+    this.isFolder = true,
+    this.children = const [],
+    this.config,
+    this.isFavorite = false,
+    this.description,
+    this.examples = const [],
+  });
   final String id;
   final String name;
   final bool isFolder;
@@ -16,17 +26,6 @@ class CollectionNodeEntity extends Equatable {
   /// Saved request+response snapshots for a leaf (request) node. Kept separate
   /// from [children] so tree-walk logic never treats an example as a tree node.
   final List<SavedExampleEntity> examples;
-
-  const CollectionNodeEntity({
-    required this.id,
-    required this.name,
-    this.isFolder = true,
-    this.children = const [],
-    this.config,
-    this.isFavorite = false,
-    this.description,
-    this.examples = const [],
-  });
 
   CollectionNodeEntity copyWith({
     String? name,

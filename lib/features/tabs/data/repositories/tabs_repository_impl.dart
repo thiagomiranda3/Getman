@@ -15,13 +15,12 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 
 class TabsRepositoryImpl implements TabsRepository {
-  final TabsLocalDataSource localDataSource;
-  final NetworkService networkService;
-
   TabsRepositoryImpl({
     required this.localDataSource,
     required this.networkService,
   });
+  final TabsLocalDataSource localDataSource;
+  final NetworkService networkService;
 
   @override
   Future<List<HttpRequestTabEntity>> getTabs() => guardPersistence(() async {
@@ -30,10 +29,11 @@ class TabsRepositoryImpl implements TabsRepository {
   });
 
   @override
-  Future<void> saveTabs(List<HttpRequestTabEntity> tabs) => guardPersistence(() async {
-    final models = tabs.map(_toPersistableModel).toList();
-    await localDataSource.saveTabs(models);
-  });
+  Future<void> saveTabs(List<HttpRequestTabEntity> tabs) =>
+      guardPersistence(() async {
+        final models = tabs.map(_toPersistableModel).toList();
+        await localDataSource.saveTabs(models);
+      });
 
   @override
   Future<void> putTab(HttpRequestTabEntity tab) => guardPersistence(() async {
@@ -46,17 +46,22 @@ class TabsRepositoryImpl implements TabsRepository {
   });
 
   @override
-  Future<void> saveTabOrder(List<String> orderedTabIds) => guardPersistence(() async {
-    await localDataSource.saveOrder(orderedTabIds);
-  });
+  Future<void> saveTabOrder(List<String> orderedTabIds) =>
+      guardPersistence(() async {
+        await localDataSource.saveOrder(orderedTabIds);
+      });
 
   /// Maps the entity to its Hive model, replacing an over-limit response body
   /// with [kResponseBodyTooLargePlaceholder]. The in-memory session keeps the
   /// full body — only the on-disk copy is capped (see persistence_limits.dart).
   HttpRequestTabModel _toPersistableModel(HttpRequestTabEntity entity) {
     final response = entity.response;
-    final capped = response != null && response.body.length > kMaxPersistedResponseBodyChars
-        ? entity.copyWith(response: response.copyWithBody(kResponseBodyTooLargePlaceholder))
+    final capped =
+        response != null &&
+            response.body.length > kMaxPersistedResponseBodyChars
+        ? entity.copyWith(
+            response: response.copyWithBody(kResponseBodyTooLargePlaceholder),
+          )
         : entity;
     return HttpRequestTabModel.fromEntity(capped);
   }

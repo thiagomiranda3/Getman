@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -55,7 +57,11 @@ class _MainScreenState extends State<MainScreen> {
     super.dispose();
   }
 
-  void _ensureActiveTabVisible(int activeIndex, int tabsLength, AppLayout layout) {
+  void _ensureActiveTabVisible(
+    int activeIndex,
+    int tabsLength,
+    AppLayout layout,
+  ) {
     if (activeIndex < 0 || activeIndex >= tabsLength) return;
     if (activeIndex == _lastActiveIndex) return;
     _lastActiveIndex = activeIndex;
@@ -78,10 +84,12 @@ class _MainScreenState extends State<MainScreen> {
         dest = targetEnd - position.viewportDimension;
       }
       if (dest == null) return;
-      _tabScrollController.animateTo(
-        dest.clamp(position.minScrollExtent, position.maxScrollExtent),
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
+      unawaited(
+        _tabScrollController.animateTo(
+          dest.clamp(position.minScrollExtent, position.maxScrollExtent),
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+        ),
       );
     });
   }
@@ -97,7 +105,10 @@ class _MainScreenState extends State<MainScreen> {
         : event.scrollDelta.dy;
     if (delta == 0) return;
     final position = _tabScrollController.position;
-    final target = (position.pixels + delta).clamp(position.minScrollExtent, position.maxScrollExtent);
+    final target = (position.pixels + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
     _tabScrollController.jumpTo(target);
   }
 
@@ -110,7 +121,10 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  Future<bool> _requestCloseConfirmation(BuildContext context, String tabId) async {
+  Future<bool> _requestCloseConfirmation(
+    BuildContext context,
+    String tabId,
+  ) async {
     final tab = context.read<TabsBloc>().state.tabs.byId(tabId);
     if (tab == null) return false;
     if (!_isTabDirty(context, tabId)) return true;
@@ -121,13 +135,24 @@ class _MainScreenState extends State<MainScreen> {
         final theme = Theme.of(dialogContext);
         return ResponsiveDialogScaffold(
           title: const Text('UNSAVED CHANGES'),
-          content: const Text('YOU HAVE UNSAVED CHANGES. ARE YOU SURE YOU WANT TO CLOSE THIS TAB?'),
+          content: const Text(
+            'YOU HAVE UNSAVED CHANGES. ARE YOU SURE YOU WANT TO CLOSE '
+            'THIS TAB?',
+          ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('CANCEL')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('CANCEL'),
+            ),
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: Text('CLOSE ANYWAY',
-                  style: TextStyle(color: theme.colorScheme.error, fontWeight: dialogContext.appTypography.titleWeight)),
+              child: Text(
+                'CLOSE ANYWAY',
+                style: TextStyle(
+                  color: theme.colorScheme.error,
+                  fontWeight: dialogContext.appTypography.titleWeight,
+                ),
+              ),
             ),
           ],
         );
@@ -150,7 +175,7 @@ class _MainScreenState extends State<MainScreen> {
     if (prev.isLoading != next.isLoading) return true;
     if (prev.activeIndex != next.activeIndex) return true;
     if (prev.tabs.length != next.tabs.length) return true;
-    for (int i = 0; i < prev.tabs.length; i++) {
+    for (var i = 0; i < prev.tabs.length; i++) {
       if (prev.tabs[i].tabId != next.tabs[i].tabId) return true;
     }
     return false;
@@ -164,7 +189,8 @@ class _MainScreenState extends State<MainScreen> {
           prev.settings.sideMenuWidth != next.settings.sideMenuWidth,
       builder: (context, settingsState) {
         final settings = settingsState.settings;
-        final currentSideMenuWidth = _localSideMenuWidth ?? settings.sideMenuWidth;
+        final currentSideMenuWidth =
+            _localSideMenuWidth ?? settings.sideMenuWidth;
 
         return BlocBuilder<TabsBloc, TabsState>(
           buildWhen: _shellNeedsRebuild,
@@ -176,22 +202,34 @@ class _MainScreenState extends State<MainScreen> {
               actions: <Type, Action<Intent>>{
                 CloseTabIntent: CallbackAction<CloseTabIntent>(
                   onInvoke: (_) {
-                    if (activeIndex < 0 || activeIndex >= tabs.length) return null;
-                    _confirmAndClose(context, tabs[activeIndex].tabId);
+                    if (activeIndex < 0 || activeIndex >= tabs.length) {
+                      return null;
+                    }
+                    unawaited(
+                      _confirmAndClose(context, tabs[activeIndex].tabId),
+                    );
                     return null;
                   },
                 ),
                 SendRequestIntent: CallbackAction<SendRequestIntent>(
                   onInvoke: (_) {
-                    if (activeIndex >= 0 && activeIndex < tabs.length && !tabs[activeIndex].isSending) {
+                    if (activeIndex >= 0 &&
+                        activeIndex < tabs.length &&
+                        !tabs[activeIndex].isSending) {
                       final envVars = ActiveEnvironmentHelper.variablesFor(
                         context.read<EnvironmentsBloc>().state.environments,
-                        context.read<SettingsBloc>().state.settings.activeEnvironmentId,
+                        context
+                            .read<SettingsBloc>()
+                            .state
+                            .settings
+                            .activeEnvironmentId,
                       );
-                      context.read<TabsBloc>().add(SendRequest(
-                            tabId: tabs[activeIndex].tabId,
-                            envVars: envVars,
-                          ));
+                      context.read<TabsBloc>().add(
+                        SendRequest(
+                          tabId: tabs[activeIndex].tabId,
+                          envVars: envVars,
+                        ),
+                      );
                     }
                     return null;
                   },
@@ -199,7 +237,9 @@ class _MainScreenState extends State<MainScreen> {
                 NextTabIntent: CallbackAction<NextTabIntent>(
                   onInvoke: (_) {
                     if (tabs.length < 2) return null;
-                    context.read<TabsBloc>().add(SetActiveIndex((activeIndex + 1) % tabs.length));
+                    context.read<TabsBloc>().add(
+                      SetActiveIndex((activeIndex + 1) % tabs.length),
+                    );
                     return null;
                   },
                 ),
@@ -207,8 +247,10 @@ class _MainScreenState extends State<MainScreen> {
                   onInvoke: (_) {
                     if (tabs.length < 2) return null;
                     context.read<TabsBloc>().add(
-                          SetActiveIndex((activeIndex - 1 + tabs.length) % tabs.length),
-                        );
+                      SetActiveIndex(
+                        (activeIndex - 1 + tabs.length) % tabs.length,
+                      ),
+                    );
                     return null;
                   },
                 ),
@@ -222,8 +264,12 @@ class _MainScreenState extends State<MainScreen> {
                 ),
                 FocusUrlIntent: CallbackAction<FocusUrlIntent>(
                   onInvoke: (_) {
-                    if (activeIndex < 0 || activeIndex >= tabs.length) return null;
-                    context.read<UrlFocusRegistry>().focus(tabs[activeIndex].tabId);
+                    if (activeIndex < 0 || activeIndex >= tabs.length) {
+                      return null;
+                    }
+                    context.read<UrlFocusRegistry>().focus(
+                      tabs[activeIndex].tabId,
+                    );
                     return null;
                   },
                 ),
@@ -232,10 +278,25 @@ class _MainScreenState extends State<MainScreen> {
                 focusNode: _mainFocusNode,
                 child: ChainingWriteBackListener(
                   child: Scaffold(
-                    drawer: context.useDrawerNav ? const Drawer(child: SideMenu()) : null,
+                    drawer: context.useDrawerNav
+                        ? const Drawer(child: SideMenu())
+                        : null,
                     body: context.useDrawerNav
-                        ? _buildDrawerShell(context, theme, tabsState, activeIndex, tabs)
-                        : _buildSplitShell(context, theme, tabsState, activeIndex, tabs, currentSideMenuWidth),
+                        ? _buildDrawerShell(
+                            context,
+                            theme,
+                            tabsState,
+                            activeIndex,
+                            tabs,
+                          )
+                        : _buildSplitShell(
+                            context,
+                            theme,
+                            tabsState,
+                            activeIndex,
+                            tabs,
+                            currentSideMenuWidth,
+                          ),
                   ),
                 ),
               ),
@@ -246,16 +307,31 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  Widget _buildDrawerShell(BuildContext context, ThemeData theme, TabsState tabsState, int activeIndex, List<HttpRequestTabEntity> tabs) {
+  Widget _buildDrawerShell(
+    BuildContext context,
+    ThemeData theme,
+    TabsState tabsState,
+    int activeIndex,
+    List<HttpRequestTabEntity> tabs,
+  ) {
     return Column(
       children: [
         _buildTabBar(context, activeIndex, tabs, includeMenuButton: true),
-        Expanded(child: _buildContent(context, theme, tabsState, activeIndex, tabs)),
+        Expanded(
+          child: _buildContent(context, theme, tabsState, activeIndex, tabs),
+        ),
       ],
     );
   }
 
-  Widget _buildSplitShell(BuildContext context, ThemeData theme, TabsState tabsState, int activeIndex, List<HttpRequestTabEntity> tabs, double currentSideMenuWidth) {
+  Widget _buildSplitShell(
+    BuildContext context,
+    ThemeData theme,
+    TabsState tabsState,
+    int activeIndex,
+    List<HttpRequestTabEntity> tabs,
+    double currentSideMenuWidth,
+  ) {
     final layout = context.appLayout;
     return Row(
       children: [
@@ -263,7 +339,10 @@ class _MainScreenState extends State<MainScreen> {
           width: currentSideMenuWidth,
           decoration: BoxDecoration(
             border: Border(
-              right: BorderSide(color: theme.dividerColor, width: layout.borderThick),
+              right: BorderSide(
+                color: theme.dividerColor,
+                width: layout.borderThick,
+              ),
             ),
           ),
           child: const SideMenu(),
@@ -272,7 +351,10 @@ class _MainScreenState extends State<MainScreen> {
           isVertical: false,
           onUpdate: (delta) {
             setState(() {
-              _localSideMenuWidth = (currentSideMenuWidth + delta).clamp(200.0, 600.0);
+              _localSideMenuWidth = (currentSideMenuWidth + delta).clamp(
+                200.0,
+                600.0,
+              );
             });
           },
           onEnd: () {
@@ -285,8 +367,21 @@ class _MainScreenState extends State<MainScreen> {
         Expanded(
           child: Column(
             children: [
-              _buildTabBar(context, activeIndex, tabs, includeMenuButton: false),
-              Expanded(child: _buildContent(context, theme, tabsState, activeIndex, tabs)),
+              _buildTabBar(
+                context,
+                activeIndex,
+                tabs,
+                includeMenuButton: false,
+              ),
+              Expanded(
+                child: _buildContent(
+                  context,
+                  theme,
+                  tabsState,
+                  activeIndex,
+                  tabs,
+                ),
+              ),
             ],
           ),
         ),
@@ -294,23 +389,38 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  Widget _buildContent(BuildContext context, ThemeData theme, TabsState tabsState, int activeIndex, List<HttpRequestTabEntity> tabs) {
+  Widget _buildContent(
+    BuildContext context,
+    ThemeData theme,
+    TabsState tabsState,
+    int activeIndex,
+    List<HttpRequestTabEntity> tabs,
+  ) {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 200),
-      transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+      transitionBuilder: (child, animation) =>
+          FadeTransition(opacity: animation, child: child),
       child: tabsState.isLoading
-          ? const Center(key: ValueKey('loading'), child: CircularProgressIndicator())
+          ? const Center(
+              key: ValueKey('loading'),
+              child: CircularProgressIndicator(),
+            )
           : tabs.isEmpty
-              ? const EmptyTabsPlaceholder(key: ValueKey('empty'))
-              : TabContentStack(
-                  key: const ValueKey('tabs'),
-                  tabs: tabs,
-                  activeIndex: activeIndex,
-                ),
+          ? const EmptyTabsPlaceholder(key: ValueKey('empty'))
+          : TabContentStack(
+              key: const ValueKey('tabs'),
+              tabs: tabs,
+              activeIndex: activeIndex,
+            ),
     );
   }
 
-  Widget _buildTabBar(BuildContext context, int activeIndex, List<HttpRequestTabEntity> tabs, {required bool includeMenuButton}) {
+  Widget _buildTabBar(
+    BuildContext context,
+    int activeIndex,
+    List<HttpRequestTabEntity> tabs, {
+    required bool includeMenuButton,
+  }) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
 
@@ -320,19 +430,26 @@ class _MainScreenState extends State<MainScreen> {
       height: layout.tabBarHeight,
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor,
-        border: Border(bottom: BorderSide(color: theme.dividerColor, width: layout.borderThick)),
+        border: Border(
+          bottom: BorderSide(
+            color: theme.dividerColor,
+            width: layout.borderThick,
+          ),
+        ),
       ),
       child: Row(
         children: [
           if (includeMenuButton)
             Builder(
-              builder: (scaffoldContext) => context.appDecoration.wrapInteractive(
-                child: IconButton(
-                  icon: Icon(Icons.menu, size: layout.iconSize),
-                  tooltip: 'OPEN MENU',
-                  onPressed: () => Scaffold.of(scaffoldContext).openDrawer(),
-                ),
-              ),
+              builder: (scaffoldContext) =>
+                  context.appDecoration.wrapInteractive(
+                    child: IconButton(
+                      icon: Icon(Icons.menu, size: layout.iconSize),
+                      tooltip: 'OPEN MENU',
+                      onPressed: () =>
+                          Scaffold.of(scaffoldContext).openDrawer(),
+                    ),
+                  ),
             ),
           Expanded(
             child: context.useTabSwitcher
@@ -349,7 +466,9 @@ class _MainScreenState extends State<MainScreen> {
                         scrollDirection: Axis.horizontal,
                         itemCount: tabs.length,
                         buildDefaultDragHandles: false,
-                        onReorder: (oldIndex, newIndex) => context.read<TabsBloc>().add(ReorderTabs(oldIndex, newIndex)),
+                        onReorder: (oldIndex, newIndex) => context
+                            .read<TabsBloc>()
+                            .add(ReorderTabs(oldIndex, newIndex)),
                         proxyDecorator: (child, index, animation) => Material(
                           color: theme.scaffoldBackgroundColor,
                           elevation: 4,
@@ -362,8 +481,11 @@ class _MainScreenState extends State<MainScreen> {
                             tabId: tab.tabId,
                             index: index,
                             isActive: activeIndex == index,
-                            onTap: () => context.read<TabsBloc>().add(SetActiveIndex(index)),
-                            onClose: () => _requestCloseConfirmation(context, tab.tabId),
+                            onTap: () => context.read<TabsBloc>().add(
+                              SetActiveIndex(index),
+                            ),
+                            onClose: () =>
+                                _requestCloseConfirmation(context, tab.tabId),
                           );
                         },
                       ),

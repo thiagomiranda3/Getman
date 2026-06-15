@@ -11,6 +11,10 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 /// mutation mirrors Hive → disk ([scheduleMirror], debounced, best-effort).
 /// No file watcher — manual git edits are picked up on an explicit reload.
 class WorkspaceSyncService {
+  WorkspaceSyncService(
+    this.dataSource, {
+    this.debounce = const Duration(seconds: 1),
+  });
   final WorkspaceCollectionsDataSource dataSource;
   final Duration debounce;
   Timer? _timer;
@@ -20,11 +24,10 @@ class WorkspaceSyncService {
   /// grant that has not been re-acquired would otherwise spam the console).
   final Set<String> _quietedRoots = {};
 
-  WorkspaceSyncService(this.dataSource, {this.debounce = const Duration(seconds: 1)});
-
   Future<List<CollectionNodeEntity>> read(String root) => dataSource.read(root);
 
-  /// Debounced Hive → disk mirror. Coalesces bursts of mutations into one write.
+  /// Debounced Hive → disk mirror. Coalesces bursts of mutations into one
+  /// write.
   void scheduleMirror(String root, List<CollectionNodeEntity> forest) {
     _timer?.cancel();
     _timer = Timer(debounce, () => _mirror(root, forest));
@@ -34,12 +37,14 @@ class WorkspaceSyncService {
     try {
       await dataSource.write(root, forest);
       _quietedRoots.remove(root); // recovered — allow logging again
-    } catch (e) {
+    } on Object catch (e) {
       // Best-effort: a failed mirror must never break the in-app session.
       // Log the first failure for a root, then stay quiet until it recovers.
       if (_quietedRoots.add(root)) {
-        debugPrint('Workspace mirror failed for "$root" '
-            '(further failures silenced this session): $e');
+        debugPrint(
+          'Workspace mirror failed for "$root" '
+          '(further failures silenced this session): $e',
+        );
       }
     }
   }

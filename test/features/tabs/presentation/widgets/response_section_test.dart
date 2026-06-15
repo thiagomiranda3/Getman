@@ -42,7 +42,10 @@ class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 SettingsBloc _settingsBloc(SettingsEntity settings) {
   final saveUseCase = MockSaveSettingsUseCase();
   when(() => saveUseCase(any())).thenAnswer((_) async {});
-  return SettingsBloc(saveSettingsUseCase: saveUseCase, initialSettings: settings);
+  return SettingsBloc(
+    saveSettingsUseCase: saveUseCase,
+    initialSettings: settings,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -68,9 +71,9 @@ HttpRequestTabEntity _tabWithBody(String tabId, String body) =>
 // ---------------------------------------------------------------------------
 
 /// Pumps a [ResponseSection] inside a fully themed [MaterialApp] with a
-/// [BlocProvider<TabsBloc>] pre-loaded with [initialTabs].
+/// [BlocProvider<TabsBloc>] pre-loaded with `initialTabs`.
 ///
-/// Uses [runAsync] so that the compute isolate's message can land on the
+/// Uses `runAsync` so that the compute isolate's message can land on the
 /// Dart event loop while we wait for it.
 Future<void> _pump(
   WidgetTester tester, {
@@ -100,12 +103,14 @@ Future<void> _pump(
   // Allow async _syncBody (compute round-trip) to complete.
   // runAsync lets real async IO (isolate messages) settle; pumpAndSettle
   // drains the resulting frame queue.
-  await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+  await tester.runAsync(
+    () => Future<void>.delayed(const Duration(milliseconds: 300)),
+  );
   await tester.pumpAndSettle();
 }
 
 /// Creates and loads a [TabsBloc] whose state contains [tab].
-/// Uses [LoadTabs] + a mocked [repository.getTabs] — same pattern as
+/// Uses [LoadTabs] + a mocked `repository.getTabs` — same pattern as
 /// tabs_bloc_test.dart.
 Future<TabsBloc> _loadedBloc(
   MockTabsRepository repository,
@@ -113,11 +118,10 @@ Future<TabsBloc> _loadedBloc(
   HttpRequestTabEntity tab,
 ) async {
   when(() => repository.getTabs()).thenAnswer((_) async => [tab]);
-  final bloc = TabsBloc(repository: repository, sendRequestUseCase: useCase);
-  bloc.add(const LoadTabs());
+  final bloc = TabsBloc(repository: repository, sendRequestUseCase: useCase)
+    ..add(const LoadTabs());
   // Wait until loading finishes.
-  await bloc.stream
-      .firstWhere((s) => !s.isLoading && s.tabs.isNotEmpty);
+  await bloc.stream.firstWhere((s) => !s.isLoading && s.tabs.isNotEmpty);
   return bloc;
 }
 
@@ -131,10 +135,12 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(_FakeConfig());
-    registerFallbackValue(const HttpRequestTabEntity(
-      tabId: 'fallback',
-      config: HttpRequestConfigEntity(id: 'fallback'),
-    ));
+    registerFallbackValue(
+      const HttpRequestTabEntity(
+        tabId: 'fallback',
+        config: HttpRequestConfigEntity(id: 'fallback'),
+      ),
+    );
     registerFallbackValue(const SettingsEntity());
   });
 
@@ -183,7 +189,8 @@ void main() {
     'body over preview limit is truncated until SHOW FULL is tapped',
     (tester) async {
       const tabId = 'tab2';
-      // Exceed both thresholds: body > viewer threshold, and body > preview limit.
+      // Exceed both thresholds: body > viewer threshold, and body > preview
+      // limit.
       final body = _body(kLargeResponseViewerChars + 1024);
       final tab = _tabWithBody(tabId, body);
       final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
@@ -195,8 +202,9 @@ void main() {
       await _pump(tester, bloc: bloc, tabId: tabId, controller: controller);
 
       // Before SHOW FULL: truncated text is rendered.
-      final selectableTextBefore =
-          tester.widget<SelectableText>(find.byType(SelectableText));
+      final selectableTextBefore = tester.widget<SelectableText>(
+        find.byType(SelectableText),
+      );
       expect(
         selectableTextBefore.data!.length,
         lessThanOrEqualTo(kLargeResponsePreviewChars),
@@ -210,8 +218,9 @@ void main() {
       await tester.pumpAndSettle();
 
       // After SHOW FULL: full body length is rendered.
-      final selectableTextAfter =
-          tester.widget<SelectableText>(find.byType(SelectableText));
+      final selectableTextAfter = tester.widget<SelectableText>(
+        find.byType(SelectableText),
+      );
       expect(selectableTextAfter.data!.length, equals(body.length));
 
       // SHOW FULL button gone after full body is shown.
@@ -244,7 +253,9 @@ void main() {
       expect(find.text('PRETTIFY ANYWAY'), findsOneWidget);
       await tester.tap(find.text('PRETTIFY ANYWAY'));
       // runAsync lets the compute isolate message land before we pump frames.
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 300)),
+      );
       await tester.pumpAndSettle();
 
       // After opt-in: CodeEditor should be visible.
@@ -333,14 +344,18 @@ void main() {
     expect(find.text('RAW'), findsOneWidget);
 
     await tester.tap(find.text('RAW'));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
     await tester.pumpAndSettle();
 
     // Still an editor after switching to raw.
     expect(find.byType(CodeEditor), findsOneWidget);
   });
 
-  testWidgets('copy button puts the body on the clipboard and shows feedback', (tester) async {
+  testWidgets('copy button puts the body on the clipboard and shows feedback', (
+    tester,
+  ) async {
     const tabId = 'tabCopy';
     final tab = _tabWithBody(tabId, '{"ok":true}');
     final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
@@ -360,8 +375,12 @@ void main() {
         return null;
       },
     );
-    addTearDown(() => tester.binding.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, null));
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
 
     await tester.tap(find.byTooltip('Copy response'));
     await tester.pump(); // run the async copy
@@ -433,14 +452,20 @@ void main() {
             providers: [
               BlocProvider.value(value: bloc),
               BlocProvider<SettingsBloc>(
-                  create: (_) => _settingsBloc(const SettingsEntity())),
+                create: (_) => _settingsBloc(const SettingsEntity()),
+              ),
             ],
-            child: ResponseSection(tabId: tabId, responseController: controller),
+            child: ResponseSection(
+              tabId: tabId,
+              responseController: controller,
+            ),
           ),
         ),
       ),
     );
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 300)),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('SIZE: '), findsOneWidget);
@@ -449,12 +474,19 @@ void main() {
   // -------------------------------------------------------------------------
   // Test 8: TESTS tab renders assertion results, a summary, and captures
   // -------------------------------------------------------------------------
-  testWidgets('TESTS tab shows assertion results + summary + captures', (tester) async {
+  testWidgets('TESTS tab shows assertion results + summary + captures', (
+    tester,
+  ) async {
     const tabId = 'tab8';
     const tab = HttpRequestTabEntity(
       tabId: tabId,
       config: HttpRequestConfigEntity(id: tabId),
-      response: HttpResponseEntity(statusCode: 200, body: '{}', headers: {}, durationMs: 5),
+      response: HttpResponseEntity(
+        statusCode: 200,
+        body: '{}',
+        headers: {},
+        durationMs: 5,
+      ),
       assertionResults: [
         AssertionResult(label: 'status = 200', passed: true, actual: '200'),
         AssertionResult(label: 'status = 201', passed: false, actual: '200'),

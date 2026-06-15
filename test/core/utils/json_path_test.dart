@@ -13,7 +13,7 @@ void main() {
       'k with space': 'spaced',
     };
 
-    test('dot member access (with and without leading \$)', () {
+    test(r'dot member access (with and without leading $)', () {
       expect(JsonPath.read(doc, 'token'), 'abc');
       expect(JsonPath.read(doc, r'$.token'), 'abc');
       expect(JsonPath.read(doc, 'user.name'), 'Ada');

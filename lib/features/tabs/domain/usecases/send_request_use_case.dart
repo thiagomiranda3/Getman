@@ -11,15 +11,14 @@ import 'package:getman/features/settings/domain/usecases/settings_usecases.dart'
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 
 class SendRequestUseCase {
-  final TabsRepository tabsRepository;
-  final AddToHistoryUseCase addToHistoryUseCase;
-  final GetSettingsUseCase getSettingsUseCase;
-
   SendRequestUseCase({
     required this.tabsRepository,
     required this.addToHistoryUseCase,
     required this.getSettingsUseCase,
   });
+  final TabsRepository tabsRepository;
+  final AddToHistoryUseCase addToHistoryUseCase;
+  final GetSettingsUseCase getSettingsUseCase;
 
   Future<HttpResponseEntity> call({
     required HttpRequestConfigEntity config,
@@ -35,7 +34,10 @@ class SendRequestUseCase {
           cancelHandle: cancelHandle,
         ),
       );
-      await traceAsync('send.recordHistory', () => _record(config, response: response));
+      await traceAsync(
+        'send.recordHistory',
+        () => _record(config, response: response),
+      );
       return response;
     } on NetworkFailure catch (f) {
       if (f.type != NetworkFailureType.cancelled) {
@@ -53,14 +55,16 @@ class SendRequestUseCase {
     try {
       final settings = await getSettingsUseCase();
       final rawBody = response?.body ?? failure?.message;
-      final cappedBody = rawBody != null && rawBody.length > kMaxPersistedResponseBodyChars
+      final cappedBody =
+          rawBody != null && rawBody.length > kMaxPersistedResponseBodyChars
           ? kResponseBodyTooLargePlaceholder
           : rawBody;
       final historyConfig = settings.saveResponseInHistory
           ? config.copyWith(
               responseBody: cappedBody,
-              // Typed empty literal: `copyWith` casts to `Map<String, String>?`,
-              // and a bare `const {}` is `Map<dynamic, dynamic>` — which throws
+              // Typed empty literal: `copyWith` casts to
+              // `Map<String, String>?`, and a bare `const {}` is
+              // `Map<dynamic, dynamic>` — which throws
               // on the failure path (response == null) and drops the record.
               responseHeaders: response?.headers ?? const <String, String>{},
               statusCode: response?.statusCode ?? failure?.statusCode ?? 0,
@@ -68,7 +72,7 @@ class SendRequestUseCase {
             )
           : config;
       await addToHistoryUseCase(historyConfig, settings.historyLimit);
-    } catch (e, st) {
+    } on Object catch (e, st) {
       // History is best-effort; never fail the request because of persistence —
       // but surface the failure so silent regressions are spotted.
       log(

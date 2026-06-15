@@ -36,8 +36,8 @@ class PrevTabIntent extends Intent {
 
 /// Jump to the tab at [index] (0-based). Bound to Cmd/Ctrl+1..9.
 class JumpToTabIntent extends Intent {
-  final int index;
   const JumpToTabIntent(this.index);
+  final int index;
 }
 
 /// Focus the active tab's URL field. Bound to Cmd/Ctrl+L.

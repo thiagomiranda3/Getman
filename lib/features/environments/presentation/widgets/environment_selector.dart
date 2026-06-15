@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -22,7 +24,8 @@ class EnvironmentSelector extends StatelessWidget {
       buildWhen: (p, n) => p.environments != n.environments,
       builder: (context, envState) {
         return BlocBuilder<SettingsBloc, SettingsState>(
-          buildWhen: (p, n) => p.settings.activeEnvironmentId != n.settings.activeEnvironmentId,
+          buildWhen: (p, n) =>
+              p.settings.activeEnvironmentId != n.settings.activeEnvironmentId,
           builder: (context, settingsState) {
             return _SelectorButton(
               environments: envState.environments,
@@ -36,10 +39,9 @@ class EnvironmentSelector extends StatelessWidget {
 }
 
 class _SelectorButton extends StatelessWidget {
+  const _SelectorButton({required this.environments, required this.activeId});
   final List<EnvironmentEntity> environments;
   final String? activeId;
-
-  const _SelectorButton({required this.environments, required this.activeId});
 
   String _activeLabel() {
     if (activeId == null) return 'No Environment';
@@ -61,20 +63,27 @@ class _SelectorButton extends StatelessWidget {
       position: PopupMenuPosition.under,
       color: theme.colorScheme.surface,
       onSelected: (value) => _onSelected(context, value),
-      itemBuilder: (popupContext) => _menuItems(popupContext),
+      itemBuilder: _menuItems,
       child: Container(
         padding: EdgeInsets.symmetric(
           horizontal: iconOnly ? 8 : layout.inputPadding,
           vertical: layout.inputPaddingVertical,
         ),
         decoration: BoxDecoration(
-          border: Border.all(color: theme.dividerColor, width: layout.borderThin),
+          border: Border.all(
+            color: theme.dividerColor,
+            width: layout.borderThin,
+          ),
           borderRadius: BorderRadius.circular(context.appShape.buttonRadius),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.public, size: layout.iconSize, color: theme.colorScheme.onSurface),
+            Icon(
+              Icons.public,
+              size: layout.iconSize,
+              color: theme.colorScheme.onSurface,
+            ),
             if (!iconOnly) ...[
               const SizedBox(width: 6),
               ConstrainedBox(
@@ -89,7 +98,11 @@ class _SelectorButton extends StatelessWidget {
                   ),
                 ),
               ),
-              Icon(Icons.arrow_drop_down, size: layout.smallIconSize, color: theme.colorScheme.onSurface),
+              Icon(
+                Icons.arrow_drop_down,
+                size: layout.smallIconSize,
+                color: theme.colorScheme.onSurface,
+              ),
             ],
           ],
         ),
@@ -106,7 +119,11 @@ class _SelectorButton extends StatelessWidget {
         child: Row(
           children: [
             if (activeId == null)
-              Icon(Icons.check, size: layout.smallIconSize, color: theme.colorScheme.secondary)
+              Icon(
+                Icons.check,
+                size: layout.smallIconSize,
+                color: theme.colorScheme.secondary,
+              )
             else
               SizedBox(width: layout.smallIconSize),
             const SizedBox(width: 6),
@@ -121,7 +138,11 @@ class _SelectorButton extends StatelessWidget {
           child: Row(
             children: [
               if (env.id == activeId)
-                Icon(Icons.check, size: layout.smallIconSize, color: theme.colorScheme.secondary)
+                Icon(
+                  Icons.check,
+                  size: layout.smallIconSize,
+                  color: theme.colorScheme.secondary,
+                )
               else
                 SizedBox(width: layout.smallIconSize),
               const SizedBox(width: 6),
@@ -145,7 +166,7 @@ class _SelectorButton extends StatelessWidget {
 
   void _onSelected(BuildContext context, String value) {
     if (value == _manageEnvironmentsValue) {
-      EnvironmentsDialog.show(context);
+      unawaited(EnvironmentsDialog.show(context));
       return;
     }
     if (value == _noEnvironmentValue) {

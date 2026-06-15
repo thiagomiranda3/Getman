@@ -4,20 +4,20 @@ import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_theme.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_theme.dart';
 
-typedef AppThemeBuilder = ThemeData Function(Brightness brightness, {bool isCompact});
+typedef AppThemeBuilder =
+    ThemeData Function(Brightness brightness, {bool isCompact});
 
 /// Everything a theme registration needs: identity (persisted in settings),
 /// a display name for the UI picker, and the actual builder.
 class ThemeDescriptor {
-  final String id;
-  final String displayName;
-  final AppThemeBuilder builder;
-
   const ThemeDescriptor({
     required this.id,
     required this.displayName,
     required this.builder,
   });
+  final String id;
+  final String displayName;
+  final AppThemeBuilder builder;
 }
 
 const String defaultThemeId = kBrutalistThemeId;
@@ -43,7 +43,8 @@ const Map<String, ThemeDescriptor> appThemes = {
 ThemeDescriptor resolveThemeDescriptor(String? themeId) =>
     appThemes[themeId] ?? appThemes[defaultThemeId]!;
 
-AppThemeBuilder resolveTheme(String? themeId) => resolveThemeDescriptor(themeId).builder;
+AppThemeBuilder resolveTheme(String? themeId) =>
+    resolveThemeDescriptor(themeId).builder;
 
 // Cache keyed by (resolved theme id, brightness, isCompact).
 // ThemeData is immutable and theme builders are pure functions of these three

@@ -54,24 +54,25 @@ import 'package:getman/features/tabs/data/repositories/tabs_repository_impl.dart
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_flutter.dart';
 
-final sl = GetIt.instance;
+final GetIt sl = GetIt.instance;
 
 Future<SettingsEntity> init() async {
   await Hive.initFlutter();
 
-  Hive.registerAdapter(SettingsModelAdapter());
-  Hive.registerAdapter(HttpRequestConfigAdapter());
-  Hive.registerAdapter(HttpRequestTabModelAdapter());
-  Hive.registerAdapter(CollectionNodeAdapter());
-  Hive.registerAdapter(SavedExampleModelAdapter());
-  Hive.registerAdapter(EnvironmentModelAdapter());
-  Hive.registerAdapter(MultipartFieldModelAdapter());
-  Hive.registerAdapter(StoredCookieModelAdapter());
-  Hive.registerAdapter(ExtractionRuleModelAdapter());
-  Hive.registerAdapter(AssertionModelAdapter());
-  Hive.registerAdapter(RequestRulesModelAdapter());
+  Hive
+    ..registerAdapter(SettingsModelAdapter())
+    ..registerAdapter(HttpRequestConfigAdapter())
+    ..registerAdapter(HttpRequestTabModelAdapter())
+    ..registerAdapter(CollectionNodeAdapter())
+    ..registerAdapter(SavedExampleModelAdapter())
+    ..registerAdapter(EnvironmentModelAdapter())
+    ..registerAdapter(MultipartFieldModelAdapter())
+    ..registerAdapter(StoredCookieModelAdapter())
+    ..registerAdapter(ExtractionRuleModelAdapter())
+    ..registerAdapter(AssertionModelAdapter())
+    ..registerAdapter(RequestRulesModelAdapter());
 
   // Open every box in PARALLEL (Future.wait) so cold start is bounded by the
   // slowest single box, not their sum. The cookies + request-rules boxes are
@@ -101,118 +102,137 @@ Future<SettingsEntity> init() async {
   // collections are first read.
   await CollectionsLocalDataSourceImpl.migrateLegacyKeysIfNeeded();
 
-  final initialSettings = settingsBox.get('current')?.toEntity() ?? const SettingsEntity();
-  final initialEnvironments =
-      environmentsBox.values.map((model) => model.toEntity()).toList(growable: false);
+  final initialSettings =
+      settingsBox.get('current')?.toEntity() ?? const SettingsEntity();
+  final initialEnvironments = environmentsBox.values
+      .map((model) => model.toEntity())
+      .toList(growable: false);
 
-  // Features - Settings
-  sl.registerLazySingleton(() => SettingsBloc(
-    saveSettingsUseCase: sl(),
-    initialSettings: initialSettings,
-  ));
-
-  sl.registerLazySingleton(() => GetSettingsUseCase(sl()));
-  sl.registerLazySingleton(() => SaveSettingsUseCase(sl()));
-
-  sl.registerLazySingleton<SettingsRepository>(() => SettingsRepositoryImpl(sl()));
-
-  sl.registerLazySingleton<SettingsLocalDataSource>(() => SettingsLocalDataSourceImpl());
-
-  // Features - History
-  sl.registerLazySingleton(() => HistoryBloc(watchHistoryUseCase: sl()));
-
-  sl.registerLazySingleton(() => AddToHistoryUseCase(sl()));
-  sl.registerLazySingleton(() => WatchHistoryUseCase(sl()));
-
-  sl.registerLazySingleton<HistoryRepository>(() => HistoryRepositoryImpl(sl()));
-
-  sl.registerLazySingleton<HistoryLocalDataSource>(() => HistoryLocalDataSourceImpl());
-
-  // Features - Collections
-  sl.registerLazySingleton(() => CollectionsBloc(
-    getCollectionsUseCase: sl(),
-    saveCollectionsUseCase: sl(),
-  ));
-
-  sl.registerLazySingleton(() => GetCollectionsUseCase(sl()));
-  sl.registerLazySingleton(() => SaveCollectionsUseCase(sl()));
-
-  sl.registerLazySingleton<CollectionsRepository>(() => CollectionsRepositoryImpl(sl()));
-
-  sl.registerLazySingleton<CollectionsLocalDataSource>(() => CollectionsLocalDataSourceImpl());
-
-  sl.registerLazySingleton(() => WorkspaceSyncService(createWorkspaceDataSource()));
-
-  // Features - Chaining (no-code extraction + assertions)
-  sl.registerLazySingleton(() => RulesBloc(
+  sl
+    // Features - Settings
+    ..registerLazySingleton(
+      () => SettingsBloc(
+        saveSettingsUseCase: sl(),
+        initialSettings: initialSettings,
+      ),
+    )
+    ..registerLazySingleton(() => GetSettingsUseCase(sl()))
+    ..registerLazySingleton(() => SaveSettingsUseCase(sl()))
+    ..registerLazySingleton<SettingsRepository>(
+      () => SettingsRepositoryImpl(sl()),
+    )
+    ..registerLazySingleton<SettingsLocalDataSource>(
+      SettingsLocalDataSourceImpl.new,
+    )
+    // Features - History
+    ..registerLazySingleton(() => HistoryBloc(watchHistoryUseCase: sl()))
+    ..registerLazySingleton(() => AddToHistoryUseCase(sl()))
+    ..registerLazySingleton(() => WatchHistoryUseCase(sl()))
+    ..registerLazySingleton<HistoryRepository>(
+      () => HistoryRepositoryImpl(sl()),
+    )
+    ..registerLazySingleton<HistoryLocalDataSource>(
+      HistoryLocalDataSourceImpl.new,
+    )
+    // Features - Collections
+    ..registerLazySingleton(
+      () => CollectionsBloc(
+        getCollectionsUseCase: sl(),
+        saveCollectionsUseCase: sl(),
+      ),
+    )
+    ..registerLazySingleton(() => GetCollectionsUseCase(sl()))
+    ..registerLazySingleton(() => SaveCollectionsUseCase(sl()))
+    ..registerLazySingleton<CollectionsRepository>(
+      () => CollectionsRepositoryImpl(sl()),
+    )
+    ..registerLazySingleton<CollectionsLocalDataSource>(
+      CollectionsLocalDataSourceImpl.new,
+    )
+    ..registerLazySingleton(
+      () => WorkspaceSyncService(createWorkspaceDataSource()),
+    )
+    // Features - Chaining (no-code extraction + assertions)
+    ..registerLazySingleton(
+      () => RulesBloc(
         getRequestRulesUseCase: sl(),
         saveRequestRulesUseCase: sl(),
-      ));
-  sl.registerLazySingleton(() => GetRequestRulesUseCase(sl()));
-  sl.registerLazySingleton(() => SaveRequestRulesUseCase(sl()));
-  sl.registerLazySingleton<RequestRulesRepository>(() => RequestRulesRepositoryImpl(sl()));
-  sl.registerLazySingleton<RequestRulesLocalDataSource>(() => RequestRulesLocalDataSourceImpl());
-
-  // Features - Environments
-  sl.registerLazySingleton(() => EnvironmentsBloc(
-    getEnvironmentsUseCase: sl(),
-    saveEnvironmentsUseCase: sl(),
-    putEnvironmentUseCase: sl(),
-    deleteEnvironmentUseCase: sl(),
-    initialEnvironments: initialEnvironments,
-  ));
-
-  sl.registerLazySingleton(() => GetEnvironmentsUseCase(sl()));
-  sl.registerLazySingleton(() => SaveEnvironmentsUseCase(sl()));
-  sl.registerLazySingleton(() => PutEnvironmentUseCase(sl()));
-  sl.registerLazySingleton(() => DeleteEnvironmentUseCase(sl()));
-
-  sl.registerLazySingleton<EnvironmentsRepository>(() => EnvironmentsRepositoryImpl(sl()));
-
-  sl.registerLazySingleton<EnvironmentsLocalDataSource>(() => EnvironmentsLocalDataSourceImpl());
-
-  // Features - Tabs
-  sl.registerLazySingleton(() => TabsBloc(
-    repository: sl(),
-    sendRequestUseCase: sl(),
-    getRequestRulesUseCase: sl(),
-  ));
-
-  sl.registerLazySingleton(() => SendRequestUseCase(
-    tabsRepository: sl(),
-    addToHistoryUseCase: sl(),
-    getSettingsUseCase: sl(),
-  ));
-
-  sl.registerLazySingleton<TabsRepository>(() => TabsRepositoryImpl(
-    localDataSource: sl(),
-    networkService: sl(),
-  ));
-
-  sl.registerLazySingleton<TabsLocalDataSource>(() => TabsLocalDataSourceImpl());
-
-  // Features - Realtime (WebSocket / SSE)
-  sl.registerLazySingleton(() => RealtimeService());
-  sl.registerLazySingleton(() => RealtimeBloc(service: sl()));
-
-  // Features - Home
-  sl.registerLazySingleton(() => const TabDirtyChecker());
-  // Lets the Cmd/Ctrl+L shortcut focus the active tab's URL field.
-  sl.registerLazySingleton(() => UrlFocusRegistry());
+      ),
+    )
+    ..registerLazySingleton(() => GetRequestRulesUseCase(sl()))
+    ..registerLazySingleton(() => SaveRequestRulesUseCase(sl()))
+    ..registerLazySingleton<RequestRulesRepository>(
+      () => RequestRulesRepositoryImpl(sl()),
+    )
+    ..registerLazySingleton<RequestRulesLocalDataSource>(
+      RequestRulesLocalDataSourceImpl.new,
+    )
+    // Features - Environments
+    ..registerLazySingleton(
+      () => EnvironmentsBloc(
+        getEnvironmentsUseCase: sl(),
+        saveEnvironmentsUseCase: sl(),
+        putEnvironmentUseCase: sl(),
+        deleteEnvironmentUseCase: sl(),
+        initialEnvironments: initialEnvironments,
+      ),
+    )
+    ..registerLazySingleton(() => GetEnvironmentsUseCase(sl()))
+    ..registerLazySingleton(() => SaveEnvironmentsUseCase(sl()))
+    ..registerLazySingleton(() => PutEnvironmentUseCase(sl()))
+    ..registerLazySingleton(() => DeleteEnvironmentUseCase(sl()))
+    ..registerLazySingleton<EnvironmentsRepository>(
+      () => EnvironmentsRepositoryImpl(sl()),
+    )
+    ..registerLazySingleton<EnvironmentsLocalDataSource>(
+      EnvironmentsLocalDataSourceImpl.new,
+    )
+    // Features - Tabs
+    ..registerLazySingleton(
+      () => TabsBloc(
+        repository: sl(),
+        sendRequestUseCase: sl(),
+        getRequestRulesUseCase: sl(),
+      ),
+    )
+    ..registerLazySingleton(
+      () => SendRequestUseCase(
+        tabsRepository: sl(),
+        addToHistoryUseCase: sl(),
+        getSettingsUseCase: sl(),
+      ),
+    )
+    ..registerLazySingleton<TabsRepository>(
+      () => TabsRepositoryImpl(
+        localDataSource: sl(),
+        networkService: sl(),
+      ),
+    )
+    ..registerLazySingleton<TabsLocalDataSource>(TabsLocalDataSourceImpl.new)
+    // Features - Realtime (WebSocket / SSE)
+    ..registerLazySingleton(RealtimeService.new)
+    ..registerLazySingleton(() => RealtimeBloc(service: sl()))
+    // Features - Home
+    ..registerLazySingleton(() => const TabDirtyChecker())
+    // Lets the Cmd/Ctrl+L shortcut focus the active tab's URL field.
+    ..registerLazySingleton(UrlFocusRegistry.new);
 
   // Core. The cookie box is already open (parallel wait above); hydrate the jar
   // before the network service can be used so the first send sees stored
   // cookies.
   final cookieStore = InMemoryCookieStore(persistence: HiveCookiePersistence());
   await openAndHydrateDeferredBoxes(cookieStore);
-  sl.registerLazySingleton<CookieStore>(() => cookieStore);
-  sl.registerLazySingleton(() => NetworkService(
+  sl
+    ..registerLazySingleton<CookieStore>(() => cookieStore)
+    ..registerLazySingleton(
+      () => NetworkService(
         dio: NetworkService.buildDio(
           initialSettings.toNetworkConfig(),
           CookieInterceptor(cookieStore),
         ),
-      ));
-  sl.registerLazySingleton(() => AppRouter());
+      ),
+    )
+    ..registerLazySingleton(AppRouter.new);
 
   return initialSettings;
 }

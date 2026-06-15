@@ -1,11 +1,30 @@
 import 'package:getman/core/network/network_cookie.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 part 'stored_cookie_model.g.dart';
 
 /// Hive model for a persisted cookie. typeId 6 (first free after 0–5).
 @HiveType(typeId: 6)
 class StoredCookieModel extends HiveObject {
+  StoredCookieModel({
+    required this.name,
+    required this.value,
+    required this.domain,
+    this.path = '/',
+    this.secure = false,
+    this.httpOnly = false,
+    this.expiresEpochMs,
+  });
+
+  factory StoredCookieModel.fromCookie(NetworkCookie c) => StoredCookieModel(
+    name: c.name,
+    value: c.value,
+    domain: c.domain,
+    path: c.path,
+    secure: c.secure,
+    httpOnly: c.httpOnly,
+    expiresEpochMs: c.expiresEpochMs,
+  );
   @HiveField(0)
   String name;
 
@@ -27,33 +46,13 @@ class StoredCookieModel extends HiveObject {
   @HiveField(6)
   int? expiresEpochMs;
 
-  StoredCookieModel({
-    required this.name,
-    required this.value,
-    required this.domain,
-    this.path = '/',
-    this.secure = false,
-    this.httpOnly = false,
-    this.expiresEpochMs,
-  });
-
-  factory StoredCookieModel.fromCookie(NetworkCookie c) => StoredCookieModel(
-        name: c.name,
-        value: c.value,
-        domain: c.domain,
-        path: c.path,
-        secure: c.secure,
-        httpOnly: c.httpOnly,
-        expiresEpochMs: c.expiresEpochMs,
-      );
-
   NetworkCookie toCookie() => NetworkCookie(
-        name: name,
-        value: value,
-        domain: domain,
-        path: path,
-        secure: secure,
-        httpOnly: httpOnly,
-        expiresEpochMs: expiresEpochMs,
-      );
+    name: name,
+    value: value,
+    domain: domain,
+    path: path,
+    secure: secure,
+    httpOnly: httpOnly,
+    expiresEpochMs: expiresEpochMs,
+  );
 }

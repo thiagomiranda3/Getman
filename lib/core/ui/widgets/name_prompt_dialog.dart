@@ -6,6 +6,17 @@ import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 /// [onConfirm] — pressing confirm closes the dialog first, so the caller can
 /// safely trigger navigation or bloc events without a deactivated context.
 class NamePromptDialog extends StatefulWidget {
+  const NamePromptDialog({
+    required this.title,
+    required this.onConfirm,
+    super.key,
+    this.initialText,
+    this.hintText,
+    this.confirmLabel = 'SAVE',
+    this.cancelLabel = 'CANCEL',
+    this.allowEmpty = false,
+    this.multiline = false,
+  });
   final String title;
   final String? initialText;
   final String? hintText;
@@ -19,18 +30,6 @@ class NamePromptDialog extends StatefulWidget {
 
   /// When true, the field grows to multiple lines (notes / descriptions).
   final bool multiline;
-
-  const NamePromptDialog({
-    super.key,
-    required this.title,
-    required this.onConfirm,
-    this.initialText,
-    this.hintText,
-    this.confirmLabel = 'SAVE',
-    this.cancelLabel = 'CANCEL',
-    this.allowEmpty = false,
-    this.multiline = false,
-  });
 
   /// Convenience wrapper around [showDialog] that builds a [NamePromptDialog].
   static Future<void> show(
@@ -80,7 +79,9 @@ class _NamePromptDialogState extends State<NamePromptDialog> {
 
   void _submit() {
     final value = _controller.text;
-    if (!widget.allowEmpty && value.trim().isEmpty) return; // matches the disabled-confirm guard
+    if (!widget.allowEmpty && value.trim().isEmpty) {
+      return; // matches the disabled-confirm guard
+    }
     Navigator.pop(context);
     widget.onConfirm(value);
   }
@@ -102,13 +103,18 @@ class _NamePromptDialogState extends State<NamePromptDialog> {
         onSubmitted: widget.multiline ? null : (_) => _submit(),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(widget.cancelLabel)),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(widget.cancelLabel),
+        ),
         // Disable confirm while the field is empty so the no-op isn't silent
         // (unless empty is explicitly allowed, e.g. clearing a description).
         ValueListenableBuilder<TextEditingValue>(
           valueListenable: _controller,
           builder: (context, value, _) => TextButton(
-            onPressed: (!widget.allowEmpty && value.text.trim().isEmpty) ? null : _submit,
+            onPressed: (!widget.allowEmpty && value.text.trim().isEmpty)
+                ? null
+                : _submit,
             child: Text(widget.confirmLabel),
           ),
         ),

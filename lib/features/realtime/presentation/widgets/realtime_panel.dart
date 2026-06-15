@@ -13,8 +13,8 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 /// log (direction shown by icon + label, not color alone), and — for
 /// WebSocket — a composer to send messages.
 class RealtimePanel extends StatefulWidget {
+  const RealtimePanel({required this.tabId, super.key});
   final String tabId;
-  const RealtimePanel({super.key, required this.tabId});
 
   @override
   State<RealtimePanel> createState() => _RealtimePanelState();
@@ -38,11 +38,13 @@ class _RealtimePanelState extends State<RealtimePanel> {
 
   /// Rebuilds only when this tab's connection status flips.
   bool _connectedChanged(RealtimeState p, RealtimeState n) =>
-      p.sessionFor(widget.tabId).connected != n.sessionFor(widget.tabId).connected;
+      p.sessionFor(widget.tabId).connected !=
+      n.sessionFor(widget.tabId).connected;
 
-  /// Rebuilds only when the frame log grows or its newest entry changes — frames
-  /// are append-only + capped, so (length, last timestamp) is a cheap, sufficient
-  /// proxy that still catches tail changes once the cap window slides.
+  /// Rebuilds only when the frame log grows or its newest entry changes —
+  /// frames are append-only + capped, so (length, last timestamp) is a cheap,
+  /// sufficient proxy that still catches tail changes once the cap window
+  /// slides.
   bool _framesChanged(RealtimeState p, RealtimeState n) {
     final pf = p.sessionFor(widget.tabId).frames;
     final nf = n.sessionFor(widget.tabId).frames;
@@ -55,15 +57,17 @@ class _RealtimePanelState extends State<RealtimePanel> {
   Widget build(BuildContext context) {
     final layout = context.appLayout;
     final kind =
-        context.read<TabsBloc>().state.tabs.byId(widget.tabId)?.config.kind ?? RequestKind.http;
+        context.read<TabsBloc>().state.tabs.byId(widget.tabId)?.config.kind ??
+        RequestKind.http;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         BlocBuilder<RealtimeBloc, RealtimeState>(
           buildWhen: _connectedChanged,
-          builder: (context, state) =>
-              _StatusBanner(connected: state.sessionFor(widget.tabId).connected),
+          builder: (context, state) => _StatusBanner(
+            connected: state.sessionFor(widget.tabId).connected,
+          ),
         ),
         SizedBox(height: layout.tabSpacing),
         Expanded(
@@ -83,7 +87,9 @@ class _RealtimePanelState extends State<RealtimePanel> {
                         style: TextStyle(
                           fontSize: layout.fontSizeNormal,
                           fontWeight: context.appTypography.titleWeight,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
                       ),
                     );
@@ -123,8 +129,12 @@ class _RealtimePanelState extends State<RealtimePanel> {
                   context.appDecoration.wrapInteractive(
                     child: ElevatedButton(
                       onPressed: connected ? _send : null,
-                      child: Text('SEND',
-                          style: TextStyle(fontWeight: context.appTypography.displayWeight)),
+                      child: Text(
+                        'SEND',
+                        style: TextStyle(
+                          fontWeight: context.appTypography.displayWeight,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -138,8 +148,8 @@ class _RealtimePanelState extends State<RealtimePanel> {
 }
 
 class _StatusBanner extends StatelessWidget {
-  final bool connected;
   const _StatusBanner({required this.connected});
+  final bool connected;
 
   @override
   Widget build(BuildContext context) {
@@ -148,16 +158,26 @@ class _StatusBanner extends StatelessWidget {
     final color = connected ? palette.statusSuccess : palette.statusError;
     final on = palette.onColor(color);
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: layout.isCompact ? 4 : 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: layout.isCompact ? 4 : 8,
+      ),
       decoration: BoxDecoration(
         color: color,
-        border: Border.all(color: Theme.of(context).dividerColor, width: layout.borderThin),
+        border: Border.all(
+          color: Theme.of(context).dividerColor,
+          width: layout.borderThin,
+        ),
         borderRadius: BorderRadius.circular(context.appShape.panelRadius),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(connected ? Icons.link : Icons.link_off, color: on, size: layout.smallIconSize),
+          Icon(
+            connected ? Icons.link : Icons.link_off,
+            color: on,
+            size: layout.smallIconSize,
+          ),
           const SizedBox(width: 6),
           Text(
             connected ? 'CONNECTED' : 'DISCONNECTED',
@@ -174,19 +194,39 @@ class _StatusBanner extends StatelessWidget {
 }
 
 class _FrameRow extends StatelessWidget {
-  final RealtimeFrame frame;
   const _FrameRow({required this.frame});
+  final RealtimeFrame frame;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
     final (icon, label, color) = switch (frame.direction) {
-      RealtimeDirection.incoming => (Icons.arrow_downward, 'IN', theme.colorScheme.onSurface),
-      RealtimeDirection.outgoing => (Icons.arrow_upward, 'OUT', theme.colorScheme.secondary),
-      RealtimeDirection.open => (Icons.link, 'OPEN', context.appPalette.statusSuccess),
-      RealtimeDirection.close => (Icons.link_off, 'CLOSE', theme.colorScheme.onSurface),
-      RealtimeDirection.error => (Icons.error_outline, 'ERROR', context.appPalette.statusError),
+      RealtimeDirection.incoming => (
+        Icons.arrow_downward,
+        'IN',
+        theme.colorScheme.onSurface,
+      ),
+      RealtimeDirection.outgoing => (
+        Icons.arrow_upward,
+        'OUT',
+        theme.colorScheme.secondary,
+      ),
+      RealtimeDirection.open => (
+        Icons.link,
+        'OPEN',
+        context.appPalette.statusSuccess,
+      ),
+      RealtimeDirection.close => (
+        Icons.link_off,
+        'CLOSE',
+        theme.colorScheme.onSurface,
+      ),
+      RealtimeDirection.error => (
+        Icons.error_outline,
+        'ERROR',
+        context.appPalette.statusError,
+      ),
     };
     return Padding(
       padding: EdgeInsets.only(bottom: layout.tabSpacing),
@@ -197,11 +237,14 @@ class _FrameRow extends StatelessWidget {
           const SizedBox(width: 8),
           SizedBox(
             width: 44,
-            child: Text(label,
-                style: TextStyle(
-                    fontSize: layout.fontSizeSmall,
-                    fontWeight: context.appTypography.displayWeight,
-                    color: color)),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: layout.fontSizeSmall,
+                fontWeight: context.appTypography.displayWeight,
+                color: color,
+              ),
+            ),
           ),
           Expanded(
             child: SelectableText(

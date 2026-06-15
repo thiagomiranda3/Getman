@@ -9,8 +9,8 @@ abstract class HistoryEvent extends Equatable {
 
 /// Internal: dispatched by the bloc's own `watchHistory()` subscription.
 class HistoryUpdated extends HistoryEvent {
-  final List<HttpRequestConfigEntity> history;
   const HistoryUpdated(this.history);
+  final List<HttpRequestConfigEntity> history;
   @override
   List<Object?> get props => [history];
 }

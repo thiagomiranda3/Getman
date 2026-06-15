@@ -17,8 +17,7 @@ class ExtractionEngine {
   static List<ExtractionResult> run(
     List<ExtractionRule> rules,
     HttpResponseEntity response,
-  ) =>
-      runDecoded(rules, response, JsonPath.tryDecode(response.body));
+  ) => runDecoded(rules, response, JsonPath.tryDecode(response.body));
 
   /// Like [run] but reuses an already-decoded JSON [decodedBody] (null when the
   /// body wasn't JSON), so N jsonPath rules don't re-decode the body N times.
@@ -31,16 +30,22 @@ class ExtractionEngine {
     for (final rule in rules) {
       if (!rule.enabled || rule.targetVariable.isEmpty) continue;
       final value = _extract(rule, response, decodedBody);
-      results.add(ExtractionResult(
-        variable: rule.targetVariable,
-        value: value,
-        matched: value != null,
-      ));
+      results.add(
+        ExtractionResult(
+          variable: rule.targetVariable,
+          value: value,
+          matched: value != null,
+        ),
+      );
     }
     return results;
   }
 
-  static String? _extract(ExtractionRule rule, HttpResponseEntity response, Object? decodedBody) {
+  static String? _extract(
+    ExtractionRule rule,
+    HttpResponseEntity response,
+    Object? decodedBody,
+  ) {
     switch (rule.kind) {
       case ExtractionKind.jsonPath:
         final v = JsonPath.read(decodedBody, rule.expression);
@@ -52,7 +57,7 @@ class ExtractionEngine {
           final match = RegExp(rule.expression).firstMatch(response.body);
           if (match == null) return null;
           return match.groupCount >= 1 ? match.group(1) : match.group(0);
-        } catch (_) {
+        } on Object catch (_) {
           return null; // invalid regex
         }
     }

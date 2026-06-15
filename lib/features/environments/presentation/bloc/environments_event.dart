@@ -15,29 +15,29 @@ class LoadEnvironments extends EnvironmentsEvent {
 /// the new environment's id up front — bloc state updates are asynchronous,
 /// so an id generated inside the handler would be unknowable at the call site.
 class AddEnvironment extends EnvironmentsEvent {
-  final EnvironmentEntity environment;
   const AddEnvironment(this.environment);
+  final EnvironmentEntity environment;
   @override
   List<Object?> get props => [environment];
 }
 
 class UpdateEnvironment extends EnvironmentsEvent {
-  final EnvironmentEntity environment;
   const UpdateEnvironment(this.environment);
+  final EnvironmentEntity environment;
   @override
   List<Object?> get props => [environment];
 }
 
 class DeleteEnvironment extends EnvironmentsEvent {
-  final String id;
   const DeleteEnvironment(this.id);
+  final String id;
   @override
   List<Object?> get props => [id];
 }
 
 class ImportEnvironments extends EnvironmentsEvent {
-  final List<EnvironmentEntity> environments;
   const ImportEnvironments(this.environments);
+  final List<EnvironmentEntity> environments;
   @override
   List<Object?> get props => [environments];
 }

@@ -5,9 +5,8 @@ import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/domain/repositories/settings_repository.dart';
 
 class SettingsRepositoryImpl implements SettingsRepository {
-  final SettingsLocalDataSource localDataSource;
-
   SettingsRepositoryImpl(this.localDataSource);
+  final SettingsLocalDataSource localDataSource;
 
   @override
   Future<SettingsEntity> getSettings() => guardPersistence(() async {
@@ -16,7 +15,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
   });
 
   @override
-  Future<void> saveSettings(SettingsEntity settings) => guardPersistence(() async {
-    await localDataSource.saveSettings(SettingsModel.fromEntity(settings));
-  });
+  Future<void> saveSettings(SettingsEntity settings) =>
+      guardPersistence(() async {
+        await localDataSource.saveSettings(SettingsModel.fromEntity(settings));
+      });
 }

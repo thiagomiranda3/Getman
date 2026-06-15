@@ -8,7 +8,7 @@ part of 'request_rules_model.dart';
 
 class RequestRulesModelAdapter extends TypeAdapter<RequestRulesModel> {
   @override
-  final int typeId = 9;
+  final typeId = 9;
 
   @override
   RequestRulesModel read(BinaryReader reader) {

@@ -2,15 +2,14 @@ import 'package:equatable/equatable.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 
 class TabsState extends Equatable {
-  final List<HttpRequestTabEntity> tabs;
-  final int activeIndex;
-  final bool isLoading;
-
   const TabsState({
     this.tabs = const [],
     this.activeIndex = 0,
     this.isLoading = false,
   });
+  final List<HttpRequestTabEntity> tabs;
+  final int activeIndex;
+  final bool isLoading;
 
   @override
   List<Object?> get props => [tabs, activeIndex, isLoading];

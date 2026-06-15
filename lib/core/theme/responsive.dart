@@ -1,4 +1,7 @@
+import 'package:flutter/material.dart' show Drawer;
 import 'package:flutter/widgets.dart';
+import 'package:getman/core/theme/app_theme.dart' show AppLayout;
+import 'package:getman/core/theme/extensions/app_layout.dart' show AppLayout;
 
 /// Progressive layout modes derived from viewport width.
 ///
@@ -12,7 +15,8 @@ enum LayoutMode {
   desktop,
 }
 
-/// Width thresholds (inclusive upper bounds). The largest tier has no upper bound.
+/// Width thresholds (inclusive upper bounds). The largest tier has no upper
+/// bound.
 const double kCompactPhoneMax = 500;
 const double kPhoneMax = 700;
 const double kTabletMax = 900;
@@ -26,7 +30,8 @@ LayoutMode layoutModeForWidth(double width) {
 
 extension ResponsiveBuildContext on BuildContext {
   /// Resolved [LayoutMode] for the current viewport width.
-  LayoutMode get layoutMode => layoutModeForWidth(MediaQuery.sizeOf(this).width);
+  LayoutMode get layoutMode =>
+      layoutModeForWidth(MediaQuery.sizeOf(this).width);
 
   /// True for compact-phone or phone tiers (viewport ≤ 700 px).
   bool get isPhone => layoutMode.index <= LayoutMode.phone.index;

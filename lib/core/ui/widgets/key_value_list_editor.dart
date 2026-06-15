@@ -15,6 +15,16 @@ import 'package:getman/core/theme/responsive.dart';
 /// rebuilt — that keeps focus and half-typed state alive. Only a genuinely
 /// external change resets the rows. See CLAUDE.md §6.
 class KeyValueListEditor<T extends Object> extends StatefulWidget {
+  const KeyValueListEditor({
+    required this.items,
+    required this.onChanged,
+    required this.decode,
+    required this.encode,
+    required this.equals,
+    super.key,
+    this.secretKeys,
+    this.onSecretKeysChanged,
+  });
   final T items;
   final ValueChanged<T> onChanged;
   final List<(String, String)> Function(T items) decode;
@@ -29,22 +39,12 @@ class KeyValueListEditor<T extends Object> extends StatefulWidget {
   /// Called with the new secret-key set when a row's lock is toggled.
   final ValueChanged<Set<String>>? onSecretKeysChanged;
 
-  const KeyValueListEditor({
-    super.key,
-    required this.items,
-    required this.onChanged,
-    required this.decode,
-    required this.encode,
-    required this.equals,
-    this.secretKeys,
-    this.onSecretKeysChanged,
-  });
-
   @override
   State<KeyValueListEditor<T>> createState() => _KeyValueListEditorState<T>();
 }
 
-class _KeyValueListEditorState<T extends Object> extends State<KeyValueListEditor<T>> {
+class _KeyValueListEditorState<T extends Object>
+    extends State<KeyValueListEditor<T>> {
   late List<TextEditingController> _keyControllers;
   late List<TextEditingController> _valControllers;
   T? _lastEmitted;
@@ -56,8 +56,12 @@ class _KeyValueListEditorState<T extends Object> extends State<KeyValueListEdito
   }
 
   void _initControllers(List<(String, String)> rows) {
-    _keyControllers = [for (final (key, _) in rows) TextEditingController(text: key)];
-    _valControllers = [for (final (_, value) in rows) TextEditingController(text: value)];
+    _keyControllers = [
+      for (final (key, _) in rows) TextEditingController(text: key),
+    ];
+    _valControllers = [
+      for (final (_, value) in rows) TextEditingController(text: value),
+    ];
     _addEmptyRow();
   }
 
@@ -134,7 +138,10 @@ class _KeyValueListEditorState<T extends Object> extends State<KeyValueListEdito
           valController: _valControllers[index],
           layout: layout,
           showSecretToggle: secrets != null,
-          isSecret: secrets != null && keyText.isNotEmpty && secrets.contains(keyText),
+          isSecret:
+              secrets != null &&
+              keyText.isNotEmpty &&
+              secrets.contains(keyText),
           onToggleSecret: secrets == null ? null : () => _toggleSecret(index),
           onKeyChanged: (val) {
             if (index == _keyControllers.length - 1 && val.isNotEmpty) {
@@ -160,6 +167,18 @@ class _KeyValueListEditorState<T extends Object> extends State<KeyValueListEdito
 }
 
 class _KeyValueRow extends StatefulWidget {
+  const _KeyValueRow({
+    required this.keyController,
+    required this.valController,
+    required this.layout,
+    required this.onKeyChanged,
+    required this.onValChanged,
+    required this.onDelete,
+    super.key,
+    this.showSecretToggle = false,
+    this.isSecret = false,
+    this.onToggleSecret,
+  });
   final TextEditingController keyController;
   final TextEditingController valController;
   final AppLayout layout;
@@ -169,19 +188,6 @@ class _KeyValueRow extends StatefulWidget {
   final bool showSecretToggle;
   final bool isSecret;
   final VoidCallback? onToggleSecret;
-
-  const _KeyValueRow({
-    super.key,
-    required this.keyController,
-    required this.valController,
-    required this.layout,
-    required this.onKeyChanged,
-    required this.onValChanged,
-    required this.onDelete,
-    this.showSecretToggle = false,
-    this.isSecret = false,
-    this.onToggleSecret,
-  });
 
   @override
   State<_KeyValueRow> createState() => _KeyValueRowState();
@@ -219,7 +225,6 @@ class _KeyValueRowState extends State<_KeyValueRow> {
       controller: widget.keyController,
       autocorrect: false,
       enableSuggestions: false,
-      textCapitalization: TextCapitalization.none,
       onChanged: widget.onKeyChanged,
     );
     final valueField = TextField(
@@ -233,8 +238,10 @@ class _KeyValueRowState extends State<_KeyValueRow> {
         suffixIcon: widget.isSecret
             ? IconButton(
                 visualDensity: VisualDensity.compact,
-                icon: Icon(_revealed ? Icons.visibility_off : Icons.visibility,
-                    size: widget.layout.isCompact ? 18 : 20),
+                icon: Icon(
+                  _revealed ? Icons.visibility_off : Icons.visibility,
+                  size: widget.layout.isCompact ? 18 : 20,
+                ),
                 tooltip: _revealed ? 'Hide value' : 'Reveal value',
                 onPressed: () => setState(() => _revealed = !_revealed),
               )
@@ -243,7 +250,6 @@ class _KeyValueRowState extends State<_KeyValueRow> {
       controller: widget.valController,
       autocorrect: false,
       enableSuggestions: false,
-      textCapitalization: TextCapitalization.none,
       onChanged: widget.onValChanged,
     );
     final secretButton = widget.showSecretToggle
@@ -278,14 +284,21 @@ class _KeyValueRowState extends State<_KeyValueRow> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         margin: EdgeInsets.only(bottom: widget.layout.isCompact ? 8.0 : 12.0),
-        padding: EdgeInsets.symmetric(horizontal: isPhone ? 8 : 4, vertical: isPhone ? 8 : 2),
+        padding: EdgeInsets.symmetric(
+          horizontal: isPhone ? 8 : 4,
+          vertical: isPhone ? 8 : 2,
+        ),
         decoration: BoxDecoration(
-          color: _isHovered ? theme.hoverColor : (isPhone ? theme.colorScheme.surface : Colors.transparent),
+          color: _isHovered
+              ? theme.hoverColor
+              : (isPhone ? theme.colorScheme.surface : Colors.transparent),
           borderRadius: BorderRadius.circular(context.appShape.panelRadius),
           border: Border.all(
             color: isPhone
                 ? theme.dividerColor.withValues(alpha: 0.6)
-                : (_isHovered ? theme.dividerColor.withValues(alpha: 0.5) : Colors.transparent),
+                : (_isHovered
+                      ? theme.dividerColor.withValues(alpha: 0.5)
+                      : Colors.transparent),
             width: widget.layout.borderThin,
           ),
         ),

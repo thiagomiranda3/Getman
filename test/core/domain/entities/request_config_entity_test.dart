@@ -8,12 +8,18 @@ import 'package:getman/core/network/request_kind.dart';
 void main() {
   group('HttpRequestConfigEntity.params getter', () {
     test('returns empty list when URL has no query', () {
-      const config = HttpRequestConfigEntity(id: 'x', url: 'https://example.com/a');
+      const config = HttpRequestConfigEntity(
+        id: 'x',
+        url: 'https://example.com/a',
+      );
       expect(config.params, isEmpty);
     });
 
     test('derives list from URL query', () {
-      const config = HttpRequestConfigEntity(id: 'x', url: 'https://example.com/a?a=1&b=2');
+      const config = HttpRequestConfigEntity(
+        id: 'x',
+        url: 'https://example.com/a?a=1&b=2',
+      );
       expect(config.params, [
         const QueryParamEntity(key: 'a', value: '1'),
         const QueryParamEntity(key: 'b', value: '2'),
@@ -21,7 +27,10 @@ void main() {
     });
 
     test('preserves duplicate keys', () {
-      const config = HttpRequestConfigEntity(id: 'x', url: 'https://example.com/a?a=1&a=2');
+      const config = HttpRequestConfigEntity(
+        id: 'x',
+        url: 'https://example.com/a?a=1&a=2',
+      );
       expect(config.params, [
         const QueryParamEntity(key: 'a', value: '1'),
         const QueryParamEntity(key: 'a', value: '2'),
@@ -31,18 +40,26 @@ void main() {
 
   group('HttpRequestConfigEntity.copyWith', () {
     test('copyWith(url: ...) rewrites the URL directly', () {
-      const config = HttpRequestConfigEntity(id: 'x', url: 'https://example.com/a');
+      const config = HttpRequestConfigEntity(
+        id: 'x',
+        url: 'https://example.com/a',
+      );
       final next = config.copyWith(url: 'https://example.com/b?c=1');
       expect(next.url, 'https://example.com/b?c=1');
       expect(next.params, [const QueryParamEntity(key: 'c', value: '1')]);
     });
 
     test('copyWith(params: [...]) rewrites the URL query', () {
-      const config = HttpRequestConfigEntity(id: 'x', url: 'https://example.com/a?old=1');
-      final next = config.copyWith(params: const [
-        QueryParamEntity(key: 'a', value: '1'),
-        QueryParamEntity(key: 'b', value: '2'),
-      ]);
+      const config = HttpRequestConfigEntity(
+        id: 'x',
+        url: 'https://example.com/a?old=1',
+      );
+      final next = config.copyWith(
+        params: const [
+          QueryParamEntity(key: 'a', value: '1'),
+          QueryParamEntity(key: 'b', value: '2'),
+        ],
+      );
       expect(next.url, 'https://example.com/a?a=1&b=2');
       expect(next.params, [
         const QueryParamEntity(key: 'a', value: '1'),
@@ -51,14 +68,20 @@ void main() {
     });
 
     test('copyWith(params: []) clears the query', () {
-      const config = HttpRequestConfigEntity(id: 'x', url: 'https://example.com/a?old=1');
+      const config = HttpRequestConfigEntity(
+        id: 'x',
+        url: 'https://example.com/a?old=1',
+      );
       final next = config.copyWith(params: const []);
       expect(next.url, 'https://example.com/a');
       expect(next.params, isEmpty);
     });
 
     test('copyWith(url:, params:) — url wins', () {
-      const config = HttpRequestConfigEntity(id: 'x', url: 'https://example.com/a');
+      const config = HttpRequestConfigEntity(
+        id: 'x',
+        url: 'https://example.com/a',
+      );
       final next = config.copyWith(
         url: 'https://example.com/b?kept=1',
         params: const [QueryParamEntity(key: 'ignored', value: 'x')],
@@ -68,10 +91,15 @@ void main() {
     });
 
     test('copyWith preserves fragment when rewriting query', () {
-      const config = HttpRequestConfigEntity(id: 'x', url: 'https://example.com/a?old=1#frag');
-      final next = config.copyWith(params: const [
-        QueryParamEntity(key: 'new', value: '2'),
-      ]);
+      const config = HttpRequestConfigEntity(
+        id: 'x',
+        url: 'https://example.com/a?old=1#frag',
+      );
+      final next = config.copyWith(
+        params: const [
+          QueryParamEntity(key: 'new', value: '2'),
+        ],
+      );
       expect(next.url, 'https://example.com/a?new=2#frag');
     });
   });
@@ -91,7 +119,9 @@ void main() {
         formFields: const [MultipartFieldEntity(name: 'a', value: '1')],
       );
       expect(next.bodyType, BodyType.urlencoded);
-      expect(next.formFields, [const MultipartFieldEntity(name: 'a', value: '1')]);
+      expect(next.formFields, [
+        const MultipartFieldEntity(name: 'a', value: '1'),
+      ]);
     });
 
     test('copyWith clears bodyFilePath via the sentinel', () {

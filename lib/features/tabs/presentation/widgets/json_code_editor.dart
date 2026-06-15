@@ -10,7 +10,8 @@ import 'package:re_highlight/styles/atom-one-light.dart';
 /// Shared highlighter — `langJson` is registered once and reused for every
 /// line. The engine is pure (no mutable per-call state) so a single instance
 /// is safe to share across editors.
-final Highlight _jsonHighlight = Highlight()..registerLanguage('json', langJson);
+final Highlight _jsonHighlight = Highlight()
+  ..registerLanguage('json', langJson);
 
 /// Synchronous, per-line JSON syntax highlighter used as a controller's
 /// [CodeLineSpanBuilder].
@@ -39,7 +40,7 @@ TextSpan jsonHighlightSpanBuilder({
   final renderer = TextSpanRenderer(style, tokenTheme);
   try {
     _jsonHighlight.highlight(code: text, language: 'json').render(renderer);
-  } catch (_) {
+  } on Object catch (_) {
     // `langJson` declares `illegal: \S`, so a non-JSON line throws — fall back
     // to the editor's base (unhighlighted) span rather than dropping the text.
     return textSpan;
@@ -54,18 +55,17 @@ CodeLineEditingController createJsonCodeController() =>
     CodeLineEditingController(spanBuilder: jsonHighlightSpanBuilder);
 
 class JsonCodeEditor extends StatelessWidget {
-  final CodeLineEditingController controller;
-  final bool readOnly;
-  final bool wordWrap;
-  final bool autofocus;
-
   const JsonCodeEditor({
-    super.key,
     required this.controller,
+    super.key,
     this.readOnly = false,
     this.wordWrap = true,
     this.autofocus = true,
   });
+  final CodeLineEditingController controller;
+  final bool readOnly;
+  final bool wordWrap;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
@@ -78,7 +78,8 @@ class JsonCodeEditor extends StatelessWidget {
         readOnly: readOnly,
         wordWrap: wordWrap,
         autofocus: autofocus,
-        findBuilder: (context, controller, readOnly) => CodeFindPanel(controller: controller, readOnly: readOnly),
+        findBuilder: (context, controller, readOnly) =>
+            CodeFindPanel(controller: controller, readOnly: readOnly),
         // Token colours come from [jsonHighlightSpanBuilder] on the controller,
         // not from a `codeTheme` here — re_editor's isolate highlighter does
         // not deliver coloured results in this app.
@@ -88,7 +89,9 @@ class JsonCodeEditor extends StatelessWidget {
           backgroundColor: context.appPalette.codeBackground,
           cursorColor: theme.primaryColor,
           selectionColor: theme.primaryColor.withValues(alpha: 0.3),
-          cursorLineColor: theme.primaryColor.withValues(alpha: readOnly ? 0.2 : 0.1),
+          cursorLineColor: theme.primaryColor.withValues(
+            alpha: readOnly ? 0.2 : 0.1,
+          ),
         ),
         indicatorBuilder: (context, controller, chunkController, notifier) {
           return DefaultCodeLineNumber(

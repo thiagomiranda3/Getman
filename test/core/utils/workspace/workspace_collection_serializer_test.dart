@@ -61,14 +61,19 @@ void main() {
     });
 
     test('omits saved examples (local-only, not git-tracked)', () {
-      final withExamples = leaf.copyWith(examples: [
-        SavedExampleEntity(
-          id: 'e1',
-          name: '200 OK',
-          capturedAt: DateTime.utc(2026, 6, 14),
-          config: const HttpRequestConfigEntity(id: 'cfg-1', responseBody: 'SECRET-EXAMPLE'),
-        ),
-      ]);
+      final withExamples = leaf.copyWith(
+        examples: [
+          SavedExampleEntity(
+            id: 'e1',
+            name: '200 OK',
+            capturedAt: DateTime.utc(2026, 6, 14),
+            config: const HttpRequestConfigEntity(
+              id: 'cfg-1',
+              responseBody: 'SECRET-EXAMPLE',
+            ),
+          ),
+        ],
+      );
       final json = WorkspaceCollectionSerializer.requestToJson(withExamples);
       expect(json.containsKey('examples'), isFalse);
       expect(json.toString(), isNot(contains('SECRET-EXAMPLE')));
@@ -80,8 +85,15 @@ void main() {
 
   group('folder + manifest', () {
     test('folder round-trips with childOrder', () {
-      const folder = CollectionNodeEntity(id: 'f1', name: 'Auth', isFavorite: true);
-      final json = WorkspaceCollectionSerializer.folderToJson(folder, ['a', 'b']);
+      const folder = CollectionNodeEntity(
+        id: 'f1',
+        name: 'Auth',
+        isFavorite: true,
+      );
+      final json = WorkspaceCollectionSerializer.folderToJson(folder, [
+        'a',
+        'b',
+      ]);
       expect(WorkspaceCollectionSerializer.childOrder(json), ['a', 'b']);
 
       final back = WorkspaceCollectionSerializer.folderFromJson(json, const []);

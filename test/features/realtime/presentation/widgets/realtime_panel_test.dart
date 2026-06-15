@@ -23,18 +23,27 @@ void main() {
 
   void stubRealtime(RealtimeState state) {
     when(() => realtimeBloc.state).thenReturn(state);
-    when(() => realtimeBloc.stream).thenAnswer((_) => const Stream<RealtimeState>.empty());
+    when(
+      () => realtimeBloc.stream,
+    ).thenAnswer((_) => const Stream<RealtimeState>.empty());
   }
 
   setUp(() {
     tabsBloc = MockTabsBloc();
     realtimeBloc = MockRealtimeBloc();
-    when(() => tabsBloc.state).thenReturn(const TabsState(tabs: [
-      HttpRequestTabEntity(
-        tabId: 't1',
-        config: HttpRequestConfigEntity(id: 't1', kind: RequestKind.webSocket),
+    when(() => tabsBloc.state).thenReturn(
+      const TabsState(
+        tabs: [
+          HttpRequestTabEntity(
+            tabId: 't1',
+            config: HttpRequestConfigEntity(
+              id: 't1',
+              kind: RequestKind.webSocket,
+            ),
+          ),
+        ],
       ),
-    ]));
+    );
   });
 
   Future<void> pump(WidgetTester tester) async {
@@ -55,10 +64,19 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('shows connected status, frames, and a composer for WebSocket', (tester) async {
-    stubRealtime(RealtimeState(sessions: {
-      't1': RealtimeSession(connected: true, frames: [RealtimeFrame.incoming('hello world')]),
-    }));
+  testWidgets('shows connected status, frames, and a composer for WebSocket', (
+    tester,
+  ) async {
+    stubRealtime(
+      RealtimeState(
+        sessions: {
+          't1': RealtimeSession(
+            connected: true,
+            frames: [RealtimeFrame.incoming('hello world')],
+          ),
+        },
+      ),
+    );
 
     await pump(tester);
 
@@ -69,7 +87,9 @@ void main() {
     expect(find.widgetWithText(ElevatedButton, 'SEND'), findsOneWidget);
   });
 
-  testWidgets('disconnected with no frames shows the empty prompt', (tester) async {
+  testWidgets('disconnected with no frames shows the empty prompt', (
+    tester,
+  ) async {
     stubRealtime(const RealtimeState());
 
     await pump(tester);

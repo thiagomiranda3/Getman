@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -19,18 +21,17 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 /// change theme. Reads bloc state at open time (passed in by [show]) and
 /// dispatches through the same events the rest of the app uses — no new bloc.
 class CommandPalette extends StatefulWidget {
-  final TabsBloc tabsBloc;
-  final CollectionsBloc collectionsBloc;
-  final EnvironmentsBloc environmentsBloc;
-  final SettingsBloc settingsBloc;
-
   const CommandPalette({
-    super.key,
     required this.tabsBloc,
     required this.collectionsBloc,
     required this.environmentsBloc,
     required this.settingsBloc,
+    super.key,
   });
+  final TabsBloc tabsBloc;
+  final CollectionsBloc collectionsBloc;
+  final EnvironmentsBloc environmentsBloc;
+  final SettingsBloc settingsBloc;
 
   static Future<void> show(BuildContext context) {
     return showResponsiveDialog(
@@ -83,8 +84,10 @@ class _CommandPaletteState extends State<CommandPalette> {
 
   void _moveSelection(int delta) {
     if (_currentResults.isEmpty) return;
-    _selected.value =
-        (_selected.value + delta).clamp(0, _currentResults.length - 1);
+    _selected.value = (_selected.value + delta).clamp(
+      0,
+      _currentResults.length - 1,
+    );
   }
 
   void _runSelected() {
@@ -98,53 +101,74 @@ class _CommandPaletteState extends State<CommandPalette> {
     final cmds = <_Command>[];
     _collectRequests(widget.collectionsBloc.state.collections, '', cmds);
 
-    cmds.add(_Command(
-      label: 'No Environment',
-      subtitle: 'Environment',
-      icon: Icons.layers_clear_outlined,
-      run: () => widget.settingsBloc.add(const UpdateActiveEnvironmentId(null)),
-    ));
-    for (final env in widget.environmentsBloc.state.environments) {
-      cmds.add(_Command(
-        label: env.name,
+    cmds.add(
+      _Command(
+        label: 'No Environment',
         subtitle: 'Environment',
-        icon: Icons.layers_outlined,
-        run: () => widget.settingsBloc.add(UpdateActiveEnvironmentId(env.id)),
-      ));
+        icon: Icons.layers_clear_outlined,
+        run: () =>
+            widget.settingsBloc.add(const UpdateActiveEnvironmentId(null)),
+      ),
+    );
+    for (final env in widget.environmentsBloc.state.environments) {
+      cmds.add(
+        _Command(
+          label: env.name,
+          subtitle: 'Environment',
+          icon: Icons.layers_outlined,
+          run: () => widget.settingsBloc.add(UpdateActiveEnvironmentId(env.id)),
+        ),
+      );
     }
 
     for (final t in appThemes.values) {
-      cmds.add(_Command(
-        label: t.displayName,
-        subtitle: 'Theme',
-        icon: Icons.palette_outlined,
-        run: () => widget.settingsBloc.add(UpdateThemeId(t.id)),
-      ));
+      cmds.add(
+        _Command(
+          label: t.displayName,
+          subtitle: 'Theme',
+          icon: Icons.palette_outlined,
+          run: () => widget.settingsBloc.add(UpdateThemeId(t.id)),
+        ),
+      );
     }
     return cmds;
   }
 
-  void _collectRequests(List<CollectionNodeEntity> nodes, String path, List<_Command> out) {
+  void _collectRequests(
+    List<CollectionNodeEntity> nodes,
+    String path,
+    List<_Command> out,
+  ) {
     for (final node in nodes) {
       if (node.isFolder) {
-        _collectRequests(node.children, path.isEmpty ? node.name : '$path / ${node.name}', out);
+        _collectRequests(
+          node.children,
+          path.isEmpty ? node.name : '$path / ${node.name}',
+          out,
+        );
       } else {
         final config = node.config;
-        out.add(_Command(
-          label: node.name,
-          subtitle: path.isEmpty ? 'Request' : path,
-          icon: Icons.http,
-          run: () => widget.tabsBloc.add(
-            AddTab(config: config, collectionNodeId: node.id, collectionName: node.name),
+        out.add(
+          _Command(
+            label: node.name,
+            subtitle: path.isEmpty ? 'Request' : path,
+            icon: Icons.http,
+            run: () => widget.tabsBloc.add(
+              AddTab(
+                config: config,
+                collectionNodeId: node.id,
+                collectionName: node.name,
+              ),
+            ),
           ),
-        ));
+        );
       }
     }
   }
 
   void _invoke(_Command command) {
     command.run();
-    Navigator.of(context).maybePop();
+    unawaited(Navigator.of(context).maybePop());
   }
 
   @override
@@ -200,8 +224,8 @@ class _CommandPaletteState extends State<CommandPalette> {
                 isDense: true,
               ),
               onChanged: _onQueryChanged,
-              // Enter via the soft keyboard action; physical Enter is handled by
-              // the Shortcuts above. Both run the highlighted row.
+              // Enter via the soft keyboard action; physical Enter is handled
+              // by the Shortcuts above. Both run the highlighted row.
               onSubmitted: (_) => _runSelected(),
             ),
             SizedBox(height: layout.sectionSpacing),
@@ -219,7 +243,9 @@ class _CommandPaletteState extends State<CommandPalette> {
                         'NO MATCHES',
                         style: TextStyle(
                           fontWeight: context.appTypography.titleWeight,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                     );
@@ -227,24 +253,34 @@ class _CommandPaletteState extends State<CommandPalette> {
                   return ValueListenableBuilder<int>(
                     valueListenable: _selected,
                     builder: (context, selected, _) {
-                      final highlight =
-                          Theme.of(context).colorScheme.primary.withValues(alpha: 0.14);
+                      final highlight = Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.14);
                       return ListView.builder(
                         shrinkWrap: true,
                         itemCount: results.length,
                         itemBuilder: (context, i) {
                           final c = results[i];
                           return ColoredBox(
-                            color: i == selected ? highlight : Colors.transparent,
+                            color: i == selected
+                                ? highlight
+                                : Colors.transparent,
                             child: ListTile(
                               dense: true,
                               leading: Icon(c.icon, size: layout.iconSize),
-                              title: Text(c.label,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(fontWeight: context.appTypography.titleWeight)),
-                              subtitle:
-                                  Text(c.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                              title: Text(
+                                c.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: context.appTypography.titleWeight,
+                                ),
+                              ),
+                              subtitle: Text(
+                                c.subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                               onTap: () => _invoke(c),
                             ),
                           );
@@ -263,21 +299,21 @@ class _CommandPaletteState extends State<CommandPalette> {
 }
 
 class _Command {
-  final String label;
-  final String subtitle;
-  final IconData icon;
-  final VoidCallback run;
   const _Command({
     required this.label,
     required this.subtitle,
     required this.icon,
     required this.run,
   });
+  final String label;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback run;
 }
 
 class _MoveSelectionIntent extends Intent {
-  final int delta;
   const _MoveSelectionIntent(this.delta);
+  final int delta;
 }
 
 class _RunSelectionIntent extends Intent {

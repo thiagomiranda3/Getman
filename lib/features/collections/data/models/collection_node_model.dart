@@ -1,13 +1,39 @@
 import 'package:getman/features/collections/data/models/saved_example_model.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/history/data/models/request_config_model.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 import 'package:uuid/uuid.dart';
 
 part 'collection_node_model.g.dart';
 
 @HiveType(typeId: 3)
 class CollectionNode extends HiveObject {
+  CollectionNode({
+    required this.name,
+    String? id,
+    this.isFolder = true,
+    List<CollectionNode>? children,
+    this.config,
+    this.isFavorite = false,
+    this.description,
+    List<SavedExampleModel>? examples,
+  }) : id = id ?? const Uuid().v4(),
+       children = children ?? [],
+       examples = examples ?? [];
+
+  factory CollectionNode.fromEntity(CollectionNodeEntity entity) =>
+      CollectionNode(
+        id: entity.id,
+        name: entity.name,
+        isFolder: entity.isFolder,
+        children: entity.children.map(CollectionNode.fromEntity).toList(),
+        config: entity.config != null
+            ? HttpRequestConfig.fromEntity(entity.config!)
+            : null,
+        isFavorite: entity.isFavorite,
+        description: entity.description,
+        examples: entity.examples.map(SavedExampleModel.fromEntity).toList(),
+      );
   @HiveField(0)
   String id;
 
@@ -31,30 +57,6 @@ class CollectionNode extends HiveObject {
 
   @HiveField(7)
   List<SavedExampleModel> examples;
-
-  CollectionNode({
-    String? id,
-    required this.name,
-    this.isFolder = true,
-    List<CollectionNode>? children,
-    this.config,
-    this.isFavorite = false,
-    this.description,
-    List<SavedExampleModel>? examples,
-  })  : id = id ?? const Uuid().v4(),
-        children = children ?? [],
-        examples = examples ?? [];
-
-  factory CollectionNode.fromEntity(CollectionNodeEntity entity) => CollectionNode(
-    id: entity.id,
-    name: entity.name,
-    isFolder: entity.isFolder,
-    children: entity.children.map((c) => CollectionNode.fromEntity(c)).toList(),
-    config: entity.config != null ? HttpRequestConfig.fromEntity(entity.config!) : null,
-    isFavorite: entity.isFavorite,
-    description: entity.description,
-    examples: entity.examples.map((e) => SavedExampleModel.fromEntity(e)).toList(),
-  );
 
   CollectionNodeEntity toEntity() => CollectionNodeEntity(
     id: id,

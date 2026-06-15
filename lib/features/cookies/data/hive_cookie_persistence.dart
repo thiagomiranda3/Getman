@@ -3,20 +3,21 @@ import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/network_cookie.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/features/cookies/data/models/stored_cookie_model.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_flutter.dart';
 
 /// Hive-backed [CookiePersistence] for the cookie jar. Cookies are stored
 /// **keyed by `domain|path|name`** so each `Set-Cookie` is a single put/delete
 /// instead of rewriting the whole jar. Failures are swallowed with a debug log
 /// — cookie durability is best-effort and must never break a request.
 class HiveCookiePersistence implements CookiePersistence {
-  Box<StoredCookieModel> _box() => Hive.box<StoredCookieModel>(HiveBoxes.cookies);
+  Box<StoredCookieModel> _box() =>
+      Hive.box<StoredCookieModel>(HiveBoxes.cookies);
 
   @override
   List<NetworkCookie> loadAll() {
     try {
       return _box().values.map((m) => m.toCookie()).toList();
-    } catch (e) {
+    } on Object catch (e) {
       debugPrint('Cookie load failed: $e');
       return const [];
     }
@@ -26,7 +27,7 @@ class HiveCookiePersistence implements CookiePersistence {
   Future<void> upsert(NetworkCookie cookie) async {
     try {
       await _box().put(cookie.key, StoredCookieModel.fromCookie(cookie));
-    } catch (e) {
+    } on Object catch (e) {
       debugPrint('Cookie upsert failed: $e');
     }
   }
@@ -35,7 +36,7 @@ class HiveCookiePersistence implements CookiePersistence {
   Future<void> remove(String key) async {
     try {
       await _box().delete(key);
-    } catch (e) {
+    } on Object catch (e) {
       debugPrint('Cookie remove failed: $e');
     }
   }
@@ -44,7 +45,7 @@ class HiveCookiePersistence implements CookiePersistence {
   Future<void> clearAll() async {
     try {
       await _box().clear();
-    } catch (e) {
+    } on Object catch (e) {
       debugPrint('Cookie clear failed: $e');
     }
   }
@@ -60,7 +61,7 @@ class HiveCookiePersistence implements CookiePersistence {
       final values = box.values.toList(growable: false);
       await box.clear();
       await box.putAll({for (final m in values) m.toCookie().key: m});
-    } catch (e) {
+    } on Object catch (e) {
       debugPrint('Cookie key migration failed: $e');
     }
   }

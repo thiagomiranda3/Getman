@@ -6,8 +6,8 @@ import 'package:getman/core/network/cookie_store.dart';
 /// from responses. No-op on web, where the browser owns cookies and the XHR
 /// adapter forbids setting the `Cookie` header anyway.
 class CookieInterceptor extends Interceptor {
-  final CookieStore store;
   CookieInterceptor(this.store);
+  final CookieStore store;
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
@@ -25,11 +25,17 @@ class CookieInterceptor extends Interceptor {
   }
 
   @override
-  void onResponse(Response response, ResponseInterceptorHandler handler) {
+  void onResponse(
+    Response<dynamic> response,
+    ResponseInterceptorHandler handler,
+  ) {
     if (!kIsWeb) {
       final setCookie = response.headers.map['set-cookie'];
       if (setCookie != null && setCookie.isNotEmpty) {
-        store.storeFromSetCookie(response.requestOptions.uri, setCookie.join(', '));
+        store.storeFromSetCookie(
+          response.requestOptions.uri,
+          setCookie.join(', '),
+        );
       }
     }
     handler.next(response);

@@ -12,7 +12,9 @@ import 'package:flutter/material.dart';
 /// Filesystem-safe lowercase slug for an export filename.
 String slugFilename(String name) {
   final trimmed = name.trim().toLowerCase();
-  final slug = trimmed.replaceAll(RegExp(r'[^a-z0-9]+'), '_').replaceAll(RegExp(r'^_+|_+$'), '');
+  final slug = trimmed
+      .replaceAll(RegExp('[^a-z0-9]+'), '_')
+      .replaceAll(RegExp(r'^_+|_+$'), '');
   return slug.isEmpty ? 'untitled' : slug;
 }
 
@@ -66,7 +68,7 @@ Future<void> saveJsonFileWithFeedback(
       await File(path).writeAsString(jsonString);
     }
     messenger?.showSnackBar(SnackBar(content: Text('Exported to $path')));
-  } catch (e) {
+  } on Object catch (e) {
     debugPrint('Export failed: $e');
     messenger?.showSnackBar(SnackBar(content: Text('Export failed: $e')));
   }
@@ -90,7 +92,7 @@ Future<void> importJsonFilesWithFeedback<T>(
       allowedExtensions: ['json'],
       withData: true,
     );
-  } catch (e) {
+  } on Object catch (e) {
     debugPrint('File picker failed: $e');
     messenger?.showSnackBar(SnackBar(content: Text('Import failed: $e')));
     return;
@@ -107,7 +109,7 @@ Future<void> importJsonFilesWithFeedback<T>(
         continue;
       }
       imported.addAll(parse(content));
-    } catch (e) {
+    } on Object catch (e) {
       failures.add('${file.name}: $e');
     }
   }

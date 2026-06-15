@@ -21,11 +21,17 @@ void main() {
     });
 
     test('resolveTheme returns default builder for unknown id', () {
-      expect(resolveTheme('does-not-exist'), appThemes[defaultThemeId]!.builder);
+      expect(
+        resolveTheme('does-not-exist'),
+        appThemes[defaultThemeId]!.builder,
+      );
     });
 
     test('resolveTheme returns registered builder for known id', () {
-      expect(resolveTheme(kBrutalistThemeId), appThemes[kBrutalistThemeId]!.builder);
+      expect(
+        resolveTheme(kBrutalistThemeId),
+        appThemes[kBrutalistThemeId]!.builder,
+      );
     });
 
     test('every descriptor has a non-empty display name matching its id', () {
@@ -37,8 +43,13 @@ void main() {
 
     // testWidgets absorbs the asynchronous google_fonts font-not-found error
     // that fires after assertions pass when fonts are missing from test assets.
-    testWidgets('registered builder returns a usable ThemeData', (tester) async {
-      final theme = resolveTheme(kBrutalistThemeId)(Brightness.light, isCompact: false);
+    testWidgets('registered builder returns a usable ThemeData', (
+      tester,
+    ) async {
+      final theme = resolveTheme(kBrutalistThemeId)(
+        Brightness.light,
+        isCompact: false,
+      );
       expect(theme, isA<ThemeData>());
     });
   });

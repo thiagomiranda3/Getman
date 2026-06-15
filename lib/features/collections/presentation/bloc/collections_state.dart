@@ -1,18 +1,19 @@
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart'
+    show TabDirtyChecker;
 
 // _configById is a lazily-memoized cache derived from `collections` (excluded
 // from props), so equality/immutability semantics are unaffected.
 // ignore: must_be_immutable
 class CollectionsState extends Equatable {
-  final List<CollectionNodeEntity> collections;
-  final bool isLoading;
-
   CollectionsState({
     this.collections = const [],
     this.isLoading = false,
   });
+  final List<CollectionNodeEntity> collections;
+  final bool isLoading;
 
   /// Flat index of every node id → its request config, built lazily and
   /// memoized once per state instance. Lets [TabDirtyChecker] do an O(1) lookup

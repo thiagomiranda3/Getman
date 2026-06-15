@@ -16,7 +16,11 @@ class EmptyTabsPlaceholder extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.bolt, size: 64, color: theme.dividerColor.withValues(alpha: 0.3)),
+          Icon(
+            Icons.bolt,
+            size: 64,
+            color: theme.dividerColor.withValues(alpha: 0.3),
+          ),
           const SizedBox(height: 16),
           Text(
             'NO OPEN TABS',
@@ -41,8 +45,9 @@ class EmptyTabsPlaceholder extends StatelessWidget {
               onPressed: () => context.read<TabsBloc>().add(const AddTab()),
               style: ElevatedButton.styleFrom(
                 padding: EdgeInsets.symmetric(
-                    horizontal: context.appLayout.buttonPaddingHorizontal,
-                    vertical: context.appLayout.buttonPaddingVertical),
+                  horizontal: context.appLayout.buttonPaddingHorizontal,
+                  vertical: context.appLayout.buttonPaddingVertical,
+                ),
               ),
               child: const Text('NEW REQUEST'),
             ),

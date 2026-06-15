@@ -13,7 +13,12 @@ void main() {
         name: 'Root',
         description: 'top-level notes',
         children: [
-          CollectionNodeEntity(id: 'child', name: 'Child', isFolder: false, description: 'child notes'),
+          CollectionNodeEntity(
+            id: 'child',
+            name: 'Child',
+            isFolder: false,
+            description: 'child notes',
+          ),
         ],
       );
 
@@ -34,7 +39,10 @@ void main() {
         id: 'req',
         name: 'GetUsers',
         isFolder: false,
-        config: const HttpRequestConfigEntity(id: 'req', url: 'https://api/users'),
+        config: const HttpRequestConfigEntity(
+          id: 'req',
+          url: 'https://api/users',
+        ),
         examples: [
           SavedExampleEntity(
             id: 'e1',
@@ -61,7 +69,9 @@ void main() {
       expect(example.capturedAt, DateTime.utc(2026, 6, 14, 14, 32));
       expect(example.config.statusCode, 200);
       expect(example.config.responseBody, '{"ok":true}');
-      expect(example.config.responseHeaders, {'content-type': 'application/json'});
+      expect(example.config.responseHeaders, {
+        'content-type': 'application/json',
+      });
       expect(example.config.durationMs, 42);
     });
 
@@ -82,7 +92,11 @@ void main() {
             id: 'e1',
             name: 'huge',
             capturedAt: DateTime.utc(2026, 6, 14),
-            config: HttpRequestConfigEntity(id: 'req', statusCode: 200, responseBody: hugeBody),
+            config: HttpRequestConfigEntity(
+              id: 'req',
+              statusCode: 200,
+              responseBody: hugeBody,
+            ),
           ),
         ],
       );
@@ -104,7 +118,10 @@ void main() {
             id: 'e1',
             name: 'ok',
             capturedAt: DateTime.utc(2026, 6, 14),
-            config: const HttpRequestConfigEntity(id: 'req', responseBody: '{"ok":true}'),
+            config: const HttpRequestConfigEntity(
+              id: 'req',
+              responseBody: '{"ok":true}',
+            ),
           ),
         ],
       );
@@ -115,7 +132,11 @@ void main() {
 
   group('CollectionNodeEntity.copyWith', () {
     test('preserves description when not provided', () {
-      const node = CollectionNodeEntity(id: 'a', name: 'A', description: 'keep');
+      const node = CollectionNodeEntity(
+        id: 'a',
+        name: 'A',
+        description: 'keep',
+      );
       expect(node.copyWith(name: 'B').description, 'keep');
     });
 

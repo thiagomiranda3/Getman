@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/navigation/url_focus_registry.dart';
@@ -21,7 +23,10 @@ import 'package:getman/features/tabs/presentation/widgets/realtime_button.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_kind_method_selector.dart';
 import 'package:getman/features/tabs/presentation/widgets/url_overflow_menu.dart';
 
-void _setControllerPreservingEnd(TextEditingController controller, String text) {
+void _setControllerPreservingEnd(
+  TextEditingController controller,
+  String text,
+) {
   if (controller.text == text) return;
   controller.value = TextEditingValue(
     text: text,
@@ -30,9 +35,9 @@ void _setControllerPreservingEnd(TextEditingController controller, String text) 
 }
 
 class UrlBar extends StatefulWidget {
+  const UrlBar({required this.tabId, required this.onSave, super.key});
   final String tabId;
   final VoidCallback onSave;
-  const UrlBar({super.key, required this.tabId, required this.onSave});
 
   @override
   State<UrlBar> createState() => _UrlBarState();
@@ -51,7 +56,8 @@ class _UrlBarState extends State<UrlBar> {
     _urlController = VariableHighlightController();
     // Register this tab's URL field so the Cmd/Ctrl+L shortcut can focus it.
     _urlFocusNode = FocusNode(debugLabel: 'url_${widget.tabId}');
-    _focusRegistry = context.read<UrlFocusRegistry>()..register(widget.tabId, _urlFocusNode);
+    _focusRegistry = context.read<UrlFocusRegistry>()
+      ..register(widget.tabId, _urlFocusNode);
   }
 
   @override
@@ -66,11 +72,12 @@ class _UrlBarState extends State<UrlBar> {
 
   void _syncHighlight(BuildContext context) {
     final palette = context.appPalette;
-    _urlController.updateColors(
-      resolved: palette.variableResolved,
-      unresolved: palette.variableUnresolved,
-    );
-    _urlController.updateVariables(_activeVariables(context));
+    _urlController
+      ..updateColors(
+        resolved: palette.variableResolved,
+        unresolved: palette.variableUnresolved,
+      )
+      ..updateVariables(_activeVariables(context));
   }
 
   Map<String, String> _activeVariables(BuildContext context) {
@@ -99,7 +106,8 @@ class _UrlBarState extends State<UrlBar> {
           listener: (ctx, _) => _syncHighlight(ctx),
         ),
         BlocListener<SettingsBloc, SettingsState>(
-          listenWhen: (p, n) => p.settings.activeEnvironmentId != n.settings.activeEnvironmentId,
+          listenWhen: (p, n) =>
+              p.settings.activeEnvironmentId != n.settings.activeEnvironmentId,
           listener: (ctx, _) => _syncHighlight(ctx),
         ),
       ],
@@ -129,7 +137,8 @@ class _UrlBarState extends State<UrlBar> {
 
           return BlocBuilder<SettingsBloc, SettingsState>(
             buildWhen: (prev, next) =>
-                prev.settings.isVerticalLayout != next.settings.isVerticalLayout,
+                prev.settings.isVerticalLayout !=
+                next.settings.isVerticalLayout,
             builder: (context, settingsState) {
               final settings = settingsState.settings;
               final layout = context.appLayout;
@@ -137,15 +146,25 @@ class _UrlBarState extends State<UrlBar> {
 
               return Container(
                 padding: const EdgeInsets.all(6),
-                decoration: context.appDecoration.panelBox(context, offset: layout.cardOffset),
+                decoration: context.appDecoration.panelBox(
+                  context,
+                  offset: layout.cardOffset,
+                ),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    // Below this threshold, collapse cURL / Save / Layout-toggle
-                    // into a single overflow menu so Method + URL + SEND always fit.
+                    // Below this threshold, collapse cURL / Save /
+                    // Layout-toggle into a single overflow menu so
+                    // Method + URL + SEND always fit.
                     final isNarrow = constraints.maxWidth < 560;
-                    final iconSize = isNarrow ? 22.0 : (layout.isCompact ? 24.0 : 28.0);
-                    final gap = isNarrow ? 4.0 : (layout.isCompact ? 8.0 : 12.0);
-                    final smallGap = isNarrow ? 2.0 : (layout.isCompact ? 4.0 : 8.0);
+                    final iconSize = isNarrow
+                        ? 22.0
+                        : (layout.isCompact ? 24.0 : 28.0);
+                    final gap = isNarrow
+                        ? 4.0
+                        : (layout.isCompact ? 8.0 : 12.0);
+                    final smallGap = isNarrow
+                        ? 2.0
+                        : (layout.isCompact ? 4.0 : 8.0);
 
                     return Row(
                       children: [
@@ -155,7 +174,11 @@ class _UrlBarState extends State<UrlBar> {
                           child: TextField(
                             controller: _urlController,
                             focusNode: _urlFocusNode,
-                            style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
+                            style: TextStyle(
+                              fontSize: layout.fontSizeTitle,
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.onSurface,
+                            ),
                             decoration: const InputDecoration(
                               hintText: 'Enter URL or paste cURL...',
                               border: InputBorder.none,
@@ -167,61 +190,105 @@ class _UrlBarState extends State<UrlBar> {
                             keyboardType: TextInputType.url,
                             autocorrect: false,
                             enableSuggestions: false,
-                            textCapitalization: TextCapitalization.none,
-                            onChanged: (val) => _handleUrlChanged(context, tab, val),
+                            onChanged: (val) =>
+                                _handleUrlChanged(context, tab, val),
                           ),
                         ),
                         SizedBox(width: gap),
                         if (!isNarrow) ...[
                           context.appDecoration.wrapInteractive(
                             child: IconButton(
-                              icon: Icon(Icons.code, color: theme.colorScheme.secondary, size: iconSize),
+                              icon: Icon(
+                                Icons.code,
+                                color: theme.colorScheme.secondary,
+                                size: iconSize,
+                              ),
                               tooltip: 'Generate code',
-                              onPressed: () => CodeExportDialog.show(context, tab.config),
+                              onPressed: () =>
+                                  CodeExportDialog.show(context, tab.config),
                             ),
                           ),
                           SizedBox(width: smallGap),
                         ],
                         if (tab.config.kind == RequestKind.http)
                           context.appDecoration.wrapInteractive(
-                          child: ElevatedButton(
-                            onPressed: tab.isSending
-                              ? () => context.read<TabsBloc>().add(CancelRequest(tab.tabId))
-                              : () => context.read<TabsBloc>().add(SendRequest(
-                                    tabId: tab.tabId,
-                                    envVars: _activeVariables(context),
-                                  )),
-                            style: ElevatedButton.styleFrom(
-                               backgroundColor: tab.isSending ? theme.colorScheme.error : null,
-                               foregroundColor: tab.isSending ? theme.colorScheme.onError : null,
-                               padding: EdgeInsets.symmetric(
-                                 horizontal: isNarrow ? 12 : layout.buttonPaddingHorizontal,
-                                 vertical: isNarrow ? 10 : layout.buttonPaddingVertical,
-                               ),
-                               minimumSize: Size.zero,
-                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 300),
-                              transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: FadeTransition(opacity: animation, child: child)),
-                              child: tab.isSending
-                                ? Row(
-                                    key: const ValueKey('cancel'),
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      SizedBox(
-                                        width: layout.smallIconSize,
-                                        height: layout.smallIconSize,
-                                        child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onError),
+                            child: ElevatedButton(
+                              onPressed: tab.isSending
+                                  ? () => context.read<TabsBloc>().add(
+                                      CancelRequest(tab.tabId),
+                                    )
+                                  : () => context.read<TabsBloc>().add(
+                                      SendRequest(
+                                        tabId: tab.tabId,
+                                        envVars: _activeVariables(context),
                                       ),
-                                      SizedBox(width: isNarrow ? 4 : 8),
-                                      Text(isNarrow ? 'STOP' : 'CANCEL', style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.displayWeight)),
-                                    ],
-                                  )
-                                : Text('SEND', key: const ValueKey('send'), style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.displayWeight)),
+                                    ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: tab.isSending
+                                    ? theme.colorScheme.error
+                                    : null,
+                                foregroundColor: tab.isSending
+                                    ? theme.colorScheme.onError
+                                    : null,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isNarrow
+                                      ? 12
+                                      : layout.buttonPaddingHorizontal,
+                                  vertical: isNarrow
+                                      ? 10
+                                      : layout.buttonPaddingVertical,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 300),
+                                transitionBuilder: (child, animation) =>
+                                    ScaleTransition(
+                                      scale: animation,
+                                      child: FadeTransition(
+                                        opacity: animation,
+                                        child: child,
+                                      ),
+                                    ),
+                                child: tab.isSending
+                                    ? Row(
+                                        key: const ValueKey('cancel'),
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          SizedBox(
+                                            width: layout.smallIconSize,
+                                            height: layout.smallIconSize,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: theme.colorScheme.onError,
+                                            ),
+                                          ),
+                                          SizedBox(width: isNarrow ? 4 : 8),
+                                          Text(
+                                            isNarrow ? 'STOP' : 'CANCEL',
+                                            style: TextStyle(
+                                              fontSize: layout.fontSizeTitle,
+                                              fontWeight: context
+                                                  .appTypography
+                                                  .displayWeight,
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    : Text(
+                                        'SEND',
+                                        key: const ValueKey('send'),
+                                        style: TextStyle(
+                                          fontSize: layout.fontSizeTitle,
+                                          fontWeight: context
+                                              .appTypography
+                                              .displayWeight,
+                                        ),
+                                      ),
+                              ),
                             ),
-                          ),
-                        )
+                          )
                         else
                           RealtimeButton(
                             tabId: tab.tabId,
@@ -235,16 +302,31 @@ class _UrlBarState extends State<UrlBar> {
                             iconSize: iconSize,
                             isSaved: tab.collectionNodeId != null,
                             isVerticalLayout: settings.isVerticalLayout,
-                            onGenerateCode: () => CodeExportDialog.show(context, tab.config),
+                            onGenerateCode: () =>
+                                CodeExportDialog.show(context, tab.config),
                             onSave: widget.onSave,
-                            onToggleLayout: () => context.read<SettingsBloc>().add(UpdateVerticalLayout(!settings.isVerticalLayout)),
+                            onToggleLayout: () =>
+                                context.read<SettingsBloc>().add(
+                                  UpdateVerticalLayout(
+                                    isVerticalLayout:
+                                        !settings.isVerticalLayout,
+                                  ),
+                                ),
                           ),
                         ] else ...[
                           SizedBox(width: gap),
                           context.appDecoration.wrapInteractive(
                             child: IconButton(
-                              icon: Icon(tab.collectionNodeId != null ? Icons.save : Icons.save_as, color: theme.colorScheme.secondary, size: iconSize),
-                              tooltip: tab.collectionNodeId != null ? 'Update Request' : 'Save to Collection',
+                              icon: Icon(
+                                tab.collectionNodeId != null
+                                    ? Icons.save
+                                    : Icons.save_as,
+                                color: theme.colorScheme.secondary,
+                                size: iconSize,
+                              ),
+                              tooltip: tab.collectionNodeId != null
+                                  ? 'Update Request'
+                                  : 'Save to Collection',
                               onPressed: widget.onSave,
                             ),
                           ),
@@ -252,12 +334,20 @@ class _UrlBarState extends State<UrlBar> {
                           context.appDecoration.wrapInteractive(
                             child: IconButton(
                               icon: Icon(
-                                settings.isVerticalLayout ? Icons.view_column_rounded : Icons.view_agenda_rounded,
+                                settings.isVerticalLayout
+                                    ? Icons.view_column_rounded
+                                    : Icons.view_agenda_rounded,
                                 color: theme.colorScheme.onSurface,
                                 size: iconSize,
                               ),
-                              tooltip: settings.isVerticalLayout ? 'Horizontal Layout' : 'Vertical Layout',
-                              onPressed: () => context.read<SettingsBloc>().add(UpdateVerticalLayout(!settings.isVerticalLayout)),
+                              tooltip: settings.isVerticalLayout
+                                  ? 'Horizontal Layout'
+                                  : 'Vertical Layout',
+                              onPressed: () => context.read<SettingsBloc>().add(
+                                UpdateVerticalLayout(
+                                  isVerticalLayout: !settings.isVerticalLayout,
+                                ),
+                              ),
                             ),
                           ),
                         ],
@@ -273,7 +363,11 @@ class _UrlBarState extends State<UrlBar> {
     );
   }
 
-  void _handleUrlChanged(BuildContext context, HttpRequestTabEntity tab, String val) {
+  void _handleUrlChanged(
+    BuildContext context,
+    HttpRequestTabEntity tab,
+    String val,
+  ) {
     if (tab.config.url == val) return;
     final tabsBloc = context.read<TabsBloc>();
 
@@ -281,15 +375,23 @@ class _UrlBarState extends State<UrlBar> {
       final parsedConfig = CurlUtils.parse(val, id: tab.config.id);
       if (parsedConfig != null) {
         tabsBloc.add(UpdateTab(tab.copyWith(config: parsedConfig)));
-        _prettifyAndUpdateBody(tabsBloc, tab.tabId, parsedConfig.body);
+        unawaited(
+          _prettifyAndUpdateBody(tabsBloc, tab.tabId, parsedConfig.body),
+        );
         return;
       }
     }
 
-    tabsBloc.add(UpdateTab(tab.copyWith(config: tab.config.copyWith(url: val))));
+    tabsBloc.add(
+      UpdateTab(tab.copyWith(config: tab.config.copyWith(url: val))),
+    );
   }
 
-  Future<void> _prettifyAndUpdateBody(TabsBloc tabsBloc, String tabId, String rawBody) async {
+  Future<void> _prettifyAndUpdateBody(
+    TabsBloc tabsBloc,
+    String tabId,
+    String rawBody,
+  ) async {
     final prettified = await JsonUtils.prettify(rawBody);
     final latestTab = tabsBloc.state.tabs.byId(tabId);
     if (latestTab == null) return;
@@ -297,8 +399,10 @@ class _UrlBarState extends State<UrlBar> {
     // clobber that newer edit with the stale prettified result.
     if (latestTab.config.body != rawBody) return;
     if (latestTab.config.body == prettified) return;
-    tabsBloc.add(UpdateTab(
-      latestTab.copyWith(config: latestTab.config.copyWith(body: prettified)),
-    ));
+    tabsBloc.add(
+      UpdateTab(
+        latestTab.copyWith(config: latestTab.config.copyWith(body: prettified)),
+      ),
+    );
   }
 }

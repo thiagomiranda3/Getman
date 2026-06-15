@@ -21,7 +21,7 @@ void main() {
 
     test('lerp returns a typography with other.codeFontFamily', () {
       final b = a.copyWith(codeFontFamily: 'Monaco');
-      final mid = a.lerp(b, 1.0);
+      final mid = a.lerp(b, 1);
       expect(mid.codeFontFamily, 'Monaco');
     });
 

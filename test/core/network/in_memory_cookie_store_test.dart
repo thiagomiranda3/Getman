@@ -4,11 +4,11 @@ import 'package:getman/core/network/in_memory_cookie_store.dart';
 import 'package:getman/core/network/network_cookie.dart';
 
 class _FakePersistence implements CookiePersistence {
+  _FakePersistence([this.stored = const []]);
   List<NetworkCookie> stored;
   final List<NetworkCookie> upserted = [];
   final List<String> removed = [];
   bool cleared = false;
-  _FakePersistence([this.stored = const []]);
 
   @override
   List<NetworkCookie> loadAll() => stored;
@@ -22,7 +22,7 @@ class _FakePersistence implements CookiePersistence {
 
 void main() {
   late _FakePersistence persistence;
-  int clock = 1000;
+  var clock = 1000;
   late InMemoryCookieStore store;
 
   setUp(() {
@@ -35,41 +35,54 @@ void main() {
     persistence = _FakePersistence([
       const NetworkCookie(name: 'a', value: '1', domain: 'api.dev'),
     ]);
-    store = InMemoryCookieStore(persistence: persistence, now: () => clock);
-    store.hydrate();
+    store = InMemoryCookieStore(persistence: persistence, now: () => clock)
+      ..hydrate();
     expect(store.all(), hasLength(1));
   });
 
-  test('storeFromSetCookie upserts incrementally, then cookieHeaderFor matches', () {
-    store.storeFromSetCookie(Uri.parse('https://api.dev/x'), 'sid=abc; Path=/');
-    // One incremental upsert — not a whole-jar rewrite.
-    expect(persistence.upserted, hasLength(1));
-    expect(persistence.upserted.single.name, 'sid');
-    expect(store.cookieHeaderFor(Uri.parse('https://api.dev/x')), 'sid=abc');
-    // Different host → no cookies.
-    expect(store.cookieHeaderFor(Uri.parse('https://other.dev/x')), isNull);
-  });
+  test(
+    'storeFromSetCookie upserts incrementally, then cookieHeaderFor matches',
+    () {
+      store.storeFromSetCookie(
+        Uri.parse('https://api.dev/x'),
+        'sid=abc; Path=/',
+      );
+      // One incremental upsert — not a whole-jar rewrite.
+      expect(persistence.upserted, hasLength(1));
+      expect(persistence.upserted.single.name, 'sid');
+      expect(store.cookieHeaderFor(Uri.parse('https://api.dev/x')), 'sid=abc');
+      // Different host → no cookies.
+      expect(store.cookieHeaderFor(Uri.parse('https://other.dev/x')), isNull);
+    },
+  );
 
   test('upsert replaces a cookie with the same domain/path/name', () {
     final uri = Uri.parse('https://api.dev/');
-    store.storeFromSetCookie(uri, 'sid=one');
-    store.storeFromSetCookie(uri, 'sid=two');
+    store
+      ..storeFromSetCookie(uri, 'sid=one')
+      ..storeFromSetCookie(uri, 'sid=two');
     expect(store.all(), hasLength(1));
     expect(store.cookieHeaderFor(uri), 'sid=two');
     // Same key upserted twice (latest wins).
     expect(persistence.upserted.map((c) => c.value), ['one', 'two']);
   });
 
-  test('an already-expired Set-Cookie removes the cookie from durable storage', () {
-    final uri = Uri.parse('https://api.dev/');
-    store.storeFromSetCookie(uri, 'sid=gone; Max-Age=0');
-    expect(store.all(), isEmpty);
-    expect(persistence.removed, isNotEmpty);
-  });
+  test(
+    'an already-expired Set-Cookie removes the cookie from durable storage',
+    () {
+      final uri = Uri.parse('https://api.dev/');
+      store.storeFromSetCookie(uri, 'sid=gone; Max-Age=0');
+      expect(store.all(), isEmpty);
+      expect(persistence.removed, isNotEmpty);
+    },
+  );
 
   test('expired cookies are filtered out of the request header', () {
     final uri = Uri.parse('https://api.dev/');
-    store.storeFromSetCookie(uri, 'sid=abc; Max-Age=10'); // expires at 1000 + 10000
+    store.storeFromSetCookie(
+      uri,
+      'sid=abc; Max-Age=10',
+    ); // expires at 1000 + 10000
     expect(store.cookieHeaderFor(uri), 'sid=abc');
     clock = 20000;
     expect(store.cookieHeaderFor(uri), isNull);
@@ -77,8 +90,9 @@ void main() {
 
   test('cookieHeaderFor orders longer paths first (RFC 6265 5.4)', () {
     final uri = Uri.parse('https://api.dev/v1/users');
-    store.storeFromSetCookie(uri, 'broad=1; Path=/');
-    store.storeFromSetCookie(uri, 'narrow=2; Path=/v1/users');
+    store
+      ..storeFromSetCookie(uri, 'broad=1; Path=/')
+      ..storeFromSetCookie(uri, 'narrow=2; Path=/v1/users');
     // More-specific (longer) path is sent first, regardless of insertion order.
     expect(store.cookieHeaderFor(uri), 'narrow=2; broad=1');
   });
@@ -91,8 +105,9 @@ void main() {
   });
 
   test('remove drops one cookie from memory and durable storage', () async {
-    store.storeFromSetCookie(Uri.parse('https://api.dev/'), 'a=1; Path=/');
-    store.storeFromSetCookie(Uri.parse('https://api.dev/'), 'b=2; Path=/');
+    store
+      ..storeFromSetCookie(Uri.parse('https://api.dev/'), 'a=1; Path=/')
+      ..storeFromSetCookie(Uri.parse('https://api.dev/'), 'b=2; Path=/');
     final target = store.all().firstWhere((c) => c.name == 'a');
 
     await store.remove(target);
@@ -103,7 +118,9 @@ void main() {
 
   test('remove of a non-stored cookie is a no-op', () async {
     store.storeFromSetCookie(Uri.parse('https://api.dev/'), 'a=1; Path=/');
-    await store.remove(const NetworkCookie(name: 'ghost', value: '', domain: 'other.dev'));
+    await store.remove(
+      const NetworkCookie(name: 'ghost', value: '', domain: 'other.dev'),
+    );
     expect(store.all(), hasLength(1));
   });
 }

@@ -70,7 +70,12 @@ void main() {
       const config = HttpRequestConfigEntity(
         id: 'c',
         url: 'https://api.dev/y',
-        auth: {'type': 'apikey', 'key': 'k', 'value': 'a b&c', 'addTo': 'query'},
+        auth: {
+          'type': 'apikey',
+          'key': 'k',
+          'value': 'a b&c',
+          'addTo': 'query',
+        },
       );
       final out = CodeGenService.generate(config, CodeGenTarget.curl);
       expect(out, contains('https://api.dev/y?k=a%20b%26c'));
@@ -96,41 +101,70 @@ void main() {
       expect(out, contains('body:'));
     });
 
-    test('multiline body is a safe double-quoted literal, not a template literal', () {
-      const config = HttpRequestConfigEntity(
-        id: 'c',
-        method: 'POST',
-        url: 'https://api.dev/x',
-        body: 'line1\n' r'`back` ${x}',
-      );
-      final out = CodeGenService.generate(config, CodeGenTarget.jsFetch);
-      expect(out, contains('body: "'), reason: 'double-quoted, so backtick/\${} are literal');
-      expect(out, isNot(contains('body: `')), reason: 'must not wrap in a template literal');
-      expect(out, contains(r'\n'), reason: 'newline escaped into a single-line literal');
-    });
+    test(
+      'multiline body is a safe double-quoted literal, not a template literal',
+      () {
+        const config = HttpRequestConfigEntity(
+          id: 'c',
+          method: 'POST',
+          url: 'https://api.dev/x',
+          body:
+              'line1\n'
+              r'`back` ${x}',
+        );
+        final out = CodeGenService.generate(config, CodeGenTarget.jsFetch);
+        expect(
+          out,
+          contains('body: "'),
+          reason: r'double-quoted, so backtick/${} are literal',
+        );
+        expect(
+          out,
+          isNot(contains('body: `')),
+          reason: 'must not wrap in a template literal',
+        );
+        expect(
+          out,
+          contains(r'\n'),
+          reason: 'newline escaped into a single-line literal',
+        );
+      },
+    );
   });
 
   group('Python requests', () {
     test('emits a requests.request call with headers and data', () {
-      final out = CodeGenService.generate(bearerJson, CodeGenTarget.pythonRequests);
+      final out = CodeGenService.generate(
+        bearerJson,
+        CodeGenTarget.pythonRequests,
+      );
       expect(out, contains('import requests'));
       expect(out, contains("requests.request('POST'"));
       expect(out, contains('headers=headers'));
       expect(out, contains('data='));
     });
 
-    test('multiline body is a double-quoted literal, not triple-single-quoted', () {
-      const config = HttpRequestConfigEntity(
-        id: 'c',
-        method: 'POST',
-        url: 'https://api.dev/x',
-        body: "a\n'''b",
-      );
-      final out = CodeGenService.generate(config, CodeGenTarget.pythonRequests);
-      expect(out, contains('data = "'),
-          reason: 'double-quoted, so an embedded triple-quote cannot break it');
-      expect(out, isNot(contains("data = '''")));
-    });
+    test(
+      'multiline body is a double-quoted literal, not triple-single-quoted',
+      () {
+        const config = HttpRequestConfigEntity(
+          id: 'c',
+          method: 'POST',
+          url: 'https://api.dev/x',
+          body: "a\n'''b",
+        );
+        final out = CodeGenService.generate(
+          config,
+          CodeGenTarget.pythonRequests,
+        );
+        expect(
+          out,
+          contains('data = "'),
+          reason: 'double-quoted, so an embedded triple-quote cannot break it',
+        );
+        expect(out, isNot(contains("data = '''")));
+      },
+    );
   });
 
   group('Node.js axios', () {
@@ -167,15 +201,21 @@ void main() {
       expect(out, contains('"net/http"'));
       expect(out, contains('method := "POST"'));
       expect(out, contains('url := "https://{{host}}/login"'));
-      expect(out, contains('req.Header.Add("Authorization", "Bearer {{token}}")'));
+      expect(
+        out,
+        contains('req.Header.Add("Authorization", "Bearer {{token}}")'),
+      );
       expect(out, contains('strings.NewReader'));
     });
 
     test('omits the strings import when there is no body', () {
       const config = HttpRequestConfigEntity(id: 'c', url: 'https://api.dev/x');
       final out = CodeGenService.generate(config, CodeGenTarget.goNetHttp);
-      expect(out, isNot(contains('"strings"')),
-          reason: 'unused imports are a compile error in Go');
+      expect(
+        out,
+        isNot(contains('"strings"')),
+        reason: 'unused imports are a compile error in Go',
+      );
       expect(out, contains('http.NewRequest(method, url, nil)'));
     });
   });
@@ -190,10 +230,16 @@ void main() {
       expect(out, contains('.addHeader("Authorization", "Bearer {{token}}")'));
     });
 
-    test('does not duplicate the Content-Type header when the body carries it', () {
-      final out = CodeGenService.generate(bearerJson, CodeGenTarget.javaOkHttp);
-      expect(out, isNot(contains('.addHeader("Content-Type"')));
-    });
+    test(
+      'does not duplicate the Content-Type header when the body carries it',
+      () {
+        final out = CodeGenService.generate(
+          bearerJson,
+          CodeGenTarget.javaOkHttp,
+        );
+        expect(out, isNot(contains('.addHeader("Content-Type"')));
+      },
+    );
 
     test('urlencoded body uses a FormBody builder', () {
       const config = HttpRequestConfigEntity(

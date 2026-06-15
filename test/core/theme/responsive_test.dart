@@ -30,7 +30,11 @@ void main() {
   });
 
   group('ResponsiveBuildContext', () {
-    Future<void> pumpAt(WidgetTester tester, double width, void Function(BuildContext) onBuild) async {
+    Future<void> pumpAt(
+      WidgetTester tester,
+      double width,
+      void Function(BuildContext) onBuild,
+    ) async {
       await tester.pumpWidget(
         MediaQuery(
           data: MediaQueryData(size: Size(width, 800)),
@@ -69,19 +73,24 @@ void main() {
       expect(ctx.isPhone, isFalse);
     });
 
-    testWidgets('phone width turns on drawer + unified tabs + fullscreen dialogs', (tester) async {
-      late BuildContext ctx;
-      await pumpAt(tester, 640, (c) => ctx = c);
-      expect(ctx.layoutMode, LayoutMode.phone);
-      expect(ctx.isPhone, isTrue);
-      expect(ctx.useDrawerNav, isTrue);
-      expect(ctx.useUnifiedRequestTabs, isTrue);
-      expect(ctx.isDialogFullscreen, isTrue);
-      expect(ctx.useTabSwitcher, isFalse);
-      expect(ctx.touchTargetMin, 44.0);
-    });
+    testWidgets(
+      'phone width turns on drawer + unified tabs + fullscreen dialogs',
+      (tester) async {
+        late BuildContext ctx;
+        await pumpAt(tester, 640, (c) => ctx = c);
+        expect(ctx.layoutMode, LayoutMode.phone);
+        expect(ctx.isPhone, isTrue);
+        expect(ctx.useDrawerNav, isTrue);
+        expect(ctx.useUnifiedRequestTabs, isTrue);
+        expect(ctx.isDialogFullscreen, isTrue);
+        expect(ctx.useTabSwitcher, isFalse);
+        expect(ctx.touchTargetMin, 44.0);
+      },
+    );
 
-    testWidgets('compact-phone width additionally turns on the tab switcher', (tester) async {
+    testWidgets('compact-phone width additionally turns on the tab switcher', (
+      tester,
+    ) async {
       late BuildContext ctx;
       await pumpAt(tester, 375, (c) => ctx = c);
       expect(ctx.layoutMode, LayoutMode.compactPhone);

@@ -8,7 +8,7 @@ part of 'request_tab_model.dart';
 
 class HttpRequestTabModelAdapter extends TypeAdapter<HttpRequestTabModel> {
   @override
-  final int typeId = 2;
+  final typeId = 2;
 
   @override
   HttpRequestTabModel read(BinaryReader reader) {
@@ -20,9 +20,9 @@ class HttpRequestTabModelAdapter extends TypeAdapter<HttpRequestTabModel> {
       config: fields[0] as HttpRequestConfig,
       responseBody: fields[1] as String?,
       responseHeaders: (fields[2] as Map?)?.cast<String, String>(),
-      statusCode: fields[3] as int?,
-      durationMs: fields[4] as int?,
-      isSending: fields[5] as bool,
+      statusCode: (fields[3] as num?)?.toInt(),
+      durationMs: (fields[4] as num?)?.toInt(),
+      isSending: fields[5] == null ? false : fields[5] as bool,
       collectionNodeId: fields[6] as String?,
       collectionName: fields[7] as String?,
       tabId: fields[8] as String?,

@@ -8,7 +8,7 @@ part of 'stored_cookie_model.dart';
 
 class StoredCookieModelAdapter extends TypeAdapter<StoredCookieModel> {
   @override
-  final int typeId = 6;
+  final typeId = 6;
 
   @override
   StoredCookieModel read(BinaryReader reader) {
@@ -23,7 +23,7 @@ class StoredCookieModelAdapter extends TypeAdapter<StoredCookieModel> {
       path: fields[3] == null ? '/' : fields[3] as String,
       secure: fields[4] == null ? false : fields[4] as bool,
       httpOnly: fields[5] == null ? false : fields[5] as bool,
-      expiresEpochMs: fields[6] as int?,
+      expiresEpochMs: (fields[6] as num?)?.toInt(),
     );
   }
 

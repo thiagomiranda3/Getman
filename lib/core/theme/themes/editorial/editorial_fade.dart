@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 
 class EditorialFade extends StatefulWidget {
-  final Widget child;
-  final VoidCallback? onTap;
-
   const EditorialFade({
-    super.key,
     required this.child,
+    super.key,
     this.onTap,
   });
+  final Widget child;
+  final VoidCallback? onTap;
 
   @override
   State<EditorialFade> createState() => _EditorialFadeState();

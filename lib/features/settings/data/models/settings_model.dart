@@ -1,6 +1,6 @@
 import 'package:getman/core/theme/theme_ids.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 part 'settings_model.g.dart';
 
@@ -8,6 +8,81 @@ const Object _unchanged = Object();
 
 @HiveType(typeId: 0)
 class SettingsModel extends HiveObject {
+  SettingsModel({
+    this.historyLimit = 100,
+    this.saveResponseInHistory = false,
+    this.alwaysPrettifyLargeResponses = false,
+    this.isDarkMode = false,
+    this.isCompactMode = false,
+    this.isVerticalLayout = false,
+    this.splitRatio = 0.5,
+    this.sideMenuWidth = 300.0,
+    this.themeId = kBrutalistThemeId,
+    this.activeEnvironmentId,
+    this.connectTimeoutMs = 30000,
+    this.sendTimeoutMs = 30000,
+    this.receiveTimeoutMs = 60000,
+    this.followRedirects = true,
+    this.maxRedirects = 5,
+    this.verifySsl = true,
+    this.proxyUrl,
+    this.clientCertPath,
+    this.clientKeyPath,
+    this.clientCertPassphrase,
+    this.workspacePath,
+    this.workspaceBookmark,
+  });
+
+  factory SettingsModel.fromJson(Map<String, dynamic> json) => SettingsModel(
+    historyLimit: json['historyLimit'] as int? ?? 100,
+    saveResponseInHistory: json['saveResponseInHistory'] as bool? ?? false,
+    alwaysPrettifyLargeResponses:
+        json['alwaysPrettifyLargeResponses'] as bool? ?? false,
+    isDarkMode: json['isDarkMode'] as bool? ?? false,
+    isCompactMode: json['isCompactMode'] as bool? ?? false,
+    isVerticalLayout: json['isVerticalLayout'] as bool? ?? false,
+    splitRatio: (json['splitRatio'] as num?)?.toDouble() ?? 0.5,
+    sideMenuWidth: (json['sideMenuWidth'] as num?)?.toDouble() ?? 300.0,
+    themeId: json['themeId'] as String? ?? kBrutalistThemeId,
+    activeEnvironmentId: json['activeEnvironmentId'] as String?,
+    connectTimeoutMs: json['connectTimeoutMs'] as int? ?? 30000,
+    sendTimeoutMs: json['sendTimeoutMs'] as int? ?? 30000,
+    receiveTimeoutMs: json['receiveTimeoutMs'] as int? ?? 60000,
+    followRedirects: json['followRedirects'] as bool? ?? true,
+    maxRedirects: json['maxRedirects'] as int? ?? 5,
+    verifySsl: json['verifySsl'] as bool? ?? true,
+    proxyUrl: json['proxyUrl'] as String?,
+    clientCertPath: json['clientCertPath'] as String?,
+    clientKeyPath: json['clientKeyPath'] as String?,
+    clientCertPassphrase: json['clientCertPassphrase'] as String?,
+    workspacePath: json['workspacePath'] as String?,
+    workspaceBookmark: json['workspaceBookmark'] as String?,
+  );
+
+  factory SettingsModel.fromEntity(SettingsEntity entity) => SettingsModel(
+    historyLimit: entity.historyLimit,
+    saveResponseInHistory: entity.saveResponseInHistory,
+    alwaysPrettifyLargeResponses: entity.alwaysPrettifyLargeResponses,
+    isDarkMode: entity.isDarkMode,
+    isCompactMode: entity.isCompactMode,
+    isVerticalLayout: entity.isVerticalLayout,
+    splitRatio: entity.splitRatio,
+    sideMenuWidth: entity.sideMenuWidth,
+    themeId: entity.themeId,
+    activeEnvironmentId: entity.activeEnvironmentId,
+    connectTimeoutMs: entity.connectTimeoutMs,
+    sendTimeoutMs: entity.sendTimeoutMs,
+    receiveTimeoutMs: entity.receiveTimeoutMs,
+    followRedirects: entity.followRedirects,
+    maxRedirects: entity.maxRedirects,
+    verifySsl: entity.verifySsl,
+    proxyUrl: entity.proxyUrl,
+    clientCertPath: entity.clientCertPath,
+    clientKeyPath: entity.clientKeyPath,
+    clientCertPassphrase: entity.clientCertPassphrase,
+    workspacePath: entity.workspacePath,
+    workspaceBookmark: entity.workspaceBookmark,
+  );
   @HiveField(0, defaultValue: 100)
   int historyLimit;
 
@@ -74,31 +149,6 @@ class SettingsModel extends HiveObject {
   @HiveField(21)
   String? clientCertPassphrase;
 
-  SettingsModel({
-    this.historyLimit = 100,
-    this.saveResponseInHistory = false,
-    this.alwaysPrettifyLargeResponses = false,
-    this.isDarkMode = false,
-    this.isCompactMode = false,
-    this.isVerticalLayout = false,
-    this.splitRatio = 0.5,
-    this.sideMenuWidth = 300.0,
-    this.themeId = kBrutalistThemeId,
-    this.activeEnvironmentId,
-    this.connectTimeoutMs = 30000,
-    this.sendTimeoutMs = 30000,
-    this.receiveTimeoutMs = 60000,
-    this.followRedirects = true,
-    this.maxRedirects = 5,
-    this.verifySsl = true,
-    this.proxyUrl,
-    this.clientCertPath,
-    this.clientKeyPath,
-    this.clientCertPassphrase,
-    this.workspacePath,
-    this.workspaceBookmark,
-  });
-
   SettingsModel copyWith({
     int? historyLimit,
     bool? saveResponseInHistory,
@@ -125,7 +175,8 @@ class SettingsModel extends HiveObject {
   }) {
     return SettingsModel(
       historyLimit: historyLimit ?? this.historyLimit,
-      saveResponseInHistory: saveResponseInHistory ?? this.saveResponseInHistory,
+      saveResponseInHistory:
+          saveResponseInHistory ?? this.saveResponseInHistory,
       alwaysPrettifyLargeResponses:
           alwaysPrettifyLargeResponses ?? this.alwaysPrettifyLargeResponses,
       isDarkMode: isDarkMode ?? this.isDarkMode,
@@ -143,16 +194,21 @@ class SettingsModel extends HiveObject {
       followRedirects: followRedirects ?? this.followRedirects,
       maxRedirects: maxRedirects ?? this.maxRedirects,
       verifySsl: verifySsl ?? this.verifySsl,
-      proxyUrl: identical(proxyUrl, _unchanged) ? this.proxyUrl : proxyUrl as String?,
-      clientCertPath:
-          identical(clientCertPath, _unchanged) ? this.clientCertPath : clientCertPath as String?,
-      clientKeyPath:
-          identical(clientKeyPath, _unchanged) ? this.clientKeyPath : clientKeyPath as String?,
+      proxyUrl: identical(proxyUrl, _unchanged)
+          ? this.proxyUrl
+          : proxyUrl as String?,
+      clientCertPath: identical(clientCertPath, _unchanged)
+          ? this.clientCertPath
+          : clientCertPath as String?,
+      clientKeyPath: identical(clientKeyPath, _unchanged)
+          ? this.clientKeyPath
+          : clientKeyPath as String?,
       clientCertPassphrase: identical(clientCertPassphrase, _unchanged)
           ? this.clientCertPassphrase
           : clientCertPassphrase as String?,
-      workspacePath:
-          identical(workspacePath, _unchanged) ? this.workspacePath : workspacePath as String?,
+      workspacePath: identical(workspacePath, _unchanged)
+          ? this.workspacePath
+          : workspacePath as String?,
       workspaceBookmark: identical(workspaceBookmark, _unchanged)
           ? this.workspaceBookmark
           : workspaceBookmark as String?,
@@ -183,56 +239,6 @@ class SettingsModel extends HiveObject {
     'workspacePath': workspacePath,
     'workspaceBookmark': workspaceBookmark,
   };
-
-  factory SettingsModel.fromJson(Map<String, dynamic> json) => SettingsModel(
-    historyLimit: json['historyLimit'] ?? 100,
-    saveResponseInHistory: json['saveResponseInHistory'] ?? false,
-    alwaysPrettifyLargeResponses: json['alwaysPrettifyLargeResponses'] ?? false,
-    isDarkMode: json['isDarkMode'] ?? false,
-    isCompactMode: json['isCompactMode'] ?? false,
-    isVerticalLayout: json['isVerticalLayout'] ?? false,
-    splitRatio: json['splitRatio'] ?? 0.5,
-    sideMenuWidth: (json['sideMenuWidth'] ?? 300.0).toDouble(),
-    themeId: json['themeId'] ?? kBrutalistThemeId,
-    activeEnvironmentId: json['activeEnvironmentId'] as String?,
-    connectTimeoutMs: json['connectTimeoutMs'] ?? 30000,
-    sendTimeoutMs: json['sendTimeoutMs'] ?? 30000,
-    receiveTimeoutMs: json['receiveTimeoutMs'] ?? 60000,
-    followRedirects: json['followRedirects'] ?? true,
-    maxRedirects: json['maxRedirects'] ?? 5,
-    verifySsl: json['verifySsl'] ?? true,
-    proxyUrl: json['proxyUrl'] as String?,
-    clientCertPath: json['clientCertPath'] as String?,
-    clientKeyPath: json['clientKeyPath'] as String?,
-    clientCertPassphrase: json['clientCertPassphrase'] as String?,
-    workspacePath: json['workspacePath'] as String?,
-    workspaceBookmark: json['workspaceBookmark'] as String?,
-  );
-
-  factory SettingsModel.fromEntity(SettingsEntity entity) => SettingsModel(
-    historyLimit: entity.historyLimit,
-    saveResponseInHistory: entity.saveResponseInHistory,
-    alwaysPrettifyLargeResponses: entity.alwaysPrettifyLargeResponses,
-    isDarkMode: entity.isDarkMode,
-    isCompactMode: entity.isCompactMode,
-    isVerticalLayout: entity.isVerticalLayout,
-    splitRatio: entity.splitRatio,
-    sideMenuWidth: entity.sideMenuWidth,
-    themeId: entity.themeId,
-    activeEnvironmentId: entity.activeEnvironmentId,
-    connectTimeoutMs: entity.connectTimeoutMs,
-    sendTimeoutMs: entity.sendTimeoutMs,
-    receiveTimeoutMs: entity.receiveTimeoutMs,
-    followRedirects: entity.followRedirects,
-    maxRedirects: entity.maxRedirects,
-    verifySsl: entity.verifySsl,
-    proxyUrl: entity.proxyUrl,
-    clientCertPath: entity.clientCertPath,
-    clientKeyPath: entity.clientKeyPath,
-    clientCertPassphrase: entity.clientCertPassphrase,
-    workspacePath: entity.workspacePath,
-    workspaceBookmark: entity.workspaceBookmark,
-  );
 
   SettingsEntity toEntity() => SettingsEntity(
     historyLimit: historyLimit,

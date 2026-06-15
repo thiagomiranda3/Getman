@@ -7,16 +7,6 @@ import 'package:getman/core/utils/cookie_parser.dart';
 /// A cookie with only an `Expires` HTTP-date is treated as a session cookie —
 /// parsing RFC HTTP dates without dart:io is out of scope for v1 (documented).
 class NetworkCookie extends Equatable {
-  final String name;
-  final String value;
-  final String domain;
-  final String path;
-  final bool secure;
-  final bool httpOnly;
-
-  /// Absolute expiry in epoch ms, or null for a session cookie.
-  final int? expiresEpochMs;
-
   const NetworkCookie({
     required this.name,
     required this.value,
@@ -26,6 +16,15 @@ class NetworkCookie extends Equatable {
     this.httpOnly = false,
     this.expiresEpochMs,
   });
+  final String name;
+  final String value;
+  final String domain;
+  final String path;
+  final bool secure;
+  final bool httpOnly;
+
+  /// Absolute expiry in epoch ms, or null for a session cookie.
+  final int? expiresEpochMs;
 
   /// Identity for upsert: a server overwriting (domain, path, name) replaces.
   String get key => '$domain|$path|$name';
@@ -84,31 +83,42 @@ class NetworkCookie extends Equatable {
         }
       }
       if (domain.isEmpty) domain = requestUri.host;
-      result.add(NetworkCookie(
-        name: c.name,
-        value: c.value,
-        domain: domain,
-        path: path,
-        secure: secure,
-        httpOnly: httpOnly,
-        expiresEpochMs: expires,
-      ));
+      result.add(
+        NetworkCookie(
+          name: c.name,
+          value: c.value,
+          domain: domain,
+          path: path,
+          secure: secure,
+          httpOnly: httpOnly,
+          expiresEpochMs: expires,
+        ),
+      );
     }
     return result;
   }
 
-  static String _stripLeadingDot(String d) => d.startsWith('.') ? d.substring(1) : d;
+  static String _stripLeadingDot(String d) =>
+      d.startsWith('.') ? d.substring(1) : d;
 
   NetworkCookie copyWith({String? value, int? expiresEpochMs}) => NetworkCookie(
-        name: name,
-        value: value ?? this.value,
-        domain: domain,
-        path: path,
-        secure: secure,
-        httpOnly: httpOnly,
-        expiresEpochMs: expiresEpochMs ?? this.expiresEpochMs,
-      );
+    name: name,
+    value: value ?? this.value,
+    domain: domain,
+    path: path,
+    secure: secure,
+    httpOnly: httpOnly,
+    expiresEpochMs: expiresEpochMs ?? this.expiresEpochMs,
+  );
 
   @override
-  List<Object?> get props => [name, value, domain, path, secure, httpOnly, expiresEpochMs];
+  List<Object?> get props => [
+    name,
+    value,
+    domain,
+    path,
+    secure,
+    httpOnly,
+    expiresEpochMs,
+  ];
 }

@@ -15,11 +15,20 @@ class AddTabButton extends StatelessWidget {
     return HoverHighlight(
       decoration: (hovered) => BoxDecoration(
         color: hovered ? theme.primaryColor : theme.scaffoldBackgroundColor,
-        border: Border(left: BorderSide(color: theme.dividerColor, width: layout.borderThick)),
+        border: Border(
+          left: BorderSide(
+            color: theme.dividerColor,
+            width: layout.borderThick,
+          ),
+        ),
       ),
       child: context.appDecoration.wrapInteractive(
         child: IconButton(
-          icon: Icon(Icons.add, size: layout.addIconSize, color: theme.colorScheme.onSurface),
+          icon: Icon(
+            Icons.add,
+            size: layout.addIconSize,
+            color: theme.colorScheme.onSurface,
+          ),
           onPressed: () => context.read<TabsBloc>().add(const AddTab()),
         ),
       ),

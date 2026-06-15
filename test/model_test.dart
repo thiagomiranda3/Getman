@@ -8,7 +8,6 @@ void main() {
       const entity = HttpRequestConfigEntity(
         id: '1',
         url: 'https://example.com',
-        method: 'GET',
       );
 
       final model = HttpRequestConfig.fromEntity(entity);
@@ -20,8 +19,8 @@ void main() {
     });
 
     test('compares equal when all non-id fields match', () {
-      final a = HttpRequestConfig(id: '1', method: 'GET', url: 'url');
-      final b = HttpRequestConfig(id: '1', method: 'GET', url: 'url');
+      final a = HttpRequestConfig(id: '1', url: 'url');
+      final b = HttpRequestConfig(id: '1', url: 'url');
       expect(a == b, isTrue);
       expect(a.hashCode, b.hashCode);
     });
@@ -31,21 +30,41 @@ void main() {
     // UUIDs would be treated as distinct and the history box would grow
     // unbounded. See CLAUDE.md §6.
     test('equality and hashCode ignore id (dedup contract)', () {
-      final a = HttpRequestConfig(id: 'id-a', method: 'POST', url: 'https://api', body: '{"x":1}');
-      final b = HttpRequestConfig(id: 'id-b', method: 'POST', url: 'https://api', body: '{"x":1}');
+      final a = HttpRequestConfig(
+        id: 'id-a',
+        method: 'POST',
+        url: 'https://api',
+        body: '{"x":1}',
+      );
+      final b = HttpRequestConfig(
+        id: 'id-b',
+        method: 'POST',
+        url: 'https://api',
+        body: '{"x":1}',
+      );
       expect(a == b, isTrue, reason: 'Equality must ignore id');
       expect(a.hashCode, b.hashCode, reason: 'hashCode must also ignore id');
     });
 
     test('equality distinguishes different methods', () {
-      final a = HttpRequestConfig(id: '1', method: 'GET', url: 'url');
+      final a = HttpRequestConfig(id: '1', url: 'url');
       final b = HttpRequestConfig(id: '1', method: 'POST', url: 'url');
       expect(a == b, isFalse);
     });
 
     test('equality distinguishes different bodies', () {
-      final a = HttpRequestConfig(id: '1', method: 'POST', url: 'url', body: 'one');
-      final b = HttpRequestConfig(id: '1', method: 'POST', url: 'url', body: 'two');
+      final a = HttpRequestConfig(
+        id: '1',
+        method: 'POST',
+        url: 'url',
+        body: 'one',
+      );
+      final b = HttpRequestConfig(
+        id: '1',
+        method: 'POST',
+        url: 'url',
+        body: 'two',
+      );
       expect(a == b, isFalse);
     });
   });

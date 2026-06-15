@@ -11,23 +11,21 @@ import 'package:getman/features/chaining/domain/logic/extraction_engine.dart';
 /// are value objects of primitives/strings/maps/enums, so it is sendable across
 /// an isolate boundary (it is the argument to [runRules] under `compute`).
 class RulesRunInput {
-  final List<ExtractionRule> extractionRules;
-  final List<Assertion> assertions;
-  final HttpResponseEntity response;
-
   const RulesRunInput({
     required this.extractionRules,
     required this.assertions,
     required this.response,
   });
+  final List<ExtractionRule> extractionRules;
+  final List<Assertion> assertions;
+  final HttpResponseEntity response;
 }
 
 /// Captured values + assertion verdicts from one rules pass.
 class RulesRunOutput {
+  const RulesRunOutput({required this.extraction, required this.assertions});
   final List<ExtractionResult> extraction;
   final List<AssertionResult> assertions;
-
-  const RulesRunOutput({required this.extraction, required this.assertions});
 }
 
 /// Decodes the response body **once** and runs both the extraction and
@@ -38,7 +36,15 @@ class RulesRunOutput {
 RulesRunOutput runRules(RulesRunInput input) {
   final decoded = JsonPath.tryDecode(input.response.body);
   return RulesRunOutput(
-    extraction: ExtractionEngine.runDecoded(input.extractionRules, input.response, decoded),
-    assertions: AssertionEngine.runDecoded(input.assertions, input.response, decoded),
+    extraction: ExtractionEngine.runDecoded(
+      input.extractionRules,
+      input.response,
+      decoded,
+    ),
+    assertions: AssertionEngine.runDecoded(
+      input.assertions,
+      input.response,
+      decoded,
+    ),
   );
 }

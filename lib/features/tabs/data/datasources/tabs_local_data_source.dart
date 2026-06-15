@@ -1,7 +1,7 @@
 import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/features/tabs/data/models/request_tab_model.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_flutter.dart';
 
 abstract class TabsLocalDataSource {
   Future<List<HttpRequestTabModel>> getTabs();
@@ -15,7 +15,8 @@ class TabsLocalDataSourceImpl implements TabsLocalDataSource {
   /// Key inside the meta box holding the ordered list of tabIds.
   static const String orderKey = 'order';
 
-  Box<HttpRequestTabModel> _box() => Hive.box<HttpRequestTabModel>(HiveBoxes.tabs);
+  Box<HttpRequestTabModel> _box() =>
+      Hive.box<HttpRequestTabModel>(HiveBoxes.tabs);
   Box<dynamic> _metaBox() => Hive.box(HiveBoxes.tabsMeta);
 
   @override
@@ -45,7 +46,9 @@ class TabsLocalDataSourceImpl implements TabsLocalDataSource {
   /// One-time migration from the legacy auto-increment layout: int keys
   /// iterate in insertion order, which *was* the tab order, so capture it
   /// before re-keying every entry by tabId.
-  Future<void> _migrateLegacyIntKeysIfNeeded(Box<HttpRequestTabModel> box) async {
+  Future<void> _migrateLegacyIntKeysIfNeeded(
+    Box<HttpRequestTabModel> box,
+  ) async {
     if (!box.keys.any((k) => k is int)) return;
     final models = box.values.toList();
     await box.clear();

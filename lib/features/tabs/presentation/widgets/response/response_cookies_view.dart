@@ -8,8 +8,8 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 
 /// COOKIES tab: parses the response's `set-cookie` header into name/value rows.
 class ResponseCookiesView extends StatelessWidget {
+  const ResponseCookiesView({required this.tabId, super.key});
   final String tabId;
-  const ResponseCookiesView({super.key, required this.tabId});
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +67,10 @@ class ResponseCookiesView extends StatelessWidget {
               ),
               subtitle: Text(
                 c.attributes.isEmpty ? c.value : '${c.value}\n${c.attributes}',
-                style: TextStyle(fontSize: layout.fontSizeNormal, color: theme.colorScheme.onSurface),
+                style: TextStyle(
+                  fontSize: layout.fontSizeNormal,
+                  color: theme.colorScheme.onSurface,
+                ),
               ),
             );
           },

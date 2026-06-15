@@ -1,5 +1,7 @@
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
-import 'package:hive/hive.dart';
+import 'package:getman/features/history/data/models/request_config_model.dart'
+    show HttpRequestConfig;
+import 'package:hive_ce/hive.dart';
 
 part 'multipart_field_model.g.dart';
 
@@ -8,6 +10,22 @@ part 'multipart_field_model.g.dart';
 /// history, collections, and tabs automatically.
 @HiveType(typeId: 5)
 class MultipartFieldModel extends HiveObject {
+  MultipartFieldModel({
+    required this.name,
+    this.value = '',
+    this.isFile = false,
+    this.filePath,
+    this.contentType,
+  });
+
+  factory MultipartFieldModel.fromEntity(MultipartFieldEntity e) =>
+      MultipartFieldModel(
+        name: e.name,
+        value: e.value,
+        isFile: e.isFile,
+        filePath: e.filePath,
+        contentType: e.contentType,
+      );
   @HiveField(0)
   String name;
 
@@ -23,27 +41,11 @@ class MultipartFieldModel extends HiveObject {
   @HiveField(4)
   String? contentType;
 
-  MultipartFieldModel({
-    required this.name,
-    this.value = '',
-    this.isFile = false,
-    this.filePath,
-    this.contentType,
-  });
-
-  factory MultipartFieldModel.fromEntity(MultipartFieldEntity e) => MultipartFieldModel(
-        name: e.name,
-        value: e.value,
-        isFile: e.isFile,
-        filePath: e.filePath,
-        contentType: e.contentType,
-      );
-
   MultipartFieldEntity toEntity() => MultipartFieldEntity(
-        name: name,
-        value: value,
-        isFile: isFile,
-        filePath: filePath,
-        contentType: contentType,
-      );
+    name: name,
+    value: value,
+    isFile: isFile,
+    filePath: filePath,
+    contentType: contentType,
+  );
 }

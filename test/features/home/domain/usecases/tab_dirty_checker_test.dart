@@ -7,7 +7,11 @@ void main() {
   const checker = TabDirtyChecker();
 
   HttpRequestTabEntity tab(HttpRequestConfigEntity config, {String? nodeId}) =>
-      HttpRequestTabEntity(tabId: 't', config: config, collectionNodeId: nodeId);
+      HttpRequestTabEntity(
+        tabId: 't',
+        config: config,
+        collectionNodeId: nodeId,
+      );
 
   group('unlinked tab', () {
     test('a pristine default config is not dirty', () {
@@ -16,13 +20,15 @@ void main() {
     });
 
     test('a modified config is dirty', () {
-      final t = tab(const HttpRequestConfigEntity(id: 't', url: 'https://x.dev'));
+      final t = tab(
+        const HttpRequestConfigEntity(id: 't', url: 'https://x.dev'),
+      );
       expect(checker(tab: t, savedConfigs: const {}), isTrue);
     });
   });
 
   group('linked tab', () {
-    final saved = const HttpRequestConfigEntity(id: 't', url: 'https://saved.dev');
+    const saved = HttpRequestConfigEntity(id: 't', url: 'https://saved.dev');
 
     test('matching the saved config is not dirty', () {
       final t = tab(saved, nodeId: 'n1');
@@ -30,7 +36,10 @@ void main() {
     });
 
     test('differing from the saved config is dirty', () {
-      final t = tab(const HttpRequestConfigEntity(id: 't', url: 'https://edited.dev'), nodeId: 'n1');
+      final t = tab(
+        const HttpRequestConfigEntity(id: 't', url: 'https://edited.dev'),
+        nodeId: 'n1',
+      );
       expect(checker(tab: t, savedConfigs: {'n1': saved}), isTrue);
     });
 

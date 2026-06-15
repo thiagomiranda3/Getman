@@ -26,11 +26,12 @@ const _resultsEquality = ListEquality<ExtractionResult>();
 /// moment an environment is selected (which emits on SettingsBloc, not
 /// TabsBloc, so it is listened for separately).
 class ChainingWriteBackListener extends StatefulWidget {
+  const ChainingWriteBackListener({required this.child, super.key});
   final Widget child;
-  const ChainingWriteBackListener({super.key, required this.child});
 
   @override
-  State<ChainingWriteBackListener> createState() => _ChainingWriteBackListenerState();
+  State<ChainingWriteBackListener> createState() =>
+      _ChainingWriteBackListenerState();
 }
 
 class _ChainingWriteBackListenerState extends State<ChainingWriteBackListener> {
@@ -43,14 +44,16 @@ class _ChainingWriteBackListenerState extends State<ChainingWriteBackListener> {
   Widget build(BuildContext context) {
     return BlocListener<TabsBloc, TabsState>(
       listenWhen: (prev, next) => _hasPending(next),
-      listener: (context, state) => _flush(context, state),
+      listener: _flush,
       child: BlocListener<SettingsBloc, SettingsState>(
         // A newly-selected environment emits no TabsState, so flush pending
         // captures here too.
         listenWhen: (prev, next) =>
-            prev.settings.activeEnvironmentId != next.settings.activeEnvironmentId &&
+            prev.settings.activeEnvironmentId !=
+                next.settings.activeEnvironmentId &&
             next.settings.activeEnvironmentId != null,
-        listener: (context, _) => _flush(context, context.read<TabsBloc>().state),
+        listener: (context, _) =>
+            _flush(context, context.read<TabsBloc>().state),
         child: widget.child,
       ),
     );
@@ -59,7 +62,10 @@ class _ChainingWriteBackListenerState extends State<ChainingWriteBackListener> {
   bool _hasPending(TabsState next) {
     for (final tab in next.tabs) {
       if (tab.extractionResults.isEmpty) continue;
-      if (!_resultsEquality.equals(_written[tab.tabId], tab.extractionResults)) {
+      if (!_resultsEquality.equals(
+        _written[tab.tabId],
+        tab.extractionResults,
+      )) {
         return true;
       }
     }
@@ -70,8 +76,12 @@ class _ChainingWriteBackListenerState extends State<ChainingWriteBackListener> {
     final pending = <String, List<ExtractionResult>>{};
     final captured = <ExtractionResult>[];
     for (final tab in state.tabs) {
-      if (_resultsEquality.equals(_written[tab.tabId], tab.extractionResults)) continue;
-      final matched = tab.extractionResults.where((e) => e.matched && e.value != null).toList();
+      if (_resultsEquality.equals(_written[tab.tabId], tab.extractionResults)) {
+        continue;
+      }
+      final matched = tab.extractionResults
+          .where((e) => e.matched && e.value != null)
+          .toList();
       if (matched.isEmpty) {
         // Nothing to persist for this tab — mark seen so it isn't reconsidered.
         _written[tab.tabId] = tab.extractionResults;
@@ -86,19 +96,28 @@ class _ChainingWriteBackListenerState extends State<ChainingWriteBackListener> {
 
     if (captured.isEmpty) return;
 
-    final activeId = context.read<SettingsBloc>().state.settings.activeEnvironmentId;
+    final activeId = context
+        .read<SettingsBloc>()
+        .state
+        .settings
+        .activeEnvironmentId;
     final envs = context.read<EnvironmentsBloc>().state.environments;
-    final active = activeId == null ? null : envs.firstWhereOrNull((e) => e.id == activeId);
+    final active = activeId == null
+        ? null
+        : envs.firstWhereOrNull((e) => e.id == activeId);
 
     if (active == null) {
       // Do NOT mark pending as written — keep it for when an environment is
       // selected. Notify once per distinct pending set.
-      final noticeKey = captured.map((e) => '${e.variable}=${e.value}').join('|');
+      final noticeKey = captured
+          .map((e) => '${e.variable}=${e.value}')
+          .join('|');
       if (_lastNoEnvNotice != noticeKey) {
         _lastNoEnvNotice = noticeKey;
         showAppSnackBar(
           context,
-          'Captured ${captured.length} value(s) — select an active environment to save them.',
+          'Captured ${captured.length} value(s) — select an active '
+          'environment to save them.',
         );
       }
       return;
@@ -108,8 +127,12 @@ class _ChainingWriteBackListenerState extends State<ChainingWriteBackListener> {
     for (final e in captured) {
       merged[e.variable] = e.value!;
     }
-    context.read<EnvironmentsBloc>().add(UpdateEnvironment(active.copyWith(variables: merged)));
-    pending.forEach((id, results) => _written[id] = results); // mark only after persist
+    context.read<EnvironmentsBloc>().add(
+      UpdateEnvironment(active.copyWith(variables: merged)),
+    );
+    pending.forEach(
+      (id, results) => _written[id] = results,
+    ); // mark only after persist
     _lastNoEnvNotice = null;
     showAppSnackBar(
       context,

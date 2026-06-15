@@ -8,7 +8,7 @@ part of 'settings_model.dart';
 
 class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
   @override
-  final int typeId = 0;
+  final typeId = 0;
 
   @override
   SettingsModel read(BinaryReader reader) {
@@ -17,22 +17,25 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return SettingsModel(
-      historyLimit: fields[0] == null ? 100 : fields[0] as int,
+      historyLimit: fields[0] == null ? 100 : (fields[0] as num).toInt(),
       saveResponseInHistory: fields[1] == null ? false : fields[1] as bool,
-      alwaysPrettifyLargeResponses:
-          fields[17] == null ? false : fields[17] as bool,
+      alwaysPrettifyLargeResponses: fields[17] == null
+          ? false
+          : fields[17] as bool,
       isDarkMode: fields[2] == null ? false : fields[2] as bool,
       isCompactMode: fields[3] == null ? false : fields[3] as bool,
       isVerticalLayout: fields[4] == null ? false : fields[4] as bool,
-      splitRatio: fields[5] == null ? 0.5 : fields[5] as double,
-      sideMenuWidth: fields[6] == null ? 300.0 : fields[6] as double,
+      splitRatio: fields[5] == null ? 0.5 : (fields[5] as num).toDouble(),
+      sideMenuWidth: fields[6] == null ? 300.0 : (fields[6] as num).toDouble(),
       themeId: fields[7] == null ? 'brutalist' : fields[7] as String,
       activeEnvironmentId: fields[8] as String?,
-      connectTimeoutMs: fields[9] == null ? 30000 : fields[9] as int,
-      sendTimeoutMs: fields[10] == null ? 30000 : fields[10] as int,
-      receiveTimeoutMs: fields[11] == null ? 60000 : fields[11] as int,
+      connectTimeoutMs: fields[9] == null ? 30000 : (fields[9] as num).toInt(),
+      sendTimeoutMs: fields[10] == null ? 30000 : (fields[10] as num).toInt(),
+      receiveTimeoutMs: fields[11] == null
+          ? 60000
+          : (fields[11] as num).toInt(),
       followRedirects: fields[12] == null ? true : fields[12] as bool,
-      maxRedirects: fields[18] == null ? 5 : fields[18] as int,
+      maxRedirects: fields[18] == null ? 5 : (fields[18] as num).toInt(),
       verifySsl: fields[13] == null ? true : fields[13] as bool,
       proxyUrl: fields[14] as String?,
       clientCertPath: fields[19] as String?,

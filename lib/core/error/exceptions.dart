@@ -1,11 +1,11 @@
 class PersistenceException implements Exception {
+  PersistenceException(this.message, {this.cause});
   final String message;
   final Object? cause;
 
-  PersistenceException(this.message, {this.cause});
-
   @override
-  String toString() => 'PersistenceException: $message${cause != null ? ' ($cause)' : ''}';
+  String toString() =>
+      'PersistenceException: $message${cause != null ? ' ($cause)' : ''}';
 }
 
 /// Thrown when a file-backed request body (multipart file row / binary body)
@@ -13,11 +13,11 @@ class PersistenceException implements Exception {
 /// dart:io) so it can cross the data→network boundary; the repository maps it
 /// to a NetworkFailure so the user sees a real error response.
 class FileBodyException implements Exception {
+  FileBodyException(this.path, {this.cause});
   final String path;
   final Object? cause;
 
-  FileBodyException(this.path, {this.cause});
-
   @override
-  String toString() => 'Could not read file: $path${cause != null ? ' ($cause)' : ''}';
+  String toString() =>
+      'Could not read file: $path${cause != null ? ' ($cause)' : ''}';
 }

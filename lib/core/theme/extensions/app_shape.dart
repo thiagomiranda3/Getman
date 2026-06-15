@@ -1,14 +1,6 @@
 import 'package:flutter/material.dart';
 
 class AppShape extends ThemeExtension<AppShape> {
-  final double panelRadius;
-  final double buttonRadius;
-  final double inputRadius;
-  final double dialogRadius;
-
-  /// Top-corner radius for modal bottom sheets (action sheets, tab switcher).
-  final double sheetRadius;
-
   const AppShape({
     required this.panelRadius,
     required this.buttonRadius,
@@ -16,6 +8,13 @@ class AppShape extends ThemeExtension<AppShape> {
     required this.dialogRadius,
     required this.sheetRadius,
   });
+  final double panelRadius;
+  final double buttonRadius;
+  final double inputRadius;
+  final double dialogRadius;
+
+  /// Top-corner radius for modal bottom sheets (action sheets, tab switcher).
+  final double sheetRadius;
 
   @override
   AppShape copyWith({

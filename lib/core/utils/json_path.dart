@@ -19,7 +19,7 @@ class JsonPath {
   static Object? read(Object? root, String path) {
     final segments = _parse(path);
     if (segments == null) return null;
-    Object? current = root;
+    var current = root;
     for (final seg in segments) {
       if (current == null) return null;
       if (seg is int) {
@@ -50,7 +50,7 @@ class JsonPath {
   static Object? tryDecode(String rawJson) {
     try {
       return jsonDecode(rawJson);
-    } catch (_) {
+    } on Object catch (_) {
       return null;
     }
   }
@@ -76,8 +76,12 @@ class JsonPath {
         if (end == -1) return null;
         final inner = p.substring(i + 1, end).trim();
         if (inner.isEmpty) return null;
-        if ((inner.startsWith('"') && inner.endsWith('"') && inner.length >= 2) ||
-            (inner.startsWith("'") && inner.endsWith("'") && inner.length >= 2)) {
+        if ((inner.startsWith('"') &&
+                inner.endsWith('"') &&
+                inner.length >= 2) ||
+            (inner.startsWith("'") &&
+                inner.endsWith("'") &&
+                inner.length >= 2)) {
           segments.add(inner.substring(1, inner.length - 1));
         } else {
           final idx = int.tryParse(inner);

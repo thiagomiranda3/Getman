@@ -3,24 +3,23 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 
 /// Renders its children as either an [AlertDialog] or a full-screen [Scaffold]
-/// page based on [BuildContext.isDialogFullscreen].
+/// page based on `BuildContext.isDialogFullscreen`.
 ///
 /// Use inside widgets whose build previously returned an `AlertDialog` — just
 /// swap `AlertDialog(...)` for `ResponsiveDialogScaffold(...)` with the same
 /// arguments.
 class ResponsiveDialogScaffold extends StatelessWidget {
+  const ResponsiveDialogScaffold({
+    required this.title,
+    required this.content,
+    super.key,
+    this.actions,
+    this.contentPadding,
+  });
   final Widget title;
   final Widget content;
   final List<Widget>? actions;
   final EdgeInsetsGeometry? contentPadding;
-
-  const ResponsiveDialogScaffold({
-    super.key,
-    required this.title,
-    required this.content,
-    this.actions,
-    this.contentPadding,
-  });
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +62,10 @@ class ResponsiveDialogScaffold extends StatelessWidget {
           ? null
           : SafeArea(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: layout.pagePadding, vertical: layout.tabSpacing),
+                padding: EdgeInsets.symmetric(
+                  horizontal: layout.pagePadding,
+                  vertical: layout.tabSpacing,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [

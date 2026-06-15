@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -26,7 +28,6 @@ BoxDecoration rpgPanelBox(
       BoxShadow(
         color: RpgPalette.gold.withValues(alpha: 0.22),
         blurRadius: 14,
-        spreadRadius: 0,
       ),
       // Inner deep shadow for depth.
       BoxShadow(
@@ -55,7 +56,7 @@ BoxDecoration rpgTabShape(
   final theme = Theme.of(context);
   final layout = context.appLayout;
   final border = theme.dividerColor;
-  final gold = RpgPalette.gold;
+  const gold = RpgPalette.gold;
   final Color background;
   if (active) {
     background = Color.lerp(theme.cardColor, gold, 0.18) ?? theme.cardColor;
@@ -65,9 +66,9 @@ BoxDecoration rpgTabShape(
     background = theme.scaffoldBackgroundColor;
   }
 
-  final BorderSide rule = BorderSide(color: border, width: 1);
-  final BorderSide goldTop = BorderSide(color: gold, width: layout.borderThick);
-  final BorderSide softTop = BorderSide(color: gold.withValues(alpha: 0.4), width: 1);
+  final rule = BorderSide(color: border);
+  final goldTop = BorderSide(color: gold, width: layout.borderThick);
+  final softTop = BorderSide(color: gold.withValues(alpha: 0.4));
 
   return BoxDecoration(
     color: background,
@@ -98,8 +99,8 @@ Widget rpgScaffoldBackground(BuildContext context, {required Widget child}) {
 /// Uses a single long-looping controller to keep cost near zero — particle
 /// positions are derived from `t` so there's no per-frame state churn.
 class _RpgAnimatedBackground extends StatefulWidget {
-  final Widget child;
   const _RpgAnimatedBackground({required this.child});
+  final Widget child;
 
   @override
   State<_RpgAnimatedBackground> createState() => _RpgAnimatedBackgroundState();
@@ -115,11 +116,12 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _frameNotifier = ValueNotifier<double>(0.0);
+    _frameNotifier = ValueNotifier<double>(0);
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 60),
-    )..repeat();
+    );
+    unawaited(_controller.repeat());
     _controller.addListener(() {
       // Quantize to 30 steps per second (60s loop × 30 steps/s = 1800 steps total).
       final q = (_controller.value * (60 * 30)).floorToDouble() / (60 * 30);
@@ -142,7 +144,7 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Don't burn CPU/battery animating the starfield while the app is hidden.
     if (state == AppLifecycleState.resumed) {
-      if (!_controller.isAnimating) _controller.repeat();
+      if (!_controller.isAnimating) unawaited(_controller.repeat());
     } else {
       _controller.stop();
     }
@@ -167,13 +169,13 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
           child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: RadialGradient(
-                center: Alignment.center,
                 radius: 1.2,
                 colors: [
                   theme.scaffoldBackgroundColor,
-                  isDark
-                      ? Colors.black.withValues(alpha: 0.6)
-                      : RpgPalette.goldDeep.withValues(alpha: 0.08),
+                  if (isDark)
+                    Colors.black.withValues(alpha: 0.6)
+                  else
+                    RpgPalette.goldDeep.withValues(alpha: 0.08),
                 ],
               ),
             ),
@@ -199,13 +201,6 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
 }
 
 class _Mote {
-  final double seedX;
-  final double seedY;
-  final double speed;
-  final double size;
-  final double twinkleOffset;
-  final double hue;
-
   _Mote({
     required this.seedX,
     required this.seedY,
@@ -214,22 +209,29 @@ class _Mote {
     required this.twinkleOffset,
     required this.hue,
   });
+  final double seedX;
+  final double seedY;
+  final double speed;
+  final double size;
+  final double twinkleOffset;
+  final double hue;
 }
 
 class _StarfieldPainter extends CustomPainter {
-  final ValueListenable<double> tListenable;
-  final List<_Mote> motes;
-  final bool isDark;
-
   _StarfieldPainter({
     required this.tListenable,
     required this.motes,
     required this.isDark,
   }) : super(repaint: tListenable);
+  final ValueListenable<double> tListenable;
+  final List<_Mote> motes;
+  final bool isDark;
 
   // Reused across motes/frames — only `.color` changes per draw (the immutable
-  // blur MaskFilter is set once). Allocating per mote per frame was the hot spot.
-  final Paint _glowPaint = Paint()..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+  // blur MaskFilter is set once). Allocating per mote per frame was the hot
+  // spot.
+  final Paint _glowPaint = Paint()
+    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
   final Paint _corePaint = Paint();
 
   @override
@@ -237,10 +239,14 @@ class _StarfieldPainter extends CustomPainter {
     final t = tListenable.value;
     for (final m in motes) {
       final dy = ((m.seedY + t * m.speed) % 1.0) * size.height;
-      final dx = ((m.seedX + math.sin((t + m.twinkleOffset) * math.pi * 2) * 0.01) % 1.0) * size.width;
+      final dx =
+          ((m.seedX + math.sin((t + m.twinkleOffset) * math.pi * 2) * 0.01) %
+              1.0) *
+          size.width;
 
       // Twinkle alpha — pulse each mote on a different phase.
-      final twinkle = 0.3 +
+      final twinkle =
+          0.3 +
           0.7 *
               (0.5 +
                   0.5 *

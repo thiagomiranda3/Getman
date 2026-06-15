@@ -50,23 +50,26 @@ class PostmanCollectionMapper {
     }
     final info = parsed['info'];
     if (info is! Map) {
-      throw const FormatException('Missing "info" object — not a Postman collection.');
+      throw const FormatException(
+        'Missing "info" object — not a Postman collection.',
+      );
     }
     final schema = info['schema'];
     if (schema is! String || !schema.contains('v2.1')) {
-      throw const FormatException('Unsupported collection schema — expected Postman v2.1.');
+      throw const FormatException(
+        'Unsupported collection schema — expected Postman v2.1.',
+      );
     }
     final name = (info['name'] as String?) ?? 'Imported Collection';
     final rawItems = parsed['item'];
-    final items = rawItems is List ? rawItems : const [];
+    final items = rawItems is List ? rawItems : const <dynamic>[];
     final children = items
-        .whereType<Map>()
+        .whereType<Map<dynamic, dynamic>>()
         .map((m) => _itemToNode(m.cast<String, dynamic>()))
         .toList();
     return CollectionNodeEntity(
       id: _uuid.v4(),
       name: name,
-      isFolder: true,
       children: children,
     );
   }
@@ -86,7 +89,9 @@ class PostmanCollectionMapper {
     };
   }
 
-  static Map<String, dynamic> _configToRequest(HttpRequestConfigEntity? config) {
+  static Map<String, dynamic> _configToRequest(
+    HttpRequestConfigEntity? config,
+  ) {
     if (config == null) {
       return {
         'method': 'GET',
@@ -126,9 +131,11 @@ class PostmanCollectionMapper {
         return null;
       case BodyType.raw:
         if (config.body.isEmpty) return null;
-        final isJson = config.headers.entries.any((e) =>
-            e.key.toLowerCase() == 'content-type' &&
-            e.value.toLowerCase().contains('json'));
+        final isJson = config.headers.entries.any(
+          (e) =>
+              e.key.toLowerCase() == 'content-type' &&
+              e.value.toLowerCase().contains('json'),
+        );
         return {
           'mode': 'raw',
           'raw': config.body,
@@ -142,7 +149,8 @@ class PostmanCollectionMapper {
           'mode': 'urlencoded',
           'urlencoded': [
             for (final f in config.formFields)
-              if (!f.isFile && f.name.isNotEmpty) {'key': f.name, 'value': f.value},
+              if (!f.isFile && f.name.isNotEmpty)
+                {'key': f.name, 'value': f.value},
           ],
         };
       case BodyType.multipart:
@@ -174,13 +182,12 @@ class PostmanCollectionMapper {
     final nestedItems = item['item'];
     if (nestedItems is List) {
       final children = nestedItems
-          .whereType<Map>()
+          .whereType<Map<dynamic, dynamic>>()
           .map((m) => _itemToNode(m.cast<String, dynamic>()))
           .toList();
       return CollectionNodeEntity(
         id: _uuid.v4(),
         name: name,
-        isFolder: true,
         children: children,
       );
     }
@@ -196,7 +203,9 @@ class PostmanCollectionMapper {
     );
   }
 
-  static HttpRequestConfigEntity _requestToConfig(Map<String, dynamic> request) {
+  static HttpRequestConfigEntity _requestToConfig(
+    Map<String, dynamic> request,
+  ) {
     final method = (request['method'] as String?)?.toUpperCase() ?? 'GET';
     final rawUrl = _parseUrl(request['url']);
     final structuredQuery = _parseQueryList(request['url']);
@@ -226,8 +235,12 @@ class PostmanCollectionMapper {
       if (raw is String) return raw;
       final host = url['host'];
       final path = url['path'];
-      final hostStr = host is List ? host.join('.') : (host is String ? host : '');
-      final pathStr = path is List ? path.join('/') : (path is String ? path : '');
+      final hostStr = host is List
+          ? host.join('.')
+          : (host is String ? host : '');
+      final pathStr = path is List
+          ? path.join('/')
+          : (path is String ? path : '');
       if (hostStr.isEmpty && pathStr.isEmpty) return '';
       final pathPart = pathStr.isNotEmpty ? '/$pathStr' : '';
       if (hostStr.isEmpty) return pathPart;
@@ -235,7 +248,9 @@ class PostmanCollectionMapper {
       // (default https) instead of dropping the scheme and producing a
       // schemeless, unsendable string.
       final protocol = url['protocol'];
-      final scheme = (protocol is String && protocol.isNotEmpty) ? protocol : 'https';
+      final scheme = (protocol is String && protocol.isNotEmpty)
+          ? protocol
+          : 'https';
       final portRaw = url['port'];
       final port = (portRaw == null || (portRaw is String && portRaw.isEmpty))
           ? ''
@@ -254,15 +269,17 @@ class PostmanCollectionMapper {
     final query = url['query'];
     if (query is! List) return null;
     final result = <QueryParamEntity>[];
-    for (final entry in query.whereType<Map>()) {
+    for (final entry in query.whereType<Map<dynamic, dynamic>>()) {
       if (entry['disabled'] == true) continue;
       final key = entry['key'];
       final value = entry['value'];
       if (key is! String || key.isEmpty) continue;
-      result.add(QueryParamEntity(
-        key: key,
-        value: value is String ? value : (value?.toString() ?? ''),
-      ));
+      result.add(
+        QueryParamEntity(
+          key: key,
+          value: value is String ? value : (value?.toString() ?? ''),
+        ),
+      );
     }
     return result;
   }
@@ -270,7 +287,7 @@ class PostmanCollectionMapper {
   static Map<String, String> _parseHeaders(dynamic header) {
     if (header is! List) return {};
     final result = <String, String>{};
-    for (final entry in header.whereType<Map>()) {
+    for (final entry in header.whereType<Map<dynamic, dynamic>>()) {
       if (entry['disabled'] == true) continue;
       final key = entry['key'];
       final value = entry['value'];
@@ -288,7 +305,8 @@ class PostmanCollectionMapper {
     String body,
     List<MultipartFieldEntity> formFields,
     String? bodyFilePath,
-  }) _parseBody(dynamic body) {
+  })
+  _parseBody(dynamic body) {
     if (body is Map) {
       switch (body['mode']) {
         case 'raw':
@@ -324,32 +342,44 @@ class PostmanCollectionMapper {
           );
       }
     }
-    return (bodyType: BodyType.raw, body: '', formFields: const [], bodyFilePath: null);
+    return (
+      bodyType: BodyType.raw,
+      body: '',
+      formFields: const [],
+      bodyFilePath: null,
+    );
   }
 
   /// Parses a Postman `urlencoded` / `formdata` array into form rows. Disabled
   /// and empty-key entries are skipped (matching headers/query parsing). For
   /// multipart, `type:'file'` rows become file rows carrying `src` as the path.
-  static List<MultipartFieldEntity> _parseFormList(dynamic list, {required bool multipart}) {
+  static List<MultipartFieldEntity> _parseFormList(
+    dynamic list, {
+    required bool multipart,
+  }) {
     if (list is! List) return const [];
     final result = <MultipartFieldEntity>[];
-    for (final entry in list.whereType<Map>()) {
+    for (final entry in list.whereType<Map<dynamic, dynamic>>()) {
       if (entry['disabled'] == true) continue;
       final key = entry['key'];
       if (key is! String || key.isEmpty) continue;
       if (multipart && entry['type'] == 'file') {
         final src = entry['src'];
-        result.add(MultipartFieldEntity(
-          name: key,
-          isFile: true,
-          filePath: src is String ? src : null,
-        ));
+        result.add(
+          MultipartFieldEntity(
+            name: key,
+            isFile: true,
+            filePath: src is String ? src : null,
+          ),
+        );
       } else {
         final value = entry['value'];
-        result.add(MultipartFieldEntity(
-          name: key,
-          value: value is String ? value : (value?.toString() ?? ''),
-        ));
+        result.add(
+          MultipartFieldEntity(
+            name: key,
+            value: value is String ? value : (value?.toString() ?? ''),
+          ),
+        );
       }
     }
     return result;

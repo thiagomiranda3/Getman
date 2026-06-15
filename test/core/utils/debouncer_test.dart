@@ -6,7 +6,9 @@ void main() {
   group('Debouncer', () {
     test('fires the action once after the quiet window', () {
       fakeAsync((async) {
-        final debouncer = Debouncer(duration: const Duration(milliseconds: 200));
+        final debouncer = Debouncer(
+          duration: const Duration(milliseconds: 200),
+        );
         var calls = 0;
         debouncer.run(() => calls++);
 
@@ -19,27 +21,39 @@ void main() {
       });
     });
 
-    test('collapses a burst of calls into a single run with the latest action', () {
-      fakeAsync((async) {
-        final debouncer = Debouncer(duration: const Duration(milliseconds: 200));
-        final fired = <int>[];
-        for (var i = 0; i < 5; i++) {
-          debouncer.run(() => fired.add(i));
-          async.elapse(const Duration(milliseconds: 50)); // each call resets the timer
-        }
-        async.elapse(const Duration(milliseconds: 200));
+    test(
+      'collapses a burst of calls into a single run with the latest action',
+      () {
+        fakeAsync((async) {
+          final debouncer = Debouncer(
+            duration: const Duration(milliseconds: 200),
+          );
+          final fired = <int>[];
+          for (var i = 0; i < 5; i++) {
+            debouncer.run(() => fired.add(i));
+            async.elapse(
+              const Duration(milliseconds: 50),
+            ); // each call resets the timer
+          }
+          async.elapse(const Duration(milliseconds: 200));
 
-        expect(fired, [4], reason: 'only the last scheduled action runs, once');
-        debouncer.dispose();
-      });
-    });
+          expect(fired, [
+            4,
+          ], reason: 'only the last scheduled action runs, once');
+          debouncer.dispose();
+        });
+      },
+    );
 
     test('dispose cancels a pending action', () {
       fakeAsync((async) {
-        final debouncer = Debouncer(duration: const Duration(milliseconds: 200));
+        final debouncer = Debouncer(
+          duration: const Duration(milliseconds: 200),
+        );
         var calls = 0;
-        debouncer.run(() => calls++);
-        debouncer.dispose();
+        debouncer
+          ..run(() => calls++)
+          ..dispose();
 
         async.elapse(const Duration(milliseconds: 500));
         expect(calls, 0);

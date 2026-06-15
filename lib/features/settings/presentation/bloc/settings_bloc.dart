@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart';
+import 'dart:developer';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/error/failures.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
@@ -11,45 +12,111 @@ import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 const int _historyLimitMin = 1;
 
 class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
-  final SaveSettingsUseCase saveSettingsUseCase;
-
   SettingsBloc({
-    required this.saveSettingsUseCase,
+    required SaveSettingsUseCase saveSettingsUseCase,
     SettingsEntity? initialSettings,
-  }) : super(SettingsState(settings: initialSettings ?? const SettingsEntity())) {
-    on<UpdateDarkMode>((e, emit) => _apply(emit, (s) => s.copyWith(isDarkMode: e.isDarkMode)));
-    on<UpdateCompactMode>((e, emit) => _apply(emit, (s) => s.copyWith(isCompactMode: e.isCompactMode)));
-    on<UpdateVerticalLayout>((e, emit) => _apply(emit, (s) => s.copyWith(isVerticalLayout: e.isVerticalLayout)));
-    on<UpdateHistoryLimit>((e, emit) => _apply(emit, (s) => s.copyWith(
-          historyLimit: e.historyLimit < _historyLimitMin ? _historyLimitMin : e.historyLimit,
-        )));
-    on<UpdateSaveResponseInHistory>((e, emit) => _apply(emit, (s) => s.copyWith(saveResponseInHistory: e.save)));
+  }) : _saveSettingsUseCase = saveSettingsUseCase,
+       super(
+         SettingsState(settings: initialSettings ?? const SettingsEntity()),
+       ) {
+    on<UpdateDarkMode>(
+      (e, emit) => _apply(emit, (s) => s.copyWith(isDarkMode: e.isDarkMode)),
+    );
+    on<UpdateCompactMode>(
+      (e, emit) =>
+          _apply(emit, (s) => s.copyWith(isCompactMode: e.isCompactMode)),
+    );
+    on<UpdateVerticalLayout>(
+      (e, emit) =>
+          _apply(emit, (s) => s.copyWith(isVerticalLayout: e.isVerticalLayout)),
+    );
+    on<UpdateHistoryLimit>(
+      (e, emit) => _apply(
+        emit,
+        (s) => s.copyWith(
+          historyLimit: e.historyLimit < _historyLimitMin
+              ? _historyLimitMin
+              : e.historyLimit,
+        ),
+      ),
+    );
+    on<UpdateSaveResponseInHistory>(
+      (e, emit) =>
+          _apply(emit, (s) => s.copyWith(saveResponseInHistory: e.save)),
+    );
     on<UpdateAlwaysPrettifyLargeResponses>(
-        (e, emit) => _apply(emit, (s) => s.copyWith(alwaysPrettifyLargeResponses: e.value)));
-    on<UpdateSplitRatio>((e, emit) => _apply(emit, (s) => s.copyWith(splitRatio: e.ratio)));
-    on<UpdateSideMenuWidth>((e, emit) => _apply(emit, (s) => s.copyWith(sideMenuWidth: e.width)));
-    on<UpdateThemeId>((e, emit) => _apply(emit, (s) => s.copyWith(themeId: e.themeId)));
-    on<UpdateActiveEnvironmentId>((e, emit) => _apply(emit, (s) => s.copyWith(activeEnvironmentId: e.id)));
-    on<UpdateConnectTimeout>((e, emit) => _apply(emit, (s) => s.copyWith(connectTimeoutMs: _clampTimeout(e.ms))));
-    on<UpdateSendTimeout>((e, emit) => _apply(emit, (s) => s.copyWith(sendTimeoutMs: _clampTimeout(e.ms))));
-    on<UpdateReceiveTimeout>((e, emit) => _apply(emit, (s) => s.copyWith(receiveTimeoutMs: _clampTimeout(e.ms))));
-    on<UpdateFollowRedirects>((e, emit) => _apply(emit, (s) => s.copyWith(followRedirects: e.value)));
-    on<UpdateMaxRedirects>((e, emit) => _apply(emit, (s) => s.copyWith(maxRedirects: _clampRedirects(e.value))));
-    on<UpdateVerifySsl>((e, emit) => _apply(emit, (s) => s.copyWith(verifySsl: e.value)));
-    on<UpdateProxyUrl>((e, emit) => _apply(emit, (s) => s.copyWith(proxyUrl: e.url)));
+      (e, emit) => _apply(
+        emit,
+        (s) => s.copyWith(alwaysPrettifyLargeResponses: e.value),
+      ),
+    );
+    on<UpdateSplitRatio>(
+      (e, emit) => _apply(emit, (s) => s.copyWith(splitRatio: e.ratio)),
+    );
+    on<UpdateSideMenuWidth>(
+      (e, emit) => _apply(emit, (s) => s.copyWith(sideMenuWidth: e.width)),
+    );
+    on<UpdateThemeId>(
+      (e, emit) => _apply(emit, (s) => s.copyWith(themeId: e.themeId)),
+    );
+    on<UpdateActiveEnvironmentId>(
+      (e, emit) => _apply(emit, (s) => s.copyWith(activeEnvironmentId: e.id)),
+    );
+    on<UpdateConnectTimeout>(
+      (e, emit) => _apply(
+        emit,
+        (s) => s.copyWith(connectTimeoutMs: _clampTimeout(e.ms)),
+      ),
+    );
+    on<UpdateSendTimeout>(
+      (e, emit) =>
+          _apply(emit, (s) => s.copyWith(sendTimeoutMs: _clampTimeout(e.ms))),
+    );
+    on<UpdateReceiveTimeout>(
+      (e, emit) => _apply(
+        emit,
+        (s) => s.copyWith(receiveTimeoutMs: _clampTimeout(e.ms)),
+      ),
+    );
+    on<UpdateFollowRedirects>(
+      (e, emit) => _apply(emit, (s) => s.copyWith(followRedirects: e.value)),
+    );
+    on<UpdateMaxRedirects>(
+      (e, emit) => _apply(
+        emit,
+        (s) => s.copyWith(maxRedirects: _clampRedirects(e.value)),
+      ),
+    );
+    on<UpdateVerifySsl>(
+      (e, emit) => _apply(emit, (s) => s.copyWith(verifySsl: e.value)),
+    );
+    on<UpdateProxyUrl>(
+      (e, emit) => _apply(emit, (s) => s.copyWith(proxyUrl: e.url)),
+    );
     // Each cert field is passed explicitly so null clears it (no sentinel).
-    on<UpdateClientCertificate>((e, emit) => _apply(emit, (s) => s.copyWith(
+    on<UpdateClientCertificate>(
+      (e, emit) => _apply(
+        emit,
+        (s) => s.copyWith(
           clientCertPath: e.certPath,
           clientKeyPath: e.keyPath,
           clientCertPassphrase: e.passphrase,
-        )));
+        ),
+      ),
+    );
     // The bookmark is always set in lockstep with the path (both null on
     // disconnect), so pass it explicitly rather than via the copyWith sentinel.
-    on<UpdateWorkspacePath>((e, emit) =>
-        _apply(emit, (s) => s.copyWith(workspacePath: e.path, workspaceBookmark: e.bookmark)));
+    on<UpdateWorkspacePath>(
+      (e, emit) => _apply(
+        emit,
+        (s) => s.copyWith(workspacePath: e.path, workspaceBookmark: e.bookmark),
+      ),
+    );
   }
+  final SaveSettingsUseCase _saveSettingsUseCase;
 
-  // 0 disables the timeout (Dio treats Duration.zero as no limit); never negative.
+  // 0 disables the timeout (Dio treats Duration.zero as no limit); never
+  // negative.
   static int _clampTimeout(int ms) => ms < 0 ? 0 : ms;
 
   // Min 1: dart:io throws "Redirect limit exceeded" on the first 3xx when
@@ -67,9 +134,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     // debugPrint so regressions show in console.
     emit(state.copyWith(settings: next));
     try {
-      await saveSettingsUseCase(next);
+      await _saveSettingsUseCase(next);
     } on PersistenceFailure catch (f) {
-      debugPrint('Settings save failed: ${f.message}');
+      log('Settings save failed: ${f.message}', name: 'SettingsBloc');
     }
   }
 }

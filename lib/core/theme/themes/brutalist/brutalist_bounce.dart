@@ -1,22 +1,24 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 class BrutalBounce extends StatefulWidget {
-  final Widget child;
-  final VoidCallback? onTap;
-  final double scaleDown;
-
   const BrutalBounce({
-    super.key,
     required this.child,
+    super.key,
     this.onTap,
     this.scaleDown = 0.95,
   });
+  final Widget child;
+  final VoidCallback? onTap;
+  final double scaleDown;
 
   @override
   State<BrutalBounce> createState() => _BrutalBounceState();
 }
 
-class _BrutalBounceState extends State<BrutalBounce> with SingleTickerProviderStateMixin {
+class _BrutalBounceState extends State<BrutalBounce>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
 
@@ -27,7 +29,7 @@ class _BrutalBounceState extends State<BrutalBounce> with SingleTickerProviderSt
       vsync: this,
       duration: const Duration(milliseconds: 100),
     );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: widget.scaleDown).animate(
+    _scaleAnimation = Tween<double>(begin: 1, end: widget.scaleDown).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
   }
@@ -36,7 +38,7 @@ class _BrutalBounceState extends State<BrutalBounce> with SingleTickerProviderSt
   void didUpdateWidget(covariant BrutalBounce oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.scaleDown != widget.scaleDown) {
-      _scaleAnimation = Tween<double>(begin: 1.0, end: widget.scaleDown).animate(
+      _scaleAnimation = Tween<double>(begin: 1, end: widget.scaleDown).animate(
         CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
       );
     }
@@ -54,7 +56,7 @@ class _BrutalBounceState extends State<BrutalBounce> with SingleTickerProviderSt
       behavior: HitTestBehavior.opaque,
       onTapDown: (_) => _controller.forward(),
       onTapUp: (_) {
-        _controller.reverse();
+        unawaited(_controller.reverse());
         widget.onTap?.call();
       },
       onTapCancel: () => _controller.reverse(),

@@ -2,17 +2,16 @@ import 'package:equatable/equatable.dart';
 
 /// One cookie parsed from a `Set-Cookie` response header.
 class ParsedCookie extends Equatable {
-  final String name;
-  final String value;
-
-  /// Remaining attributes joined back with `; ` (Path, HttpOnly, Expires, …).
-  final String attributes;
-
   const ParsedCookie({
     required this.name,
     required this.value,
     this.attributes = '',
   });
+  final String name;
+  final String value;
+
+  /// Remaining attributes joined back with `; ` (Path, HttpOnly, Expires, …).
+  final String attributes;
 
   @override
   List<Object?> get props => [name, value, attributes];
@@ -49,7 +48,9 @@ class CookieParser {
           .map((p) => p.trim())
           .where((p) => p.isNotEmpty)
           .join('; ');
-      result.add(ParsedCookie(name: name, value: value, attributes: attributes));
+      result.add(
+        ParsedCookie(name: name, value: value, attributes: attributes),
+      );
     }
     return result;
   }

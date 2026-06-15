@@ -1,7 +1,8 @@
 import 'package:getman/features/collections/data/datasources/workspace_collections_data_source.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 
-WorkspaceCollectionsDataSource createWorkspaceDataSource() => _StubWorkspaceDataSource();
+WorkspaceCollectionsDataSource createWorkspaceDataSource() =>
+    _StubWorkspaceDataSource();
 
 /// Web has no filesystem; workspace mode is desktop/mobile-only and never
 /// activated on web, so these are inert.

@@ -1,7 +1,7 @@
 import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/features/chaining/data/models/request_rules_model.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_flutter.dart';
 
 abstract class RequestRulesLocalDataSource {
   RequestRulesModel? getRules(String configId);
@@ -10,7 +10,8 @@ abstract class RequestRulesLocalDataSource {
 }
 
 class RequestRulesLocalDataSourceImpl implements RequestRulesLocalDataSource {
-  Box<RequestRulesModel> _box() => Hive.box<RequestRulesModel>(HiveBoxes.requestRules);
+  Box<RequestRulesModel> _box() =>
+      Hive.box<RequestRulesModel>(HiveBoxes.requestRules);
 
   @override
   RequestRulesModel? getRules(String configId) {

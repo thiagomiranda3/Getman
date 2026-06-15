@@ -32,7 +32,8 @@ class WorkspaceCollectionSerializer {
   }
 
   static CollectionNodeEntity requestFromJson(Map<String, dynamic> json) {
-    final request = (json['request'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final request =
+        (json['request'] as Map?)?.cast<String, dynamic>() ?? const {};
     return CollectionNodeEntity(
       id: (json['id'] as String?) ?? '',
       name: (json['name'] as String?) ?? 'Request',
@@ -63,7 +64,6 @@ class WorkspaceCollectionSerializer {
     return CollectionNodeEntity(
       id: (json['id'] as String?) ?? '',
       name: (json['name'] as String?) ?? 'Folder',
-      isFolder: true,
       isFavorite: json['isFavorite'] == true,
       children: children,
     );
@@ -74,8 +74,10 @@ class WorkspaceCollectionSerializer {
 
   // ---- workspace manifest ----
 
-  static Map<String, dynamic> manifestToJson(List<String> rootOrder) =>
-      {'version': version, 'rootOrder': rootOrder};
+  static Map<String, dynamic> manifestToJson(List<String> rootOrder) => {
+    'version': version,
+    'rootOrder': rootOrder,
+  };
 
   static List<String> rootOrder(Map<String, dynamic> manifest) =>
       ((manifest['rootOrder'] as List?) ?? const []).cast<String>();
@@ -83,26 +85,26 @@ class WorkspaceCollectionSerializer {
   // ---- config (response fields omitted) ----
 
   static Map<String, dynamic> _configToJson(HttpRequestConfigEntity c) => {
-        'id': c.id,
-        'method': c.method,
-        'url': c.url,
-        'headers': c.headers,
-        'body': c.body,
-        'bodyType': c.bodyType.wire,
-        'auth': c.auth,
-        if (c.formFields.isNotEmpty)
-          'formFields': [
-            for (final f in c.formFields)
-              {
-                'name': f.name,
-                'value': f.value,
-                'isFile': f.isFile,
-                if (f.filePath != null) 'filePath': f.filePath,
-                if (f.contentType != null) 'contentType': f.contentType,
-              },
-          ],
-        if (c.bodyFilePath != null) 'bodyFilePath': c.bodyFilePath,
-      };
+    'id': c.id,
+    'method': c.method,
+    'url': c.url,
+    'headers': c.headers,
+    'body': c.body,
+    'bodyType': c.bodyType.wire,
+    'auth': c.auth,
+    if (c.formFields.isNotEmpty)
+      'formFields': [
+        for (final f in c.formFields)
+          {
+            'name': f.name,
+            'value': f.value,
+            'isFile': f.isFile,
+            if (f.filePath != null) 'filePath': f.filePath,
+            if (f.contentType != null) 'contentType': f.contentType,
+          },
+      ],
+    if (c.bodyFilePath != null) 'bodyFilePath': c.bodyFilePath,
+  };
 
   static HttpRequestConfigEntity _configFromJson(Map<String, dynamic> json) {
     return HttpRequestConfigEntity(
@@ -114,7 +116,9 @@ class WorkspaceCollectionSerializer {
       bodyType: BodyType.fromWire(json['bodyType'] as String?),
       auth: ((json['auth'] as Map?) ?? const {}).cast<String, String>(),
       formFields: [
-        for (final m in (json['formFields'] as List?) ?? const [])
+        for (final Map<String, dynamic> m
+            in ((json['formFields'] as List?) ?? const [])
+                .cast<Map<String, dynamic>>())
           MultipartFieldEntity(
             name: (m['name'] as String?) ?? '',
             value: (m['value'] as String?) ?? '',

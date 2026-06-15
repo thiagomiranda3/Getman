@@ -5,12 +5,6 @@ import 'package:equatable/equatable.dart';
 /// carry a [contentType]). [name]/[value] may contain `{{env vars}}`, resolved
 /// at send time.
 class MultipartFieldEntity extends Equatable {
-  final String name;
-  final String value;
-  final bool isFile;
-  final String? filePath;
-  final String? contentType;
-
   const MultipartFieldEntity({
     required this.name,
     this.value = '',
@@ -18,6 +12,11 @@ class MultipartFieldEntity extends Equatable {
     this.filePath,
     this.contentType,
   });
+  final String name;
+  final String value;
+  final bool isFile;
+  final String? filePath;
+  final String? contentType;
 
   MultipartFieldEntity copyWith({
     String? name,

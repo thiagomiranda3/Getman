@@ -7,20 +7,19 @@ import 'package:getman/core/theme/app_theme.dart';
 /// Used by the request config panel, the unified phone panel, the response
 /// panel, and the side menu — keep the chrome here so it stays identical.
 class BrandedTabBar extends StatelessWidget implements PreferredSizeWidget {
-  final List<String> labels;
-  final TabController? controller;
-  final bool isScrollable;
-  final EdgeInsetsGeometry? padding;
-  final EdgeInsetsGeometry? labelPadding;
-
   const BrandedTabBar({
-    super.key,
     required this.labels,
+    super.key,
     this.controller,
     this.isScrollable = false,
     this.padding,
     this.labelPadding,
   });
+  final List<String> labels;
+  final TabController? controller;
+  final bool isScrollable;
+  final EdgeInsetsGeometry? padding;
+  final EdgeInsetsGeometry? labelPadding;
 
   @override
   Size get preferredSize => const Size.fromHeight(kTextTabBarHeight);
@@ -40,8 +39,14 @@ class BrandedTabBar extends StatelessWidget implements PreferredSizeWidget {
         color: theme.primaryColor,
         border: Border(
           top: BorderSide(color: theme.dividerColor, width: layout.borderThick),
-          left: BorderSide(color: theme.dividerColor, width: layout.borderThick),
-          right: BorderSide(color: theme.dividerColor, width: layout.borderThick),
+          left: BorderSide(
+            color: theme.dividerColor,
+            width: layout.borderThick,
+          ),
+          right: BorderSide(
+            color: theme.dividerColor,
+            width: layout.borderThick,
+          ),
         ),
       ),
       labelColor: theme.colorScheme.onPrimary,

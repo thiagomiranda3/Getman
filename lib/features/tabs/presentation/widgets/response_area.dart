@@ -11,22 +11,22 @@ import 'package:re_editor/re_editor.dart';
 /// Shows the HTTP [ResponseSection] or, for WebSocket/SSE requests, the live
 /// [RealtimePanel] — switching on the tab's request kind.
 class ResponseArea extends StatelessWidget {
+  const ResponseArea({
+    required this.tabId,
+    required this.responseController,
+    super.key,
+    this.showMetadata = true,
+  });
   final String tabId;
   final CodeLineEditingController responseController;
   final bool showMetadata;
-
-  const ResponseArea({
-    super.key,
-    required this.tabId,
-    required this.responseController,
-    this.showMetadata = true,
-  });
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<TabsBloc, TabsState>(
       buildWhen: (prev, next) =>
-          prev.tabs.byId(tabId)?.config.kind != next.tabs.byId(tabId)?.config.kind,
+          prev.tabs.byId(tabId)?.config.kind !=
+          next.tabs.byId(tabId)?.config.kind,
       builder: (context, state) {
         final kind = state.tabs.byId(tabId)?.config.kind ?? RequestKind.http;
         if (kind == RequestKind.http) {

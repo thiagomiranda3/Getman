@@ -8,12 +8,17 @@ void main() {
     });
 
     test('no variables returns input unchanged', () {
-      expect(EnvironmentResolver.resolve('https://example.com/foo', {}), 'https://example.com/foo');
+      expect(
+        EnvironmentResolver.resolve('https://example.com/foo', {}),
+        'https://example.com/foo',
+      );
     });
 
     test('substitutes a single variable', () {
       expect(
-        EnvironmentResolver.resolve('{{baseUrl}}/users', {'baseUrl': 'https://api.example.com'}),
+        EnvironmentResolver.resolve('{{baseUrl}}/users', {
+          'baseUrl': 'https://api.example.com',
+        }),
         'https://api.example.com/users',
       );
     });
@@ -30,7 +35,9 @@ void main() {
 
     test('leaves unknown variable names verbatim', () {
       expect(
-        EnvironmentResolver.resolve('{{baseUrl}}/{{missing}}', {'baseUrl': 'https://x'}),
+        EnvironmentResolver.resolve('{{baseUrl}}/{{missing}}', {
+          'baseUrl': 'https://x',
+        }),
         'https://x/{{missing}}',
       );
     });
@@ -76,41 +83,59 @@ void main() {
   });
 
   group('EnvironmentResolver dynamic variables', () {
-    test('resolves {{\$timestamp}} to unix seconds even with no environment', () {
-      final out = EnvironmentResolver.resolve('{{\$timestamp}}', const {});
-      expect(out, matches(RegExp(r'^\d+$')));
-    });
+    test(
+      r'resolves {{$timestamp}} to unix seconds even with no environment',
+      () {
+        final out = EnvironmentResolver.resolve(r'{{$timestamp}}', const {});
+        expect(out, matches(RegExp(r'^\d+$')));
+      },
+    );
 
-    test('resolves {{\$isoTimestamp}} to a parseable ISO-8601 instant', () {
-      final out = EnvironmentResolver.resolve('{{\$isoTimestamp}}', const {});
+    test(r'resolves {{$isoTimestamp}} to a parseable ISO-8601 instant', () {
+      final out = EnvironmentResolver.resolve(r'{{$isoTimestamp}}', const {});
       expect(() => DateTime.parse(out), returnsNormally);
       expect(out, contains('T'));
     });
 
-    test('resolves {{\$randomInt}} to 0..1000', () {
-      final n = int.parse(EnvironmentResolver.resolve('{{\$randomInt}}', const {}));
+    test(r'resolves {{$randomInt}} to 0..1000', () {
+      final n = int.parse(
+        EnvironmentResolver.resolve(r'{{$randomInt}}', const {}),
+      );
       expect(n, inInclusiveRange(0, 1000));
     });
 
-    test('resolves {{\$guid}} / {{\$randomUUID}} to a v4 UUID', () {
+    test(r'resolves {{$guid}} / {{$randomUUID}} to a v4 UUID', () {
       final uuidRe = RegExp(
-          r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$');
-      expect(EnvironmentResolver.resolve('{{\$guid}}', const {}), matches(uuidRe));
-      expect(EnvironmentResolver.resolve('{{\$randomUUID}}', const {}), matches(uuidRe));
+        '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-'
+        r'[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+      );
+      expect(
+        EnvironmentResolver.resolve(r'{{$guid}}', const {}),
+        matches(uuidRe),
+      );
+      expect(
+        EnvironmentResolver.resolve(r'{{$randomUUID}}', const {}),
+        matches(uuidRe),
+      );
     });
 
-    test('each occurrence of {{\$guid}} is independent', () {
-      final out = EnvironmentResolver.resolve('{{\$guid}}|{{\$guid}}', const {});
+    test(r'each occurrence of {{$guid}} is independent', () {
+      final out = EnvironmentResolver.resolve(r'{{$guid}}|{{$guid}}', const {});
       final parts = out.split('|');
       expect(parts[0], isNot(parts[1]));
     });
 
     test('an env variable of the same name wins over a dynamic one', () {
-      expect(EnvironmentResolver.resolve('{{\$timestamp}}', {r'$timestamp': 'pinned'}), 'pinned');
+      expect(
+        EnvironmentResolver.resolve(r'{{$timestamp}}', {
+          r'$timestamp': 'pinned',
+        }),
+        'pinned',
+      );
     });
 
-    test('unknown \$-prefixed names are left verbatim', () {
-      expect(EnvironmentResolver.resolve('{{\$nope}}', const {}), '{{\$nope}}');
+    test(r'unknown $-prefixed names are left verbatim', () {
+      expect(EnvironmentResolver.resolve(r'{{$nope}}', const {}), r'{{$nope}}');
     });
 
     test('isDynamic recognizes built-ins only', () {
@@ -119,8 +144,10 @@ void main() {
       expect(EnvironmentResolver.isDynamic(r'$nope'), isFalse);
     });
 
-    test('findVariables captures \$-prefixed names', () {
-      final matches = EnvironmentResolver.findVariables('{{\$timestamp}}').toList();
+    test(r'findVariables captures $-prefixed names', () {
+      final matches = EnvironmentResolver.findVariables(
+        r'{{$timestamp}}',
+      ).toList();
       expect(matches, hasLength(1));
       expect(matches.first.name, r'$timestamp');
     });
@@ -128,7 +155,10 @@ void main() {
 
   group('EnvironmentResolver.resolveMap', () {
     test('empty input returns empty map', () {
-      expect(EnvironmentResolver.resolveMap(const {}, {'a': '1'}), const <String, String>{});
+      expect(
+        EnvironmentResolver.resolveMap(const {}, {'a': '1'}),
+        const <String, String>{},
+      );
     });
 
     test('substitutes values but leaves keys alone', () {
@@ -147,7 +177,9 @@ void main() {
     });
 
     test('finds all variable positions and names', () {
-      final matches = EnvironmentResolver.findVariables('{{a}}/static/{{b}}').toList();
+      final matches = EnvironmentResolver.findVariables(
+        '{{a}}/static/{{b}}',
+      ).toList();
       expect(matches.length, 2);
       expect(matches[0].name, 'a');
       expect(matches[0].start, 0);
@@ -156,7 +188,9 @@ void main() {
     });
 
     test('finds names even when braces contain whitespace', () {
-      final matches = EnvironmentResolver.findVariables('{{ baseUrl }}').toList();
+      final matches = EnvironmentResolver.findVariables(
+        '{{ baseUrl }}',
+      ).toList();
       expect(matches, hasLength(1));
       expect(matches.first.name, 'baseUrl');
     });

@@ -34,11 +34,11 @@ BoxDecoration editorialTabShape(
   if (active) {
     bottom = BorderSide(color: ink, width: layout.borderThick);
   } else if (hovered) {
-    bottom = BorderSide(color: ink, width: 1);
+    bottom = BorderSide(color: ink);
   } else {
-    bottom = BorderSide(color: inkSoft.withValues(alpha: 0.4), width: 1);
+    bottom = BorderSide(color: inkSoft.withValues(alpha: 0.4));
   }
-  final BorderSide columnRule = BorderSide(color: ink, width: 1);
+  final columnRule = BorderSide(color: ink);
   return BoxDecoration(
     color: theme.scaffoldBackgroundColor,
     border: Border(
@@ -49,7 +49,10 @@ BoxDecoration editorialTabShape(
   );
 }
 
-Widget editorialScaffoldBackground(BuildContext context, {required Widget child}) {
+Widget editorialScaffoldBackground(
+  BuildContext context, {
+  required Widget child,
+}) {
   final theme = Theme.of(context);
   return Stack(
     children: [
@@ -59,7 +62,6 @@ Widget editorialScaffoldBackground(BuildContext context, {required Widget child}
           child: RepaintBoundary(
             child: CustomPaint(
               isComplex: true,
-              willChange: false,
               painter: _DotGridPainter(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.07),
               ),
@@ -75,7 +77,7 @@ class _DotGridPainter extends CustomPainter {
   _DotGridPainter({required this.color});
 
   final Color color;
-  static const double _spacing = 4.0;
+  static const double _spacing = 4;
 
   // Cache of raw float coordinates keyed by the last painted size.
   // Recomputed only when the canvas size changes.

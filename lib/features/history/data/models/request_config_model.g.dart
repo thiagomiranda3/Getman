@@ -8,7 +8,7 @@ part of 'request_config_model.dart';
 
 class HttpRequestConfigAdapter extends TypeAdapter<HttpRequestConfig> {
   @override
-  final int typeId = 1;
+  final typeId = 1;
 
   @override
   HttpRequestConfig read(BinaryReader reader) {
@@ -27,11 +27,11 @@ class HttpRequestConfigAdapter extends TypeAdapter<HttpRequestConfig> {
       bodyType: fields[11] == null ? 'raw' : fields[11] as String,
       formFields: (fields[12] as List?)?.cast<MultipartFieldModel>(),
       bodyFilePath: fields[13] as String?,
-      kind: fields[14] == null ? 0 : fields[14] as int,
+      kind: fields[14] == null ? 0 : (fields[14] as num).toInt(),
       responseBody: fields[7] as String?,
       responseHeaders: (fields[8] as Map?)?.cast<String, String>(),
-      statusCode: fields[9] as int?,
-      durationMs: fields[10] as int?,
+      statusCode: (fields[9] as num?)?.toInt(),
+      durationMs: (fields[10] as num?)?.toInt(),
     );
   }
 

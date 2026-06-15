@@ -7,9 +7,26 @@ class CurlUtils {
   /// Common value-taking flags we don't model. Their argument is consumed and
   /// discarded so it isn't mistaken for the URL (e.g. `-e <referer> <url>`).
   static const _skipValueFlags = {
-    '-A', '--user-agent', '-e', '--referer', '-o', '--output', '-F', '--form',
-    '-x', '--proxy', '-m', '--max-time', '--connect-timeout', '-T',
-    '--upload-file', '--cert', '--key', '--cacert', '-w', '--write-out',
+    '-A',
+    '--user-agent',
+    '-e',
+    '--referer',
+    '-o',
+    '--output',
+    '-F',
+    '--form',
+    '-x',
+    '--proxy',
+    '-m',
+    '--max-time',
+    '--connect-timeout',
+    '-T',
+    '--upload-file',
+    '--cert',
+    '--key',
+    '--cacert',
+    '-w',
+    '--write-out',
   };
 
   static final RegExp _domainish = RegExp(r'^[\w.-]+\.[\w.-]+');
@@ -66,7 +83,8 @@ class CurlUtils {
         if (i + 1 < args.length) addData(_urlEncodeData(args[++i]));
       } else if (arg == '-u' || arg == '--user') {
         if (i + 1 < args.length && !_hasHeader(headers, 'authorization')) {
-          headers['Authorization'] = 'Basic ${base64.encode(utf8.encode(args[++i]))}';
+          headers['Authorization'] =
+              'Basic ${base64.encode(utf8.encode(args[++i]))}';
         }
       } else if (arg == '-b' || arg == '--cookie') {
         if (i + 1 < args.length && !_hasHeader(headers, 'cookie')) {
@@ -107,7 +125,9 @@ class CurlUtils {
   static String _urlEncodeData(String data) {
     final eq = data.indexOf('=');
     if (eq == -1) return Uri.encodeComponent(data);
-    return '${data.substring(0, eq)}=${Uri.encodeComponent(data.substring(eq + 1))}';
+    final name = data.substring(0, eq);
+    final value = Uri.encodeComponent(data.substring(eq + 1));
+    return '$name=$value';
   }
 
   static bool _hasHeader(Map<String, String> h, String name) {
@@ -128,8 +148,14 @@ class CurlUtils {
     // 1. Single quoted strings: '...'
     // 2. Double quoted strings: "..."
     // 3. Unquoted words: [^\s]+
-    final regex = RegExp(r"'([^']*)'|" '"' r'([^"]*)' '"' r"|([^\s]+)");
-    
+    final regex = RegExp(
+      "'([^']*)'|"
+      '"'
+      '([^"]*)'
+      '"'
+      r'|([^\s]+)',
+    );
+
     final matches = regex.allMatches(command);
     for (final match in matches) {
       if (match.group(1) != null) {

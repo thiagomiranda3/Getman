@@ -4,10 +4,12 @@
 enum RequestKind {
   http(0),
   webSocket(1),
-  sse(2);
+  sse(2)
+  ;
+
+  const RequestKind(this.wire);
 
   final int wire;
-  const RequestKind(this.wire);
 
   static RequestKind fromWire(int? value) {
     for (final k in RequestKind.values) {

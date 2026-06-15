@@ -28,14 +28,26 @@ void main() {
 
   setUp(() {
     tabsBloc = MockTabsBloc();
-    when(() => tabsBloc.state).thenReturn(const TabsState(tabs: [
-      HttpRequestTabEntity(tabId: 't1', config: HttpRequestConfigEntity(id: 't1')),
-    ]));
+    when(() => tabsBloc.state).thenReturn(
+      const TabsState(
+        tabs: [
+          HttpRequestTabEntity(
+            tabId: 't1',
+            config: HttpRequestConfigEntity(id: 't1'),
+          ),
+        ],
+      ),
+    );
     get = MockGet();
     save = MockSave();
-    when(() => get.call('t1')).thenAnswer((_) async => const RequestRulesEntity(configId: 't1'));
+    when(
+      () => get.call('t1'),
+    ).thenAnswer((_) async => const RequestRulesEntity(configId: 't1'));
     when(() => save.call(any())).thenAnswer((_) async {});
-    rulesBloc = RulesBloc(getRequestRulesUseCase: get, saveRequestRulesUseCase: save);
+    rulesBloc = RulesBloc(
+      getRequestRulesUseCase: get,
+      saveRequestRulesUseCase: save,
+    );
   });
 
   tearDown(() => rulesBloc.close());
@@ -77,7 +89,9 @@ void main() {
     verify(() => save.call(any())).called(1);
   });
 
-  testWidgets('adding an extraction rule shows the kind dropdown', (tester) async {
+  testWidgets('adding an extraction rule shows the kind dropdown', (
+    tester,
+  ) async {
     await pump(tester);
 
     await tester.tap(find.text('ADD EXTRACTION'));

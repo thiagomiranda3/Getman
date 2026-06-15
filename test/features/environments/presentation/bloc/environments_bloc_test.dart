@@ -5,9 +5,11 @@ import 'package:getman/features/environments/domain/repositories/environments_re
 import 'package:getman/features/environments/domain/usecases/environments_usecases.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
 import 'package:mocktail/mocktail.dart';
 
-class MockEnvironmentsRepository extends Mock implements EnvironmentsRepository {}
+class MockEnvironmentsRepository extends Mock
+    implements EnvironmentsRepository {}
 
 void main() {
   late MockEnvironmentsRepository mockRepository;
@@ -20,7 +22,9 @@ void main() {
   setUp(() {
     mockRepository = MockEnvironmentsRepository();
     when(() => mockRepository.putEnvironment(any())).thenAnswer((_) async {});
-    when(() => mockRepository.deleteEnvironment(any())).thenAnswer((_) async {});
+    when(
+      () => mockRepository.deleteEnvironment(any()),
+    ).thenAnswer((_) async {});
     when(() => mockRepository.saveEnvironments(any())).thenAnswer((_) async {});
     bloc = EnvironmentsBloc(
       getEnvironmentsUseCase: GetEnvironmentsUseCase(mockRepository),
@@ -33,15 +37,18 @@ void main() {
   tearDown(() => bloc.close());
 
   group('AddEnvironment', () {
-    test('appends the given entity, preserving the caller-supplied id', () async {
-      final env = EnvironmentEntity(id: 'env-1', name: 'Staging');
+    test(
+      'appends the given entity, preserving the caller-supplied id',
+      () async {
+        final env = EnvironmentEntity(id: 'env-1', name: 'Staging');
 
-      bloc.add(AddEnvironment(env));
-      await untilCalled(() => mockRepository.putEnvironment(any()));
+        bloc.add(AddEnvironment(env));
+        await untilCalled(() => mockRepository.putEnvironment(any()));
 
-      expect(bloc.state.environments, [env]);
-      expect(bloc.state.environments.single.id, 'env-1');
-    });
+        expect(bloc.state.environments, [env]);
+        expect(bloc.state.environments.single.id, 'env-1');
+      },
+    );
 
     test('persists only the added environment (single keyed put)', () async {
       final env = EnvironmentEntity(id: 'env-1', name: 'Staging');
@@ -57,7 +64,10 @@ void main() {
   group('UpdateEnvironment', () {
     test('replaces the environment with a matching id and puts it', () async {
       final original = EnvironmentEntity(id: 'env-1', name: 'Staging');
-      final updated = original.copyWith(name: 'Production', variables: {'host': 'prod'});
+      final updated = original.copyWith(
+        name: 'Production',
+        variables: {'host': 'prod'},
+      );
 
       bloc.add(AddEnvironment(original));
       await untilCalled(() => mockRepository.putEnvironment(original));
@@ -68,7 +78,9 @@ void main() {
     });
 
     test('ignores updates for unknown ids', () async {
-      bloc.add(UpdateEnvironment(EnvironmentEntity(id: 'ghost', name: 'Ghost')));
+      bloc.add(
+        UpdateEnvironment(EnvironmentEntity(id: 'ghost', name: 'Ghost')),
+      );
       await Future<void>.delayed(Duration.zero);
 
       expect(bloc.state.environments, isEmpty);
@@ -106,27 +118,39 @@ void main() {
   group('LoadEnvironments', () {
     test('emits loaded environments', () async {
       final env = EnvironmentEntity(id: 'env-1', name: 'Staging');
-      when(() => mockRepository.getEnvironments()).thenAnswer((_) async => [env]);
+      when(
+        () => mockRepository.getEnvironments(),
+      ).thenAnswer((_) async => [env]);
 
       bloc.add(const LoadEnvironments());
       await expectLater(
         bloc.stream,
-        emitsThrough(predicate<dynamic>((s) => s.environments.length == 1 && !s.isLoading)),
+        emitsThrough(
+          predicate<EnvironmentsState>(
+            (s) => s.environments.length == 1 && !s.isLoading,
+          ),
+        ),
       );
     });
 
-    test('clears isLoading and keeps current list when the read fails', () async {
-      when(() => mockRepository.getEnvironments())
-          .thenThrow(const PersistenceFailure('corrupted box'));
+    test(
+      'clears isLoading and keeps current list when the read fails',
+      () async {
+        when(
+          () => mockRepository.getEnvironments(),
+        ).thenThrow(const PersistenceFailure('corrupted box'));
 
-      bloc.add(const LoadEnvironments());
-      await expectLater(
-        bloc.stream,
-        emitsInOrder([
-          predicate<dynamic>((s) => s.isLoading == true),
-          predicate<dynamic>((s) => s.isLoading == false && s.environments.isEmpty),
-        ]),
-      );
-    });
+        bloc.add(const LoadEnvironments());
+        await expectLater(
+          bloc.stream,
+          emitsInOrder([
+            predicate<EnvironmentsState>((s) => s.isLoading),
+            predicate<EnvironmentsState>(
+              (s) => !s.isLoading && s.environments.isEmpty,
+            ),
+          ]),
+        );
+      },
+    );
   });
 }

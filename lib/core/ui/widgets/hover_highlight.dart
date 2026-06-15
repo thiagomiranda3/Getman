@@ -7,16 +7,20 @@ import 'package:flutter/material.dart';
 /// per-widget `bool _isHovered + setState` boilerplate that rebuilt whole rows
 /// on every mouse enter/exit.
 class HoverHighlight extends StatefulWidget {
-  final Widget child;
-  final BoxDecoration Function(bool hovered) decoration;
-  final Duration duration;
-
   const HoverHighlight({
-    super.key,
     required this.child,
     required this.decoration,
+    super.key,
     this.duration = const Duration(milliseconds: 200),
   });
+  final Widget child;
+
+  /// Callback signature: the positional `hovered` flag is the natural shape for
+  /// this decoration builder and its closures live in out-of-scope feature
+  /// widgets; converting to a named param would change their call sites.
+  // ignore: avoid_positional_boolean_parameters
+  final BoxDecoration Function(bool hovered) decoration;
+  final Duration duration;
 
   @override
   State<HoverHighlight> createState() => _HoverHighlightState();

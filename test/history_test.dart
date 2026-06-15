@@ -19,45 +19,53 @@ void main() {
   setUp(() {
     mockRepository = MockHistoryRepository();
     watchController = StreamController<List<HttpRequestConfigEntity>>();
-    when(() => mockRepository.watchHistory()).thenAnswer((_) => watchController.stream);
+    when(
+      () => mockRepository.watchHistory(),
+    ).thenAnswer((_) => watchController.stream);
   });
 
   tearDown(() => watchController.close());
 
   const tConfig = HttpRequestConfigEntity(
     id: '1',
-    method: 'GET',
     url: 'https://example.com',
   );
 
-  test('starts loading until the watch stream delivers the initial list', () async {
-    final bloc = buildBloc();
-    addTearDown(bloc.close);
+  test(
+    'starts loading until the watch stream delivers the initial list',
+    () async {
+      final bloc = buildBloc();
+      addTearDown(bloc.close);
 
-    expect(bloc.state.isLoading, isTrue);
+      expect(bloc.state.isLoading, isTrue);
 
-    watchController.add(const [tConfig]);
-    await expectLater(
-      bloc.stream,
-      emits(const HistoryState(history: [tConfig], isLoading: false)),
-    );
-  });
+      watchController.add(const [tConfig]);
+      await expectLater(
+        bloc.stream,
+        emits(const HistoryState(history: [tConfig])),
+      );
+    },
+  );
 
-  test('updates state on every subsequent watch emission, newest list winning', () async {
-    final bloc = buildBloc();
-    addTearDown(bloc.close);
+  test(
+    'updates state on every subsequent watch emission, newest list winning',
+    () async {
+      final bloc = buildBloc();
+      addTearDown(bloc.close);
 
-    watchController.add(const [tConfig]);
-    watchController.add(const []);
+      watchController
+        ..add(const [tConfig])
+        ..add(const []);
 
-    await expectLater(
-      bloc.stream,
-      emitsInOrder([
-        const HistoryState(history: [tConfig], isLoading: false),
-        const HistoryState(history: [], isLoading: false),
-      ]),
-    );
-  });
+      await expectLater(
+        bloc.stream,
+        emitsInOrder([
+          const HistoryState(history: [tConfig]),
+          const HistoryState(),
+        ]),
+      );
+    },
+  );
 
   test('ignores emissions arriving after close instead of throwing', () async {
     final bloc = buildBloc();

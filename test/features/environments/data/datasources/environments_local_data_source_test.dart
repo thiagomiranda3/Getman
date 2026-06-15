@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/features/environments/data/datasources/environments_local_data_source.dart';
 import 'package:getman/features/environments/data/models/environment_model.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 void main() {
   late Directory tempDir;
@@ -26,7 +26,8 @@ void main() {
     if (tempDir.existsSync()) await tempDir.delete(recursive: true);
   });
 
-  EnvironmentModel model(String id, String name) => EnvironmentModel(id: id, name: name);
+  EnvironmentModel model(String id, String name) =>
+      EnvironmentModel(id: id, name: name);
 
   test('putEnvironment stores keyed by id and overwrites in place', () async {
     await dataSource.putEnvironment(model('a', 'Staging'));
@@ -35,7 +36,10 @@ void main() {
 
     expect(box.length, 2);
     expect(box.get('a')!.name, 'Production');
-    expect((await dataSource.getEnvironments()).map((e) => e.id).toSet(), {'a', 'b'});
+    expect((await dataSource.getEnvironments()).map((e) => e.id).toSet(), {
+      'a',
+      'b',
+    });
   });
 
   test('deleteEnvironment removes one by id', () async {
@@ -55,7 +59,10 @@ void main() {
   });
 
   test('migrateLegacyKeysIfNeeded re-keys int-keyed entries by id', () async {
-    await box.addAll([model('a', 'A'), model('b', 'B')]); // legacy auto int keys
+    await box.addAll([
+      model('a', 'A'),
+      model('b', 'B'),
+    ]); // legacy auto int keys
     expect(box.keys.every((k) => k is int), isTrue);
 
     await EnvironmentsLocalDataSourceImpl.migrateLegacyKeysIfNeeded();

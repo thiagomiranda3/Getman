@@ -59,7 +59,11 @@ void main() {
     });
 
     test('copyWith preserves secretKeys when not provided', () {
-      final entity = EnvironmentEntity(id: 'a', name: 'Env', secretKeys: const {'k'});
+      final entity = EnvironmentEntity(
+        id: 'a',
+        name: 'Env',
+        secretKeys: const {'k'},
+      );
       expect(entity.copyWith(name: 'Env2').secretKeys, {'k'});
     });
   });

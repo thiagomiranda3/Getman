@@ -2,13 +2,12 @@ import 'package:equatable/equatable.dart';
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 
 class EnvironmentsState extends Equatable {
-  final List<EnvironmentEntity> environments;
-  final bool isLoading;
-
   const EnvironmentsState({
     this.environments = const [],
     this.isLoading = false,
   });
+  final List<EnvironmentEntity> environments;
+  final bool isLoading;
 
   @override
   List<Object?> get props => [environments, isLoading];

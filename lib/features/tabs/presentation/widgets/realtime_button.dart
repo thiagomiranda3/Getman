@@ -10,25 +10,25 @@ import 'package:getman/features/realtime/presentation/bloc/realtime_state.dart';
 /// CONNECT / DISCONNECT button for WebSocket & SSE requests, driven by the
 /// realtime connection status for this tab.
 class RealtimeButton extends StatelessWidget {
-  final String tabId;
-  final HttpRequestConfigEntity config;
-  final bool isNarrow;
-  final Map<String, String> activeVars;
-
   const RealtimeButton({
-    super.key,
     required this.tabId,
     required this.config,
     required this.isNarrow,
     required this.activeVars,
+    super.key,
   });
+  final String tabId;
+  final HttpRequestConfigEntity config;
+  final bool isNarrow;
+  final Map<String, String> activeVars;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
     return BlocBuilder<RealtimeBloc, RealtimeState>(
-      buildWhen: (p, n) => p.sessionFor(tabId).connected != n.sessionFor(tabId).connected,
+      buildWhen: (p, n) =>
+          p.sessionFor(tabId).connected != n.sessionFor(tabId).connected,
       builder: (context, rt) {
         final connected = rt.sessionFor(tabId).connected;
         return context.appDecoration.wrapInteractive(
@@ -38,12 +38,17 @@ class RealtimeButton extends StatelessWidget {
               if (connected) {
                 bloc.add(Disconnect(tabId));
               } else {
-                bloc.add(Connect(
-                  tabId: tabId,
-                  kind: config.kind,
-                  url: EnvironmentResolver.resolve(config.url, activeVars),
-                  headers: EnvironmentResolver.resolveMap(config.headers, activeVars),
-                ));
+                bloc.add(
+                  Connect(
+                    tabId: tabId,
+                    kind: config.kind,
+                    url: EnvironmentResolver.resolve(config.url, activeVars),
+                    headers: EnvironmentResolver.resolveMap(
+                      config.headers,
+                      activeVars,
+                    ),
+                  ),
+                );
               }
             },
             style: ElevatedButton.styleFrom(
@@ -58,7 +63,10 @@ class RealtimeButton extends StatelessWidget {
             ),
             child: Text(
               connected ? (isNarrow ? 'STOP' : 'DISCONNECT') : 'CONNECT',
-              style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.displayWeight),
+              style: TextStyle(
+                fontSize: layout.fontSizeTitle,
+                fontWeight: context.appTypography.displayWeight,
+              ),
             ),
           ),
         );

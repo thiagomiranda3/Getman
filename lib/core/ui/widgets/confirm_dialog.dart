@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:getman/core/ui/widgets/name_prompt_dialog.dart'
+    show NamePromptDialog;
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 
 /// A yes/no confirmation for irreversible actions (delete, clear). Mirrors
@@ -7,22 +9,21 @@ import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 /// events without a deactivated context. Destructive confirms are tinted with
 /// the theme's error color.
 class ConfirmDialog extends StatelessWidget {
+  const ConfirmDialog({
+    required this.title,
+    required this.message,
+    required this.onConfirm,
+    super.key,
+    this.confirmLabel = 'DELETE',
+    this.cancelLabel = 'CANCEL',
+    this.destructive = true,
+  });
   final String title;
   final String message;
   final String confirmLabel;
   final String cancelLabel;
   final bool destructive;
   final VoidCallback onConfirm;
-
-  const ConfirmDialog({
-    super.key,
-    required this.title,
-    required this.message,
-    required this.onConfirm,
-    this.confirmLabel = 'DELETE',
-    this.cancelLabel = 'CANCEL',
-    this.destructive = true,
-  });
 
   /// Convenience wrapper around [showResponsiveDialog].
   static Future<void> show(

@@ -4,13 +4,61 @@ import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
 import 'package:getman/features/tabs/data/models/multipart_field_model.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 import 'package:uuid/uuid.dart';
 
 part 'request_config_model.g.dart';
 
 @HiveType(typeId: 1)
 class HttpRequestConfig extends HiveObject {
+  HttpRequestConfig({
+    String? id,
+    this.method = 'GET',
+    this.url = '',
+    Map<String, String>? headers,
+    Map<String, String>? params,
+    this.body = '',
+    Map<String, String>? auth,
+    this.bodyType = 'raw',
+    List<MultipartFieldModel>? formFields,
+    this.bodyFilePath,
+    this.kind = 0,
+    this.responseBody,
+    this.responseHeaders,
+    this.statusCode,
+    this.durationMs,
+  }) : id = id ?? const Uuid().v4(),
+       headers =
+           headers ??
+           {
+             'Content-Type': 'application/json',
+             'Accept': '*/*',
+           },
+       params = params ?? {},
+       auth = auth ?? {},
+       formFields = formFields ?? [];
+
+  factory HttpRequestConfig.fromEntity(HttpRequestConfigEntity entity) =>
+      HttpRequestConfig(
+        id: entity.id,
+        method: entity.method,
+        url: entity.url,
+        headers: entity.headers,
+        // URL carries the query now; stored params stays empty going forward.
+        params: const {},
+        body: entity.body,
+        auth: entity.auth,
+        bodyType: entity.bodyType.wire,
+        formFields: entity.formFields
+            .map(MultipartFieldModel.fromEntity)
+            .toList(),
+        bodyFilePath: entity.bodyFilePath,
+        kind: entity.kind.wire,
+        responseBody: entity.responseBody,
+        responseHeaders: entity.responseHeaders,
+        statusCode: entity.statusCode,
+        durationMs: entity.durationMs,
+      );
   @HiveField(0)
   String id;
 
@@ -62,51 +110,6 @@ class HttpRequestConfig extends HiveObject {
   @HiveField(14, defaultValue: 0)
   int kind;
 
-  HttpRequestConfig({
-    String? id,
-    this.method = 'GET',
-    this.url = '',
-    Map<String, String>? headers,
-    Map<String, String>? params,
-    this.body = '',
-    Map<String, String>? auth,
-    this.bodyType = 'raw',
-    List<MultipartFieldModel>? formFields,
-    this.bodyFilePath,
-    this.kind = 0,
-    this.responseBody,
-    this.responseHeaders,
-    this.statusCode,
-    this.durationMs,
-  })  : id = id ?? const Uuid().v4(),
-        headers = headers ??
-            {
-              'Content-Type': 'application/json',
-              'Accept': '*/*',
-            },
-        params = params ?? {},
-        auth = auth ?? {},
-        formFields = formFields ?? [];
-
-  factory HttpRequestConfig.fromEntity(HttpRequestConfigEntity entity) => HttpRequestConfig(
-    id: entity.id,
-    method: entity.method,
-    url: entity.url,
-    headers: entity.headers,
-    // URL carries the query now; stored params stays empty going forward.
-    params: const {},
-    body: entity.body,
-    auth: entity.auth,
-    bodyType: entity.bodyType.wire,
-    formFields: entity.formFields.map(MultipartFieldModel.fromEntity).toList(),
-    bodyFilePath: entity.bodyFilePath,
-    kind: entity.kind.wire,
-    responseBody: entity.responseBody,
-    responseHeaders: entity.responseHeaders,
-    statusCode: entity.statusCode,
-    durationMs: entity.durationMs,
-  );
-
   HttpRequestConfigEntity toEntity() {
     // Lazy migration: if a legacy record stored params in the separate map,
     // merge them into the URL's query string. Next save writes params back
@@ -140,6 +143,9 @@ class HttpRequestConfig extends HiveObject {
   // and body — ignoring `id` and response fields. URL now carries the query
   // portion, so dedup distinguishes ?a=1 from ?a=2. See CLAUDE.md §6.
   @override
+  // Signature-only equality is intentional for history dedup; a HiveObject is
+  // inherently mutable so it can't be @immutable.
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     return other is HttpRequestConfig &&
@@ -149,5 +155,8 @@ class HttpRequestConfig extends HiveObject {
   }
 
   @override
+  // Signature-only equality is intentional for history dedup; a HiveObject is
+  // inherently mutable so it can't be @immutable.
+  // ignore: avoid_equals_and_hash_code_on_mutable_classes
   int get hashCode => Object.hash(method, url, body);
 }

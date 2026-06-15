@@ -1,15 +1,14 @@
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 
 class UrlParts {
-  final String base;
-  final List<QueryParamEntity> params;
-  final String? fragment;
-
   const UrlParts({
     required this.base,
     required this.params,
     required this.fragment,
   });
+  final String base;
+  final List<QueryParamEntity> params;
+  final String? fragment;
 }
 
 class UrlQueryUtils {
@@ -72,12 +71,14 @@ class UrlQueryUtils {
       rendered.add('${_encode(p.key)}=${_encode(p.value)}');
     }
     if (rendered.isNotEmpty) {
-      buf.write('?');
-      buf.write(rendered.join('&'));
+      buf
+        ..write('?')
+        ..write(rendered.join('&'));
     }
     if (fragment != null) {
-      buf.write('#');
-      buf.write(fragment);
+      buf
+        ..write('#')
+        ..write(fragment);
     }
     return buf.toString();
   }
@@ -85,7 +86,7 @@ class UrlQueryUtils {
   static String _encode(String input) {
     if (input.isEmpty) return '';
     final buf = StringBuffer();
-    int i = 0;
+    var i = 0;
     for (final m in _varToken.allMatches(input)) {
       if (m.start > i) {
         buf.write(Uri.encodeComponent(input.substring(i, m.start)));
@@ -102,7 +103,7 @@ class UrlQueryUtils {
   static String _decode(String input) {
     if (input.isEmpty) return '';
     final buf = StringBuffer();
-    int i = 0;
+    var i = 0;
     for (final m in _varToken.allMatches(input)) {
       if (m.start > i) {
         buf.write(_safeDecode(input.substring(i, m.start)));
@@ -119,7 +120,7 @@ class UrlQueryUtils {
   static String _safeDecode(String input) {
     try {
       return Uri.decodeComponent(input);
-    } catch (_) {
+    } on Object catch (_) {
       return input;
     }
   }

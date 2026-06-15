@@ -23,11 +23,13 @@ void configureHttpAdapter(
 }) {
   dio.httpClientAdapter = IOHttpClientAdapter(
     createHttpClient: () {
-      final client = HttpClient(context: _securityContext(
-        clientCertPath: clientCertPath,
-        clientKeyPath: clientKeyPath,
-        clientCertPassphrase: clientCertPassphrase,
-      ));
+      final client = HttpClient(
+        context: _securityContext(
+          clientCertPath: clientCertPath,
+          clientKeyPath: clientKeyPath,
+          clientCertPassphrase: clientCertPassphrase,
+        ),
+      );
       if (!verifySsl) {
         client.badCertificateCallback = (cert, host, port) => true;
       }
@@ -52,12 +54,15 @@ SecurityContext? _securityContext({
   final key = clientKeyPath?.trim() ?? '';
   if (cert.isEmpty || key.isEmpty) return null;
   try {
-    final context = SecurityContext(withTrustedRoots: true);
-    context.useCertificateChain(cert);
     final pass = clientCertPassphrase;
-    context.usePrivateKey(key, password: (pass != null && pass.isNotEmpty) ? pass : null);
+    final context = SecurityContext(withTrustedRoots: true)
+      ..useCertificateChain(cert)
+      ..usePrivateKey(
+        key,
+        password: (pass != null && pass.isNotEmpty) ? pass : null,
+      );
     return context;
-  } catch (e) {
+  } on Object catch (e) {
     debugPrint('Client certificate load failed (falling back to default): $e');
     return null;
   }

@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 
 class MethodBadge extends StatelessWidget {
+  const MethodBadge({required this.method, super.key, this.small = false});
   final String method;
   final bool small;
-  const MethodBadge({super.key, required this.method, this.small = false});
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +24,8 @@ class MethodBadge extends StatelessWidget {
       child: Text(
         method,
         style: TextStyle(
-          // Contrast against the per-method color, not a fixed onPrimary (a11y).
+          // Contrast against the per-method color, not a fixed onPrimary
+          // (a11y).
           color: context.appPalette.methodOn(method),
           fontWeight: context.appTypography.displayWeight,
           fontSize: small ? layout.fontSizeSmall : layout.fontSizeNormal,

@@ -4,15 +4,14 @@ import 'package:equatable/equatable.dart';
 /// (no reference to the rule) so it can travel on the tab entity without
 /// coupling the tabs feature to the chaining feature.
 class ExtractionResult extends Equatable {
-  final String variable;
-  final String? value;
-  final bool matched;
-
   const ExtractionResult({
     required this.variable,
     required this.value,
     required this.matched,
   });
+  final String variable;
+  final String? value;
+  final bool matched;
 
   @override
   List<Object?> get props => [variable, value, matched];

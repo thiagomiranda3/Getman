@@ -19,34 +19,36 @@ abstract class RealtimeConnection {
 /// WebSocket uses `web_socket_channel` (cross-platform). Custom request headers
 /// are not supported on the browser WebSocket API, so auth on web must use a
 /// query param or subprotocol — documented limitation. SSE streams a Dio
-/// response; on web the XHR adapter may buffer rather than stream incrementally.
+/// response; on web the XHR adapter may buffer rather than stream
+/// incrementally.
 class RealtimeService {
+  RealtimeService({
+    Dio? dio,
+    WebSocketChannel Function(Uri uri)? webSocketFactory,
+  }) : _dio = dio ?? _buildSseDio(),
+       _webSocketFactory = webSocketFactory ?? WebSocketChannel.connect;
   final Dio _dio;
   final WebSocketChannel Function(Uri uri) _webSocketFactory;
 
-  RealtimeService({Dio? dio, WebSocketChannel Function(Uri uri)? webSocketFactory})
-      : _dio = dio ?? _buildSseDio(),
-        _webSocketFactory = webSocketFactory ?? WebSocketChannel.connect;
-
   // SSE is a long-lived stream — no receive timeout, or it would be killed.
-  static Dio _buildSseDio() => Dio(BaseOptions(
-        connectTimeout: const Duration(seconds: 30),
-        validateStatus: (_) => true,
-        responseType: ResponseType.stream,
-      ));
+  static Dio _buildSseDio() => Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 30),
+      validateStatus: (_) => true,
+      responseType: ResponseType.stream,
+    ),
+  );
 
   RealtimeConnection connectWebSocket(String url) =>
       _WebSocketConnection(_webSocketFactory(Uri.parse(url)), url);
 
-  RealtimeConnection connectSse(String url, {Map<String, String> headers = const {}}) =>
-      _SseConnection(_dio, url, headers);
+  RealtimeConnection connectSse(
+    String url, {
+    Map<String, String> headers = const {},
+  }) => _SseConnection(_dio, url, headers);
 }
 
 class _WebSocketConnection implements RealtimeConnection {
-  final WebSocketChannel _channel;
-  final _controller = StreamController<RealtimeFrame>.broadcast();
-  StreamSubscription<dynamic>? _sub;
-
   _WebSocketConnection(this._channel, String url) {
     _emit(RealtimeFrame.open('Connecting to $url'));
     _sub = _channel.stream.listen(
@@ -55,6 +57,9 @@ class _WebSocketConnection implements RealtimeConnection {
       onDone: () => _emit(RealtimeFrame.close()),
     );
   }
+  final WebSocketChannel _channel;
+  final _controller = StreamController<RealtimeFrame>.broadcast();
+  StreamSubscription<dynamic>? _sub;
 
   void _emit(RealtimeFrame f) {
     if (!_controller.isClosed) _controller.add(f);
@@ -78,52 +83,57 @@ class _WebSocketConnection implements RealtimeConnection {
 }
 
 class _SseConnection implements RealtimeConnection {
+  _SseConnection(Dio dio, String url, Map<String, String> headers) {
+    _emit(RealtimeFrame.open('Streaming $url'));
+    unawaited(
+      dio
+          .get<ResponseBody>(
+            url,
+            options: Options(
+              responseType: ResponseType.stream,
+              headers: {...headers, 'Accept': 'text/event-stream'},
+            ),
+            cancelToken: _cancel,
+          )
+          .then((response) {
+            final body = response.data;
+            if (body == null) {
+              _emit(RealtimeFrame.error('No response body'));
+              return;
+            }
+            // Decode through a single streaming UTF-8 decoder so a multi-byte
+            // code point split across two network chunks buffers across the
+            // boundary instead of being corrupted into U+FFFD on each side.
+            // `bind` accepts the covariant Stream<Uint8List>; `.transform`
+            // would not type-check.
+            final decoded = const Utf8Decoder(
+              allowMalformed: true,
+            ).bind(body.stream);
+            _sub = decoded.listen(
+              (text) {
+                for (final event in _parser.addChunk(text)) {
+                  _emit(RealtimeFrame.incoming(event));
+                }
+              },
+              onError: (Object e) => _emit(RealtimeFrame.error(e.toString())),
+              onDone: () {
+                for (final event in _parser.flush()) {
+                  _emit(RealtimeFrame.incoming(event));
+                }
+                _emit(RealtimeFrame.close());
+              },
+            );
+          })
+          .catchError((Object e) {
+            if (e is DioException && CancelToken.isCancel(e)) return;
+            _emit(RealtimeFrame.error(e.toString()));
+          }),
+    );
+  }
   final _controller = StreamController<RealtimeFrame>.broadcast();
   final SseParser _parser = SseParser();
   final CancelToken _cancel = CancelToken();
   StreamSubscription<dynamic>? _sub;
-
-  _SseConnection(Dio dio, String url, Map<String, String> headers) {
-    _emit(RealtimeFrame.open('Streaming $url'));
-    dio
-        .get<ResponseBody>(
-      url,
-      options: Options(
-        responseType: ResponseType.stream,
-        headers: {...headers, 'Accept': 'text/event-stream'},
-      ),
-      cancelToken: _cancel,
-    )
-        .then((response) {
-      final body = response.data;
-      if (body == null) {
-        _emit(RealtimeFrame.error('No response body'));
-        return;
-      }
-      // Decode through a single streaming UTF-8 decoder so a multi-byte code
-      // point split across two network chunks buffers across the boundary
-      // instead of being corrupted into U+FFFD on each side. `bind` accepts the
-      // covariant Stream<Uint8List>; `.transform` would not type-check.
-      final decoded = const Utf8Decoder(allowMalformed: true).bind(body.stream);
-      _sub = decoded.listen(
-        (text) {
-          for (final event in _parser.addChunk(text)) {
-            _emit(RealtimeFrame.incoming(event));
-          }
-        },
-        onError: (Object e) => _emit(RealtimeFrame.error(e.toString())),
-        onDone: () {
-          for (final event in _parser.flush()) {
-            _emit(RealtimeFrame.incoming(event));
-          }
-          _emit(RealtimeFrame.close());
-        },
-      );
-    }).catchError((Object e) {
-      if (e is DioException && CancelToken.isCancel(e)) return;
-      _emit(RealtimeFrame.error(e.toString()));
-    });
-  }
 
   void _emit(RealtimeFrame f) {
     if (!_controller.isClosed) _controller.add(f);
@@ -133,7 +143,9 @@ class _SseConnection implements RealtimeConnection {
   Stream<RealtimeFrame> get frames => _controller.stream;
 
   @override
-  void send(String message) {/* SSE is read-only */}
+  void send(String message) {
+    /* SSE is read-only */
+  }
 
   @override
   Future<void> close() async {

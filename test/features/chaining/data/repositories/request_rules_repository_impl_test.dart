@@ -28,33 +28,39 @@ class _FakeRulesDataSource implements RequestRulesLocalDataSource {
 
 void main() {
   test('getRules maps a stored model to its entity', () async {
-    final entity = const RequestRulesEntity(
+    const entity = RequestRulesEntity(
       configId: 'c1',
       extractionRules: [ExtractionRule(id: 'r1', targetVariable: 'tok')],
     );
-    final ds = _FakeRulesDataSource()..toReturn = RequestRulesModel.fromEntity(entity);
+    final ds = _FakeRulesDataSource()
+      ..toReturn = RequestRulesModel.fromEntity(entity);
     final repo = RequestRulesRepositoryImpl(ds);
 
     expect(await repo.getRules('c1'), entity);
   });
 
-  test('getRules returns an empty entity for the configId when nothing is stored', () async {
-    final ds = _FakeRulesDataSource();
-    final repo = RequestRulesRepositoryImpl(ds);
+  test(
+    'getRules returns an empty entity for the configId when nothing is stored',
+    () async {
+      final ds = _FakeRulesDataSource();
+      final repo = RequestRulesRepositoryImpl(ds);
 
-    final result = await repo.getRules('c2');
-    expect(result.configId, 'c2');
-    expect(result.isEmpty, isTrue);
-  });
+      final result = await repo.getRules('c2');
+      expect(result.configId, 'c2');
+      expect(result.isEmpty, isTrue);
+    },
+  );
 
   test('saveRules with a non-empty entity forwards a saveRules', () async {
     final ds = _FakeRulesDataSource();
     final repo = RequestRulesRepositoryImpl(ds);
 
-    await repo.saveRules(const RequestRulesEntity(
-      configId: 'c3',
-      extractionRules: [ExtractionRule(id: 'r1', targetVariable: 'tok')],
-    ));
+    await repo.saveRules(
+      const RequestRulesEntity(
+        configId: 'c3',
+        extractionRules: [ExtractionRule(id: 'r1', targetVariable: 'tok')],
+      ),
+    );
 
     expect(ds.saved, isNotNull);
     expect(ds.deletedConfigId, isNull);

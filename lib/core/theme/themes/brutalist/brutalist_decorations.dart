@@ -19,8 +19,10 @@ BoxDecoration brutalistPanelBox(
     boxShadow: [
       BoxShadow(
         color: border,
-        offset: Offset(offset ?? layout.borderHeavy, offset ?? layout.borderHeavy),
-        blurRadius: 0,
+        offset: Offset(
+          offset ?? layout.borderHeavy,
+          offset ?? layout.borderHeavy,
+        ),
       ),
     ],
   );
@@ -42,7 +44,7 @@ BoxDecoration brutalistTabShape(
   } else {
     background = theme.cardColor;
   }
-  final BorderSide rule = BorderSide(color: border, width: 1);
+  final rule = BorderSide(color: border);
   return BoxDecoration(
     color: background,
     border: Border(
@@ -54,4 +56,7 @@ BoxDecoration brutalistTabShape(
   );
 }
 
-Widget brutalistScaffoldBackground(BuildContext context, {required Widget child}) => child;
+Widget brutalistScaffoldBackground(
+  BuildContext context, {
+  required Widget child,
+}) => child;

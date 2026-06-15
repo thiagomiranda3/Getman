@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -50,16 +52,21 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
       builder: (context, state) {
         final environments = state.environments;
         // Reconcile selection with the live list.
-        if (_selectedId != null && environments.every((e) => e.id != _selectedId)) {
+        if (_selectedId != null &&
+            environments.every((e) => e.id != _selectedId)) {
           _selectedId = null;
         }
         final isFullscreen = context.isDialogFullscreen;
         // Wide: auto-select first so the editor pane shows something.
         // Narrow: start at the list page; don't auto-push to detail.
         if (!isFullscreen) {
-          _selectedId ??= environments.isNotEmpty ? environments.first.id : null;
+          _selectedId ??= environments.isNotEmpty
+              ? environments.first.id
+              : null;
         }
-        final selected = environments.firstWhereOrNull((e) => e.id == _selectedId);
+        final selected = environments.firstWhereOrNull(
+          (e) => e.id == _selectedId,
+        );
 
         if (isFullscreen) {
           return _buildNarrow(context, environments, selected);
@@ -86,7 +93,11 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
           children: [
             SizedBox(
               width: 220,
-              child: _listPane(context, environments, onItemTap: (env) => setState(() => _selectedId = env.id)),
+              child: _listPane(
+                context,
+                environments,
+                onItemTap: (env) => setState(() => _selectedId = env.id),
+              ),
             ),
             SizedBox(width: layout.sectionSpacing),
             Expanded(
@@ -96,17 +107,25 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
                         'Select or create an environment',
                         style: TextStyle(
                           fontSize: layout.fontSizeNormal,
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
                         ),
                       ),
                     )
-                  : EnvironmentEditor(key: ValueKey(selected.id), environment: selected),
+                  : EnvironmentEditor(
+                      key: ValueKey(selected.id),
+                      environment: selected,
+                    ),
             ),
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('CLOSE')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('CLOSE'),
+        ),
       ],
     );
   }
@@ -136,21 +155,30 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
               if (showDetail) {
                 setState(() => _selectedId = null);
               } else {
-                Navigator.of(context).maybePop();
+                unawaited(Navigator.of(context).maybePop());
               }
             },
           ),
-          title: Text(showDetail ? selected.name.toUpperCase() : 'ENVIRONMENTS'),
+          title: Text(
+            showDetail ? selected.name.toUpperCase() : 'ENVIRONMENTS',
+          ),
         ),
         body: SafeArea(
           child: showDetail
               ? Padding(
                   padding: EdgeInsets.all(context.appLayout.pagePadding),
-                  child: EnvironmentEditor(key: ValueKey(selected.id), environment: selected),
+                  child: EnvironmentEditor(
+                    key: ValueKey(selected.id),
+                    environment: selected,
+                  ),
                 )
               : Padding(
                   padding: EdgeInsets.all(context.appLayout.pagePadding),
-                  child: _listPane(context, environments, onItemTap: (env) => setState(() => _selectedId = env.id)),
+                  child: _listPane(
+                    context,
+                    environments,
+                    onItemTap: (env) => setState(() => _selectedId = env.id),
+                  ),
                 ),
         ),
       ),
@@ -217,7 +245,9 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: layout.fontSizeNormal,
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
                         ),
                       ),
                     ),
@@ -244,38 +274,43 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
 
   void _createEnvironment(BuildContext context) {
     final bloc = context.read<EnvironmentsBloc>();
-    NamePromptDialog.show(
-      context,
-      title: 'NEW ENVIRONMENT',
-      hintText: 'ENVIRONMENT NAME',
-      confirmLabel: 'CREATE',
-      onConfirm: (name) {
-        // Build the entity here so its id is known before the bloc processes
-        // the event — reading bloc.state right after add() would race.
-        final environment = EnvironmentEntity(name: name);
-        bloc.add(AddEnvironment(environment));
-        setState(() => _selectedId = environment.id);
-      },
+    unawaited(
+      NamePromptDialog.show(
+        context,
+        title: 'NEW ENVIRONMENT',
+        hintText: 'ENVIRONMENT NAME',
+        confirmLabel: 'CREATE',
+        onConfirm: (name) {
+          // Build the entity here so its id is known before the bloc processes
+          // the event — reading bloc.state right after add() would race.
+          final environment = EnvironmentEntity(name: name);
+          bloc.add(AddEnvironment(environment));
+          setState(() => _selectedId = environment.id);
+        },
+      ),
     );
   }
 
   void _deleteEnvironment(BuildContext context, EnvironmentEntity env) {
-    ConfirmDialog.show(
-      context,
-      title: 'Delete environment?',
-      message: 'Deletes "${env.name}" and its variables. This cannot be undone.',
-      onConfirm: () {
-        final envsBloc = context.read<EnvironmentsBloc>();
-        final settingsBloc = context.read<SettingsBloc>();
-        envsBloc.add(DeleteEnvironment(env.id));
-        if (settingsBloc.state.settings.activeEnvironmentId == env.id) {
-          settingsBloc.add(const UpdateActiveEnvironmentId(null));
-        }
-        if (_selectedId == env.id) {
-          setState(() => _selectedId = null);
-        }
-        showAppSnackBar(context, 'Deleted "${env.name}"');
-      },
+    unawaited(
+      ConfirmDialog.show(
+        context,
+        title: 'Delete environment?',
+        message:
+            'Deletes "${env.name}" and its variables. This cannot be undone.',
+        onConfirm: () {
+          final envsBloc = context.read<EnvironmentsBloc>();
+          final settingsBloc = context.read<SettingsBloc>();
+          envsBloc.add(DeleteEnvironment(env.id));
+          if (settingsBloc.state.settings.activeEnvironmentId == env.id) {
+            settingsBloc.add(const UpdateActiveEnvironmentId(null));
+          }
+          if (_selectedId == env.id) {
+            setState(() => _selectedId = null);
+          }
+          showAppSnackBar(context, 'Deleted "${env.name}"');
+        },
+      ),
     );
   }
 
@@ -301,7 +336,10 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
     );
   }
 
-  Future<void> _exportAllEnvironments(BuildContext context, List<EnvironmentEntity> envs) {
+  Future<void> _exportAllEnvironments(
+    BuildContext context,
+    List<EnvironmentEntity> envs,
+  ) {
     return saveJsonFileWithFeedback(
       context,
       jsonString: PostmanEnvironmentMapper.toJsonAll(envs),

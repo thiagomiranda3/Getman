@@ -16,7 +16,11 @@ class HeaderUtils {
 
   /// Sets [name] to [value], dropping any case-variant of the key first so we
   /// never emit two spellings of the same header.
-  static void setHeader(Map<String, String> headers, String name, String value) {
+  static void setHeader(
+    Map<String, String> headers,
+    String name,
+    String value,
+  ) {
     removeHeader(headers, name);
     headers[name] = value;
   }

@@ -15,27 +15,28 @@ export 'package:getman/core/network/cancel_handle.dart';
 String _jsonEncode(dynamic data) => json.encode(data);
 
 class NetworkService {
-  final Dio _dio;
-
   NetworkService({required Dio dio}) : _dio = dio;
+  final Dio _dio;
 
   static Dio buildDio([
     NetworkConfig config = NetworkConfig.defaults,
     Interceptor? cookieInterceptor,
   ]) {
-    // responseType: plain keeps the raw server bytes as a String; _stringifyBody's
-    // "if (data is String) return data" fast path then short-circuits decode/re-encode,
-    // saving two full JSON passes per response.
-    final dio = Dio(BaseOptions(
-      connectTimeout: Duration(milliseconds: config.connectTimeoutMs),
-      sendTimeout: Duration(milliseconds: config.sendTimeoutMs),
-      receiveTimeout: Duration(milliseconds: config.receiveTimeoutMs),
-      followRedirects: config.followRedirects,
-      maxRedirects: config.maxRedirects,
-      validateStatus: (_) => true,
-      listFormat: ListFormat.multi,
-      responseType: ResponseType.plain,
-    ));
+    // responseType: plain keeps the raw server bytes as a String;
+    // _stringifyBody's "if (data is String) return data" fast path then
+    // short-circuits decode/re-encode, saving two full JSON passes per response.
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: Duration(milliseconds: config.connectTimeoutMs),
+        sendTimeout: Duration(milliseconds: config.sendTimeoutMs),
+        receiveTimeout: Duration(milliseconds: config.receiveTimeoutMs),
+        followRedirects: config.followRedirects,
+        maxRedirects: config.maxRedirects,
+        validateStatus: (_) => true,
+        listFormat: ListFormat.multi,
+        responseType: ResponseType.plain,
+      ),
+    );
     configureHttpAdapter(
       dio,
       verifySsl: config.verifySsl,
@@ -82,9 +83,9 @@ class NetworkService {
   }) async {
     final stopwatch = Stopwatch()..start();
     final cancelToken = CancelToken();
-    cancelHandle?.bindCancel((reason) => cancelToken.cancel(reason));
+    cancelHandle?.bindCancel(cancelToken.cancel);
     try {
-      final response = await _dio.request(
+      final response = await _dio.request<dynamic>(
         url,
         data: data,
         queryParameters: queryParameters,
@@ -114,7 +115,7 @@ class NetworkService {
     if (data is String) return data;
     try {
       return await compute(_jsonEncode, data);
-    } catch (e) {
+    } on Object catch (e) {
       debugPrint('NetworkService._stringifyBody failed: $e');
       return data.toString();
     }
@@ -123,16 +124,31 @@ class NetworkService {
   NetworkFailure _mapDioException(DioException e) {
     switch (e.type) {
       case DioExceptionType.cancel:
-        return const NetworkFailure('Request cancelled', type: NetworkFailureType.cancelled);
+        return const NetworkFailure(
+          'Request cancelled',
+          type: NetworkFailureType.cancelled,
+        );
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.connectionError:
-        return NetworkFailure(e.message ?? 'Connection failed', type: NetworkFailureType.connection);
+        return NetworkFailure(
+          e.message ?? 'Connection failed',
+          type: NetworkFailureType.connection,
+        );
       case DioExceptionType.sendTimeout:
-        return NetworkFailure(e.message ?? 'Send timeout', type: NetworkFailureType.sendTimeout);
+        return NetworkFailure(
+          e.message ?? 'Send timeout',
+          type: NetworkFailureType.sendTimeout,
+        );
       case DioExceptionType.receiveTimeout:
-        return NetworkFailure(e.message ?? 'Receive timeout', type: NetworkFailureType.receiveTimeout);
+        return NetworkFailure(
+          e.message ?? 'Receive timeout',
+          type: NetworkFailureType.receiveTimeout,
+        );
       case DioExceptionType.badCertificate:
-        return NetworkFailure(e.message ?? 'Bad certificate', type: NetworkFailureType.badCertificate);
+        return NetworkFailure(
+          e.message ?? 'Bad certificate',
+          type: NetworkFailureType.badCertificate,
+        );
       case DioExceptionType.badResponse:
         return NetworkFailure(
           e.message ?? 'Bad response',
@@ -140,7 +156,10 @@ class NetworkService {
           statusCode: e.response?.statusCode,
         );
       case DioExceptionType.unknown:
-        return NetworkFailure(e.message ?? e.toString(), type: NetworkFailureType.unknown);
+        return NetworkFailure(
+          e.message ?? e.toString(),
+          type: NetworkFailureType.unknown,
+        );
     }
   }
 }

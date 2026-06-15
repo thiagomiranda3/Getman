@@ -6,15 +6,14 @@ import 'package:getman/features/chaining/domain/entities/extraction_rule.dart';
 /// request config's id. Stored in its own box (not on the dedup-sensitive
 /// typeId-1 config) so most requests carry no rule overhead.
 class RequestRulesEntity extends Equatable {
-  final String configId;
-  final List<ExtractionRule> extractionRules;
-  final List<Assertion> assertions;
-
   const RequestRulesEntity({
     required this.configId,
     this.extractionRules = const [],
     this.assertions = const [],
   });
+  final String configId;
+  final List<ExtractionRule> extractionRules;
+  final List<Assertion> assertions;
 
   bool get isEmpty => extractionRules.isEmpty && assertions.isEmpty;
 

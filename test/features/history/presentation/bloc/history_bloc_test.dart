@@ -13,7 +13,8 @@ void main() {
   late MockHistoryRepository repo;
   late StreamController<List<HttpRequestConfigEntity>> controller;
 
-  HttpRequestConfigEntity req(String url) => HttpRequestConfigEntity(id: url, url: url);
+  HttpRequestConfigEntity req(String url) =>
+      HttpRequestConfigEntity(id: url, url: url);
 
   setUp(() {
     repo = MockHistoryRepository();
@@ -21,7 +22,8 @@ void main() {
     when(() => repo.watchHistory()).thenAnswer((_) => controller.stream);
   });
 
-  HistoryBloc build() => HistoryBloc(watchHistoryUseCase: WatchHistoryUseCase(repo));
+  HistoryBloc build() =>
+      HistoryBloc(watchHistoryUseCase: WatchHistoryUseCase(repo));
 
   test('starts loading, then mirrors the watched history', () async {
     final bloc = build();
@@ -44,19 +46,25 @@ void main() {
     controller.add([req('https://a.com'), req('https://b.com')]);
     await bloc.stream.firstWhere((s) => s.history.length == 2);
 
-    expect(bloc.state.history.map((e) => e.url), ['https://a.com', 'https://b.com']);
+    expect(bloc.state.history.map((e) => e.url), [
+      'https://a.com',
+      'https://b.com',
+    ]);
   });
 
-  test('close() cancels the subscription so later emissions are ignored', () async {
-    final bloc = build();
-    controller.add([req('https://a.com')]);
-    await bloc.stream.firstWhere((s) => !s.isLoading);
+  test(
+    'close() cancels the subscription so later emissions are ignored',
+    () async {
+      final bloc = build();
+      controller.add([req('https://a.com')]);
+      await bloc.stream.firstWhere((s) => !s.isLoading);
 
-    await bloc.close();
+      await bloc.close();
 
-    // Emitting after close must not throw (the subscription is cancelled and
-    // the listener also guards on isClosed).
-    expect(() => controller.add([req('https://c.com')]), returnsNormally);
-    expect(bloc.state.history.map((e) => e.url), ['https://a.com']);
-  });
+      // Emitting after close must not throw (the subscription is cancelled and
+      // the listener also guards on isClosed).
+      expect(() => controller.add([req('https://c.com')]), returnsNormally);
+      expect(bloc.state.history.map((e) => e.url), ['https://a.com']);
+    },
+  );
 }

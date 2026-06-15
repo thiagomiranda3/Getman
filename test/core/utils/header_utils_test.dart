@@ -29,7 +29,11 @@ void main() {
 
   group('HeaderUtils.removeHeader', () {
     test('removes every case-variant', () {
-      final headers = {'Content-Type': 'a', 'content-type': 'b', 'X-Other': 'c'};
+      final headers = {
+        'Content-Type': 'a',
+        'content-type': 'b',
+        'X-Other': 'c',
+      };
       HeaderUtils.removeHeader(headers, 'CONTENT-TYPE');
       expect(headers, {'X-Other': 'c'});
     });
@@ -41,11 +45,19 @@ void main() {
     });
 
     test('false when it is the JSON default (any casing/whitespace)', () {
-      expect(HeaderUtils.hasCustomContentType({'content-type': ' Application/JSON '}), isFalse);
+      expect(
+        HeaderUtils.hasCustomContentType({
+          'content-type': ' Application/JSON ',
+        }),
+        isFalse,
+      );
     });
 
     test('true when a non-default content-type is set', () {
-      expect(HeaderUtils.hasCustomContentType({'Content-Type': 'image/png'}), isTrue);
+      expect(
+        HeaderUtils.hasCustomContentType({'Content-Type': 'image/png'}),
+        isTrue,
+      );
     });
   });
 }

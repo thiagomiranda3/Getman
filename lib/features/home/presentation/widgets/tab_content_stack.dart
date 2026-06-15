@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/screens/request_view.dart';
+import 'package:re_editor/re_editor.dart'
+    as re_editor
+    show CodeLineEditingController;
 
 /// Maximum number of live [RequestView] instances kept in memory.
 /// Each live view holds two [re_editor.CodeLineEditingController]s and their
@@ -10,7 +13,7 @@ const int kMaxLiveTabViews = 5;
 /// Keeps up to [kMaxLiveTabViews] [RequestView]s alive in a [Stack]/[Offstage]
 /// so that switching tabs does not rebuild the editor tree from scratch.
 ///
-/// Reconciliation runs synchronously on every [build] call:
+/// Reconciliation runs synchronously on every `build` call:
 ///  1. Ids belonging to closed tabs are evicted.
 ///  2. The active tab is added to the live set when not already present.
 ///  3. The oldest non-active tab is evicted when the live set exceeds the cap.
@@ -25,19 +28,18 @@ const int kMaxLiveTabViews = 5;
 /// [childBuilder] is exposed for testing — production code leaves it null so
 /// the default [RequestView] builder is used.
 class TabContentStack extends StatefulWidget {
+  const TabContentStack({
+    required this.tabs,
+    required this.activeIndex,
+    super.key,
+    this.childBuilder,
+  });
   final List<HttpRequestTabEntity> tabs;
   final int activeIndex;
 
   /// Overrides the child builder. Provide a lightweight stand-in in tests to
   /// avoid setting up the full BLoC/provider tree that [RequestView] needs.
   final Widget Function(String tabId)? childBuilder;
-
-  const TabContentStack({
-    super.key,
-    required this.tabs,
-    required this.activeIndex,
-    this.childBuilder,
-  });
 
   @override
   State<TabContentStack> createState() => _TabContentStackState();
@@ -119,19 +121,17 @@ class _TabContentStackState extends State<TabContentStack> {
   }
 
   /// Runs full reconciliation and returns the current active tab id, or null
-  /// when [widget.tabs] is empty.
+  /// when `widget.tabs` is empty.
   ///
-  /// Called once per [build] invocation (synchronous, no setState). Evicted
+  /// Called once per `build` invocation (synchronous, no setState). Evicted
   /// [FocusScopeNode]s are collected for deferred disposal via a post-frame
   /// callback.
   String? _reconcile() {
     final currentIds = {for (final t in widget.tabs) t.tabId};
 
-    // 1. Remove ids of closed tabs.
-    final removed = _liveIds.where((id) => !currentIds.contains(id)).toList();
-    for (final id in removed) {
-      _evict(id);
-    }
+    // 1. Remove ids of closed tabs. Materialize with toList() first so _evict
+    // can mutate _liveIds without a concurrent-modification error.
+    _liveIds.where((id) => !currentIds.contains(id)).toList().forEach(_evict);
 
     if (widget.tabs.isEmpty) return null;
 
@@ -151,7 +151,7 @@ class _TabContentStackState extends State<TabContentStack> {
     while (_liveIds.length > kMaxLiveTabViews) {
       // Find the non-active id with the smallest last-use timestamp.
       String? lruId;
-      int lruStamp = _useCounter + 1;
+      var lruStamp = _useCounter + 1;
       for (final id in _liveIds) {
         if (id == activeId) continue;
         final stamp = _lastUsed[id] ?? 0;
@@ -193,14 +193,17 @@ class _TabContentStackState extends State<TabContentStack> {
       });
     }
 
-    final builder = widget.childBuilder ?? (String id) => RequestView(key: ValueKey('view_$id'), tabId: id);
+    final builder =
+        widget.childBuilder ??
+        (String id) => RequestView(key: ValueKey('view_$id'), tabId: id);
 
-    // Use Stack + Offstage rather than IndexedStack. IndexedStack wraps children
-    // in anonymous Offstage nodes internally, so Flutter cannot match keyed
-    // children across rebuilds when the children list changes — the entire set
-    // gets disposed and remounted. With an explicit Stack whose direct children
-    // carry the ValueKey, Flutter's element reconciliation matches by key and
-    // keeps existing subtrees alive across evictions and list reorders.
+    // Use Stack + Offstage rather than IndexedStack. IndexedStack wraps
+    // children in anonymous Offstage nodes internally, so Flutter cannot match
+    // keyed children across rebuilds when the children list changes — the
+    // entire set gets disposed and remounted. With an explicit Stack whose
+    // direct children carry the ValueKey, Flutter's element reconciliation
+    // matches by key and keeps existing subtrees alive across evictions and
+    // list reorders.
     // Offstage children skip paint and hit-testing but still participate in
     // ancestor relayout — every resize or splitter drag lays out all live views
     // (up to kMaxLiveTabViews). This is an intentional trade-off; the cap keeps

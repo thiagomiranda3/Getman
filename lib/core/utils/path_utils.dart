@@ -9,7 +9,7 @@ class PathUtils {
   /// first, so a directory-like path (e.g. `/a/b/`) returns `b`, not `''`.
   static String basename(String path) {
     var p = path;
-    while (p.isNotEmpty && (p.endsWith('/') || p.endsWith('\\'))) {
+    while (p.isNotEmpty && (p.endsWith('/') || p.endsWith(r'\'))) {
       p = p.substring(0, p.length - 1);
     }
     if (p.isEmpty) return '';

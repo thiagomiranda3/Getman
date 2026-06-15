@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+#
+# Getman pre-commit gate — formatting + the full static-analysis stack must pass
+# before a commit is allowed. This is the same bar CLAUDE.md §5 requires before
+# any feature is considered done.
+#
+# Enabled per clone with:  git config core.hooksPath .githooks
+# Emergency bypass (avoid):  git commit --no-verify
+#
+set -uo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT" || exit 1
+
+# The project pins Flutter via .fvmrc — prefer fvm when present.
+if command -v fvm >/dev/null 2>&1; then
+  DART="fvm dart"
+  FLUTTER="fvm flutter"
+else
+  DART="dart"
+  FLUTTER="flutter"
+fi
+
+step() { printf '\033[1m▶ %s\033[0m\n' "$1"; }
+fail() {
+  printf '\033[31m✗ pre-commit failed: %s\033[0m\n' "$1" >&2
+  printf '  fix it, or bypass in an emergency with: git commit --no-verify\n' >&2
+  exit 1
+}
+
+step "dart format (check only)"
+$DART format --output=none --set-exit-if-changed lib test tools \
+  || fail "code is not formatted — run: $DART format lib test tools"
+
+step "flutter analyze (very_good_analysis)"
+$FLUTTER analyze || fail "analyzer reported issues"
+
+step "custom_lint (Getman architecture rules)"
+$DART run custom_lint || fail "custom_lint reported issues"
+
+step "bloc lint"
+$DART run bloc_tools:bloc lint lib </dev/null || fail "bloc_lint reported issues"
+
+printf '\033[32m✓ pre-commit checks passed\033[0m\n'

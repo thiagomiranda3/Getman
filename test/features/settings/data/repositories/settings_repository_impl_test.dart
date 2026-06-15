@@ -7,10 +7,10 @@ import 'package:getman/features/settings/data/repositories/settings_repository_i
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 
 class _FakeSettingsDataSource implements SettingsLocalDataSource {
+  _FakeSettingsDataSource(this.toReturn);
   SettingsModel toReturn;
   SettingsModel? saved;
   bool throwOnGet = false;
-  _FakeSettingsDataSource(this.toReturn);
 
   @override
   Future<SettingsModel> getSettings() async {
@@ -33,7 +33,9 @@ void main() {
 
   test('saveSettings converts the entity to a model and forwards it', () async {
     const entity = SettingsEntity(historyLimit: 7);
-    final ds = _FakeSettingsDataSource(SettingsModel.fromEntity(const SettingsEntity()));
+    final ds = _FakeSettingsDataSource(
+      SettingsModel.fromEntity(const SettingsEntity()),
+    );
     final repo = SettingsRepositoryImpl(ds);
 
     await repo.saveSettings(entity);
@@ -43,8 +45,9 @@ void main() {
   });
 
   test('translates a PersistenceException into a PersistenceFailure', () async {
-    final ds = _FakeSettingsDataSource(SettingsModel.fromEntity(const SettingsEntity()))
-      ..throwOnGet = true;
+    final ds = _FakeSettingsDataSource(
+      SettingsModel.fromEntity(const SettingsEntity()),
+    )..throwOnGet = true;
     final repo = SettingsRepositoryImpl(ds);
 
     expect(repo.getSettings(), throwsA(isA<PersistenceFailure>()));

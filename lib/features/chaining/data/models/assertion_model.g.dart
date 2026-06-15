@@ -8,7 +8,7 @@ part of 'assertion_model.dart';
 
 class AssertionModelAdapter extends TypeAdapter<AssertionModel> {
   @override
-  final int typeId = 8;
+  final typeId = 8;
 
   @override
   AssertionModel read(BinaryReader reader) {

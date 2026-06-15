@@ -10,8 +10,8 @@ import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 /// `listenWhen` is gated to the network fields so unrelated settings keystrokes
 /// never touch Dio.
 class NetworkSettingsListener extends StatelessWidget {
+  const NetworkSettingsListener({required this.child, super.key});
   final Widget child;
-  const NetworkSettingsListener({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -30,8 +30,9 @@ class NetworkSettingsListener extends StatelessWidget {
             a.clientKeyPath != b.clientKeyPath ||
             a.clientCertPassphrase != b.clientCertPassphrase;
       },
-      listener: (context, state) =>
-          context.read<NetworkService>().applyConfig(state.settings.toNetworkConfig()),
+      listener: (context, state) => context.read<NetworkService>().applyConfig(
+        state.settings.toNetworkConfig(),
+      ),
       child: child,
     );
   }

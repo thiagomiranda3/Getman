@@ -8,8 +8,12 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/auth_tab_view.dart';
+import 'package:getman/features/tabs/presentation/widgets/request_config_section.dart'
+    show RequestConfigSection;
 import 'package:getman/features/tabs/presentation/widgets/request_editor_tabs.dart';
 import 'package:getman/features/tabs/presentation/widgets/response_area.dart';
+import 'package:getman/features/tabs/presentation/widgets/response_section.dart'
+    show ResponseSection;
 import 'package:re_editor/re_editor.dart';
 
 /// Narrow-width alternative to [RequestConfigSection] + [ResponseSection].
@@ -19,22 +23,22 @@ import 'package:re_editor/re_editor.dart';
 /// strip so it stays visible on every tab. Auto-focuses the RESPONSE tab when
 /// a send completes.
 class UnifiedRequestPanel extends StatefulWidget {
-  final String tabId;
-  final CodeLineEditingController bodyController;
-  final CodeLineEditingController responseController;
-
   const UnifiedRequestPanel({
-    super.key,
     required this.tabId,
     required this.bodyController,
     required this.responseController,
+    super.key,
   });
+  final String tabId;
+  final CodeLineEditingController bodyController;
+  final CodeLineEditingController responseController;
 
   @override
   State<UnifiedRequestPanel> createState() => _UnifiedRequestPanelState();
 }
 
-class _UnifiedRequestPanelState extends State<UnifiedRequestPanel> with SingleTickerProviderStateMixin {
+class _UnifiedRequestPanelState extends State<UnifiedRequestPanel>
+    with SingleTickerProviderStateMixin {
   static const int _responseTabIndex = 5;
   late final TabController _tabController;
 
@@ -56,8 +60,11 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel> with SingleTi
       listenWhen: (prev, next) {
         final p = prev.tabs.byId(widget.tabId);
         final n = next.tabs.byId(widget.tabId);
-        // Send completed: isSending flipped true → false AND we have a response.
-        return p?.isSending == true && n?.isSending == false && n?.response != null;
+        // Send completed: isSending flipped true → false AND we have a
+        // response.
+        return p?.isSending == true &&
+            n?.isSending == false &&
+            n?.response != null;
       },
       listener: (context, state) {
         if (_tabController.index != _responseTabIndex) {
@@ -70,7 +77,14 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel> with SingleTi
           _StatusRibbon(tabId: widget.tabId),
           BrandedTabBar(
             controller: _tabController,
-            labels: const ['PARAMS', 'AUTH', 'HEADERS', 'BODY', 'RULES', 'RESPONSE'],
+            labels: const [
+              'PARAMS',
+              'AUTH',
+              'HEADERS',
+              'BODY',
+              'RULES',
+              'RESPONSE',
+            ],
             isScrollable: true,
           ),
           Expanded(
@@ -82,8 +96,14 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel> with SingleTi
                   ParamsTabView(tabId: widget.tabId),
                   AuthTabView(tabId: widget.tabId),
                   HeadersTabView(tabId: widget.tabId),
-                  BodyTabView(tabId: widget.tabId, controller: widget.bodyController),
-                  RulesTabView(key: ValueKey('rules_${widget.tabId}'), tabId: widget.tabId),
+                  BodyTabView(
+                    tabId: widget.tabId,
+                    controller: widget.bodyController,
+                  ),
+                  RulesTabView(
+                    key: ValueKey('rules_${widget.tabId}'),
+                    tabId: widget.tabId,
+                  ),
                   ResponseArea(
                     tabId: widget.tabId,
                     responseController: widget.responseController,
@@ -100,8 +120,8 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel> with SingleTi
 }
 
 class _StatusRibbon extends StatelessWidget {
-  final String tabId;
   const _StatusRibbon({required this.tabId});
+  final String tabId;
 
   @override
   Widget build(BuildContext context) {
@@ -130,9 +150,18 @@ class _StatusRibbon extends StatelessWidget {
               if (tab.isSending)
                 _Pill(label: 'SENDING', color: theme.colorScheme.secondary)
               else if (response != null) ...[
-                _Pill(label: response.statusCode.toString(), color: context.appPalette.statusAccent(response.statusCode)),
-                _Pill(label: '${response.durationMs} ms', color: theme.colorScheme.secondary),
-                _Pill(label: formatBytes(responseSizeBytes(response)), color: theme.colorScheme.secondary),
+                _Pill(
+                  label: response.statusCode.toString(),
+                  color: context.appPalette.statusAccent(response.statusCode),
+                ),
+                _Pill(
+                  label: '${response.durationMs} ms',
+                  color: theme.colorScheme.secondary,
+                ),
+                _Pill(
+                  label: formatBytes(responseSizeBytes(response)),
+                  color: theme.colorScheme.secondary,
+                ),
               ],
             ],
           ),
@@ -143,16 +172,19 @@ class _StatusRibbon extends StatelessWidget {
 }
 
 class _Pill extends StatelessWidget {
+  const _Pill({required this.label, required this.color});
   final String label;
   final Color color;
-  const _Pill({required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: layout.badgePaddingHorizontal, vertical: layout.badgePaddingVertical),
+      padding: EdgeInsets.symmetric(
+        horizontal: layout.badgePaddingHorizontal,
+        vertical: layout.badgePaddingVertical,
+      ),
       decoration: BoxDecoration(
         color: color,
         border: Border.all(color: theme.dividerColor, width: layout.borderThin),

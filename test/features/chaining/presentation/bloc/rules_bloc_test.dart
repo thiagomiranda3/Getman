@@ -21,24 +21,35 @@ void main() {
     get = MockGet();
     save = MockSave();
     when(() => save.call(any())).thenAnswer((_) async {});
-    bloc = RulesBloc(getRequestRulesUseCase: get, saveRequestRulesUseCase: save);
+    bloc = RulesBloc(
+      getRequestRulesUseCase: get,
+      saveRequestRulesUseCase: save,
+    );
   });
 
   tearDown(() => bloc.close());
 
   test('LoadRules emits the loaded rules', () async {
     when(() => get.call('c1')).thenAnswer(
-      (_) async => const RequestRulesEntity(configId: 'c1', assertions: [Assertion(id: 'a1')]),
+      (_) async => const RequestRulesEntity(
+        configId: 'c1',
+        assertions: [Assertion(id: 'a1')],
+      ),
     );
 
     bloc.add(const LoadRules('c1'));
-    await bloc.stream.firstWhere((s) => s.rules?.configId == 'c1' && !s.isLoading);
+    await bloc.stream.firstWhere(
+      (s) => s.rules?.configId == 'c1' && !s.isLoading,
+    );
 
     expect(bloc.state.rules!.assertions, hasLength(1));
   });
 
   test('SaveRules reflects immediately and persists', () async {
-    const rules = RequestRulesEntity(configId: 'c1', assertions: [Assertion(id: 'a1')]);
+    const rules = RequestRulesEntity(
+      configId: 'c1',
+      assertions: [Assertion(id: 'a1')],
+    );
 
     bloc.add(const SaveRules(rules));
     await bloc.stream.firstWhere((s) => s.rules == rules);

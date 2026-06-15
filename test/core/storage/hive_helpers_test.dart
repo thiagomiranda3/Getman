@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/storage/hive_helpers.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockBox extends Mock implements Box<String> {}
@@ -13,7 +13,9 @@ void main() {
     late Box<String> box;
 
     setUp(() async {
-      tempDir = await Directory.systemTemp.createTemp('getman_hive_helpers_test');
+      tempDir = await Directory.systemTemp.createTemp(
+        'getman_hive_helpers_test',
+      );
       Hive.init(tempDir.path);
       box = await Hive.openBox<String>('replace_all_test');
       await box.addAll(['old1', 'old2']);
@@ -29,11 +31,15 @@ void main() {
       expect(box.values.toList(), ['new1', 'new2', 'new3']);
     });
 
-    test('materializes items before clearing, so values-derived input survives', () async {
-      // A lazy iterable that reads the box would be emptied by an early clear().
-      await replaceAllInBox(box, box.values.map((v) => v.toUpperCase()));
-      expect(box.values.toList(), ['OLD1', 'OLD2']);
-    });
+    test(
+      'materializes items before clearing, so values-derived input survives',
+      () async {
+        // A lazy iterable that reads the box would be emptied by an early
+        // clear().
+        await replaceAllInBox(box, box.values.map((v) => v.toUpperCase()));
+        expect(box.values.toList(), ['OLD1', 'OLD2']);
+      },
+    );
   });
 
   group('replaceAllInBox (addAll failure)', () {
@@ -41,7 +47,7 @@ void main() {
       final box = _MockBox();
       var addCalls = 0;
       when(() => box.values).thenReturn(['old1', 'old2']);
-      when(() => box.clear()).thenAnswer((_) async => 0);
+      when(box.clear).thenAnswer((_) async => 0);
       when(() => box.addAll(any())).thenAnswer((_) async {
         addCalls++;
         if (addCalls == 1) throw StateError('disk full');

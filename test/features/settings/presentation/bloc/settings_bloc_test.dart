@@ -16,7 +16,10 @@ void main() {
   setUp(() {
     save = MockSaveSettingsUseCase();
     when(() => save.call(any())).thenAnswer((_) async {});
-    bloc = SettingsBloc(saveSettingsUseCase: save, initialSettings: const SettingsEntity());
+    bloc = SettingsBloc(
+      saveSettingsUseCase: save,
+      initialSettings: const SettingsEntity(),
+    );
   });
 
   tearDown(() => bloc.close());
@@ -34,34 +37,42 @@ void main() {
     expect(bloc.state.settings.receiveTimeoutMs, 0);
   });
 
-  test('UpdateVerifySsl and UpdateFollowRedirects toggle their flags', () async {
-    bloc.add(const UpdateVerifySsl(false));
-    await bloc.stream.firstWhere((s) => s.settings.verifySsl == false);
-    bloc.add(const UpdateFollowRedirects(false));
-    await bloc.stream.firstWhere((s) => s.settings.followRedirects == false);
-    expect(bloc.state.settings.verifySsl, isFalse);
-    expect(bloc.state.settings.followRedirects, isFalse);
-  });
+  test(
+    'UpdateVerifySsl and UpdateFollowRedirects toggle their flags',
+    () async {
+      bloc.add(const UpdateVerifySsl(value: false));
+      await bloc.stream.firstWhere((s) => !s.settings.verifySsl);
+      bloc.add(const UpdateFollowRedirects(value: false));
+      await bloc.stream.firstWhere((s) => !s.settings.followRedirects);
+      expect(bloc.state.settings.verifySsl, isFalse);
+      expect(bloc.state.settings.followRedirects, isFalse);
+    },
+  );
 
-  test('UpdateMaxRedirects updates and persists; clamps below 1 to 1', () async {
-    bloc.add(const UpdateMaxRedirects(3));
-    await bloc.stream.firstWhere((s) => s.settings.maxRedirects == 3);
-    expect(bloc.state.settings.maxRedirects, 3);
-    verify(() => save.call(any())).called(1);
+  test(
+    'UpdateMaxRedirects updates and persists; clamps below 1 to 1',
+    () async {
+      bloc.add(const UpdateMaxRedirects(3));
+      await bloc.stream.firstWhere((s) => s.settings.maxRedirects == 3);
+      expect(bloc.state.settings.maxRedirects, 3);
+      verify(() => save.call(any())).called(1);
 
-    // 0 with followRedirects on makes dart:io throw on the first redirect, so
-    // it is clamped up to 1 — disabling redirects is FOLLOW REDIRECTS off.
-    bloc.add(const UpdateMaxRedirects(0));
-    await bloc.stream.firstWhere((s) => s.settings.maxRedirects == 1);
-    expect(bloc.state.settings.maxRedirects, 1);
-  });
+      // 0 with followRedirects on makes dart:io throw on the first redirect, so
+      // it is clamped up to 1 — disabling redirects is FOLLOW REDIRECTS off.
+      bloc.add(const UpdateMaxRedirects(0));
+      await bloc.stream.firstWhere((s) => s.settings.maxRedirects == 1);
+      expect(bloc.state.settings.maxRedirects, 1);
+    },
+  );
 
   test('UpdateClientCertificate sets the trio, then clears it', () async {
-    bloc.add(const UpdateClientCertificate(
-      certPath: '/c.pem',
-      keyPath: '/k.pem',
-      passphrase: 'secret',
-    ));
+    bloc.add(
+      const UpdateClientCertificate(
+        certPath: '/c.pem',
+        keyPath: '/k.pem',
+        passphrase: 'secret',
+      ),
+    );
     await bloc.stream.firstWhere((s) => s.settings.clientCertPath == '/c.pem');
     expect(bloc.state.settings.clientKeyPath, '/k.pem');
     expect(bloc.state.settings.clientCertPassphrase, 'secret');
@@ -74,20 +85,26 @@ void main() {
 
   test('UpdateProxyUrl sets and clears the proxy', () async {
     bloc.add(const UpdateProxyUrl('127.0.0.1:8888'));
-    await bloc.stream.firstWhere((s) => s.settings.proxyUrl == '127.0.0.1:8888');
+    await bloc.stream.firstWhere(
+      (s) => s.settings.proxyUrl == '127.0.0.1:8888',
+    );
     bloc.add(const UpdateProxyUrl(null));
     await bloc.stream.firstWhere((s) => s.settings.proxyUrl == null);
     expect(bloc.state.settings.proxyUrl, isNull);
   });
 
-  test('UpdateWorkspacePath connects with a bookmark, then disconnect clears both', () async {
-    bloc.add(const UpdateWorkspacePath('/ws', bookmark: 'Ym0='));
-    await bloc.stream.firstWhere((s) => s.settings.workspacePath == '/ws');
-    expect(bloc.state.settings.workspaceBookmark, 'Ym0=');
+  test(
+    'UpdateWorkspacePath connects with a bookmark, then disconnect clears both',
+    () async {
+      bloc.add(const UpdateWorkspacePath('/ws', bookmark: 'Ym0='));
+      await bloc.stream.firstWhere((s) => s.settings.workspacePath == '/ws');
+      expect(bloc.state.settings.workspaceBookmark, 'Ym0=');
 
-    // Disconnect (no bookmark arg) must clear the bookmark too, not strand it.
-    bloc.add(const UpdateWorkspacePath(null));
-    await bloc.stream.firstWhere((s) => s.settings.workspacePath == null);
-    expect(bloc.state.settings.workspaceBookmark, isNull);
-  });
+      // Disconnect (no bookmark arg) must clear the bookmark too, not strand
+      // it.
+      bloc.add(const UpdateWorkspacePath(null));
+      await bloc.stream.firstWhere((s) => s.settings.workspacePath == null);
+      expect(bloc.state.settings.workspaceBookmark, isNull);
+    },
+  );
 }

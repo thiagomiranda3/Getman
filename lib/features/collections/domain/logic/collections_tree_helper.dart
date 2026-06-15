@@ -3,15 +3,17 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
 
 class CollectionsTreeHelper {
-  static List<CollectionNodeEntity> sort(List<CollectionNodeEntity> collections) {
-    final sorted = List<CollectionNodeEntity>.from(collections);
-    sorted.sort((a, b) {
-      if (a.isFavorite && !b.isFavorite) return -1;
-      if (!a.isFavorite && b.isFavorite) return 1;
-      if (a.isFolder && !b.isFolder) return -1;
-      if (!a.isFolder && b.isFolder) return 1;
-      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-    });
+  static List<CollectionNodeEntity> sort(
+    List<CollectionNodeEntity> collections,
+  ) {
+    final sorted = List<CollectionNodeEntity>.from(collections)
+      ..sort((a, b) {
+        if (a.isFavorite && !b.isFavorite) return -1;
+        if (!a.isFavorite && b.isFavorite) return 1;
+        if (a.isFolder && !b.isFolder) return -1;
+        if (!a.isFolder && b.isFolder) return 1;
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
 
     return sorted.map((node) {
       if (node.children.isEmpty) return node;
@@ -20,42 +22,63 @@ class CollectionsTreeHelper {
   }
 
   static List<CollectionNodeEntity> addToParent(
-      List<CollectionNodeEntity> nodes, String parentId, CollectionNodeEntity newNode) {
+    List<CollectionNodeEntity> nodes,
+    String parentId,
+    CollectionNodeEntity newNode,
+  ) {
     return nodes.map((node) {
       if (node.id == parentId) {
         return node.copyWith(children: [...node.children, newNode]);
       }
       if (node.children.isEmpty) return node;
-      return node.copyWith(children: addToParent(node.children, parentId, newNode));
+      return node.copyWith(
+        children: addToParent(node.children, parentId, newNode),
+      );
     }).toList();
   }
 
-  static List<CollectionNodeEntity> removeFromTree(List<CollectionNodeEntity> nodes, String id) {
+  static List<CollectionNodeEntity> removeFromTree(
+    List<CollectionNodeEntity> nodes,
+    String id,
+  ) {
     return nodes
         .where((node) => node.id != id)
-        .map((node) => node.copyWith(children: removeFromTree(node.children, id)))
+        .map(
+          (node) => node.copyWith(children: removeFromTree(node.children, id)),
+        )
         .toList();
   }
 
-  static List<CollectionNodeEntity> renameInTree(List<CollectionNodeEntity> nodes, String id, String newName) =>
-      _updateNodeById(nodes, id, (node) => node.copyWith(name: newName));
+  static List<CollectionNodeEntity> renameInTree(
+    List<CollectionNodeEntity> nodes,
+    String id,
+    String newName,
+  ) => _updateNodeById(nodes, id, (node) => node.copyWith(name: newName));
 
-  static List<CollectionNodeEntity> toggleFavoriteInTree(List<CollectionNodeEntity> nodes, String id) =>
-      _updateNodeById(nodes, id, (node) => node.copyWith(isFavorite: !node.isFavorite));
+  static List<CollectionNodeEntity> toggleFavoriteInTree(
+    List<CollectionNodeEntity> nodes,
+    String id,
+  ) => _updateNodeById(
+    nodes,
+    id,
+    (node) => node.copyWith(isFavorite: !node.isFavorite),
+  );
 
   static List<CollectionNodeEntity> updateConfigInTree(
     List<CollectionNodeEntity> nodes,
     String id,
     HttpRequestConfigEntity config,
-  ) =>
-      _updateNodeById(nodes, id, (node) => node.copyWith(config: config));
+  ) => _updateNodeById(nodes, id, (node) => node.copyWith(config: config));
 
   static List<CollectionNodeEntity> describeInTree(
     List<CollectionNodeEntity> nodes,
     String id,
     String description,
-  ) =>
-      _updateNodeById(nodes, id, (node) => node.copyWith(description: description));
+  ) => _updateNodeById(
+    nodes,
+    id,
+    (node) => node.copyWith(description: description),
+  );
 
   /// Append [example] to the node's saved examples (newest last). No-op if the
   /// id is missing.
@@ -63,12 +86,11 @@ class CollectionsTreeHelper {
     List<CollectionNodeEntity> nodes,
     String id,
     SavedExampleEntity example,
-  ) =>
-      _updateNodeById(
-        nodes,
-        id,
-        (node) => node.copyWith(examples: [...node.examples, example]),
-      );
+  ) => _updateNodeById(
+    nodes,
+    id,
+    (node) => node.copyWith(examples: [...node.examples, example]),
+  );
 
   /// Remove the example with [exampleId] from the node. No-op if either id is
   /// missing.
@@ -76,14 +98,13 @@ class CollectionsTreeHelper {
     List<CollectionNodeEntity> nodes,
     String id,
     String exampleId,
-  ) =>
-      _updateNodeById(
-        nodes,
-        id,
-        (node) => node.copyWith(
-          examples: node.examples.where((e) => e.id != exampleId).toList(),
-        ),
-      );
+  ) => _updateNodeById(
+    nodes,
+    id,
+    (node) => node.copyWith(
+      examples: node.examples.where((e) => e.id != exampleId).toList(),
+    ),
+  );
 
   /// Rename the example with [exampleId] inside the node. No-op if either id is
   /// missing.
@@ -92,18 +113,20 @@ class CollectionsTreeHelper {
     String id,
     String exampleId,
     String newName,
-  ) =>
-      _updateNodeById(
-        nodes,
-        id,
-        (node) => node.copyWith(
-          examples: node.examples
-              .map((e) => e.id == exampleId ? e.copyWith(name: newName) : e)
-              .toList(),
-        ),
-      );
+  ) => _updateNodeById(
+    nodes,
+    id,
+    (node) => node.copyWith(
+      examples: node.examples
+          .map((e) => e.id == exampleId ? e.copyWith(name: newName) : e)
+          .toList(),
+    ),
+  );
 
-  static CollectionNodeEntity? findNode(List<CollectionNodeEntity> nodes, String id) {
+  static CollectionNodeEntity? findNode(
+    List<CollectionNodeEntity> nodes,
+    String id,
+  ) {
     for (final node in nodes) {
       if (node.id == id) return node;
       final found = findNode(node.children, id);
@@ -112,7 +135,8 @@ class CollectionsTreeHelper {
     return null;
   }
 
-  /// True if [candidateId] is [ancestorId] or appears anywhere inside its subtree.
+  /// True if [candidateId] is [ancestorId] or appears anywhere inside its
+  /// subtree.
   /// Used by MoveNode to reject drops that would orphan a subtree (a folder
   /// cannot become its own descendant).
   static bool isDescendantOrSelf(
@@ -141,7 +165,9 @@ class CollectionsTreeHelper {
     return nodes.map((node) {
       if (node.id == id) return transform(node);
       if (node.children.isEmpty) return node;
-      return node.copyWith(children: _updateNodeById(node.children, id, transform));
+      return node.copyWith(
+        children: _updateNodeById(node.children, id, transform),
+      );
     }).toList();
   }
 }

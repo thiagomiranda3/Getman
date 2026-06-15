@@ -31,12 +31,14 @@ void main() {
   });
 
   CollectionsBloc build() => CollectionsBloc(
-        getCollectionsUseCase: GetCollectionsUseCase(repo),
-        saveCollectionsUseCase: SaveCollectionsUseCase(repo),
-        saveDebounce: const Duration(milliseconds: 5),
-      );
+    getCollectionsUseCase: GetCollectionsUseCase(repo),
+    saveCollectionsUseCase: SaveCollectionsUseCase(repo),
+    saveDebounce: const Duration(milliseconds: 5),
+  );
 
-  testWidgets('folder stays expanded after a child inside it is renamed', (tester) async {
+  testWidgets('folder stays expanded after a child inside it is renamed', (
+    tester,
+  ) async {
     final bloc = build();
     addTearDown(bloc.close);
 
@@ -49,7 +51,6 @@ void main() {
     const folder = CollectionNodeEntity(
       id: 'F',
       name: 'Folder',
-      isFolder: true,
       children: [child],
     );
     const sibling = CollectionNodeEntity(

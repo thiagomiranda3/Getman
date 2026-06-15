@@ -1,7 +1,7 @@
 import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/features/history/data/models/request_config_model.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_flutter.dart';
 
 abstract class HistoryLocalDataSource {
   Future<List<HttpRequestConfig>> getHistory();
@@ -10,11 +10,12 @@ abstract class HistoryLocalDataSource {
 }
 
 class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
-  Box<HttpRequestConfig> _box() => Hive.box<HttpRequestConfig>(HiveBoxes.history);
+  Box<HttpRequestConfig> _box() =>
+      Hive.box<HttpRequestConfig>(HiveBoxes.history);
 
-  // Signature index: hashCode(method+url+body) → list of box keys with that hash.
-  // Built lazily on first addToHistory call; rebuilt if box length drifts (e.g.
-  // external deletes or box replacements between sessions).
+  // Signature index: hashCode(method+url+body) → list of box keys with that
+  // hash. Built lazily on first addToHistory call; rebuilt if box length drifts
+  // (e.g. external deletes or box replacements between sessions).
   Map<int, List<dynamic>>? _signatureIndex;
   int _indexedKeyCount = 0;
 
@@ -33,7 +34,8 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
       _buildIndex(box);
       return;
     }
-    // Defensive resync: if something mutated the box outside our tracking, rebuild.
+    // Defensive resync: if something mutated the box outside our tracking,
+    // rebuild.
     if (_indexedKeyCount != box.length) {
       _buildIndex(box);
     }
@@ -67,7 +69,8 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
       final box = _box();
       _ensureIndex(box);
 
-      // Dedup: look up by signature hash, then confirm equality (hash-collision guard).
+      // Dedup: look up by signature hash, then confirm equality
+      // (hash-collision guard).
       final candidates = List<dynamic>.from(
         _signatureIndex![config.hashCode] ?? const [],
       );
@@ -89,9 +92,9 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
       if (box.length > limit) {
         final removeCount = box.length - limit;
         final keysToRemove = <dynamic>[];
-        // Advance past any null key instead of consuming a removal slot for it,
-        // so exactly `removeCount` real entries are dropped and the box can't be
-        // left above the limit.
+        // Advance past any null key instead of consuming a removal slot for
+        // it, so exactly `removeCount` real entries are dropped and the box
+        // can't be left above the limit.
         var i = 0;
         while (keysToRemove.length < removeCount && i < box.length) {
           final oldKey = box.keyAt(i);

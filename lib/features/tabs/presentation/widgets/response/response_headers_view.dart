@@ -7,8 +7,8 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 
 /// HEADERS tab: lists the response headers as key/value rows.
 class ResponseHeadersView extends StatelessWidget {
+  const ResponseHeadersView({required this.tabId, super.key});
   final String tabId;
-  const ResponseHeadersView({super.key, required this.tabId});
 
   @override
   Widget build(BuildContext context) {
@@ -48,8 +48,21 @@ class ResponseHeadersView extends StatelessWidget {
             final e = entries[index];
             return ListTile(
               dense: true,
-              title: Text(e.key.toUpperCase(), style: TextStyle(fontWeight: context.appTypography.titleWeight, fontSize: layout.fontSizeNormal, color: theme.primaryColor)),
-              subtitle: Text(e.value, style: TextStyle(fontSize: layout.fontSizeNormal, color: theme.colorScheme.onSurface)),
+              title: Text(
+                e.key.toUpperCase(),
+                style: TextStyle(
+                  fontWeight: context.appTypography.titleWeight,
+                  fontSize: layout.fontSizeNormal,
+                  color: theme.primaryColor,
+                ),
+              ),
+              subtitle: Text(
+                e.value,
+                style: TextStyle(
+                  fontSize: layout.fontSizeNormal,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
             );
           },
         );

@@ -6,7 +6,8 @@ import 'package:getman/core/utils/workspace/workspace_collection_serializer.dart
 import 'package:getman/features/collections/data/datasources/workspace_collections_data_source.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 
-WorkspaceCollectionsDataSource createWorkspaceDataSource() => _IoWorkspaceDataSource();
+WorkspaceCollectionsDataSource createWorkspaceDataSource() =>
+    _IoWorkspaceDataSource();
 
 class _IoWorkspaceDataSource implements WorkspaceCollectionsDataSource {
   static const String _metaDir = '.getman';
@@ -31,7 +32,10 @@ class _IoWorkspaceDataSource implements WorkspaceCollectionsDataSource {
 
   /// Writes [nodes] into [dirPath], returns their slugs in order, and deletes
   /// orphaned `.req.json` files / getman folder dirs no longer present.
-  Future<List<String>> _writeNodes(String dirPath, List<CollectionNodeEntity> nodes) async {
+  Future<List<String>> _writeNodes(
+    String dirPath,
+    List<CollectionNodeEntity> nodes,
+  ) async {
     await Directory(dirPath).create(recursive: true);
     final slugged = _assignSlugs(nodes);
     final expectedReq = <String>{};
@@ -62,16 +66,24 @@ class _IoWorkspaceDataSource implements WorkspaceCollectionsDataSource {
     return [for (final e in slugged) e.$1];
   }
 
-  Future<void> _reconcile(String dirPath, Set<String> expectedReq, Set<String> expectedDir) async {
+  Future<void> _reconcile(
+    String dirPath,
+    Set<String> expectedReq,
+    Set<String> expectedDir,
+  ) async {
     final dir = Directory(dirPath);
     final entities = await dir.list(followLinks: false).toList();
     for (final entity in entities) {
       final name = _basename(entity.path);
-      if (entity is File && name.endsWith(_reqExt) && !expectedReq.contains(name)) {
+      if (entity is File &&
+          name.endsWith(_reqExt) &&
+          !expectedReq.contains(name)) {
         await entity.delete();
-      } else if (entity is Directory && name != _metaDir && !expectedDir.contains(name)) {
+      } else if (entity is Directory &&
+          name != _metaDir &&
+          !expectedDir.contains(name)) {
         // Only remove directories that are getman folders.
-        if (await File('${entity.path}/$_folderMeta').exists()) {
+        if (File('${entity.path}/$_folderMeta').existsSync()) {
           await entity.delete(recursive: true);
         }
       }
@@ -85,7 +97,9 @@ class _IoWorkspaceDataSource implements WorkspaceCollectionsDataSource {
   }
 
   /// Deterministic, collision-free slugs per sibling group.
-  List<(String, CollectionNodeEntity)> _assignSlugs(List<CollectionNodeEntity> nodes) {
+  List<(String, CollectionNodeEntity)> _assignSlugs(
+    List<CollectionNodeEntity> nodes,
+  ) {
     final used = <String>{};
     final result = <(String, CollectionNodeEntity)>[];
     for (final node in nodes) {
@@ -111,18 +125,22 @@ class _IoWorkspaceDataSource implements WorkspaceCollectionsDataSource {
   @override
   Future<List<CollectionNodeEntity>> read(String root) async {
     final dir = Directory(root);
-    if (!await dir.exists()) return const [];
+    if (!dir.existsSync()) return const [];
     var order = const <String>[];
     final manifest = File('$root/$_metaDir/$_manifest');
-    if (await manifest.exists()) {
+    if (manifest.existsSync()) {
       order = WorkspaceCollectionSerializer.rootOrder(
-        (jsonDecode(await manifest.readAsString()) as Map).cast<String, dynamic>(),
+        (jsonDecode(await manifest.readAsString()) as Map)
+            .cast<String, dynamic>(),
       );
     }
     return _readNodes(root, order);
   }
 
-  Future<List<CollectionNodeEntity>> _readNodes(String dirPath, List<String> order) async {
+  Future<List<CollectionNodeEntity>> _readNodes(
+    String dirPath,
+    List<String> order,
+  ) async {
     final dir = Directory(dirPath);
     final bySlug = <String, CollectionNodeEntity>{};
     final discovered = <String>[];
@@ -132,16 +150,21 @@ class _IoWorkspaceDataSource implements WorkspaceCollectionsDataSource {
       final name = _basename(entity.path);
       if (entity is File && name.endsWith(_reqExt)) {
         final slug = name.substring(0, name.length - _reqExt.length);
-        final json = (jsonDecode(await entity.readAsString()) as Map).cast<String, dynamic>();
+        final json = (jsonDecode(await entity.readAsString()) as Map)
+            .cast<String, dynamic>();
         bySlug[slug] = WorkspaceCollectionSerializer.requestFromJson(json);
         discovered.add(slug);
       } else if (entity is Directory && name != _metaDir) {
         final metaFile = File('${entity.path}/$_folderMeta');
-        if (await metaFile.exists()) {
-          final meta = (jsonDecode(await metaFile.readAsString()) as Map).cast<String, dynamic>();
+        if (metaFile.existsSync()) {
+          final meta = (jsonDecode(await metaFile.readAsString()) as Map)
+              .cast<String, dynamic>();
           final childOrder = WorkspaceCollectionSerializer.childOrder(meta);
           final children = await _readNodes(entity.path, childOrder);
-          bySlug[name] = WorkspaceCollectionSerializer.folderFromJson(meta, children);
+          bySlug[name] = WorkspaceCollectionSerializer.folderFromJson(
+            meta,
+            children,
+          );
           discovered.add(name);
         }
       }
@@ -163,5 +186,6 @@ class _IoWorkspaceDataSource implements WorkspaceCollectionsDataSource {
     return result;
   }
 
-  static String _basename(String path) => path.split(Platform.pathSeparator).last;
+  static String _basename(String path) =>
+      path.split(Platform.pathSeparator).last;
 }

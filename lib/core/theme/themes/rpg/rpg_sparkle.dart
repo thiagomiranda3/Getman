@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_palette.dart';
 
@@ -10,23 +12,21 @@ import 'package:getman/core/theme/themes/rpg/rpg_palette.dart';
 ///      that fly outward, rotate, scale, and fade. Stack uses `Clip.none` so
 ///      sparkles can leave the widget bounds.
 class RpgSparkle extends StatefulWidget {
-  final Widget child;
-  final VoidCallback? onTap;
-  final double scaleDown;
-
   const RpgSparkle({
-    super.key,
     required this.child,
+    super.key,
     this.onTap,
     this.scaleDown = 0.96,
   });
+  final Widget child;
+  final VoidCallback? onTap;
+  final double scaleDown;
 
   @override
   State<RpgSparkle> createState() => _RpgSparkleState();
 }
 
-class _RpgSparkleState extends State<RpgSparkle>
-    with TickerProviderStateMixin {
+class _RpgSparkleState extends State<RpgSparkle> with TickerProviderStateMixin {
   late final AnimationController _scaleController;
   late Animation<double> _scaleAnim;
   final List<_Burst> _bursts = [];
@@ -39,16 +39,18 @@ class _RpgSparkleState extends State<RpgSparkle>
       vsync: this,
       duration: const Duration(milliseconds: 100),
     );
-    _scaleAnim = Tween<double>(begin: 1.0, end: widget.scaleDown)
-        .animate(CurvedAnimation(parent: _scaleController, curve: Curves.easeInOut));
+    _scaleAnim = Tween<double>(begin: 1, end: widget.scaleDown).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.easeInOut),
+    );
   }
 
   @override
   void didUpdateWidget(covariant RpgSparkle old) {
     super.didUpdateWidget(old);
     if (old.scaleDown != widget.scaleDown) {
-      _scaleAnim = Tween<double>(begin: 1.0, end: widget.scaleDown)
-          .animate(CurvedAnimation(parent: _scaleController, curve: Curves.easeInOut));
+      _scaleAnim = Tween<double>(begin: 1, end: widget.scaleDown).animate(
+        CurvedAnimation(parent: _scaleController, curve: Curves.easeInOut),
+      );
     }
   }
 
@@ -78,7 +80,11 @@ class _RpgSparkleState extends State<RpgSparkle>
         color: _pickColor(),
       );
     });
-    final burst = _Burst(origin: origin, controller: controller, particles: particles);
+    final burst = _Burst(
+      origin: origin,
+      controller: controller,
+      particles: particles,
+    );
     burst.controller.addStatusListener((status) {
       if (status == AnimationStatus.completed && mounted) {
         setState(() => _bursts.remove(burst));
@@ -86,7 +92,7 @@ class _RpgSparkleState extends State<RpgSparkle>
       }
     });
     setState(() => _bursts.add(burst));
-    burst.controller.forward();
+    unawaited(burst.controller.forward());
   }
 
   Color _pickColor() {
@@ -105,11 +111,11 @@ class _RpgSparkleState extends State<RpgSparkle>
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: (details) {
-        _scaleController.forward();
+        unawaited(_scaleController.forward());
         _emitBurst(details.localPosition);
       },
       onTapUp: (_) {
-        _scaleController.reverse();
+        unawaited(_scaleController.reverse());
         widget.onTap?.call();
       },
       onTapCancel: () => _scaleController.reverse(),
@@ -135,21 +141,17 @@ class _RpgSparkleState extends State<RpgSparkle>
 }
 
 class _Burst {
+  _Burst({
+    required this.origin,
+    required this.controller,
+    required this.particles,
+  });
   final Offset origin;
   final AnimationController controller;
   final List<_Particle> particles;
-
-  _Burst({required this.origin, required this.controller, required this.particles});
 }
 
 class _Particle {
-  final double angle;
-  final double distance;
-  final double size;
-  final double rotation;
-  final double spin;
-  final Color color;
-
   _Particle({
     required this.angle,
     required this.distance,
@@ -158,17 +160,23 @@ class _Particle {
     required this.spin,
     required this.color,
   });
+  final double angle;
+  final double distance;
+  final double size;
+  final double rotation;
+  final double spin;
+  final Color color;
 }
 
 class _SparklePainter extends CustomPainter {
+  _SparklePainter({required this.burst, required this.t});
   final _Burst burst;
   final double t;
 
-  _SparklePainter({required this.burst, required this.t});
-
   // Reused across particles/frames — `.color` is the only per-draw mutation.
   // The unit-size 4-point star path is built once and scaled via the canvas.
-  final Paint _glowPaint = Paint()..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+  final Paint _glowPaint = Paint()
+    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
   final Paint _sparklePaint = Paint();
   final Path _sparkleUnitPath = _buildSparkleUnitPath();
 
@@ -182,43 +190,48 @@ class _SparklePainter extends CustomPainter {
     final scale = t < 0.3 ? 0.5 + (t / 0.3) * 0.5 : 1.0 - (t - 0.3) * 0.4;
 
     for (final p in burst.particles) {
-      final offset = burst.origin +
-          Offset(math.cos(p.angle) * p.distance * travel,
-                 math.sin(p.angle) * p.distance * travel);
+      final offset =
+          burst.origin +
+          Offset(
+            math.cos(p.angle) * p.distance * travel,
+            math.sin(p.angle) * p.distance * travel,
+          );
       final rotation = p.rotation + p.spin * t;
-      final opacity = (alpha).clamp(0.0, 1.0);
+      final opacity = alpha.clamp(0.0, 1.0);
       final halfSize = p.size * scale;
 
       // Soft glow halo.
       _glowPaint.color = p.color.withValues(alpha: 0.35 * opacity);
-      canvas.drawCircle(offset, halfSize * 1.8, _glowPaint);
 
       // Four-point sparkle — draw the unit path scaled to halfSize.
-      canvas.save();
-      canvas.translate(offset.dx, offset.dy);
-      canvas.rotate(rotation);
-      canvas.scale(halfSize, halfSize);
+      canvas
+        ..drawCircle(offset, halfSize * 1.8, _glowPaint)
+        ..save()
+        ..translate(offset.dx, offset.dy)
+        ..rotate(rotation)
+        ..scale(halfSize, halfSize);
       _sparklePaint.color = p.color.withValues(alpha: opacity);
-      canvas.drawPath(_sparkleUnitPath, _sparklePaint);
-      canvas.restore();
+      canvas
+        ..drawPath(_sparkleUnitPath, _sparklePaint)
+        ..restore();
     }
   }
 
   /// Classic 4-point star at unit radius (r = 1.0): two crossed diamond shapes
   /// pinched at center. Scaled per particle via a canvas transform.
   static Path _buildSparkleUnitPath() {
-    final path = Path();
     const wide = 1.0;
     const thin = wide * 0.18;
-    path.moveTo(0, -wide);
-    path.lineTo(thin, -thin);
-    path.lineTo(wide, 0);
-    path.lineTo(thin, thin);
-    path.lineTo(0, wide);
-    path.lineTo(-thin, thin);
-    path.lineTo(-wide, 0);
-    path.lineTo(-thin, -thin);
-    path.close();
+    final path = Path()
+      ..moveTo(0, -wide)
+      ..lineTo(thin, -thin)
+      ..lineTo(wide, 0)
+      ..lineTo(thin, thin)
+      ..lineTo(0, wide)
+      ..lineTo(-thin, thin)
+      ..lineTo(-wide, 0)
+      ..lineTo(-thin, -thin)
+      ..close();
     return path;
   }
 

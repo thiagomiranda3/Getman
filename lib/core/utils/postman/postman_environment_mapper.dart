@@ -35,12 +35,13 @@ class PostmanEnvironmentMapper {
     }
     if (parsed is List) {
       return parsed
-          .whereType<Map>()
+          .whereType<Map<dynamic, dynamic>>()
           .map((m) => _mapToEnv(m.cast<String, dynamic>()))
           .toList();
     }
     throw const FormatException(
-        'Expected a JSON object or array for a Postman environment.');
+      'Expected a JSON object or array for a Postman environment.',
+    );
   }
 
   static Map<String, dynamic> _envToMap(EnvironmentEntity env) {
@@ -70,7 +71,7 @@ class PostmanEnvironmentMapper {
     final rawValues = data['values'];
     final variables = <String, String>{};
     if (rawValues is List) {
-      for (final entry in rawValues.whereType<Map>()) {
+      for (final entry in rawValues.whereType<Map<dynamic, dynamic>>()) {
         if (entry['enabled'] == false) continue;
         final key = entry['key'];
         final value = entry['value'];

@@ -15,7 +15,7 @@ class JsonUtils {
     try {
       final decoded = json.decode(body);
       return const JsonEncoder.withIndent('    ').convert(decoded);
-    } catch (_) {
+    } on Object catch (_) {
       // Not valid JSON (an XML/HTML error page, a JS array literal, the
       // over-1-MB placeholder, etc.). Returning the body verbatim is the
       // intended contract here — a parse miss on an arbitrary HTTP response is

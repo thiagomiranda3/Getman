@@ -5,6 +5,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
+import 'package:getman/core/ui/widgets/key_value_list_editor.dart'
+    show KeyValueListEditor;
 import 'package:getman/core/utils/path_utils.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
@@ -20,9 +22,13 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 /// (mirrors [KeyValueListEditor]) so typing never loses focus across the bloc
 /// round-trip.
 class FormDataEditor extends StatefulWidget {
+  const FormDataEditor({
+    required this.tabId,
+    required this.allowFiles,
+    super.key,
+  });
   final String tabId;
   final bool allowFiles;
-  const FormDataEditor({super.key, required this.tabId, required this.allowFiles});
 
   @override
   State<FormDataEditor> createState() => _FormDataEditorState();
@@ -42,7 +48,13 @@ class _FormDataEditorState extends State<FormDataEditor> {
   }
 
   List<MultipartFieldEntity> _currentFields() =>
-      context.read<TabsBloc>().state.tabs.byId(widget.tabId)?.config.formFields ??
+      context
+          .read<TabsBloc>()
+          .state
+          .tabs
+          .byId(widget.tabId)
+          ?.config
+          .formFields ??
       const [];
 
   void _initRows(List<MultipartFieldEntity> fields) {
@@ -70,7 +82,9 @@ class _FormDataEditorState extends State<FormDataEditor> {
     final bloc = context.read<TabsBloc>();
     final tab = bloc.state.tabs.byId(widget.tabId);
     if (tab == null) return;
-    bloc.add(UpdateTab(tab.copyWith(config: tab.config.copyWith(formFields: fields))));
+    bloc.add(
+      UpdateTab(tab.copyWith(config: tab.config.copyWith(formFields: fields))),
+    );
   }
 
   Future<void> _pickFile(_RowState row) async {
@@ -79,13 +93,17 @@ class _FormDataEditorState extends State<FormDataEditor> {
     final picked = result.files.single;
     if (picked.path == null) {
       if (mounted) {
-        showAppSnackBar(context, 'File uploads need the desktop or mobile app.');
+        showAppSnackBar(
+          context,
+          'File uploads need the desktop or mobile app.',
+        );
       }
       return;
     }
     setState(() {
-      row.filePath = picked.path;
-      row.fileName = picked.name;
+      row
+        ..filePath = picked.path
+        ..fileName = picked.name;
     });
     _emit();
   }
@@ -100,8 +118,10 @@ class _FormDataEditorState extends State<FormDataEditor> {
         next.tabs.byId(widget.tabId)?.config.formFields,
       ),
       listener: (context, state) {
-        final fields = state.tabs.byId(widget.tabId)?.config.formFields ?? const [];
-        if (_lastEmitted != null && _fieldListEquality.equals(fields, _lastEmitted)) {
+        final fields =
+            state.tabs.byId(widget.tabId)?.config.formFields ?? const [];
+        if (_lastEmitted != null &&
+            _fieldListEquality.equals(fields, _lastEmitted)) {
           return;
         }
         setState(() {
@@ -113,7 +133,7 @@ class _FormDataEditorState extends State<FormDataEditor> {
       child: ListView.builder(
         padding: EdgeInsets.all(layout.pagePadding),
         itemCount: _rows.length,
-        itemBuilder: (context, index) => _buildRow(context, index),
+        itemBuilder: _buildRow,
       ),
     );
   }
@@ -134,7 +154,11 @@ class _FormDataEditorState extends State<FormDataEditor> {
       style: textStyle,
       autocorrect: false,
       enableSuggestions: false,
-      decoration: InputDecoration(hintText: 'KEY', isDense: true, contentPadding: fieldPadding),
+      decoration: InputDecoration(
+        hintText: 'KEY',
+        isDense: true,
+        contentPadding: fieldPadding,
+      ),
       onChanged: (val) {
         if (index == _rows.length - 1 && val.isNotEmpty) {
           setState(() => _rows.add(_RowState.empty()));
@@ -143,7 +167,7 @@ class _FormDataEditorState extends State<FormDataEditor> {
       },
     );
 
-    final Widget valueWidget = row.isFile
+    final valueWidget = row.isFile
         ? _FilePickButton(
             label: row.fileLabel,
             onTap: () => _pickFile(row),
@@ -154,8 +178,11 @@ class _FormDataEditorState extends State<FormDataEditor> {
             style: textStyle,
             autocorrect: false,
             enableSuggestions: false,
-            decoration:
-                InputDecoration(hintText: 'VALUE', isDense: true, contentPadding: fieldPadding),
+            decoration: InputDecoration(
+              hintText: 'VALUE',
+              isDense: true,
+              contentPadding: fieldPadding,
+            ),
             onChanged: (_) => _emit(),
           );
 
@@ -166,34 +193,42 @@ class _FormDataEditorState extends State<FormDataEditor> {
     ];
 
     if (widget.allowFiles) {
-      children.add(context.appDecoration.wrapInteractive(
+      children.add(
+        context.appDecoration.wrapInteractive(
+          child: IconButton(
+            icon: Icon(
+              row.isFile ? Icons.text_fields : Icons.attach_file,
+              size: layout.isCompact ? 20 : 24,
+              color: theme.colorScheme.onSurface,
+            ),
+            tooltip: row.isFile ? 'Use a text value' : 'Attach a file',
+            onPressed: () {
+              setState(() => row.isFile = !row.isFile);
+              _emit();
+            },
+          ),
+        ),
+      );
+    }
+
+    children.add(
+      context.appDecoration.wrapInteractive(
         child: IconButton(
           icon: Icon(
-            row.isFile ? Icons.text_fields : Icons.attach_file,
+            Icons.delete_outline,
             size: layout.isCompact ? 20 : 24,
-            color: theme.colorScheme.onSurface,
+            color: theme.colorScheme.error,
           ),
-          tooltip: row.isFile ? 'Use a text value' : 'Attach a file',
           onPressed: () {
-            setState(() => row.isFile = !row.isFile);
+            setState(() {
+              _rows.removeAt(index).dispose();
+              if (_rows.isEmpty) _rows.add(_RowState.empty());
+            });
             _emit();
           },
         ),
-      ));
-    }
-
-    children.add(context.appDecoration.wrapInteractive(
-      child: IconButton(
-        icon: Icon(Icons.delete_outline, size: layout.isCompact ? 20 : 24, color: theme.colorScheme.error),
-        onPressed: () {
-          setState(() {
-            _rows.removeAt(index).dispose();
-            if (_rows.isEmpty) _rows.add(_RowState.empty());
-          });
-          _emit();
-        },
       ),
-    ));
+    );
 
     return Padding(
       padding: EdgeInsets.only(bottom: layout.isCompact ? 8.0 : 12.0),
@@ -203,9 +238,9 @@ class _FormDataEditorState extends State<FormDataEditor> {
 }
 
 class _FilePickButton extends StatelessWidget {
+  const _FilePickButton({required this.label, required this.onTap});
   final String label;
   final VoidCallback onTap;
-  const _FilePickButton({required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -214,15 +249,25 @@ class _FilePickButton extends StatelessWidget {
     return context.appDecoration.wrapInteractive(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: layout.inputPadding, vertical: layout.inputPaddingVertical),
+        padding: EdgeInsets.symmetric(
+          horizontal: layout.inputPadding,
+          vertical: layout.inputPaddingVertical,
+        ),
         decoration: BoxDecoration(
-          border: Border.all(color: theme.dividerColor, width: layout.borderThin),
+          border: Border.all(
+            color: theme.dividerColor,
+            width: layout.borderThin,
+          ),
           borderRadius: BorderRadius.circular(context.appShape.inputRadius),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.upload_file, size: layout.smallIconSize, color: theme.colorScheme.secondary),
+            Icon(
+              Icons.upload_file,
+              size: layout.smallIconSize,
+              color: theme.colorScheme.secondary,
+            ),
             SizedBox(width: layout.tabSpacing),
             Flexible(
               child: Text(
@@ -242,8 +287,31 @@ class _FilePickButton extends StatelessWidget {
   }
 }
 
-/// Per-row mutable UI state. [id] keys the row's widgets stably across rebuilds.
+/// Per-row mutable UI state. [id] keys the row's widgets stably across
+/// rebuilds.
 class _RowState {
+  _RowState({
+    required this.nameController,
+    required this.valueController,
+    this.isFile = false,
+    this.filePath,
+    this.fileName,
+    this.contentType,
+  }) : id = _counter++;
+
+  factory _RowState.from(MultipartFieldEntity f) => _RowState(
+    nameController: TextEditingController(text: f.name),
+    valueController: TextEditingController(text: f.value),
+    isFile: f.isFile,
+    filePath: f.filePath,
+    fileName: f.filePath == null ? null : PathUtils.basename(f.filePath!),
+    contentType: f.contentType,
+  );
+
+  factory _RowState.empty() => _RowState(
+    nameController: TextEditingController(),
+    valueController: TextEditingController(),
+  );
   static int _counter = 0;
   final int id;
   final TextEditingController nameController;
@@ -255,38 +323,15 @@ class _RowState {
   // workspace mirror survives an edit instead of being dropped on re-emit.
   String? contentType;
 
-  _RowState({
-    required this.nameController,
-    required this.valueController,
-    this.isFile = false,
-    this.filePath,
-    this.fileName,
-    this.contentType,
-  }) : id = _counter++;
-
-  factory _RowState.from(MultipartFieldEntity f) => _RowState(
-        nameController: TextEditingController(text: f.name),
-        valueController: TextEditingController(text: f.value),
-        isFile: f.isFile,
-        filePath: f.filePath,
-        fileName: f.filePath == null ? null : PathUtils.basename(f.filePath!),
-        contentType: f.contentType,
-      );
-
-  factory _RowState.empty() => _RowState(
-        nameController: TextEditingController(),
-        valueController: TextEditingController(),
-      );
-
   String get fileLabel => fileName ?? 'CHOOSE FILE';
 
   MultipartFieldEntity toEntity() => MultipartFieldEntity(
-        name: nameController.text,
-        value: isFile ? '' : valueController.text,
-        isFile: isFile,
-        filePath: isFile ? filePath : null,
-        contentType: isFile ? contentType : null,
-      );
+    name: nameController.text,
+    value: isFile ? '' : valueController.text,
+    isFile: isFile,
+    filePath: isFile ? filePath : null,
+    contentType: isFile ? contentType : null,
+  );
 
   void dispose() {
     nameController.dispose();

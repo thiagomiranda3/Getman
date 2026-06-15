@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
 
 class AppTypography extends ThemeExtension<AppTypography> {
-  final TextTheme base;
-  final String codeFontFamily;
-  final FontWeight displayWeight;
-  final FontWeight titleWeight;
-  final FontWeight bodyWeight;
-
   const AppTypography({
     required this.base,
     required this.codeFontFamily,
@@ -14,6 +8,11 @@ class AppTypography extends ThemeExtension<AppTypography> {
     required this.titleWeight,
     required this.bodyWeight,
   });
+  final TextTheme base;
+  final String codeFontFamily;
+  final FontWeight displayWeight;
+  final FontWeight titleWeight;
+  final FontWeight bodyWeight;
 
   @override
   AppTypography copyWith({

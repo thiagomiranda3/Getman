@@ -12,14 +12,13 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 /// bar. The method dropdown only shows for HTTP requests. Dispatches UpdateTab
 /// directly so the URL bar stays a thin composition.
 class RequestKindMethodSelector extends StatelessWidget {
-  final HttpRequestTabEntity tab;
-  final bool isNarrow;
-
   const RequestKindMethodSelector({
-    super.key,
     required this.tab,
     required this.isNarrow,
+    super.key,
   });
+  final HttpRequestTabEntity tab;
+  final bool isNarrow;
 
   @override
   Widget build(BuildContext context) {
@@ -28,9 +27,16 @@ class RequestKindMethodSelector extends StatelessWidget {
     final smallGap = isNarrow ? 2.0 : (layout.isCompact ? 4.0 : 8.0);
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: isNarrow ? 6 : (layout.isCompact ? 8 : 12)),
+      padding: EdgeInsets.symmetric(
+        horizontal: isNarrow ? 6 : (layout.isCompact ? 8 : 12),
+      ),
       decoration: BoxDecoration(
-        border: Border(right: BorderSide(color: theme.dividerColor, width: layout.borderThick)),
+        border: Border(
+          right: BorderSide(
+            color: theme.dividerColor,
+            width: layout.borderThick,
+          ),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -46,14 +52,19 @@ class RequestKindMethodSelector extends StatelessWidget {
               ),
               items: const [
                 DropdownMenuItem(value: RequestKind.http, child: Text('HTTP')),
-                DropdownMenuItem(value: RequestKind.webSocket, child: Text('WS')),
+                DropdownMenuItem(
+                  value: RequestKind.webSocket,
+                  child: Text('WS'),
+                ),
                 DropdownMenuItem(value: RequestKind.sse, child: Text('SSE')),
               ],
               onChanged: (k) {
                 if (k != null && tab.config.kind != k) {
-                  context.read<TabsBloc>().add(UpdateTab(
-                    tab.copyWith(config: tab.config.copyWith(kind: k)),
-                  ));
+                  context.read<TabsBloc>().add(
+                    UpdateTab(
+                      tab.copyWith(config: tab.config.copyWith(kind: k)),
+                    ),
+                  );
                 }
               },
             ),
@@ -70,22 +81,28 @@ class RequestKindMethodSelector extends StatelessWidget {
                   fontSize: layout.fontSizeNormal,
                 ),
                 selectedItemBuilder: (context) {
-                  return HttpMethods.all.map((m) => Center(child: MethodBadge(method: m))).toList();
+                  return HttpMethods.all
+                      .map((m) => Center(child: MethodBadge(method: m)))
+                      .toList();
                 },
                 items: HttpMethods.all
-                    .map((m) => DropdownMenuItem(
-                      value: m,
-                      child: SizedBox(
-                        width: isNarrow ? 64 : (layout.isCompact ? 80 : 100),
-                        child: Center(child: MethodBadge(method: m)),
+                    .map(
+                      (m) => DropdownMenuItem(
+                        value: m,
+                        child: SizedBox(
+                          width: isNarrow ? 64 : (layout.isCompact ? 80 : 100),
+                          child: Center(child: MethodBadge(method: m)),
+                        ),
                       ),
-                    ))
+                    )
                     .toList(),
                 onChanged: (val) {
                   if (val != null && tab.config.method != val) {
-                    context.read<TabsBloc>().add(UpdateTab(
-                      tab.copyWith(config: tab.config.copyWith(method: val)),
-                    ));
+                    context.read<TabsBloc>().add(
+                      UpdateTab(
+                        tab.copyWith(config: tab.config.copyWith(method: val)),
+                      ),
+                    );
                   }
                 },
               ),

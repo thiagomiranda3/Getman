@@ -13,8 +13,10 @@ class AssertionEngine {
   /// Decodes the body once, then delegates to [runDecoded]. Callers running
   /// both engines should decode once themselves and use [runDecoded] (see
   /// `rules_runner.dart`).
-  static List<AssertionResult> run(List<Assertion> assertions, HttpResponseEntity response) =>
-      runDecoded(assertions, response, JsonPath.tryDecode(response.body));
+  static List<AssertionResult> run(
+    List<Assertion> assertions,
+    HttpResponseEntity response,
+  ) => runDecoded(assertions, response, JsonPath.tryDecode(response.body));
 
   /// Like [run] but reuses an already-decoded JSON [decodedBody] (null when the
   /// body wasn't JSON), so N bodyJsonPath assertions don't re-decode N times.
@@ -28,13 +30,19 @@ class AssertionEngine {
       if (!a.enabled) continue;
       final (actual, present) = _actual(a, response, decodedBody);
       final passed = _compare(a.comparator, actual, a.expected, present);
-      results.add(AssertionResult(label: _label(a), passed: passed, actual: actual));
+      results.add(
+        AssertionResult(label: _label(a), passed: passed, actual: actual),
+      );
     }
     return results;
   }
 
   /// Returns the actual value as a string + whether it was present at all.
-  static (String, bool) _actual(Assertion a, HttpResponseEntity response, Object? decodedBody) {
+  static (String, bool) _actual(
+    Assertion a,
+    HttpResponseEntity response,
+    Object? decodedBody,
+  ) {
     switch (a.target) {
       case AssertionTarget.statusCode:
         return (response.statusCode.toString(), true);
@@ -49,7 +57,12 @@ class AssertionEngine {
     }
   }
 
-  static bool _compare(AssertionComparator c, String actual, String expected, bool present) {
+  static bool _compare(
+    AssertionComparator c,
+    String actual,
+    String expected,
+    bool present,
+  ) {
     switch (c) {
       case AssertionComparator.exists:
         return present;

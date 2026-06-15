@@ -3,8 +3,20 @@ import 'package:getman/core/theme/app_theme.dart';
 
 void main() {
   group('AppShape', () {
-    const a = AppShape(panelRadius: 4, buttonRadius: 4, inputRadius: 4, dialogRadius: 8, sheetRadius: 10);
-    const b = AppShape(panelRadius: 12, buttonRadius: 12, inputRadius: 12, dialogRadius: 20, sheetRadius: 30);
+    const a = AppShape(
+      panelRadius: 4,
+      buttonRadius: 4,
+      inputRadius: 4,
+      dialogRadius: 8,
+      sheetRadius: 10,
+    );
+    const b = AppShape(
+      panelRadius: 12,
+      buttonRadius: 12,
+      inputRadius: 12,
+      dialogRadius: 20,
+      sheetRadius: 30,
+    );
 
     test('copyWith preserves non-overridden fields', () {
       final copy = a.copyWith(panelRadius: 99);

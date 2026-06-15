@@ -12,9 +12,9 @@ import 'package:getman/features/realtime/presentation/bloc/realtime_state.dart';
 /// causes one state emission (and one list copy) per window instead of per
 /// frame. Private to this file — never part of the public event API.
 class _FramesBatchReceived extends RealtimeEvent {
+  const _FramesBatchReceived(this.tabId, this.frames);
   final String tabId;
   final List<RealtimeFrame> frames;
-  const _FramesBatchReceived(this.tabId, this.frames);
   @override
   List<Object?> get props => [tabId, frames];
 }
@@ -23,7 +23,16 @@ class _FramesBatchReceived extends RealtimeEvent {
 /// the TabsBloc request-manager teardown discipline: every connection is closed
 /// on disconnect, on a new connect for the same tab, and on bloc close.
 class RealtimeBloc extends Bloc<RealtimeEvent, RealtimeState> {
-  final RealtimeService service;
+  RealtimeBloc({required RealtimeService service})
+    : _service = service,
+      super(const RealtimeState()) {
+    on<Connect>(_onConnect);
+    on<SendRealtimeMessage>(_onSend);
+    on<Disconnect>(_onDisconnect);
+    on<FrameReceived>(_onFrame);
+    on<_FramesBatchReceived>(_onFramesBatch);
+  }
+  final RealtimeService _service;
 
   static const int _maxFrames = 500;
 
@@ -39,29 +48,28 @@ class RealtimeBloc extends Bloc<RealtimeEvent, RealtimeState> {
   final Map<String, List<RealtimeFrame>> _pending = {};
   final Map<String, Timer> _flushTimers = {};
 
-  RealtimeBloc({required this.service}) : super(const RealtimeState()) {
-    on<Connect>(_onConnect);
-    on<SendRealtimeMessage>(_onSend);
-    on<Disconnect>(_onDisconnect);
-    on<FrameReceived>(_onFrame);
-    on<_FramesBatchReceived>(_onFramesBatch);
-  }
-
   Future<void> _onConnect(Connect event, Emitter<RealtimeState> emit) async {
     await _teardown(event.tabId);
     final conn = event.kind == RequestKind.sse
-        ? service.connectSse(event.url, headers: event.headers)
-        : service.connectWebSocket(event.url);
+        ? _service.connectSse(event.url, headers: event.headers)
+        : _service.connectWebSocket(event.url);
     _connections[event.tabId] = conn;
-    _subs[event.tabId] = conn.frames.listen((f) => _bufferFrame(event.tabId, f));
-    emit(state.withSession(event.tabId, const RealtimeSession(connected: true, frames: [])));
+    _subs[event.tabId] = conn.frames.listen(
+      (f) => _bufferFrame(event.tabId, f),
+    );
+    emit(
+      state.withSession(event.tabId, const RealtimeSession(connected: true)),
+    );
   }
 
   void _onSend(SendRealtimeMessage event, Emitter<RealtimeState> emit) {
     _connections[event.tabId]?.send(event.text);
   }
 
-  Future<void> _onDisconnect(Disconnect event, Emitter<RealtimeState> emit) async {
+  Future<void> _onDisconnect(
+    Disconnect event,
+    Emitter<RealtimeState> emit,
+  ) async {
     await _teardown(event.tabId);
     final session = state.sessionFor(event.tabId);
     emit(state.withSession(event.tabId, session.copyWith(connected: false)));
@@ -74,7 +82,9 @@ class RealtimeBloc extends Bloc<RealtimeEvent, RealtimeState> {
     _flushTimers[tabId] ??= Timer(_coalesceWindow, () {
       _flushTimers.remove(tabId);
       final batch = _pending.remove(tabId);
-      if (batch != null && batch.isNotEmpty) add(_FramesBatchReceived(tabId, batch));
+      if (batch != null && batch.isNotEmpty) {
+        add(_FramesBatchReceived(tabId, batch));
+      }
     });
   }
 
@@ -89,20 +99,29 @@ class RealtimeBloc extends Bloc<RealtimeEvent, RealtimeState> {
   /// Appends [incoming] to the tab's log (one list copy), re-applies the
   /// [_maxFrames] cap, and derives `connected` from the last frame — matching
   /// the per-frame semantics applied sequentially.
-  void _appendFrames(String tabId, List<RealtimeFrame> incoming, Emitter<RealtimeState> emit) {
+  void _appendFrames(
+    String tabId,
+    List<RealtimeFrame> incoming,
+    Emitter<RealtimeState> emit,
+  ) {
     if (incoming.isEmpty) return;
     final session = state.sessionFor(tabId);
     final frames = [...session.frames, ...incoming];
-    final capped =
-        frames.length > _maxFrames ? frames.sublist(frames.length - _maxFrames) : frames;
+    final capped = frames.length > _maxFrames
+        ? frames.sublist(frames.length - _maxFrames)
+        : frames;
     final connected = switch (incoming.last.direction) {
       RealtimeDirection.open ||
       RealtimeDirection.incoming ||
-      RealtimeDirection.outgoing =>
-        true,
+      RealtimeDirection.outgoing => true,
       RealtimeDirection.close || RealtimeDirection.error => false,
     };
-    emit(state.withSession(tabId, RealtimeSession(connected: connected, frames: capped)));
+    emit(
+      state.withSession(
+        tabId,
+        RealtimeSession(connected: connected, frames: capped),
+      ),
+    );
   }
 
   Future<void> _teardown(String tabId) async {

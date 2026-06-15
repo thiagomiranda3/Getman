@@ -3,28 +3,52 @@
 #
 # The issues identified by the analyzer are surfaced in the UI of Dart-enabled
 # IDEs (https://dart.dev/tools#ides-and-editors). The analyzer can also be
-# invoked from the command line by running `flutter analyze`.
+# invoked from the command line by running `fvm flutter analyze`.
 
-# The following line activates a set of recommended lints for Flutter apps,
-# packages, and plugins designed to encourage good coding practices.
-include: package:flutter_lints/flutter.yaml
+# `very_good_analysis` is a strict superset of `flutter_lints` (Very Good
+# Ventures). It is the project baseline; tighten/loosen via the `linter.rules`
+# block below rather than swapping the include.
+include: package:very_good_analysis/analysis_options.yaml
 
 analyzer:
   exclude:
     - "**/*.g.dart"
     - "**/*.freezed.dart"
+    # The project-local lint plugin is its own package (own pubspec/deps); the
+    # app analyzer must not descend into it.
+    - "tools/**"
+  # custom_lint runs the project-local architecture rules (tools/getman_lints)
+  # plus any other custom_lint plugins. NOTE: these do NOT surface in
+  # `fvm flutter analyze` — they are a separate pass, run via
+  # `fvm dart run custom_lint` (wired into the pre-commit hook + the
+  # verification bar in CLAUDE.md §5).
+  plugins:
+    - custom_lint
 
 linter:
   rules:
+    # Rules CLAUDE.md depends on (all already enabled by VGA — pinned here so
+    # they survive a baseline swap and document intent):
     avoid_print: true
-    prefer_const_constructors: true
-    prefer_const_literals_to_create_immutables: true
-    unawaited_futures: true
     use_build_context_synchronously: true
-    unnecessary_const: true
-    unnecessary_new: true
-    unnecessary_this: true
-    avoid_unused_constructor_parameters: true
-    prefer_final_locals: true
     always_use_package_imports: true
     directives_ordering: true
+    unawaited_futures: true
+
+    # Disabled: `public_member_api_docs` requires a doc comment on every public
+    # member. It targets *published package* APIs; Getman is an application, so
+    # documenting every internal member is noise, not value. (This is the one
+    # VGA rule we opt out of.)
+    public_member_api_docs: false
+
+# bloc_lint config (the bloc team's official rules). NOT read by the analyzer —
+# it is a separate pass run via `fvm dart run bloc_tools:bloc lint lib`
+# (wired into the pre-commit hook + the verification bar in CLAUDE.md §5).
+# Rule set: bloc_lint's "recommended".
+bloc:
+  rules:
+    - avoid_flutter_imports
+    - avoid_public_bloc_methods
+    - avoid_public_fields
+    - prefer_file_naming_conventions
+    - prefer_void_public_cubit_methods

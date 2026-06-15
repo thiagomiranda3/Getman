@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'dart:developer';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/history/domain/usecases/history_usecases.dart';
@@ -11,23 +12,24 @@ import 'package:getman/features/history/presentation/bloc/history_state.dart';
 /// `watchHistory()` — which yields the current list on subscribe, so no
 /// explicit load event is needed.
 class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
-  final WatchHistoryUseCase watchHistoryUseCase;
-
-  StreamSubscription<List<HttpRequestConfigEntity>>? _subscription;
-
-  HistoryBloc({required this.watchHistoryUseCase})
-      : super(const HistoryState(isLoading: true)) {
+  HistoryBloc({required WatchHistoryUseCase watchHistoryUseCase})
+    : _watchHistoryUseCase = watchHistoryUseCase,
+      super(const HistoryState(isLoading: true)) {
     on<HistoryUpdated>(_onHistoryUpdated);
 
     // Guard against the stream emitting during/after close() — otherwise
     // `add(HistoryUpdated)` on a closed bloc throws StateError.
-    _subscription = watchHistoryUseCase().listen(
+    _subscription = _watchHistoryUseCase().listen(
       (history) {
         if (!isClosed) add(HistoryUpdated(history));
       },
-      onError: (e) => debugPrint('History watch error: $e'),
+      onError: (Object e) =>
+          log('History watch error: $e', name: 'HistoryBloc'),
     );
   }
+  final WatchHistoryUseCase _watchHistoryUseCase;
+
+  StreamSubscription<List<HttpRequestConfigEntity>>? _subscription;
 
   @override
   Future<void> close() async {

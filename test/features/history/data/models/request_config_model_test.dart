@@ -12,7 +12,6 @@ void main() {
     test('merges legacy params map into URL when non-empty', () {
       final model = HttpRequestConfig(
         id: 'id',
-        method: 'GET',
         url: 'https://x.y/path',
         params: {'a': '1', 'b': '2'},
       );
@@ -24,17 +23,20 @@ void main() {
       ]);
     });
 
-    test('replaces existing URL query with legacy params when both present', () {
-      // Pre-migration data shouldn't have both, but be lenient: legacy map
-      // wins to restore user intent (they had explicit params rows before).
-      final model = HttpRequestConfig(
-        id: 'id',
-        url: 'https://x.y/path?stale=1',
-        params: {'fresh': '2'},
-      );
-      final entity = model.toEntity();
-      expect(entity.url, 'https://x.y/path?fresh=2');
-    });
+    test(
+      'replaces existing URL query with legacy params when both present',
+      () {
+        // Pre-migration data shouldn't have both, but be lenient: legacy map
+        // wins to restore user intent (they had explicit params rows before).
+        final model = HttpRequestConfig(
+          id: 'id',
+          url: 'https://x.y/path?stale=1',
+          params: {'fresh': '2'},
+        );
+        final entity = model.toEntity();
+        expect(entity.url, 'https://x.y/path?fresh=2');
+      },
+    );
 
     test('passes URL through when legacy params is empty', () {
       final model = HttpRequestConfig(
@@ -73,7 +75,11 @@ void main() {
         bodyType: BodyType.multipart,
         formFields: [
           MultipartFieldEntity(name: 'field', value: 'v'),
-          MultipartFieldEntity(name: 'doc', isFile: true, filePath: '/tmp/a.txt'),
+          MultipartFieldEntity(
+            name: 'doc',
+            isFile: true,
+            filePath: '/tmp/a.txt',
+          ),
         ],
         bodyFilePath: '/tmp/raw.bin',
       );
@@ -83,26 +89,28 @@ void main() {
       expect(back.bodyFilePath, '/tmp/raw.bin');
     });
 
-    test('equality/dedup still ignores body type + form fields (CLAUDE.md §6)', () {
-      final a = HttpRequestConfig(
-        id: 'a',
-        method: 'POST',
-        url: 'https://x.y',
-        body: 'b',
-        bodyType: 'raw',
-      );
-      final b = HttpRequestConfig(
-        id: 'b',
-        method: 'POST',
-        url: 'https://x.y',
-        body: 'b',
-        bodyType: 'multipart',
-        formFields: [MultipartFieldModel(name: 'x')],
-      );
-      // method + url + body match → dedup-equal regardless of body type.
-      expect(a == b, isTrue);
-      expect(a.hashCode, b.hashCode);
-    });
+    test(
+      'equality/dedup still ignores body type + form fields (CLAUDE.md §6)',
+      () {
+        final a = HttpRequestConfig(
+          id: 'a',
+          method: 'POST',
+          url: 'https://x.y',
+          body: 'b',
+        );
+        final b = HttpRequestConfig(
+          id: 'b',
+          method: 'POST',
+          url: 'https://x.y',
+          body: 'b',
+          bodyType: 'multipart',
+          formFields: [MultipartFieldModel(name: 'x')],
+        );
+        // method + url + body match → dedup-equal regardless of body type.
+        expect(a == b, isTrue);
+        expect(a.hashCode, b.hashCode);
+      },
+    );
   });
 
   group('request kind', () {
@@ -111,13 +119,20 @@ void main() {
     });
 
     test('round-trips the kind', () {
-      const entity = HttpRequestConfigEntity(id: 'id', url: 'wss://x', kind: RequestKind.webSocket);
-      expect(HttpRequestConfig.fromEntity(entity).toEntity().kind, RequestKind.webSocket);
+      const entity = HttpRequestConfigEntity(
+        id: 'id',
+        url: 'wss://x',
+        kind: RequestKind.webSocket,
+      );
+      expect(
+        HttpRequestConfig.fromEntity(entity).toEntity().kind,
+        RequestKind.webSocket,
+      );
     });
 
     test('dedup ignores kind (method+url+body only)', () {
-      final http = HttpRequestConfig(id: 'a', method: 'GET', url: 'wss://x', kind: 0);
-      final ws = HttpRequestConfig(id: 'b', method: 'GET', url: 'wss://x', kind: 1);
+      final http = HttpRequestConfig(id: 'a', url: 'wss://x');
+      final ws = HttpRequestConfig(id: 'b', url: 'wss://x', kind: 1);
       expect(http == ws, isTrue);
     });
   });

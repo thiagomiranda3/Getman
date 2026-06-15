@@ -10,8 +10,8 @@ import 'package:getman/features/environments/presentation/bloc/environments_even
 /// Detail editor for a single environment: name field + a key/value variable
 /// editor with per-variable secret toggles. Emits UpdateEnvironment on change.
 class EnvironmentEditor extends StatefulWidget {
+  const EnvironmentEditor({required this.environment, super.key});
   final EnvironmentEntity environment;
-  const EnvironmentEditor({super.key, required this.environment});
 
   @override
   State<EnvironmentEditor> createState() => _EnvironmentEditorState();
@@ -33,13 +33,15 @@ class _EnvironmentEditorState extends State<EnvironmentEditor> {
   }
 
   void _emit({Map<String, String>? variables, Set<String>? secretKeys}) {
-    context.read<EnvironmentsBloc>().add(UpdateEnvironment(
-      widget.environment.copyWith(
-        name: _nameController.text,
-        variables: variables ?? widget.environment.variables,
-        secretKeys: secretKeys ?? widget.environment.secretKeys,
+    context.read<EnvironmentsBloc>().add(
+      UpdateEnvironment(
+        widget.environment.copyWith(
+          name: _nameController.text,
+          variables: variables ?? widget.environment.variables,
+          secretKeys: secretKeys ?? widget.environment.secretKeys,
+        ),
       ),
-    ));
+    );
   }
 
   @override
@@ -52,7 +54,10 @@ class _EnvironmentEditorState extends State<EnvironmentEditor> {
         TextField(
           controller: _nameController,
           decoration: const InputDecoration(labelText: 'NAME'),
-          style: TextStyle(fontSize: layout.fontSizeTitle, fontWeight: context.appTypography.titleWeight),
+          style: TextStyle(
+            fontSize: layout.fontSizeTitle,
+            fontWeight: context.appTypography.titleWeight,
+          ),
           onChanged: (_) => _emit(),
         ),
         SizedBox(height: layout.sectionSpacing),
@@ -68,7 +73,9 @@ class _EnvironmentEditorState extends State<EnvironmentEditor> {
         Expanded(
           child: KeyValueListEditor<Map<String, String>>(
             items: widget.environment.variables,
-            decode: (variables) => [for (final e in variables.entries) (e.key, e.value)],
+            decode: (variables) => [
+              for (final e in variables.entries) (e.key, e.value),
+            ],
             encode: (rows) => {
               for (final (key, value) in rows)
                 if (key.trim().isNotEmpty) key.trim(): value,
@@ -80,7 +87,9 @@ class _EnvironmentEditorState extends State<EnvironmentEditor> {
             // renamed or deleted key) so the set never drifts from the map.
             onChanged: (variables) => _emit(
               variables: variables,
-              secretKeys: widget.environment.secretKeys.intersection(variables.keys.toSet()),
+              secretKeys: widget.environment.secretKeys.intersection(
+                variables.keys.toSet(),
+              ),
             ),
           ),
         ),

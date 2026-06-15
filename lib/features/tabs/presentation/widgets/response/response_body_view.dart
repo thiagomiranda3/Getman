@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -24,9 +26,13 @@ import 'package:uuid/uuid.dart';
 /// Pretty/Raw toggle + the JSON editor; bodies over [kLargeResponseViewerChars]
 /// fall back to a plain-text viewer (unless the user opts into highlighting).
 class ResponseBodyView extends StatefulWidget {
+  const ResponseBodyView({
+    required this.tabId,
+    required this.responseController,
+    super.key,
+  });
   final String tabId;
   final CodeLineEditingController responseController;
-  const ResponseBodyView({super.key, required this.tabId, required this.responseController});
 
   @override
   State<ResponseBodyView> createState() => _ResponseBodyViewState();
@@ -48,7 +54,7 @@ class _ResponseBodyViewState extends State<ResponseBodyView> {
   void initState() {
     super.initState();
     final tab = context.read<TabsBloc>().state.tabs.byId(widget.tabId);
-    _syncBody(tab?.response?.body);
+    unawaited(_syncBody(tab?.response?.body));
   }
 
   Future<void> _syncBody(String? rawBody) async {
@@ -59,8 +65,12 @@ class _ResponseBodyViewState extends State<ResponseBodyView> {
       // user accepts the render cost). The over-1-MB placeholder is a known
       // non-JSON sentinel, so it always stays in plain-text mode.
       final autoPrettify =
-          context.read<SettingsBloc>().state.settings.alwaysPrettifyLargeResponses &&
-              rawBody != kResponseBodyTooLargePlaceholder;
+          context
+              .read<SettingsBloc>()
+              .state
+              .settings
+              .alwaysPrettifyLargeResponses &&
+          rawBody != kResponseBodyTooLargePlaceholder;
       if (autoPrettify) {
         final prettified = await JsonUtils.prettify(rawBody);
         if (!mounted || syncId != _pendingSyncId) return;
@@ -104,8 +114,14 @@ class _ResponseBodyViewState extends State<ResponseBodyView> {
   void _setRaw(bool raw) {
     if (_raw == raw) return;
     setState(() => _raw = raw);
-    final body = context.read<TabsBloc>().state.tabs.byId(widget.tabId)?.response?.body;
-    _syncBody(body);
+    final body = context
+        .read<TabsBloc>()
+        .state
+        .tabs
+        .byId(widget.tabId)
+        ?.response
+        ?.body;
+    unawaited(_syncBody(body));
   }
 
   Future<void> _prettifyAndOptIn() async {
@@ -130,7 +146,7 @@ class _ResponseBodyViewState extends State<ResponseBodyView> {
           },
           listener: (context, state) {
             final tab = state.tabs.byId(widget.tabId);
-            _syncBody(tab?.response?.body);
+            unawaited(_syncBody(tab?.response?.body));
           },
         ),
         // Re-render the current body when the user flips the prettify-large
@@ -140,9 +156,14 @@ class _ResponseBodyViewState extends State<ResponseBodyView> {
               prev.settings.alwaysPrettifyLargeResponses !=
               next.settings.alwaysPrettifyLargeResponses,
           listener: (context, state) {
-            final body =
-                context.read<TabsBloc>().state.tabs.byId(widget.tabId)?.response?.body;
-            _syncBody(body);
+            final body = context
+                .read<TabsBloc>()
+                .state
+                .tabs
+                .byId(widget.tabId)
+                ?.response
+                ?.body;
+            unawaited(_syncBody(body));
           },
         ),
       ],
@@ -209,13 +230,18 @@ class _ResponseBodyViewState extends State<ResponseBodyView> {
       },
       builder: (context, state) {
         final tab = state.tabs.byId(widget.tabId);
-        if (tab == null || tab.collectionNodeId == null || tab.response == null) {
+        if (tab == null ||
+            tab.collectionNodeId == null ||
+            tab.response == null) {
           return const SizedBox.shrink();
         }
         return IconButton(
           tooltip: 'Save as example',
           visualDensity: VisualDensity.compact,
-          icon: Icon(Icons.bookmark_add_outlined, size: context.appLayout.iconSize),
+          icon: Icon(
+            Icons.bookmark_add_outlined,
+            size: context.appLayout.iconSize,
+          ),
           onPressed: () => _saveAsExample(context),
         );
       },
@@ -238,7 +264,6 @@ class _ResponseBodyViewState extends State<ResponseBodyView> {
       context,
       title: 'SAVE AS EXAMPLE',
       initialText: defaultName,
-      confirmLabel: 'SAVE',
       onConfirm: (name) {
         final trimmed = name.trim().isEmpty ? defaultName : name.trim();
         final example = SavedExampleEntity(
@@ -258,8 +283,11 @@ class _ResponseBodyViewState extends State<ResponseBodyView> {
     );
   }
 
-  static String _hhmm(DateTime t) =>
-      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  static String _hhmm(DateTime t) {
+    final hh = t.hour.toString().padLeft(2, '0');
+    final mm = t.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
+  }
 
   /// Sub-threshold view: a Pretty/Raw toggle (+ copy) above the editor.
   Widget _buildSmallMode() {
@@ -268,7 +296,9 @@ class _ResponseBodyViewState extends State<ResponseBodyView> {
       children: [
         Row(
           children: [
-            Expanded(child: _PrettyRawToggle(raw: _raw, onChanged: _setRaw)),
+            Expanded(
+              child: _PrettyRawToggle(raw: _raw, onChanged: _setRaw),
+            ),
             _copyButton(context),
             _saveButton(context),
             _saveAsExampleButton(context),
@@ -285,7 +315,7 @@ class _ResponseBodyViewState extends State<ResponseBodyView> {
       child: JsonCodeEditor(
         controller: widget.responseController,
         readOnly: true,
-        wordWrap: _highlightingOptedIn ? false : true,
+        wordWrap: !_highlightingOptedIn,
       ),
     );
   }
@@ -301,7 +331,8 @@ class _ResponseBodyViewState extends State<ResponseBodyView> {
     final displayText = _showFullPreview
         ? body
         : body.substring(0, body.length.clamp(0, kLargeResponsePreviewChars));
-    final isTruncated = !_showFullPreview && body.length > kLargeResponsePreviewChars;
+    final isTruncated =
+        !_showFullPreview && body.length > kLargeResponsePreviewChars;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -383,9 +414,9 @@ class _ResponseBodyViewState extends State<ResponseBodyView> {
 }
 
 class _PrettyRawToggle extends StatelessWidget {
+  const _PrettyRawToggle({required this.raw, required this.onChanged});
   final bool raw;
   final ValueChanged<bool> onChanged;
-  const _PrettyRawToggle({required this.raw, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -405,13 +436,22 @@ class _PrettyRawToggle extends StatelessWidget {
     );
   }
 
-  Widget _seg(BuildContext context, String label, bool active, VoidCallback onTap) {
+  Widget _seg(
+    BuildContext context,
+    String label,
+    bool active,
+    VoidCallback onTap,
+  ) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
     final activeBg = context.appPalette.selectorActive;
-    final onActive = ThemeData.estimateBrightnessForColor(activeBg) == Brightness.dark
-        ? Colors.white
-        : Colors.black;
+    final activeIsDark =
+        ThemeData.estimateBrightnessForColor(activeBg) == Brightness.dark;
+    // Deliberate contrast: a readable foreground picked from the dynamic,
+    // theme-derived `activeBg` brightness (CLAUDE.md §4.8 exception) — not a
+    // themeable surface color.
+    // ignore: avoid_hardcoded_brand_colors
+    final onActive = activeIsDark ? Colors.white : Colors.black;
     return context.appDecoration.wrapInteractive(
       onTap: onTap,
       child: Container(
@@ -421,7 +461,10 @@ class _PrettyRawToggle extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: active ? activeBg : Colors.transparent,
-          border: Border.all(color: theme.dividerColor, width: layout.borderThin),
+          border: Border.all(
+            color: theme.dividerColor,
+            width: layout.borderThin,
+          ),
           borderRadius: BorderRadius.circular(context.appShape.buttonRadius),
         ),
         child: Text(

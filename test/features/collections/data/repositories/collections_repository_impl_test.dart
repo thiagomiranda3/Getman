@@ -7,12 +7,12 @@ import 'package:getman/features/collections/data/repositories/collections_reposi
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 
 class _FakeCollectionsDataSource implements CollectionsLocalDataSource {
+  _FakeCollectionsDataSource([this.stored = const []]);
   List<CollectionNode> stored;
   List<CollectionNode>? savedList;
   List<CollectionNode>? putList;
   List<String>? deletedIds;
   bool throwOnGet = false;
-  _FakeCollectionsDataSource([this.stored = const []]);
 
   @override
   Future<List<CollectionNode>> getCollections() async {
@@ -28,17 +28,22 @@ class _FakeCollectionsDataSource implements CollectionsLocalDataSource {
   Future<void> putRoots(List<CollectionNode> roots) async => putList = roots;
 
   @override
-  Future<void> deleteRoots(Iterable<String> ids) async => deletedIds = ids.toList();
+  Future<void> deleteRoots(Iterable<String> ids) async =>
+      deletedIds = ids.toList();
 }
 
 void main() {
   test('getCollections maps each model (with children) to an entity', () async {
     final ds = _FakeCollectionsDataSource([
-      CollectionNode.fromEntity(const CollectionNodeEntity(
-        id: 'root',
-        name: 'Root',
-        children: [CollectionNodeEntity(id: 'child', name: 'Child', isFolder: false)],
-      )),
+      CollectionNode.fromEntity(
+        const CollectionNodeEntity(
+          id: 'root',
+          name: 'Root',
+          children: [
+            CollectionNodeEntity(id: 'child', name: 'Child', isFolder: false),
+          ],
+        ),
+      ),
     ]);
     final repo = CollectionsRepositoryImpl(ds);
 
@@ -48,56 +53,79 @@ void main() {
     expect(result.single.children.single.name, 'Child');
   });
 
-  test('saveCollections does a full keyed replace when disk state is unknown', () async {
-    final ds = _FakeCollectionsDataSource();
-    final repo = CollectionsRepositoryImpl(ds);
+  test(
+    'saveCollections does a full keyed replace when disk state is unknown',
+    () async {
+      final ds = _FakeCollectionsDataSource();
+      final repo = CollectionsRepositoryImpl(ds);
 
-    // No prior getCollections → snapshot unknown → full replace.
-    await repo.saveCollections(const [
-      CollectionNodeEntity(id: 'a', name: 'A'),
-      CollectionNodeEntity(id: 'b', name: 'B'),
-    ]);
+      // No prior getCollections → snapshot unknown → full replace.
+      await repo.saveCollections(const [
+        CollectionNodeEntity(id: 'a', name: 'A'),
+        CollectionNodeEntity(id: 'b', name: 'B'),
+      ]);
 
-    expect(ds.savedList?.map((m) => m.id), ['a', 'b']);
-    expect(ds.putList, isNull);
-  });
+      expect(ds.savedList?.map((m) => m.id), ['a', 'b']);
+      expect(ds.putList, isNull);
+    },
+  );
 
-  test('after a load, saveCollections rewrites only changed roots (L12 diff)', () async {
-    final ds = _FakeCollectionsDataSource([
-      CollectionNode.fromEntity(const CollectionNodeEntity(id: 'a', name: 'A')),
-      CollectionNode.fromEntity(const CollectionNodeEntity(id: 'b', name: 'B')),
-    ]);
-    final repo = CollectionsRepositoryImpl(ds);
+  test(
+    'after a load, saveCollections rewrites only changed roots (L12 diff)',
+    () async {
+      final ds = _FakeCollectionsDataSource([
+        CollectionNode.fromEntity(
+          const CollectionNodeEntity(id: 'a', name: 'A'),
+        ),
+        CollectionNode.fromEntity(
+          const CollectionNodeEntity(id: 'b', name: 'B'),
+        ),
+      ]);
+      final repo = CollectionsRepositoryImpl(ds);
 
-    await repo.getCollections(); // seeds the snapshot
+      await repo.getCollections(); // seeds the snapshot
 
-    // Change only root 'b'; leave 'a' untouched.
-    await repo.saveCollections(const [
-      CollectionNodeEntity(id: 'a', name: 'A'),
-      CollectionNodeEntity(id: 'b', name: 'B-renamed'),
-    ]);
+      // Change only root 'b'; leave 'a' untouched.
+      await repo.saveCollections(const [
+        CollectionNodeEntity(id: 'a', name: 'A'),
+        CollectionNodeEntity(id: 'b', name: 'B-renamed'),
+      ]);
 
-    expect(ds.savedList, isNull, reason: 'no full replace once disk state is known');
-    expect(ds.putList?.map((m) => m.id), ['b']);
-    expect(ds.deletedIds ?? const [], isEmpty);
-  });
+      expect(
+        ds.savedList,
+        isNull,
+        reason: 'no full replace once disk state is known',
+      );
+      expect(ds.putList?.map((m) => m.id), ['b']);
+      expect(ds.deletedIds ?? const [], isEmpty);
+    },
+  );
 
-  test('saveCollections deletes roots removed since the last persist', () async {
-    final ds = _FakeCollectionsDataSource([
-      CollectionNode.fromEntity(const CollectionNodeEntity(id: 'a', name: 'A')),
-      CollectionNode.fromEntity(const CollectionNodeEntity(id: 'b', name: 'B')),
-    ]);
-    final repo = CollectionsRepositoryImpl(ds);
+  test(
+    'saveCollections deletes roots removed since the last persist',
+    () async {
+      final ds = _FakeCollectionsDataSource([
+        CollectionNode.fromEntity(
+          const CollectionNodeEntity(id: 'a', name: 'A'),
+        ),
+        CollectionNode.fromEntity(
+          const CollectionNodeEntity(id: 'b', name: 'B'),
+        ),
+      ]);
+      final repo = CollectionsRepositoryImpl(ds);
 
-    await repo.getCollections();
+      await repo.getCollections();
 
-    // Drop root 'b'.
-    await repo.saveCollections(const [CollectionNodeEntity(id: 'a', name: 'A')]);
+      // Drop root 'b'.
+      await repo.saveCollections(const [
+        CollectionNodeEntity(id: 'a', name: 'A'),
+      ]);
 
-    expect(ds.deletedIds, ['b']);
-    // 'a' unchanged → not re-written.
-    expect(ds.putList ?? const [], isEmpty);
-  });
+      expect(ds.deletedIds, ['b']);
+      // 'a' unchanged → not re-written.
+      expect(ds.putList ?? const [], isEmpty);
+    },
+  );
 
   test('translates a PersistenceException into a PersistenceFailure', () async {
     final ds = _FakeCollectionsDataSource()..throwOnGet = true;

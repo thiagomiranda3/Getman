@@ -1,0 +1,14 @@
+name: getman_lints
+description: >-
+  Project-local custom_lint rules that enforce Getman's architecture mandates
+  (CLAUDE.md). Not published — consumed via a path dependency from the root
+  app's dev_dependencies and run with `dart run custom_lint`.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.11.4
+
+dependencies:
+  analyzer: ">=6.0.0 <14.0.0"
+  custom_lint_builder: ^0.8.0

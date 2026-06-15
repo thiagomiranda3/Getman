@@ -7,14 +7,13 @@ import 'package:getman/features/history/data/models/request_config_model.dart';
 import 'package:getman/features/history/domain/repositories/history_repository.dart';
 
 class HistoryRepositoryImpl implements HistoryRepository {
+  HistoryRepositoryImpl(this.localDataSource);
   final HistoryLocalDataSource localDataSource;
 
   /// One `addToHistory` performs up to ~3 box mutations (dedup delete + add +
   /// batched trim), each firing a watch event. Coalescing within this window
   /// turns that burst into a single full re-read + emission.
   static const Duration _coalesceWindow = Duration(milliseconds: 80);
-
-  HistoryRepositoryImpl(this.localDataSource);
 
   Future<List<HttpRequestConfigEntity>> _read() => guardPersistence(() async {
     final models = await localDataSource.getHistory();
@@ -25,8 +24,11 @@ class HistoryRepositoryImpl implements HistoryRepository {
   @override
   Future<void> addToHistory(HttpRequestConfigEntity config, int limit) =>
       guardPersistence(() async {
-    await localDataSource.addToHistory(HttpRequestConfig.fromEntity(config), limit);
-  });
+        await localDataSource.addToHistory(
+          HttpRequestConfig.fromEntity(config),
+          limit,
+        );
+      });
 
   @override
   Stream<List<HttpRequestConfigEntity>> watchHistory() {
@@ -38,14 +40,14 @@ class HistoryRepositoryImpl implements HistoryRepository {
       try {
         final list = await _read();
         if (!controller.isClosed) controller.add(list);
-      } catch (e) {
+      } on Object catch (e) {
         if (!controller.isClosed) controller.addError(e);
       }
     }
 
     controller = StreamController<List<HttpRequestConfigEntity>>(
       onListen: () {
-        push(); // initial snapshot on subscribe
+        unawaited(push()); // initial snapshot on subscribe
         sub = localDataSource.watch().listen((_) {
           debounce?.cancel();
           debounce = Timer(_coalesceWindow, push);

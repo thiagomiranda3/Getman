@@ -10,10 +10,13 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 void main() {
   group('PostmanCollectionMapper.toJson', () {
     test('emits v2.1 schema and collection name', () {
-      const root = CollectionNodeEntity(id: 'root', name: 'My API', children: []);
-      final decoded = jsonDecode(PostmanCollectionMapper.toJson(root)) as Map<String, dynamic>;
-      expect(decoded['info']['name'], 'My API');
-      expect(decoded['info']['schema'], contains('v2.1'));
+      const root = CollectionNodeEntity(id: 'root', name: 'My API');
+      final decoded =
+          jsonDecode(PostmanCollectionMapper.toJson(root))
+              as Map<String, dynamic>;
+      final info = decoded['info'] as Map<String, dynamic>;
+      expect(info['name'], 'My API');
+      expect(info['schema'], contains('v2.1'));
       expect(decoded['item'], isEmpty);
     });
 
@@ -24,10 +27,8 @@ void main() {
         isFolder: false,
         config: HttpRequestConfigEntity(
           id: 'cfg',
-          method: 'GET',
           url: 'https://api.example.com/users?page=1',
           headers: {'X-Token': 'abc', 'Accept': 'application/json'},
-          body: '',
         ),
       );
       const root = CollectionNodeEntity(
@@ -35,18 +36,27 @@ void main() {
         name: 'API',
         children: [child],
       );
-      final decoded = jsonDecode(PostmanCollectionMapper.toJson(root)) as Map<String, dynamic>;
+      final decoded =
+          jsonDecode(PostmanCollectionMapper.toJson(root))
+              as Map<String, dynamic>;
       final items = decoded['item'] as List;
       expect(items, hasLength(1));
       final item = items.first as Map<String, dynamic>;
       expect(item['name'], 'Get Users');
       final request = item['request'] as Map<String, dynamic>;
       expect(request['method'], 'GET');
-      expect(request['url']['raw'], 'https://api.example.com/users?page=1');
-      final query = request['url']['query'] as List;
+      final url = request['url'] as Map<String, dynamic>;
+      expect(url['raw'], 'https://api.example.com/users?page=1');
+      final query = url['query'] as List;
       expect(query.first, {'key': 'page', 'value': '1'});
       final headers = request['header'] as List;
-      expect(headers.any((h) => h['key'] == 'X-Token' && h['value'] == 'abc'), isTrue);
+      expect(
+        headers.any((h) {
+          final header = h as Map<String, dynamic>;
+          return header['key'] == 'X-Token' && header['value'] == 'abc';
+        }),
+        isTrue,
+      );
     });
 
     test('preserves duplicate query keys on export', () {
@@ -59,36 +69,48 @@ void main() {
           url: 'https://x.y?a=1&a=2',
         ),
       );
-      final decoded = jsonDecode(PostmanCollectionMapper.toJson(leaf)) as Map<String, dynamic>;
+      final decoded =
+          jsonDecode(PostmanCollectionMapper.toJson(leaf))
+              as Map<String, dynamic>;
       final item = (decoded['item'] as List).first as Map<String, dynamic>;
-      final query = item['request']['url']['query'] as List;
+      final request = item['request'] as Map<String, dynamic>;
+      final url = request['url'] as Map<String, dynamic>;
+      final query = url['query'] as List;
       expect(query, [
         {'key': 'a', 'value': '1'},
         {'key': 'a', 'value': '2'},
       ]);
     });
 
-    test('emits raw body with json language hint when Content-Type is json', () {
-      final config = const HttpRequestConfigEntity(
-        id: 'cfg',
-        method: 'POST',
-        url: 'https://api.example.com/users',
-        headers: {'Content-Type': 'application/json'},
-        body: '{"name":"x"}',
-      );
-      final leaf = CollectionNodeEntity(
-        id: 'leaf',
-        name: 'Create',
-        isFolder: false,
-        config: config,
-      );
-      final decoded = jsonDecode(PostmanCollectionMapper.toJson(leaf)) as Map<String, dynamic>;
-      final item = (decoded['item'] as List).first as Map<String, dynamic>;
-      final body = item['request']['body'] as Map<String, dynamic>;
-      expect(body['mode'], 'raw');
-      expect(body['raw'], '{"name":"x"}');
-      expect(body['options']['raw']['language'], 'json');
-    });
+    test(
+      'emits raw body with json language hint when Content-Type is json',
+      () {
+        const config = HttpRequestConfigEntity(
+          id: 'cfg',
+          method: 'POST',
+          url: 'https://api.example.com/users',
+          headers: {'Content-Type': 'application/json'},
+          body: '{"name":"x"}',
+        );
+        const leaf = CollectionNodeEntity(
+          id: 'leaf',
+          name: 'Create',
+          isFolder: false,
+          config: config,
+        );
+        final decoded =
+            jsonDecode(PostmanCollectionMapper.toJson(leaf))
+                as Map<String, dynamic>;
+        final item = (decoded['item'] as List).first as Map<String, dynamic>;
+        final request = item['request'] as Map<String, dynamic>;
+        final body = request['body'] as Map<String, dynamic>;
+        expect(body['mode'], 'raw');
+        expect(body['raw'], '{"name":"x"}');
+        final options = body['options'] as Map<String, dynamic>;
+        final raw = options['raw'] as Map<String, dynamic>;
+        expect(raw['language'], 'json');
+      },
+    );
 
     test('wraps a single request leaf as an item', () {
       const leaf = CollectionNodeEntity(
@@ -97,7 +119,9 @@ void main() {
         isFolder: false,
         config: HttpRequestConfigEntity(id: 'cfg', url: 'https://example.com'),
       );
-      final decoded = jsonDecode(PostmanCollectionMapper.toJson(leaf)) as Map<String, dynamic>;
+      final decoded =
+          jsonDecode(PostmanCollectionMapper.toJson(leaf))
+              as Map<String, dynamic>;
       final items = decoded['item'] as List;
       expect(items, hasLength(1));
       expect((items.first as Map)['name'], 'Ping');
@@ -167,8 +191,11 @@ void main() {
       expect(node.children.first.config!.method, 'POST');
     });
 
-    test('reconstructs a structured url (no raw) with protocol, host, port and path', () {
-      const source = '''
+    test(
+      'reconstructs a structured url (no raw) with protocol, host, port '
+      'and path',
+      () {
+        const source = '''
 {
   "info": {"name": "S", "schema": "v2.1.0"},
   "item": [
@@ -187,9 +214,12 @@ void main() {
   ]
 }
 ''';
-      final config = PostmanCollectionMapper.fromJson(source).children.first.config!;
-      expect(config.url, 'https://api.example.com:8443/v1/users');
-    });
+        final config = PostmanCollectionMapper.fromJson(
+          source,
+        ).children.first.config!;
+        expect(config.url, 'https://api.example.com:8443/v1/users');
+      },
+    );
 
     test('defaults to https when a structured url omits the protocol', () {
       const source = '''
@@ -206,7 +236,9 @@ void main() {
   ]
 }
 ''';
-      final config = PostmanCollectionMapper.fromJson(source).children.first.config!;
+      final config = PostmanCollectionMapper.fromJson(
+        source,
+      ).children.first.config!;
       expect(config.url, 'https://api.example.com/x');
     });
 
@@ -235,7 +267,9 @@ void main() {
   ]
 }
 ''';
-      final config = PostmanCollectionMapper.fromJson(source).children.first.config!;
+      final config = PostmanCollectionMapper.fromJson(
+        source,
+      ).children.first.config!;
       expect(config.headers, {'A': '1'});
       expect(config.url, 'https://x.y?k1=v1');
       expect(
@@ -262,7 +296,9 @@ void main() {
   ]
 }
 ''';
-      final config = PostmanCollectionMapper.fromJson(source).children.first.config!;
+      final config = PostmanCollectionMapper.fromJson(
+        source,
+      ).children.first.config!;
       expect(config.url, 'https://x.y?new=2');
       expect(
         config.params,
@@ -271,12 +307,17 @@ void main() {
     });
 
     test('throws FormatException on malformed JSON', () {
-      expect(() => PostmanCollectionMapper.fromJson('not json'), throwsFormatException);
+      expect(
+        () => PostmanCollectionMapper.fromJson('not json'),
+        throwsFormatException,
+      );
     });
 
     test('throws FormatException on missing info.schema', () {
       expect(
-        () => PostmanCollectionMapper.fromJson('{"info": {"name": "x"}, "item": []}'),
+        () => PostmanCollectionMapper.fromJson(
+          '{"info": {"name": "x"}, "item": []}',
+        ),
         throwsFormatException,
       );
     });
@@ -357,8 +398,9 @@ void main() {
         ),
       );
 
-      final reimported =
-          PostmanCollectionMapper.fromJson(PostmanCollectionMapper.toJson(leaf));
+      final reimported = PostmanCollectionMapper.fromJson(
+        PostmanCollectionMapper.toJson(leaf),
+      );
       final config = reimported.children.first.config!;
 
       expect(config.bodyType, BodyType.urlencoded);
@@ -368,32 +410,44 @@ void main() {
       ]);
     });
 
-    test('export then import preserves a multipart form body (text + file)', () {
-      const leaf = CollectionNodeEntity(
-        id: 'leaf',
-        name: 'Upload',
-        isFolder: false,
-        config: HttpRequestConfigEntity(
-          id: 'cfg',
-          method: 'POST',
-          url: 'https://api.example.com/upload',
-          bodyType: BodyType.multipart,
-          formFields: [
-            MultipartFieldEntity(name: 'caption', value: 'hi'),
-            MultipartFieldEntity(name: 'file', isFile: true, filePath: '/tmp/a.png'),
-          ],
-        ),
-      );
+    test(
+      'export then import preserves a multipart form body (text + file)',
+      () {
+        const leaf = CollectionNodeEntity(
+          id: 'leaf',
+          name: 'Upload',
+          isFolder: false,
+          config: HttpRequestConfigEntity(
+            id: 'cfg',
+            method: 'POST',
+            url: 'https://api.example.com/upload',
+            bodyType: BodyType.multipart,
+            formFields: [
+              MultipartFieldEntity(name: 'caption', value: 'hi'),
+              MultipartFieldEntity(
+                name: 'file',
+                isFile: true,
+                filePath: '/tmp/a.png',
+              ),
+            ],
+          ),
+        );
 
-      final reimported =
-          PostmanCollectionMapper.fromJson(PostmanCollectionMapper.toJson(leaf));
-      final config = reimported.children.first.config!;
+        final reimported = PostmanCollectionMapper.fromJson(
+          PostmanCollectionMapper.toJson(leaf),
+        );
+        final config = reimported.children.first.config!;
 
-      expect(config.bodyType, BodyType.multipart);
-      expect(config.formFields, const [
-        MultipartFieldEntity(name: 'caption', value: 'hi'),
-        MultipartFieldEntity(name: 'file', isFile: true, filePath: '/tmp/a.png'),
-      ]);
-    });
+        expect(config.bodyType, BodyType.multipart);
+        expect(config.formFields, const [
+          MultipartFieldEntity(name: 'caption', value: 'hi'),
+          MultipartFieldEntity(
+            name: 'file',
+            isFile: true,
+            filePath: '/tmp/a.png',
+          ),
+        ]);
+      },
+    );
   });
 }
