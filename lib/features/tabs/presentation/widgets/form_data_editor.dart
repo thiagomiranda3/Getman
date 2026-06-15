@@ -88,7 +88,7 @@ class _FormDataEditorState extends State<FormDataEditor> {
   }
 
   Future<void> _pickFile(_RowState row) async {
-    final result = await FilePicker.platform.pickFiles();
+    final result = await FilePicker.pickFiles();
     if (result == null || result.files.isEmpty) return;
     final picked = result.files.single;
     if (picked.path == null) {

@@ -14,7 +14,7 @@ Future<WorkspaceLocation?> pickWorkspaceDirectory() async {
     return WorkspaceBookmarks.pickDirectory();
   }
   try {
-    final path = await FilePicker.platform.getDirectoryPath(
+    final path = await FilePicker.getDirectoryPath(
       dialogTitle: 'Choose workspace folder',
     );
     return path == null ? null : WorkspaceLocation(path);

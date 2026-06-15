@@ -41,7 +41,7 @@ class _ClientCertificateTileState extends State<ClientCertificateTile> {
   Future<void> _pick(BuildContext context, {required bool isCert}) async {
     final settings = context.read<SettingsBloc>();
     final current = settings.state.settings;
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       dialogTitle: isCert
           ? 'Choose certificate (PEM)'
           : 'Choose private key (PEM)',

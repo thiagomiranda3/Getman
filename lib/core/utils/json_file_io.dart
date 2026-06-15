@@ -54,7 +54,7 @@ Future<void> saveJsonFileWithFeedback(
 }) async {
   final messenger = ScaffoldMessenger.maybeOf(context);
   try {
-    final path = await FilePicker.platform.saveFile(
+    final path = await FilePicker.saveFile(
       dialogTitle: dialogTitle,
       fileName: fileName,
       type: FileType.custom,
@@ -86,7 +86,7 @@ Future<void> importJsonFilesWithFeedback<T>(
   final messenger = ScaffoldMessenger.maybeOf(context);
   final FilePickerResult? result;
   try {
-    result = await FilePicker.platform.pickFiles(
+    result = await FilePicker.pickFiles(
       allowMultiple: true,
       type: FileType.custom,
       allowedExtensions: ['json'],

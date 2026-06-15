@@ -324,7 +324,7 @@ class _BinaryBodyPicker extends StatelessWidget {
   final String tabId;
 
   Future<void> _pick(BuildContext context) async {
-    final result = await FilePicker.platform.pickFiles();
+    final result = await FilePicker.pickFiles();
     if (result == null || result.files.isEmpty) return;
     final picked = result.files.single;
     if (picked.path == null) {
