@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
+import 'package:getman/core/ui/widgets/variable_highlight_controller.dart';
+import 'package:getman/core/ui/widgets/variable_hover_popover.dart';
+import 'package:getman/core/utils/variable_resolution_helper.dart';
 
 /// Generic editable key/value row list backing the params, headers, and
 /// environment-variable editors. The canonical value type [T] (ordered list,
@@ -24,6 +27,7 @@ class KeyValueListEditor<T extends Object> extends StatefulWidget {
     super.key,
     this.secretKeys,
     this.onSecretKeysChanged,
+    this.variableContext,
   });
   final T items;
   final ValueChanged<T> onChanged;
@@ -39,6 +43,13 @@ class KeyValueListEditor<T extends Object> extends StatefulWidget {
   /// Called with the new secret-key set when a row's lock is toggled.
   final ValueChanged<Set<String>>? onSecretKeysChanged;
 
+  /// When non-null, value fields highlight `{{var}}` tokens and show a hover
+  /// popover resolving them against the active environment. Params and headers
+  /// pass a context (highlighting enabled); the env editor and other consumers
+  /// pass null, leaving value fields as plain text. Note: this is unrelated to
+  /// [secretKeys], which toggles per-row secret obscuring in the env editor.
+  final VariableHoverContext? variableContext;
+
   @override
   State<KeyValueListEditor<T>> createState() => _KeyValueListEditorState<T>();
 }
@@ -49,10 +60,18 @@ class _KeyValueListEditorState<T extends Object>
   late List<TextEditingController> _valControllers;
   T? _lastEmitted;
 
+  final VariableHoverController _hoverController = VariableHoverController();
+
   @override
   void initState() {
     super.initState();
     _initControllers(widget.decode(widget.items));
+  }
+
+  TextEditingController _newValueController(String value) {
+    return widget.variableContext != null
+        ? VariableHighlightController(text: value)
+        : TextEditingController(text: value);
   }
 
   void _initControllers(List<(String, String)> rows) {
@@ -60,14 +79,27 @@ class _KeyValueListEditorState<T extends Object>
       for (final (key, _) in rows) TextEditingController(text: key),
     ];
     _valControllers = [
-      for (final (_, value) in rows) TextEditingController(text: value),
+      for (final (_, value) in rows) _newValueController(value),
     ];
     _addEmptyRow();
   }
 
   void _addEmptyRow() {
     _keyControllers.add(TextEditingController());
-    _valControllers.add(TextEditingController());
+    _valControllers.add(_newValueController(''));
+  }
+
+  void _showVariablePopover(BuildContext context, String name, Offset pos) {
+    if (!mounted) return;
+    final varContext = widget.variableContext;
+    if (varContext == null) return;
+    final data = VariableResolutionHelper.classify(
+      name: name,
+      variables: varContext.variables,
+      secretKeys: varContext.secretKeys,
+      environmentName: varContext.environmentName,
+    );
+    _hoverController.showFor(context, data, pos);
   }
 
   @override
@@ -96,6 +128,7 @@ class _KeyValueListEditorState<T extends Object>
 
   @override
   void dispose() {
+    _hoverController.dispose();
     _disposeControllers();
     super.dispose();
   }
@@ -132,6 +165,27 @@ class _KeyValueListEditorState<T extends Object>
         // and the env editor's trimming encode), so an untrimmed compare would
         // mis-flag a key with surrounding whitespace.
         final keyText = _keyControllers[index].text.trim();
+
+        final varContext = widget.variableContext;
+        final valController = _valControllers[index];
+        if (varContext != null &&
+            valController is VariableHighlightController) {
+          final palette = context.appPalette;
+          // Block syntax for onVariableEnter prevents the arrow-function body
+          // from greedily capturing the following cascade item as part of its
+          // return expression, which would trigger use_of_void_result.
+          valController
+            ..onVariableEnter = (name, pos) {
+              _showVariablePopover(context, name, pos);
+            }
+            ..onVariableExit = _hoverController.scheduleHide
+            ..updateColors(
+              resolved: palette.variableResolved,
+              unresolved: palette.variableUnresolved,
+            )
+            ..updateVariables(varContext.variables);
+        }
+
         return _KeyValueRow(
           key: ValueKey(_keyControllers[index]),
           keyController: _keyControllers[index],
