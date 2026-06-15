@@ -4,6 +4,8 @@ import FlutterMacOS
 class MainFlutterWindow: NSWindow {
   // Retained for the window's lifetime so its method-channel handler stays alive.
   private let workspaceBookmarkPlugin = WorkspaceBookmarkPlugin()
+  // Retained so its handler stays alive (test-only window sizing channel).
+  private var testWindowChannel: FlutterMethodChannel?
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -14,6 +16,28 @@ class MainFlutterWindow: NSWindow {
     RegisterGeneratedPlugins(registry: flutterViewController)
     workspaceBookmarkPlugin.register(
       registrar: flutterViewController.registrar(forPlugin: "WorkspaceBookmarkPlugin"))
+
+    // Test-only channel: lets E2E integration tests set the real window size so
+    // they run at a deterministic desktop size at NATIVE scale (real responsive
+    // layout), instead of faking it via the device pixel ratio. No normal app
+    // launch uses this channel — it's a no-op unless a test calls it.
+    let channel = FlutterMethodChannel(
+      name: "getman/test_window",
+      binaryMessenger: flutterViewController.registrar(forPlugin: "TestWindow").messenger)
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard call.method == "setContentSize",
+        let args = call.arguments as? [String: Any],
+        let width = args["width"] as? Double,
+        let height = args["height"] as? Double
+      else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      self?.setContentSize(NSSize(width: width, height: height))
+      self?.center()
+      result(nil)
+    }
+    testWindowChannel = channel
 
     super.awakeFromNib()
   }

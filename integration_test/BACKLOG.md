@@ -93,7 +93,18 @@ Each item: what's missing · why it isn't done yet · a suggested approach.
 - **Suggested:** the right-click tab context menu + keyboard shortcuts; gate the
   shortcut ones on item 1's key-simulation fix.
 
-## 9. Error & edge states
+## 9. Responsive layout
+
+- **Missing:** flows that assert the layout adapts across breakpoints — phone
+  (≤700: unified single tab-strip), tablet (≤900: drawer side menu), desktop.
+- **Now possible:** `bootGetman` resizes the real window at native scale, and
+  `resizeWindow($, size)` (in `support/app_harness.dart`) can resize mid-flow,
+  so responsive breakpoints fire for real (no devicePixelRatio faking).
+- **Suggested:** boot at / resize to a phone width and assert the unified panel
+  (`RESPONSE` tab present, drawer-based side menu) vs. desktop split-pane;
+  cover the `useTabSwitcher` (≤500) chip + switcher sheet.
+
+## 10. Error & edge states
 
 - **Missing:** request timeout, non-2xx rendering, malformed-JSON body, request
   cancel mid-flight (`cancel` key exists), history dedup specifics, every theme

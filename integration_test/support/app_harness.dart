@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/di/injection_container.dart' as di;
@@ -7,19 +8,52 @@ import 'package:getman/main.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:patrol_finders/patrol_finders.dart';
 
-/// The flows assume the **desktop** layout — inline side menu + split-pane
-/// request/response (so the `reqtab_*` / `resptab_*` / `menutab_*` tab anchors
-/// exist and the side-menu buttons are visible). `flutter test`'s default
-/// surface is only 800×600 logical (tablet → drawer side menu), so `bootGetman`
-/// widens it to a desktop logical width by lowering **only** the device pixel
-/// ratio (see below) — never `physicalSize`, which would decouple rendering
-/// from the window and strand it on the "Test starting…" stub (you could no
-/// longer watch the app run).
-///
+/// Default window size the E2E flows boot at — a real desktop size (inline side
+/// menu + split-pane request/response, so the `reqtab_*` / `resptab_*` /
+/// `menutab_*` anchors exist and the side-menu buttons show). Wide enough that
+/// the URL bar keeps its inline actions (Generate-code / Save) instead of
+/// collapsing into the overflow menu.
+const Size kE2eWindowSize = Size(1500, 950);
+
+/// Channel into the macOS Runner that resizes the real `NSWindow`
+/// (see `macos/Runner/MainFlutterWindow.swift`). Test-only.
+const MethodChannel _testWindowChannel = MethodChannel('getman/test_window');
+
 /// Watch mode is on whenever a slow-motion delay is requested
 /// (`--dart-define=E2E_SLOW_MS=<ms>`). A getter (not a const) so the analyzer
 /// doesn't fold the default 0 into dead-code warnings.
 bool get _watchMode => const int.fromEnvironment('E2E_SLOW_MS') > 0;
+
+/// Logical width of the current test view.
+double _logicalWidth(PatrolTester $) =>
+    $.tester.view.physicalSize.width / $.tester.view.devicePixelRatio;
+
+/// Sets the **real** macOS window to [size] (logical points, at the native
+/// device pixel ratio) and waits for the new metrics to land. This actually
+/// resizes the window, so the app lays out at [size] and responsive breakpoints
+/// fire for real — unlike scaling via `devicePixelRatio`. Safe to call mid-flow
+/// to exercise responsive behaviour:
+/// ```dart
+/// await resizeWindow($, const Size(560, 900)); // phone-ish → unified panel
+/// ```
+/// No-op off macOS (the channel isn't registered).
+Future<void> resizeWindow(PatrolTester $, Size size) async {
+  try {
+    await _testWindowChannel.invokeMethod<void>('setContentSize', {
+      'width': size.width,
+      'height': size.height,
+    });
+  } on MissingPluginException {
+    return;
+  }
+  // The native resize lands asynchronously as a view-metrics change; pump until
+  // the logical width matches (or give up after ~1s and let the test fail).
+  for (var i = 0; i < 60; i++) {
+    await $.tester.pump(const Duration(milliseconds: 16));
+    if ((_logicalWidth($) - size.width).abs() < 2) break;
+  }
+  await $.pumpAndSettle();
+}
 
 /// Boots the **real** Getman app for an E2E flow and pumps it until settled.
 ///
@@ -30,6 +64,10 @@ bool get _watchMode => const int.fromEnvironment('E2E_SLOW_MS') > 0;
 /// the DI container is reset, all Hive boxes are closed, and the temp dir is
 /// deleted.
 ///
+/// The window is resized to [kE2eWindowSize] at native scale so flows run in
+/// the desktop layout while staying fully visible (you can watch them — see the
+/// README "Watch it run"). Pass [windowSize] to boot at another size.
+///
 /// Call once at the start of a flow:
 /// ```dart
 /// patrolWidgetTest('my flow', ($) async {
@@ -37,27 +75,21 @@ bool get _watchMode => const int.fromEnvironment('E2E_SLOW_MS') > 0;
 ///   // ... drive the app via `$` ...
 /// });
 /// ```
-Future<void> bootGetman(PatrolTester $) async {
+Future<void> bootGetman(
+  PatrolTester $, {
+  Size windowSize = kE2eWindowSize,
+}) async {
   // The app bundles its Google Fonts; forbid runtime fetching so a test never
   // hits the network for a font (matches main.dart).
   GoogleFonts.config.allowRuntimeFetching = false;
 
-  // Watch mode: ask the live test binding to render every frame so the OS
-  // window shows the app being driven instead of the "Test starting…" stub.
-  // Best-effort — desktop live rendering is unreliable; a mobile simulator is
-  // the dependable way to actually watch (see README "Watch it run").
+  // Watch mode: render every frame so the on-screen window shows the app
+  // animating as it's driven (the suite is visible either way; this just makes
+  // animations smooth).
   final binding = WidgetsBinding.instance;
   if (_watchMode && binding is LiveTestWidgetsFlutterBinding) {
     binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
   }
-
-  // Reach the desktop layout (logical width > 900) by lowering ONLY the device
-  // pixel ratio. physicalSize is left at the real window backing, so rendering
-  // stays coupled to the window and the app stays visible — unlike overriding
-  // physicalSize, which strands the window on "Test starting…".
-  final view = $.tester.view;
-  view.devicePixelRatio = view.physicalSize.width / 1600.0;
-  addTearDown(view.resetDevicePixelRatio);
 
   final tempDir = await Directory.systemTemp.createTemp('getman_e2e');
   addTearDown(() async {
@@ -69,4 +101,5 @@ Future<void> bootGetman(PatrolTester $) async {
 
   final settings = await di.init(storageDirectoryOverride: tempDir.path);
   await $.pumpWidgetAndSettle(MyApp(initialSettings: settings));
+  await resizeWindow($, windowSize);
 }

@@ -43,12 +43,11 @@ fvm flutter test integration_test/pipeline_smoke_test.dart -d macos
 ## Watch it run (see the real app)
 
 On macOS the test **renders to a real, visible app window** — you watch the
-taps/typing happen — as long as the harness does **not** override
-`tester.view.physicalSize` (that decouples rendering from the window and leaves
-it stuck on the "Test starting…" stub). `bootGetman` deliberately doesn't — it
-only lowers the device pixel ratio to reach the desktop layout, leaving the
-physical surface (and thus the visible rendering) intact. So watching just needs
-a **single flow** (followable) plus **slow-motion**:
+taps/typing happen. `bootGetman` resizes that real window to a desktop size at
+native scale (see Isolation above); it does **not** override
+`tester.view.physicalSize`, which would decouple rendering from the window and
+strand it on the "Test starting…" stub. So watching just needs a **single flow**
+(followable) plus **slow-motion**:
 
 ```bash
 bash integration_test/run_macos_watch.sh tabs            # one flow, slow, visible
@@ -89,10 +88,14 @@ test fails.
 
 The flows target the **desktop layout** (inline side menu + split request/
 response panes — `reqtab_*` / `resptab_*` / `menutab_*` anchors). `flutter test`
-defaults to an 800×600 logical surface (tablet → drawer side menu), so
-`bootGetman` widens it to a desktop logical width by lowering **only** the
-device pixel ratio — never `physicalSize`, since that would break the visible
-rendering (see "Watch it run").
+boots the macOS app at an 800×600 surface (tablet → drawer side menu), so
+`bootGetman` resizes the **real window** to `kE2eWindowSize` (1500×950) at
+native scale via a test-only platform channel (`getman/test_window`, handled in
+`macos/Runner/MainFlutterWindow.swift`). It's an actual resize — the app lays
+out at the new size at the native pixel ratio — so responsive breakpoints fire
+for real (call `resizeWindow($, size)` mid-flow to exercise them) and the window
+stays visible. (We do **not** fake the size via `devicePixelRatio`; that scales
+the pixels instead of resizing, which defeats responsive testing.)
 
 ## Layout
 
