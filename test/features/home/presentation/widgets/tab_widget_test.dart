@@ -97,8 +97,10 @@ void main() {
             ],
             child: RepositoryProvider<TabDirtyChecker>.value(
               value: const TabDirtyChecker(),
-              child: Align(
-                alignment: Alignment.topLeft,
+              // Centered so the screen's top-left corner (Offset.zero) is
+              // OUTSIDE the tab — lets the pointer move on/off it to fire
+              // MouseRegion onEnter/onExit.
+              child: Center(
                 child: TabWidget(
                   tabId: tab.tabId,
                   index: 0,
@@ -115,12 +117,20 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  // The screen's top-left corner, outside the centered tab — moving on/off it
+  // fires MouseRegion onEnter/onExit.
+  const outside = Offset.zero;
+
   Future<TestGesture> hoverTab(WidgetTester tester) async {
     final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
-    await gesture.addPointer(location: Offset.zero);
+    await gesture.addPointer(location: outside);
     addTearDown(gesture.removePointer);
-    await gesture.moveTo(tester.getCenter(find.byType(TabWidget)));
     await tester.pump();
+    // The tab content is aligned to the top-left of its (tall) layout box, over
+    // the title — not the geometric center. Aim just inside the top-left.
+    final rect = tester.getRect(find.byType(TabWidget));
+    await gesture.moveTo(rect.topLeft + const Offset(12, 12));
+    await tester.pumpAndSettle();
     return gesture;
   }
 
@@ -137,6 +147,7 @@ void main() {
 
     // After the delay, the tooltip appears with both lines.
     await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
     expect(tooltip, findsOneWidget);
     expect(
       find.descendant(of: tooltip, matching: find.text('GetUsers')),
@@ -154,6 +165,7 @@ void main() {
 
     await hoverTab(tester);
     await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump();
 
     expect(tooltip, findsOneWidget);
     expect(
@@ -175,7 +187,7 @@ void main() {
 
     final gesture = await hoverTab(tester);
     await tester.pump(const Duration(milliseconds: 200)); // < 500ms delay
-    await gesture.moveTo(Offset.zero); // leave the tab
+    await gesture.moveTo(outside); // leave the tab
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
 
