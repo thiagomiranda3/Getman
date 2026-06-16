@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
@@ -17,7 +16,7 @@ import 'package:getman/features/collections/presentation/bloc/collections_bloc.d
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
 import 'package:getman/features/collections/presentation/widgets/collection_node_menu.dart';
-import 'package:getman/features/collections/presentation/widgets/example_menu.dart';
+import 'package:getman/features/collections/presentation/widgets/example_row.dart';
 import 'package:getman/features/collections/presentation/widgets/node_action_sheet.dart';
 import 'package:getman/features/collections/presentation/widgets/spec_import_dialog.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
@@ -333,9 +332,11 @@ class _CollectionsListState extends State<CollectionsList> {
                       treeNodeBuilder: (context, node, animationStyle) {
                         final item = node.content;
                         if (item is _ExampleItem) {
-                          return _ExampleRow(
+                          return ExampleRow(
                             key: ValueKey('${item.nodeId}/${item.example.id}'),
-                            item: item,
+                            nodeId: item.nodeId,
+                            nodeName: item.nodeName,
+                            example: item.example,
                             depth: node.depth ?? 0,
                             rowWidth: rowWidth,
                             rowHeight: rowHeight,
@@ -661,107 +662,4 @@ class _ExampleItem extends _TreeItem {
   final String nodeId;
   final String nodeName;
   final SavedExampleEntity example;
-}
-
-/// A saved-example row rendered beneath its request node. Tapping opens the
-/// snapshot as a fresh (unlinked) tab with its captured response shown; the
-/// trailing menu renames or deletes the example.
-class _ExampleRow extends StatefulWidget {
-  const _ExampleRow({
-    required this.item,
-    required this.depth,
-    required this.rowWidth,
-    required this.rowHeight,
-    super.key,
-  });
-  final _ExampleItem item;
-  final int depth;
-  final double rowWidth;
-  final double rowHeight;
-
-  @override
-  State<_ExampleRow> createState() => _ExampleRowState();
-}
-
-class _ExampleRowState extends State<_ExampleRow> {
-  bool _isHovered = false;
-
-  void _open(BuildContext context) {
-    final cfg = widget.item.example.config;
-    final response = cfg.statusCode != null
-        ? HttpResponseEntity(
-            statusCode: cfg.statusCode!,
-            body: cfg.responseBody ?? '',
-            headers: cfg.responseHeaders ?? const {},
-            durationMs: cfg.durationMs ?? 0,
-          )
-        : null;
-    // Opened unlinked (no collectionNodeId) so editing/re-sending a snapshot
-    // never overwrites the saved request.
-    context.read<TabsBloc>().add(
-      AddTab(
-        config: cfg.copyWith(),
-        collectionName: '${widget.item.nodeName} · ${widget.item.example.name}',
-        response: response,
-      ),
-    );
-    Scaffold.maybeOf(context)?.closeDrawer();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final layout = context.appLayout;
-    final indent = widget.depth * layout.depthPaddingMultiplier;
-
-    return SizedBox(
-      width: widget.rowWidth,
-      height: widget.rowHeight,
-      child: context.appDecoration.wrapInteractive(
-        child: InkWell(
-          onTap: () => _open(context),
-          child: MouseRegion(
-            onEnter: (_) => setState(() => _isHovered = true),
-            onExit: (_) => setState(() => _isHovered = false),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              decoration: BoxDecoration(
-                color: _isHovered ? theme.hoverColor : Colors.transparent,
-              ),
-              child: Padding(
-                padding: EdgeInsets.only(left: indent + layout.smallIconSize),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.bookmark_outline,
-                      size: layout.smallIconSize,
-                      color: theme.colorScheme.secondary,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        widget.item.example.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: layout.fontSizeSmall,
-                          fontWeight: context.appTypography.bodyWeight,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                      ),
-                    ),
-                    ExampleMenu(
-                      nodeId: widget.item.nodeId,
-                      exampleId: widget.item.example.id,
-                      exampleName: widget.item.example.name,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
