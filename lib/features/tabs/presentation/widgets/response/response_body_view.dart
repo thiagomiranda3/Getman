@@ -11,7 +11,6 @@ import 'package:getman/core/ui/widgets/compare_target_picker.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/ui/widgets/response_diff_view.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
-import 'package:getman/core/utils/byte_format.dart';
 import 'package:getman/core/utils/json_file_io.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/core/utils/response_diff_builder.dart';
@@ -26,6 +25,7 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart';
+import 'package:getman/features/tabs/presentation/widgets/response/response_large_body_view.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:uuid/uuid.dart';
 
@@ -174,7 +174,7 @@ class _ResponseBodyViewState extends State<ResponseBodyView> {
           },
         ),
       ],
-      child: _largeBody != null ? _buildLargeMode(context) : _buildSmallMode(),
+      child: _largeBody != null ? _buildLargeMode() : _buildSmallMode(),
     );
   }
 
@@ -440,77 +440,39 @@ class _ResponseBodyViewState extends State<ResponseBodyView> {
     );
   }
 
-  Widget _buildLargeMode(BuildContext context) {
-    final layout = context.appLayout;
-    final typography = context.appTypography;
+  Widget _buildLargeMode() {
     final palette = context.appPalette;
+    final typography = context.appTypography;
+    final layout = context.appLayout;
     final theme = Theme.of(context);
     final body = _largeBody!;
-    final sizeLabel = formatBytes(body.length);
-
     final displayText = _showFullPreview
         ? body
         : body.substring(0, body.length.clamp(0, kLargeResponsePreviewChars));
-    final isTruncated =
-        !_showFullPreview && body.length > kLargeResponsePreviewChars;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Banner row
-        ColoredBox(
-          color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: layout.pagePadding,
-              vertical: layout.pagePadding / 2,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _highlightingOptedIn
-                        ? 'LARGE RESPONSE ($sizeLabel) — HIGHLIGHTING ENABLED'
-                        : 'LARGE RESPONSE ($sizeLabel) — HIGHLIGHTING DISABLED',
-                    style: TextStyle(
-                      fontSize: layout.fontSizeSmall,
-                      fontWeight: typography.titleWeight,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-                if (!_highlightingOptedIn) ...[
-                  TextButton(
-                    onPressed: _prettifyAndOptIn,
-                    child: Text(
-                      'PRETTIFY ANYWAY',
-                      style: TextStyle(
-                        fontSize: layout.fontSizeSmall,
-                        fontWeight: typography.titleWeight,
-                      ),
-                    ),
-                  ),
-                  if (isTruncated)
-                    TextButton(
-                      onPressed: () => setState(() => _showFullPreview = true),
-                      child: Text(
-                        'SHOW FULL',
-                        style: TextStyle(
-                          fontSize: layout.fontSizeSmall,
-                          fontWeight: typography.titleWeight,
-                        ),
-                      ),
-                    ),
-                ],
-                _copyButton(context),
-                _saveButton(context),
-                _compareButton(context),
-                _saveAsExampleButton(context),
-              ],
-            ),
+        // Banner row — extracted to ResponseLargeBodyView.
+        ResponseLargeBodyView(
+          body: body,
+          showFullPreview: _showFullPreview,
+          highlightingOptedIn: _highlightingOptedIn,
+          onPrettifyAndOptIn: _prettifyAndOptIn,
+          onShowFull: () => setState(() => _showFullPreview = true),
+          controls: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _copyButton(context),
+              _saveButton(context),
+              _compareButton(context),
+              _saveAsExampleButton(context),
+            ],
           ),
         ),
-        // Body — editor when opted-in, plain text otherwise
+        // Body — editor when opted-in, plain text otherwise. Kept here so the
+        // editor widget occupies the same Column.children[1] position in both
+        // small and large mode, preventing re_editor state teardown on switch.
         Expanded(
           child: _highlightingOptedIn
               ? _buildEditorMode()
