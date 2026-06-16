@@ -72,34 +72,38 @@ class _RealtimePanelState extends State<RealtimePanel> {
         SizedBox(height: layout.tabSpacing),
         Expanded(
           child: RepaintBoundary(
-            child: Container(
-              decoration: context.appDecoration.panelBox(context, offset: 0),
-              child: BlocBuilder<RealtimeBloc, RealtimeState>(
-                buildWhen: _framesChanged,
-                builder: (context, state) {
-                  final frames = state.sessionFor(widget.tabId).frames;
-                  if (frames.isEmpty) {
-                    return Center(
-                      child: Text(
-                        kind == RequestKind.sse
-                            ? 'CONNECT TO STREAM EVENTS'
-                            : 'CONNECT TO START MESSAGING',
-                        style: TextStyle(
-                          fontSize: layout.fontSizeNormal,
-                          fontWeight: context.appTypography.titleWeight,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.5),
+            child: context.appDecoration.frost(
+              context,
+              borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+              child: Container(
+                decoration: context.appDecoration.panelBox(context, offset: 0),
+                child: BlocBuilder<RealtimeBloc, RealtimeState>(
+                  buildWhen: _framesChanged,
+                  builder: (context, state) {
+                    final frames = state.sessionFor(widget.tabId).frames;
+                    if (frames.isEmpty) {
+                      return Center(
+                        child: Text(
+                          kind == RequestKind.sse
+                              ? 'CONNECT TO STREAM EVENTS'
+                              : 'CONNECT TO START MESSAGING',
+                          style: TextStyle(
+                            fontSize: layout.fontSizeNormal,
+                            fontWeight: context.appTypography.titleWeight,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.5),
+                          ),
                         ),
-                      ),
+                      );
+                    }
+                    return ListView.builder(
+                      padding: EdgeInsets.all(layout.isCompact ? 8 : 12),
+                      itemCount: frames.length,
+                      itemBuilder: (context, i) => _FrameRow(frame: frames[i]),
                     );
-                  }
-                  return ListView.builder(
-                    padding: EdgeInsets.all(layout.isCompact ? 8 : 12),
-                    itemCount: frames.length,
-                    itemBuilder: (context, i) => _FrameRow(frame: frames[i]),
-                  );
-                },
+                  },
+                ),
               ),
             ),
           ),

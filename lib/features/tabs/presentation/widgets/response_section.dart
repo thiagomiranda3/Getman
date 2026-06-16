@@ -184,21 +184,27 @@ class ResponseSection extends StatelessWidget {
                       tabKeyPrefix: 'resptab',
                     ),
                     Expanded(
-                      child: Container(
-                        decoration: context.appDecoration.panelBox(
-                          context,
-                          offset: 0,
+                      child: context.appDecoration.frost(
+                        context,
+                        borderRadius: BorderRadius.circular(
+                          context.appShape.panelRadius,
                         ),
-                        child: TabBarView(
-                          children: [
-                            ResponseBodyView(
-                              tabId: tabId,
-                              responseController: responseController,
-                            ),
-                            ResponseHeadersView(tabId: tabId),
-                            ResponseCookiesView(tabId: tabId),
-                            ResponseTestsView(tabId: tabId),
-                          ],
+                        child: Container(
+                          decoration: context.appDecoration.panelBox(
+                            context,
+                            offset: 0,
+                          ),
+                          child: TabBarView(
+                            children: [
+                              ResponseBodyView(
+                                tabId: tabId,
+                                responseController: responseController,
+                              ),
+                              ResponseHeadersView(tabId: tabId),
+                              ResponseCookiesView(tabId: tabId),
+                              ResponseTestsView(tabId: tabId),
+                            ],
+                          ),
                         ),
                       ),
                     ),

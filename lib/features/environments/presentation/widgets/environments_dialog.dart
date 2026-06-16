@@ -235,38 +235,42 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
         ),
         SizedBox(height: layout.tabSpacing),
         Expanded(
-          child: Container(
-            decoration: context.appDecoration.panelBox(context, offset: 0),
-            child: environments.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(layout.pagePadding),
-                      child: Text(
-                        'No environments yet.\nClick + to create one.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: layout.fontSizeNormal,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.6,
+          child: context.appDecoration.frost(
+            context,
+            borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+            child: Container(
+              decoration: context.appDecoration.panelBox(context, offset: 0),
+              child: environments.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(layout.pagePadding),
+                        child: Text(
+                          'No environments yet.\nClick + to create one.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: layout.fontSizeNormal,
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.6,
+                            ),
                           ),
                         ),
                       ),
+                    )
+                  : ListView.builder(
+                      itemCount: environments.length,
+                      itemBuilder: (context, index) {
+                        final env = environments[index];
+                        final isSelected = env.id == _selectedId;
+                        return EnvironmentListTile(
+                          environment: env,
+                          isSelected: isSelected,
+                          onTap: () => onItemTap(env),
+                          onDelete: () => _deleteEnvironment(context, env),
+                          onExport: () => _exportEnvironment(context, env),
+                        );
+                      },
                     ),
-                  )
-                : ListView.builder(
-                    itemCount: environments.length,
-                    itemBuilder: (context, index) {
-                      final env = environments[index];
-                      final isSelected = env.id == _selectedId;
-                      return EnvironmentListTile(
-                        environment: env,
-                        isSelected: isSelected,
-                        onTap: () => onItemTap(env),
-                        onDelete: () => _deleteEnvironment(context, env),
-                        onExport: () => _exportEnvironment(context, env),
-                      );
-                    },
-                  ),
+            ),
           ),
         ),
       ],

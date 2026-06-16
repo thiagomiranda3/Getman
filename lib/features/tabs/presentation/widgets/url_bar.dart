@@ -170,219 +170,232 @@ class _UrlBarState extends State<UrlBar> {
               final layout = context.appLayout;
               final theme = Theme.of(context);
 
-              return Container(
-                padding: const EdgeInsets.all(6),
-                decoration: context.appDecoration.panelBox(
-                  context,
-                  offset: layout.cardOffset,
+              return context.appDecoration.frost(
+                context,
+                borderRadius: BorderRadius.circular(
+                  context.appShape.panelRadius,
                 ),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    // Below this threshold, collapse cURL / Save /
-                    // Layout-toggle into a single overflow menu so
-                    // Method + URL + SEND always fit.
-                    final isNarrow = constraints.maxWidth < 560;
-                    final iconSize = isNarrow
-                        ? 22.0
-                        : (layout.isCompact ? 24.0 : 28.0);
-                    final gap = isNarrow
-                        ? 4.0
-                        : (layout.isCompact ? 8.0 : 12.0);
-                    final smallGap = isNarrow
-                        ? 2.0
-                        : (layout.isCompact ? 4.0 : 8.0);
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: context.appDecoration.panelBox(
+                    context,
+                    offset: layout.cardOffset,
+                  ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Below this threshold, collapse cURL / Save /
+                      // Layout-toggle into a single overflow menu so
+                      // Method + URL + SEND always fit.
+                      final isNarrow = constraints.maxWidth < 560;
+                      final iconSize = isNarrow
+                          ? 22.0
+                          : (layout.isCompact ? 24.0 : 28.0);
+                      final gap = isNarrow
+                          ? 4.0
+                          : (layout.isCompact ? 8.0 : 12.0);
+                      final smallGap = isNarrow
+                          ? 2.0
+                          : (layout.isCompact ? 4.0 : 8.0);
 
-                    return Row(
-                      children: [
-                        RequestKindMethodSelector(tab: tab, isNarrow: isNarrow),
-                        SizedBox(width: gap),
-                        Expanded(
-                          child: TextField(
-                            key: const ValueKey('url_field'),
-                            controller: _urlController,
-                            focusNode: _urlFocusNode,
-                            style: TextStyle(
-                              fontSize: layout.fontSizeTitle,
-                              fontWeight: FontWeight.w600,
-                              color: theme.colorScheme.onSurface,
-                            ),
-                            decoration: const InputDecoration(
-                              hintText: 'Enter URL or paste cURL...',
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              isDense: true,
-                              filled: false,
-                            ),
-                            keyboardType: TextInputType.url,
-                            autocorrect: false,
-                            enableSuggestions: false,
-                            onChanged: (val) =>
-                                _handleUrlChanged(context, tab, val),
+                      return Row(
+                        children: [
+                          RequestKindMethodSelector(
+                            tab: tab,
+                            isNarrow: isNarrow,
                           ),
-                        ),
-                        SizedBox(width: gap),
-                        if (!isNarrow) ...[
-                          context.appDecoration.wrapInteractive(
-                            child: IconButton(
-                              key: const ValueKey('code_export_button'),
-                              icon: Icon(
-                                Icons.code,
-                                color: theme.colorScheme.secondary,
-                                size: iconSize,
+                          SizedBox(width: gap),
+                          Expanded(
+                            child: TextField(
+                              key: const ValueKey('url_field'),
+                              controller: _urlController,
+                              focusNode: _urlFocusNode,
+                              style: TextStyle(
+                                fontSize: layout.fontSizeTitle,
+                                fontWeight: FontWeight.w600,
+                                color: theme.colorScheme.onSurface,
                               ),
-                              tooltip: 'Generate code',
-                              onPressed: () =>
-                                  CodeExportDialog.show(context, tab.config),
+                              decoration: const InputDecoration(
+                                hintText: 'Enter URL or paste cURL...',
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                isDense: true,
+                                filled: false,
+                              ),
+                              keyboardType: TextInputType.url,
+                              autocorrect: false,
+                              enableSuggestions: false,
+                              onChanged: (val) =>
+                                  _handleUrlChanged(context, tab, val),
                             ),
                           ),
-                          SizedBox(width: smallGap),
-                        ],
-                        if (tab.config.kind == RequestKind.http)
-                          context.appDecoration.wrapInteractive(
-                            child: ElevatedButton(
-                              onPressed: tab.isSending
-                                  ? () => context.read<TabsBloc>().add(
-                                      CancelRequest(tab.tabId),
-                                    )
-                                  : () => context.read<TabsBloc>().add(
-                                      SendRequest(
-                                        tabId: tab.tabId,
-                                        envVars: _activeVariables(context),
-                                      ),
-                                    ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: tab.isSending
-                                    ? theme.colorScheme.error
-                                    : null,
-                                foregroundColor: tab.isSending
-                                    ? theme.colorScheme.onError
-                                    : null,
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: isNarrow
-                                      ? 12
-                                      : layout.buttonPaddingHorizontal,
-                                  vertical: isNarrow
-                                      ? 10
-                                      : layout.buttonPaddingVertical,
+                          SizedBox(width: gap),
+                          if (!isNarrow) ...[
+                            context.appDecoration.wrapInteractive(
+                              child: IconButton(
+                                key: const ValueKey('code_export_button'),
+                                icon: Icon(
+                                  Icons.code,
+                                  color: theme.colorScheme.secondary,
+                                  size: iconSize,
                                 ),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                tooltip: 'Generate code',
+                                onPressed: () =>
+                                    CodeExportDialog.show(context, tab.config),
                               ),
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 300),
-                                transitionBuilder: (child, animation) =>
-                                    ScaleTransition(
-                                      scale: animation,
-                                      child: FadeTransition(
-                                        opacity: animation,
-                                        child: child,
-                                      ),
-                                    ),
-                                child: tab.isSending
-                                    ? Row(
-                                        key: const ValueKey('cancel'),
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          SizedBox(
-                                            width: layout.smallIconSize,
-                                            height: layout.smallIconSize,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: theme.colorScheme.onError,
-                                            ),
-                                          ),
-                                          SizedBox(width: isNarrow ? 4 : 8),
-                                          Text(
-                                            isNarrow ? 'STOP' : 'CANCEL',
-                                            style: TextStyle(
-                                              fontSize: layout.fontSizeTitle,
-                                              fontWeight: context
-                                                  .appTypography
-                                                  .displayWeight,
-                                            ),
-                                          ),
-                                        ],
+                            ),
+                            SizedBox(width: smallGap),
+                          ],
+                          if (tab.config.kind == RequestKind.http)
+                            context.appDecoration.wrapInteractive(
+                              child: ElevatedButton(
+                                onPressed: tab.isSending
+                                    ? () => context.read<TabsBloc>().add(
+                                        CancelRequest(tab.tabId),
                                       )
-                                    : Text(
-                                        'SEND',
-                                        key: const ValueKey('send'),
-                                        style: TextStyle(
-                                          fontSize: layout.fontSizeTitle,
-                                          fontWeight: context
-                                              .appTypography
-                                              .displayWeight,
+                                    : () => context.read<TabsBloc>().add(
+                                        SendRequest(
+                                          tabId: tab.tabId,
+                                          envVars: _activeVariables(context),
                                         ),
                                       ),
-                              ),
-                            ),
-                          )
-                        else
-                          RealtimeButton(
-                            tabId: tab.tabId,
-                            config: tab.config,
-                            isNarrow: isNarrow,
-                            activeVars: _activeVariables(context),
-                          ),
-                        if (isNarrow) ...[
-                          SizedBox(width: smallGap),
-                          UrlOverflowMenu(
-                            iconSize: iconSize,
-                            isSaved: tab.collectionNodeId != null,
-                            isVerticalLayout: settings.isVerticalLayout,
-                            onGenerateCode: () =>
-                                CodeExportDialog.show(context, tab.config),
-                            onSave: widget.onSave,
-                            onToggleLayout: () =>
-                                context.read<SettingsBloc>().add(
-                                  UpdateVerticalLayout(
-                                    isVerticalLayout:
-                                        !settings.isVerticalLayout,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: tab.isSending
+                                      ? theme.colorScheme.error
+                                      : null,
+                                  foregroundColor: tab.isSending
+                                      ? theme.colorScheme.onError
+                                      : null,
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: isNarrow
+                                        ? 12
+                                        : layout.buttonPaddingHorizontal,
+                                    vertical: isNarrow
+                                        ? 10
+                                        : layout.buttonPaddingVertical,
                                   ),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
                                 ),
-                          ),
-                        ] else ...[
-                          SizedBox(width: gap),
-                          context.appDecoration.wrapInteractive(
-                            child: IconButton(
-                              key: const ValueKey('save_request_button'),
-                              icon: Icon(
-                                tab.collectionNodeId != null
-                                    ? Icons.save
-                                    : Icons.save_as,
-                                color: theme.colorScheme.secondary,
-                                size: iconSize,
-                              ),
-                              tooltip: tab.collectionNodeId != null
-                                  ? 'Update Request'
-                                  : 'Save to Collection',
-                              onPressed: widget.onSave,
-                            ),
-                          ),
-                          SizedBox(width: smallGap),
-                          context.appDecoration.wrapInteractive(
-                            child: IconButton(
-                              icon: Icon(
-                                settings.isVerticalLayout
-                                    ? Icons.view_column_rounded
-                                    : Icons.view_agenda_rounded,
-                                color: theme.colorScheme.onSurface,
-                                size: iconSize,
-                              ),
-                              tooltip: settings.isVerticalLayout
-                                  ? 'Horizontal Layout'
-                                  : 'Vertical Layout',
-                              onPressed: () => context.read<SettingsBloc>().add(
-                                UpdateVerticalLayout(
-                                  isVerticalLayout: !settings.isVerticalLayout,
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 300),
+                                  transitionBuilder: (child, animation) =>
+                                      ScaleTransition(
+                                        scale: animation,
+                                        child: FadeTransition(
+                                          opacity: animation,
+                                          child: child,
+                                        ),
+                                      ),
+                                  child: tab.isSending
+                                      ? Row(
+                                          key: const ValueKey('cancel'),
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            SizedBox(
+                                              width: layout.smallIconSize,
+                                              height: layout.smallIconSize,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color:
+                                                    theme.colorScheme.onError,
+                                              ),
+                                            ),
+                                            SizedBox(width: isNarrow ? 4 : 8),
+                                            Text(
+                                              isNarrow ? 'STOP' : 'CANCEL',
+                                              style: TextStyle(
+                                                fontSize: layout.fontSizeTitle,
+                                                fontWeight: context
+                                                    .appTypography
+                                                    .displayWeight,
+                                              ),
+                                            ),
+                                          ],
+                                        )
+                                      : Text(
+                                          'SEND',
+                                          key: const ValueKey('send'),
+                                          style: TextStyle(
+                                            fontSize: layout.fontSizeTitle,
+                                            fontWeight: context
+                                                .appTypography
+                                                .displayWeight,
+                                          ),
+                                        ),
                                 ),
                               ),
+                            )
+                          else
+                            RealtimeButton(
+                              tabId: tab.tabId,
+                              config: tab.config,
+                              isNarrow: isNarrow,
+                              activeVars: _activeVariables(context),
                             ),
-                          ),
+                          if (isNarrow) ...[
+                            SizedBox(width: smallGap),
+                            UrlOverflowMenu(
+                              iconSize: iconSize,
+                              isSaved: tab.collectionNodeId != null,
+                              isVerticalLayout: settings.isVerticalLayout,
+                              onGenerateCode: () =>
+                                  CodeExportDialog.show(context, tab.config),
+                              onSave: widget.onSave,
+                              onToggleLayout: () =>
+                                  context.read<SettingsBloc>().add(
+                                    UpdateVerticalLayout(
+                                      isVerticalLayout:
+                                          !settings.isVerticalLayout,
+                                    ),
+                                  ),
+                            ),
+                          ] else ...[
+                            SizedBox(width: gap),
+                            context.appDecoration.wrapInteractive(
+                              child: IconButton(
+                                key: const ValueKey('save_request_button'),
+                                icon: Icon(
+                                  tab.collectionNodeId != null
+                                      ? Icons.save
+                                      : Icons.save_as,
+                                  color: theme.colorScheme.secondary,
+                                  size: iconSize,
+                                ),
+                                tooltip: tab.collectionNodeId != null
+                                    ? 'Update Request'
+                                    : 'Save to Collection',
+                                onPressed: widget.onSave,
+                              ),
+                            ),
+                            SizedBox(width: smallGap),
+                            context.appDecoration.wrapInteractive(
+                              child: IconButton(
+                                icon: Icon(
+                                  settings.isVerticalLayout
+                                      ? Icons.view_column_rounded
+                                      : Icons.view_agenda_rounded,
+                                  color: theme.colorScheme.onSurface,
+                                  size: iconSize,
+                                ),
+                                tooltip: settings.isVerticalLayout
+                                    ? 'Horizontal Layout'
+                                    : 'Vertical Layout',
+                                onPressed: () =>
+                                    context.read<SettingsBloc>().add(
+                                      UpdateVerticalLayout(
+                                        isVerticalLayout:
+                                            !settings.isVerticalLayout,
+                                      ),
+                                    ),
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               );
             },

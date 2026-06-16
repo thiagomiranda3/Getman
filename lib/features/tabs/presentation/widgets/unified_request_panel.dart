@@ -88,28 +88,32 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel>
             isScrollable: true,
           ),
           Expanded(
-            child: Container(
-              decoration: context.appDecoration.panelBox(context, offset: 0),
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  ParamsTabView(tabId: widget.tabId),
-                  AuthTabView(tabId: widget.tabId),
-                  HeadersTabView(tabId: widget.tabId),
-                  BodyTabView(
-                    tabId: widget.tabId,
-                    controller: widget.bodyController,
-                  ),
-                  RulesTabView(
-                    key: ValueKey('rules_${widget.tabId}'),
-                    tabId: widget.tabId,
-                  ),
-                  ResponseArea(
-                    tabId: widget.tabId,
-                    responseController: widget.responseController,
-                    showMetadata: false,
-                  ),
-                ],
+            child: context.appDecoration.frost(
+              context,
+              borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+              child: Container(
+                decoration: context.appDecoration.panelBox(context, offset: 0),
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    ParamsTabView(tabId: widget.tabId),
+                    AuthTabView(tabId: widget.tabId),
+                    HeadersTabView(tabId: widget.tabId),
+                    BodyTabView(
+                      tabId: widget.tabId,
+                      controller: widget.bodyController,
+                    ),
+                    RulesTabView(
+                      key: ValueKey('rules_${widget.tabId}'),
+                      tabId: widget.tabId,
+                    ),
+                    ResponseArea(
+                      tabId: widget.tabId,
+                      responseController: widget.responseController,
+                      showMetadata: false,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

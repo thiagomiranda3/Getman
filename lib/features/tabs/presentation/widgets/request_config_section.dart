@@ -32,16 +32,20 @@ class RequestConfigSection extends StatelessWidget {
             tabKeyPrefix: 'reqtab',
           ),
           Expanded(
-            child: Container(
-              decoration: context.appDecoration.panelBox(context, offset: 0),
-              child: TabBarView(
-                children: [
-                  ParamsTabView(tabId: tabId),
-                  AuthTabView(tabId: tabId),
-                  HeadersTabView(tabId: tabId),
-                  BodyTabView(tabId: tabId, controller: bodyController),
-                  RulesTabView(key: ValueKey('rules_$tabId'), tabId: tabId),
-                ],
+            child: context.appDecoration.frost(
+              context,
+              borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+              child: Container(
+                decoration: context.appDecoration.panelBox(context, offset: 0),
+                child: TabBarView(
+                  children: [
+                    ParamsTabView(tabId: tabId),
+                    AuthTabView(tabId: tabId),
+                    HeadersTabView(tabId: tabId),
+                    BodyTabView(tabId: tabId, controller: bodyController),
+                    RulesTabView(key: ValueKey('rules_$tabId'), tabId: tabId),
+                  ],
+                ),
               ),
             ),
           ),

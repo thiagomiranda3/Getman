@@ -369,38 +369,42 @@ class _TabTooltipCard extends StatelessWidget {
 
     return Material(
       type: MaterialType.transparency,
-      child: Container(
-        key: ValueKey('tab_tooltip_${tab.tabId}'),
-        constraints: const BoxConstraints(maxWidth: _tabTooltipMaxWidth),
-        padding: EdgeInsets.all(layout.isCompact ? 8 : 12),
-        decoration: context.appDecoration.panelBox(context),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              tab.displayTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: layout.fontSizeNormal,
-                fontWeight: typography.titleWeight,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-            if (url.isNotEmpty) ...[
-              SizedBox(height: layout.tabSpacing),
+      child: context.appDecoration.frost(
+        context,
+        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+        child: Container(
+          key: ValueKey('tab_tooltip_${tab.tabId}'),
+          constraints: const BoxConstraints(maxWidth: _tabTooltipMaxWidth),
+          padding: EdgeInsets.all(layout.isCompact ? 8 : 12),
+          decoration: context.appDecoration.panelBox(context),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                url,
-                maxLines: 2,
+                tab.displayTitle,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: layout.fontSizeSmall,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  fontSize: layout.fontSizeNormal,
+                  fontWeight: typography.titleWeight,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
+              if (url.isNotEmpty) ...[
+                SizedBox(height: layout.tabSpacing),
+                Text(
+                  url,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: layout.fontSizeSmall,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

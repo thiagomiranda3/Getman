@@ -22,7 +22,7 @@ class NodeActionSheet {
     final collectionsBloc = context.read<CollectionsBloc>();
     return showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Colors.transparent,
       useSafeArea: true,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
@@ -31,7 +31,16 @@ class NodeActionSheet {
       ),
       builder: (sheetContext) => BlocProvider.value(
         value: collectionsBloc,
-        child: _SheetBody(node: node),
+        child: sheetContext.appDecoration.frost(
+          sheetContext,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(sheetContext.appShape.sheetRadius),
+          ),
+          child: ColoredBox(
+            color: Theme.of(sheetContext).scaffoldBackgroundColor,
+            child: _SheetBody(node: node),
+          ),
+        ),
       ),
     );
   }
@@ -251,7 +260,7 @@ class _MoveToSheet {
     final folders = _flattenFolders(bloc.state.collections, exclude: source.id);
     return showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Colors.transparent,
       useSafeArea: true,
       isScrollControlled: true,
       shape: RoundedRectangleBorder(
@@ -264,62 +273,71 @@ class _MoveToSheet {
         final layout = sheetContext.appLayout;
         return FractionallySizedBox(
           heightFactor: 0.6,
-          child: SafeArea(
-            top: false,
-            child: Column(
-              children: [
-                Padding(
-                  padding: EdgeInsets.all(layout.inputPadding),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'MOVE "${source.name}" TO...',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: layout.fontSizeSubtitle,
-                            fontWeight: context.appTypography.displayWeight,
+          child: sheetContext.appDecoration.frost(
+            sheetContext,
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(sheetContext.appShape.sheetRadius),
+            ),
+            child: ColoredBox(
+              color: theme.scaffoldBackgroundColor,
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.all(layout.inputPadding),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'MOVE "${source.name}" TO...',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: layout.fontSizeSubtitle,
+                                fontWeight: context.appTypography.displayWeight,
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                Divider(
-                  color: theme.dividerColor,
-                  height: 0,
-                  thickness: layout.borderThick,
-                ),
-                Expanded(
-                  // Lazy build: a deep collection can flatten to many folders,
-                  // and only the visible window needs constructing.
-                  child: ListView.builder(
-                    itemCount: folders.length + 1,
-                    itemBuilder: (context, index) {
-                      if (index == 0) {
-                        return _Action(
-                          icon: Icons.home_outlined,
-                          label: 'ROOT (TOP LEVEL)',
-                          onTap: () {
-                            bloc.add(MoveNode(source.id, null));
-                            Navigator.of(sheetContext).pop();
-                          },
-                        );
-                      }
-                      final f = folders[index - 1];
-                      return _Action(
-                        icon: Icons.folder,
-                        label: '${'  ' * f.depth}${f.node.name}',
-                        onTap: () {
-                          bloc.add(MoveNode(source.id, f.node.id));
-                          Navigator.of(sheetContext).pop();
+                    ),
+                    Divider(
+                      color: theme.dividerColor,
+                      height: 0,
+                      thickness: layout.borderThick,
+                    ),
+                    Expanded(
+                      // Lazy build: a deep collection can flatten to many
+                      // folders; only the visible window needs constructing.
+                      child: ListView.builder(
+                        itemCount: folders.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == 0) {
+                            return _Action(
+                              icon: Icons.home_outlined,
+                              label: 'ROOT (TOP LEVEL)',
+                              onTap: () {
+                                bloc.add(MoveNode(source.id, null));
+                                Navigator.of(sheetContext).pop();
+                              },
+                            );
+                          }
+                          final f = folders[index - 1];
+                          return _Action(
+                            icon: Icons.folder,
+                            label: '${'  ' * f.depth}${f.node.name}',
+                            onTap: () {
+                              bloc.add(MoveNode(source.id, f.node.id));
+                              Navigator.of(sheetContext).pop();
+                            },
+                          );
                         },
-                      );
-                    },
-                  ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         );

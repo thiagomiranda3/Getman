@@ -66,18 +66,26 @@ class _VariableHoverPopoverState extends State<VariableHoverPopover> {
 
     return Material(
       type: MaterialType.transparency,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 320),
-        padding: EdgeInsets.all(layout.isCompact ? 8 : 12),
-        decoration: context.appDecoration.panelBox(context),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('{{${data.name}}}', style: nameStyle),
-            SizedBox(height: layout.tabSpacing),
-            ..._body(context, valueStyle: valueStyle, sourceStyle: sourceStyle),
-          ],
+      child: context.appDecoration.frost(
+        context,
+        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 320),
+          padding: EdgeInsets.all(layout.isCompact ? 8 : 12),
+          decoration: context.appDecoration.panelBox(context),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('{{${data.name}}}', style: nameStyle),
+              SizedBox(height: layout.tabSpacing),
+              ..._body(
+                context,
+                valueStyle: valueStyle,
+                sourceStyle: sourceStyle,
+              ),
+            ],
+          ),
         ),
       ),
     );

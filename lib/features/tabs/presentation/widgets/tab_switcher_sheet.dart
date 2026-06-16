@@ -52,72 +52,80 @@ class TabSwitcherSheet extends StatelessWidget {
 
         return FractionallySizedBox(
           heightFactor: 0.85,
-          child: Container(
-            decoration: BoxDecoration(
-              color: theme.scaffoldBackgroundColor,
-              border: Border(
-                top: BorderSide(
-                  color: theme.dividerColor,
-                  width: layout.borderThick,
+          child: context.appDecoration.frost(
+            context,
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(context.appShape.sheetRadius),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: theme.scaffoldBackgroundColor,
+                border: Border(
+                  top: BorderSide(
+                    color: theme.dividerColor,
+                    width: layout.borderThick,
+                  ),
                 ),
               ),
-            ),
-            child: Column(
-              children: [
-                _Header(count: tabs.length),
-                Expanded(
-                  child: tabs.isEmpty
-                      ? Center(
-                          child: Text(
-                            'NO OPEN TABS',
-                            style: TextStyle(
-                              fontSize: layout.fontSizeSubtitle,
-                              fontWeight: context.appTypography.displayWeight,
-                              color: theme.dividerColor.withValues(alpha: 0.5),
+              child: Column(
+                children: [
+                  _Header(count: tabs.length),
+                  Expanded(
+                    child: tabs.isEmpty
+                        ? Center(
+                            child: Text(
+                              'NO OPEN TABS',
+                              style: TextStyle(
+                                fontSize: layout.fontSizeSubtitle,
+                                fontWeight: context.appTypography.displayWeight,
+                                color: theme.dividerColor.withValues(
+                                  alpha: 0.5,
+                                ),
+                              ),
                             ),
+                          )
+                        : ReorderableListView.builder(
+                            padding: EdgeInsets.all(layout.pagePadding / 2),
+                            itemCount: tabs.length,
+                            buildDefaultDragHandles: false,
+                            onReorder: (oldIndex, newIndex) => context
+                                .read<TabsBloc>()
+                                .add(ReorderTabs(oldIndex, newIndex)),
+                            itemBuilder: (_, index) {
+                              final tab = tabs[index];
+                              return _TabRow(
+                                key: ValueKey('switcher_${tab.tabId}'),
+                                tab: tab,
+                                index: index,
+                                isActive: index == activeIndex,
+                                onTap: () {
+                                  context.read<TabsBloc>().add(
+                                    SetActiveIndex(index),
+                                  );
+                                  Navigator.of(context).pop();
+                                },
+                                onClose: () async {
+                                  final confirmed = await onRequestClose(
+                                    tab.tabId,
+                                  );
+                                  if (!confirmed || !context.mounted) return;
+                                  context.read<TabsBloc>().add(
+                                    RemoveTab(tab.tabId),
+                                  );
+                                },
+                              );
+                            },
                           ),
-                        )
-                      : ReorderableListView.builder(
-                          padding: EdgeInsets.all(layout.pagePadding / 2),
-                          itemCount: tabs.length,
-                          buildDefaultDragHandles: false,
-                          onReorder: (oldIndex, newIndex) => context
-                              .read<TabsBloc>()
-                              .add(ReorderTabs(oldIndex, newIndex)),
-                          itemBuilder: (_, index) {
-                            final tab = tabs[index];
-                            return _TabRow(
-                              key: ValueKey('switcher_${tab.tabId}'),
-                              tab: tab,
-                              index: index,
-                              isActive: index == activeIndex,
-                              onTap: () {
-                                context.read<TabsBloc>().add(
-                                  SetActiveIndex(index),
-                                );
-                                Navigator.of(context).pop();
-                              },
-                              onClose: () async {
-                                final confirmed = await onRequestClose(
-                                  tab.tabId,
-                                );
-                                if (!confirmed || !context.mounted) return;
-                                context.read<TabsBloc>().add(
-                                  RemoveTab(tab.tabId),
-                                );
-                              },
-                            );
-                          },
-                        ),
-                ),
-                _Footer(
-                  onNewTab: () {
-                    context.read<TabsBloc>().add(const AddTab());
-                    Navigator.of(context).pop();
-                  },
-                  onDismiss: () => Navigator.of(context).pop(),
-                ),
-              ],
+                  ),
+                  _Footer(
+                    onNewTab: () {
+                      context.read<TabsBloc>().add(const AddTab());
+                      Navigator.of(context).pop();
+                    },
+                    onDismiss: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
             ),
           ),
         );
