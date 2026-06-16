@@ -6,8 +6,10 @@ import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
+import 'package:getman/core/ui/widgets/bulk_kv_editor.dart';
 import 'package:getman/core/ui/widgets/key_value_list_editor.dart';
 import 'package:getman/core/ui/widgets/variable_hover_popover.dart';
+import 'package:getman/core/utils/bulk_kv_codec.dart';
 import 'package:getman/core/utils/equality.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/core/utils/path_utils.dart';
@@ -68,17 +70,81 @@ class _VariableContextBuilder extends StatelessWidget {
   }
 }
 
+/// Small header above the params/headers editor body offering the row⇄bulk
+/// toggle. [bulk] is the current mode; [onToggle] flips it. The icon/label
+/// describe the action the tap performs (Postman convention).
+class _BulkModeToggle extends StatelessWidget {
+  const _BulkModeToggle({required this.bulk, required this.onToggle});
+
+  final bool bulk;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final layout = context.appLayout;
+    final typography = context.appTypography;
+    final theme = Theme.of(context);
+    // In bulk mode the action returns to rows; in row mode it goes to bulk.
+    final label = bulk ? 'Edit as rows' : 'Bulk edit';
+    final icon = bulk ? Icons.view_list_outlined : Icons.notes_outlined;
+
+    return Align(
+      alignment: Alignment.centerRight,
+      child: context.appDecoration.wrapInteractive(
+        onTap: onToggle,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: layout.badgePaddingHorizontal,
+            vertical: layout.badgePaddingVertical,
+          ),
+          child: Tooltip(
+            message: label,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: layout.smallIconSize,
+                  color: theme.colorScheme.secondary,
+                ),
+                SizedBox(width: layout.tabSpacing),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: layout.fontSizeSmall,
+                    fontWeight: typography.titleWeight,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 const ListEquality<QueryParamEntity> _queryParamListEquality =
     ListEquality<QueryParamEntity>();
 
 /// Ordered query-param editor. Duplicate keys allowed, order preserved —
 /// the URL is the single source of truth, so edits round-trip through it.
-class ParamsTabView extends StatelessWidget {
+class ParamsTabView extends StatefulWidget {
   const ParamsTabView({required this.tabId, super.key});
   final String tabId;
 
   @override
+  State<ParamsTabView> createState() => _ParamsTabViewState();
+}
+
+class _ParamsTabViewState extends State<ParamsTabView> {
+  // Ephemeral view preference (D7): not persisted, resets to row on reload.
+  bool _bulk = false;
+
+  @override
   Widget build(BuildContext context) {
+    final tabId = widget.tabId;
     return BlocBuilder<TabsBloc, TabsState>(
       buildWhen: (prev, next) {
         // URL carries the query — a single equality check captures any params
@@ -89,32 +155,56 @@ class ParamsTabView extends StatelessWidget {
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
         if (tab == null) return const SizedBox.shrink();
-        return _VariableContextBuilder(
-          builder: (context, varContext) =>
-              KeyValueListEditor<List<QueryParamEntity>>(
-                items: tab.config.params,
-                variableContext: varContext,
-                fieldPrefix: 'param',
-                decode: (params) => [for (final p in params) (p.key, p.value)],
-                encode: (rows) => [
-                  for (final (key, value) in rows)
-                    if (key.isNotEmpty)
-                      QueryParamEntity(key: key, value: value),
-                ],
-                equals: _queryParamListEquality.equals,
-                onChanged: (list) {
-                  final bloc = context.read<TabsBloc>();
-                  final current = bloc.state.tabs.byId(tabId);
-                  if (current == null) return;
-                  bloc.add(
-                    UpdateTab(
-                      current.copyWith(
-                        config: current.config.copyWith(params: list),
+
+        List<QueryParamEntity> encode(List<(String, String)> rows) => [
+          for (final (key, value) in rows)
+            if (key.isNotEmpty) QueryParamEntity(key: key, value: value),
+        ];
+        List<(String, String)> decode(List<QueryParamEntity> params) => [
+          for (final p in params) (p.key, p.value),
+        ];
+        void emit(List<QueryParamEntity> list) {
+          final bloc = context.read<TabsBloc>();
+          final current = bloc.state.tabs.byId(tabId);
+          if (current == null) return;
+          bloc.add(
+            UpdateTab(
+              current.copyWith(config: current.config.copyWith(params: list)),
+            ),
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _BulkModeToggle(
+              bulk: _bulk,
+              onToggle: () => setState(() => _bulk = !_bulk),
+            ),
+            Expanded(
+              child: _bulk
+                  ? BulkKvEditor(
+                      fieldPrefix: 'param',
+                      initialText: BulkKvCodec.serialize(
+                        decode(tab.config.params),
                       ),
+                      onChanged: (text) =>
+                          emit(encode(BulkKvCodec.parse(text))),
+                    )
+                  : _VariableContextBuilder(
+                      builder: (context, varContext) =>
+                          KeyValueListEditor<List<QueryParamEntity>>(
+                            items: tab.config.params,
+                            variableContext: varContext,
+                            fieldPrefix: 'param',
+                            decode: decode,
+                            encode: encode,
+                            equals: _queryParamListEquality.equals,
+                            onChanged: emit,
+                          ),
                     ),
-                  );
-                },
-              ),
+            ),
+          ],
         );
       },
     );
@@ -123,12 +213,21 @@ class ParamsTabView extends StatelessWidget {
 
 /// Header editor keyed as `Map<String, String>` — duplicates are not a real
 /// concern for headers in this UI; last-write-wins is fine.
-class HeadersTabView extends StatelessWidget {
+class HeadersTabView extends StatefulWidget {
   const HeadersTabView({required this.tabId, super.key});
   final String tabId;
 
   @override
+  State<HeadersTabView> createState() => _HeadersTabViewState();
+}
+
+class _HeadersTabViewState extends State<HeadersTabView> {
+  // Ephemeral view preference (D7): not persisted, resets to row on reload.
+  bool _bulk = false;
+
+  @override
   Widget build(BuildContext context) {
+    final tabId = widget.tabId;
     return BlocBuilder<TabsBloc, TabsState>(
       buildWhen: (prev, next) => !stringMapEquality.equals(
         prev.tabs.byId(tabId)?.config.headers,
@@ -137,33 +236,56 @@ class HeadersTabView extends StatelessWidget {
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
         if (tab == null) return const SizedBox.shrink();
-        return _VariableContextBuilder(
-          builder: (context, varContext) =>
-              KeyValueListEditor<Map<String, String>>(
-                items: tab.config.headers,
-                variableContext: varContext,
-                fieldPrefix: 'header',
-                decode: (headers) => [
-                  for (final e in headers.entries) (e.key, e.value),
-                ],
-                encode: (rows) => {
-                  for (final (key, value) in rows)
-                    if (key.isNotEmpty) key: value,
-                },
-                equals: stringMapEquality.equals,
-                onChanged: (map) {
-                  final bloc = context.read<TabsBloc>();
-                  final current = bloc.state.tabs.byId(tabId);
-                  if (current == null) return;
-                  bloc.add(
-                    UpdateTab(
-                      current.copyWith(
-                        config: current.config.copyWith(headers: map),
+
+        Map<String, String> encode(List<(String, String)> rows) => {
+          for (final (key, value) in rows)
+            if (key.isNotEmpty) key: value,
+        };
+        List<(String, String)> decode(Map<String, String> headers) => [
+          for (final e in headers.entries) (e.key, e.value),
+        ];
+        void emit(Map<String, String> map) {
+          final bloc = context.read<TabsBloc>();
+          final current = bloc.state.tabs.byId(tabId);
+          if (current == null) return;
+          bloc.add(
+            UpdateTab(
+              current.copyWith(config: current.config.copyWith(headers: map)),
+            ),
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _BulkModeToggle(
+              bulk: _bulk,
+              onToggle: () => setState(() => _bulk = !_bulk),
+            ),
+            Expanded(
+              child: _bulk
+                  ? BulkKvEditor(
+                      fieldPrefix: 'header',
+                      initialText: BulkKvCodec.serialize(
+                        decode(tab.config.headers),
                       ),
+                      onChanged: (text) =>
+                          emit(encode(BulkKvCodec.parse(text))),
+                    )
+                  : _VariableContextBuilder(
+                      builder: (context, varContext) =>
+                          KeyValueListEditor<Map<String, String>>(
+                            items: tab.config.headers,
+                            variableContext: varContext,
+                            fieldPrefix: 'header',
+                            decode: decode,
+                            encode: encode,
+                            equals: stringMapEquality.equals,
+                            onChanged: emit,
+                          ),
                     ),
-                  );
-                },
-              ),
+            ),
+          ],
         );
       },
     );
