@@ -6,6 +6,7 @@ import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/utils/openapi/normalized_api.dart';
 import 'package:getman/core/utils/openapi/ref_resolver.dart';
 import 'package:getman/core/utils/openapi/schema_sampler.dart';
+import 'package:getman/core/utils/openapi/spec_helpers.dart';
 
 const _httpMethods = [
   'get',
@@ -37,7 +38,7 @@ NormalizedApi normalizeSwaggerV2(Map<String, dynamic> spec) {
       : [NormalizedServer(url: '$scheme://$host$basePath')];
 
   final schemes = _securityDefinitions(spec);
-  final globalSecurity = _firstSchemeName(spec['security']);
+  final globalSecurity = firstSecuritySchemeName(spec['security']);
 
   final operations = <NormalizedOperation>[];
   final paths = spec['paths'];
@@ -147,7 +148,7 @@ NormalizedOperation _operation({
 
   NormalizedSecurityScheme? security;
   if (op.containsKey('security')) {
-    final n = _firstSchemeName(op['security']);
+    final n = firstSecuritySchemeName(op['security']);
     security = n == null ? null : schemes[n];
   } else if (globalSecurity != null) {
     security = schemes[globalSecurity];
@@ -211,12 +212,4 @@ String _paramValue(Map<String, dynamic> param) {
     return enumValues.first.toString();
   }
   return '';
-}
-
-String? _firstSchemeName(Object? security) {
-  if (security is List && security.isNotEmpty) {
-    final first = security.first;
-    if (first is Map && first.isNotEmpty) return first.keys.first.toString();
-  }
-  return null;
 }

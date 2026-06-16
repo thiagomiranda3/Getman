@@ -6,6 +6,7 @@ import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/utils/openapi/normalized_api.dart';
 import 'package:getman/core/utils/openapi/ref_resolver.dart';
 import 'package:getman/core/utils/openapi/schema_sampler.dart';
+import 'package:getman/core/utils/openapi/spec_helpers.dart';
 
 const _httpMethods = [
   'get',
@@ -49,7 +50,7 @@ NormalizedApi normalizeOpenApiV3(Map<String, dynamic> spec) {
   }
 
   final schemes = _securitySchemes(spec, refs);
-  final globalSecurity = _firstSchemeName(spec['security']);
+  final globalSecurity = firstSecuritySchemeName(spec['security']);
 
   final operations = <NormalizedOperation>[];
   final paths = spec['paths'];
@@ -126,7 +127,7 @@ NormalizedOperation _operation({
   // Operation-level security overrides global; [] means "no auth".
   NormalizedSecurityScheme? security;
   if (op.containsKey('security')) {
-    final opSecName = _firstSchemeName(op['security']);
+    final opSecName = firstSecuritySchemeName(op['security']);
     security = opSecName == null ? null : schemes[opSecName];
   } else if (globalSecurity != null) {
     security = schemes[globalSecurity];
@@ -264,13 +265,4 @@ NormalizedSecurityScheme _scheme(Map<String, dynamic> scheme) {
         kind: SecuritySchemeKind.unsupported,
       );
   }
-}
-
-/// `[{schemeName: [...]}, ...]` → first scheme name, or null if empty/absent.
-String? _firstSchemeName(Object? security) {
-  if (security is List && security.isNotEmpty) {
-    final first = security.first;
-    if (first is Map && first.isNotEmpty) return first.keys.first.toString();
-  }
-  return null;
 }
