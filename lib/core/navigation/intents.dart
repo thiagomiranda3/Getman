@@ -24,6 +24,11 @@ class CommandPaletteIntent extends Intent {
   const CommandPaletteIntent();
 }
 
+/// Open the quick environment switcher overlay. Bound to Cmd/Ctrl+E.
+class SwitchEnvironmentIntent extends Intent {
+  const SwitchEnvironmentIntent();
+}
+
 /// Activate the next tab (wraps around). Bound to Ctrl+Tab.
 class NextTabIntent extends Intent {
   const NextTabIntent();

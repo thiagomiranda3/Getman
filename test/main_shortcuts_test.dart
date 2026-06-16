@@ -61,5 +61,22 @@ void main() {
         isA<NewTabIntent>(),
       );
     });
+
+    test('Cmd/Ctrl+E map to SwitchEnvironmentIntent', () {
+      expect(
+        appShortcuts[const SingleActivator(
+          LogicalKeyboardKey.keyE,
+          meta: true,
+        )],
+        isA<SwitchEnvironmentIntent>(),
+      );
+      expect(
+        appShortcuts[const SingleActivator(
+          LogicalKeyboardKey.keyE,
+          control: true,
+        )],
+        isA<SwitchEnvironmentIntent>(),
+      );
+    });
   });
 }

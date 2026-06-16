@@ -116,6 +116,10 @@ final Map<ShortcutActivator, Intent> appShortcuts = {
       const CommandPaletteIntent(),
   const SingleActivator(LogicalKeyboardKey.keyK, meta: true):
       const CommandPaletteIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyE, control: true):
+      const SwitchEnvironmentIntent(),
+  const SingleActivator(LogicalKeyboardKey.keyE, meta: true):
+      const SwitchEnvironmentIntent(),
   const SingleActivator(LogicalKeyboardKey.tab, control: true):
       const NextTabIntent(),
   const SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true):
