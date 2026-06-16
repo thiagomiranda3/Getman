@@ -197,14 +197,20 @@ other four themes:
 - `realtime_panel.dart`
 - `environments_dialog.dart` (panel inside the dialog)
 - `variable_hover_popover.dart` (floating popover)
-- `tab_widget.dart` (per-tab chrome — full-effects only)
-- `collection_node_row.dart` (tree rows — full-effects only)
+- `tab_widget.dart` (the floating tab **tooltip** popover — not the tab chrome,
+  which is styled by `tabShape`)
 - Custom overlay containers: `tab_switcher_sheet.dart`, `node_action_sheet.dart`,
   and the command palette.
 
-Tree rows and tabs are frosted **only when effects are full** — automatic,
-because the glass builder installs `_identityFrost` in reduced mode, so every
-call site stops blurring at once with no per-site branching.
+NOTE (corrected from initial framing): the `panelBox` use in
+`collection_node_row.dart` is the **drag-feedback chip** (solid `primaryColor`,
+transient, one at a time) — frost would be invisible over an opaque fill, so it
+is intentionally left unfrosted. There is no always-visible tree-row/tab
+`panelBox` to worry about; the real tab chrome uses `tabShape` (a `BoxDecoration`,
+not frostable). So all frosted sites are panels/floating overlays — no
+"dozens-on-screen" cost. Frost is still globally gated: the glass builder
+installs `_identityFrost` in reduced mode, so every site stops blurring at once
+with no per-site branching.
 
 Desktop `AlertDialog`s (built by Material via `DialogTheme`) get translucent
 glass styling; where a dialog renders through `ResponsiveDialogScaffold` (a
