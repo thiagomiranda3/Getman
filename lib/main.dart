@@ -20,6 +20,7 @@ import 'package:getman/features/collections/presentation/widgets/workspace_sync_
 import 'package:getman/features/command_palette/presentation/widgets/command_palette.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
+import 'package:getman/features/environments/presentation/widgets/quick_env_switcher.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
@@ -202,6 +203,13 @@ class MyApp extends StatelessWidget {
                           CallbackAction<CommandPaletteIntent>(
                             onInvoke: (intent) {
                               unawaited(CommandPalette.show(context));
+                              return null;
+                            },
+                          ),
+                      SwitchEnvironmentIntent:
+                          CallbackAction<SwitchEnvironmentIntent>(
+                            onInvoke: (intent) {
+                              unawaited(QuickEnvSwitcher.show(context));
                               return null;
                             },
                           ),
