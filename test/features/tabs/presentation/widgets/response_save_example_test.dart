@@ -15,6 +15,9 @@ import 'package:getman/features/collections/domain/repositories/collections_repo
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
+import 'package:getman/features/history/presentation/bloc/history_event.dart';
+import 'package:getman/features/history/presentation/bloc/history_state.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
@@ -36,6 +39,13 @@ class MockSaveSettingsUseCase extends Mock implements SaveSettingsUseCase {}
 class MockCollectionsRepository extends Mock implements CollectionsRepository {}
 
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
+
+// Minimal empty HistoryBloc so the response pane's Compare button finds it in
+// scope; no history -> the only compare target here is the saved example.
+class _FakeHistoryBloc extends Bloc<HistoryEvent, HistoryState>
+    implements HistoryBloc {
+  _FakeHistoryBloc() : super(const HistoryState());
+}
 
 HttpRequestTabEntity _tab({String? collectionNodeId}) => HttpRequestTabEntity(
   tabId: 'tab1',
@@ -124,6 +134,7 @@ void main() {
             providers: [
               BlocProvider.value(value: tabsBloc),
               BlocProvider.value(value: collectionsBloc),
+              BlocProvider<HistoryBloc>(create: (_) => _FakeHistoryBloc()),
               BlocProvider<SettingsBloc>(
                 create: (_) => SettingsBloc(
                   saveSettingsUseCase: settingsSave,

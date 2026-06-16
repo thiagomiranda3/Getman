@@ -14,6 +14,12 @@ import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
+import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
+import 'package:getman/features/history/presentation/bloc/history_event.dart';
+import 'package:getman/features/history/presentation/bloc/history_state.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
@@ -37,6 +43,20 @@ class MockSendRequestUseCase extends Mock implements SendRequestUseCase {}
 class MockSaveSettingsUseCase extends Mock implements SaveSettingsUseCase {}
 
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
+
+// Minimal blocs so the response pane's Compare button (which reads
+// CollectionsBloc/HistoryBloc state in its builder) finds them in scope. Seeded
+// empty -> no compare targets -> the button renders disabled, which is the
+// correct state for these large-response/metadata tests.
+class _FakeCollectionsBloc extends Bloc<CollectionsEvent, CollectionsState>
+    implements CollectionsBloc {
+  _FakeCollectionsBloc() : super(CollectionsState());
+}
+
+class _FakeHistoryBloc extends Bloc<HistoryEvent, HistoryState>
+    implements HistoryBloc {
+  _FakeHistoryBloc() : super(const HistoryState());
+}
 
 /// A [SettingsBloc] backed by a no-op save, seeded with [settings].
 SettingsBloc _settingsBloc(SettingsEntity settings) {
@@ -90,6 +110,10 @@ Future<void> _pump(
           providers: [
             BlocProvider.value(value: bloc),
             BlocProvider<SettingsBloc>(create: (_) => _settingsBloc(settings)),
+            BlocProvider<CollectionsBloc>(
+              create: (_) => _FakeCollectionsBloc(),
+            ),
+            BlocProvider<HistoryBloc>(create: (_) => _FakeHistoryBloc()),
           ],
           child: ResponseSection(
             tabId: tabId,
@@ -454,6 +478,10 @@ void main() {
               BlocProvider<SettingsBloc>(
                 create: (_) => _settingsBloc(const SettingsEntity()),
               ),
+              BlocProvider<CollectionsBloc>(
+                create: (_) => _FakeCollectionsBloc(),
+              ),
+              BlocProvider<HistoryBloc>(create: (_) => _FakeHistoryBloc()),
             ],
             child: ResponseSection(
               tabId: tabId,
