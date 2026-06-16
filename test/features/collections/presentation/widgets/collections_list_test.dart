@@ -91,4 +91,29 @@ void main() {
     // The folder must still be expanded, showing the renamed child.
     expect(find.text('ChildRenamed'), findsOneWidget);
   });
+
+  testWidgets('import button opens a menu with Postman + OpenAPI entries', (
+    tester,
+  ) async {
+    final bloc = build();
+    addTearDown(bloc.close);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: brutalistTheme(Brightness.light),
+        home: Scaffold(
+          body: BlocProvider.value(value: bloc, child: const CollectionsList()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Tap the import affordance (only the menu opens — selecting an item is not
+    // exercised here, so the coordinator's other blocs/services aren't needed).
+    await tester.tap(find.byIcon(Icons.file_upload));
+    await tester.pumpAndSettle();
+
+    expect(find.text('FROM POSTMAN'), findsOneWidget);
+    expect(find.text('FROM OPENAPI / SWAGGER'), findsOneWidget);
+  });
 }
