@@ -72,8 +72,12 @@ class _CommandPaletteState extends State<CommandPalette> {
     super.dispose();
   }
 
+  static String _matchString(_Command c) => c.matchExtra.isEmpty
+      ? '${c.label} ${c.subtitle}'
+      : '${c.label} ${c.subtitle} ${c.matchExtra}';
+
   List<_Command> _resultsFor(String query) =>
-      FuzzyMatcher.filter(query, _all, (c) => '${c.label} ${c.subtitle}');
+      FuzzyMatcher.filter(query, _all, _matchString);
 
   void _onQueryChanged(String v) {
     _debouncer.run(() {
@@ -153,6 +157,7 @@ class _CommandPaletteState extends State<CommandPalette> {
             label: node.name,
             subtitle: path.isEmpty ? 'Request' : path,
             icon: Icons.http,
+            matchExtra: config == null ? '' : '${config.method} ${config.url}',
             run: () => widget.tabsBloc.add(
               AddTab(
                 config: config,
@@ -306,11 +311,18 @@ class _Command {
     required this.subtitle,
     required this.icon,
     required this.run,
+    this.matchExtra = '',
   });
   final String label;
   final String subtitle;
   final IconData icon;
   final VoidCallback run;
+
+  /// Extra text folded into the fuzzy-match string but NOT displayed — lets a
+  /// saved request match by method + URL (and a history entry by method)
+  /// without changing the visible label/subtitle. Default `''` keeps
+  /// environment/theme commands matching on label + subtitle only.
+  final String matchExtra;
 }
 
 class _MoveSelectionIntent extends Intent {

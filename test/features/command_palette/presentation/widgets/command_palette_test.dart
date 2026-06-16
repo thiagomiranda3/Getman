@@ -156,4 +156,55 @@ void main() {
       () => settings.add(any(that: isA<UpdateActiveEnvironmentId>())),
     ).called(1);
   });
+
+  testWidgets('request matches by URL fragment, not just name', (tester) async {
+    // Seed a leaf whose NAME ('Widgets List') does not contain the URL token
+    // 'orders' — only the URL does. Proves the widened match string.
+    when(() => collections.state).thenReturn(
+      CollectionsState(
+        collections: const [
+          CollectionNodeEntity(
+            id: 'r2',
+            name: 'Widgets List',
+            isFolder: false,
+            config: HttpRequestConfigEntity(
+              id: 'c2',
+              url: 'https://api.dev/orders',
+            ),
+          ),
+        ],
+      ),
+    );
+    await pump(tester);
+    await tester.enterText(find.byType(TextField), 'orders');
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pumpAndSettle();
+    // The displayed label is still the node name — the URL only widened the
+    // hidden match text.
+    expect(find.text('Widgets List'), findsOneWidget);
+  });
+
+  testWidgets('request matches by HTTP method', (tester) async {
+    when(() => collections.state).thenReturn(
+      CollectionsState(
+        collections: const [
+          CollectionNodeEntity(
+            id: 'r3',
+            name: 'Remove User',
+            isFolder: false,
+            config: HttpRequestConfigEntity(
+              id: 'c3',
+              method: 'DELETE',
+              url: 'https://api.dev/users/1',
+            ),
+          ),
+        ],
+      ),
+    );
+    await pump(tester);
+    await tester.enterText(find.byType(TextField), 'delete');
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pumpAndSettle();
+    expect(find.text('Remove User'), findsOneWidget);
+  });
 }
