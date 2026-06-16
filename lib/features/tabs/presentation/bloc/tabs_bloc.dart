@@ -9,7 +9,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/error/failures.dart';
-import 'package:getman/core/network/cancel_handle.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/utils/perf_trace.dart';
 import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';
@@ -18,41 +17,10 @@ import 'package:getman/features/chaining/domain/usecases/request_rules_usecases.
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
+import 'package:getman/features/tabs/presentation/bloc/request_manager.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:uuid/uuid.dart';
-
-class _RequestManager {
-  final Map<String, NetworkCancelHandle> _handles = {};
-
-  NetworkCancelHandle start(String tabId) {
-    final handle = NetworkCancelHandle();
-    _handles[tabId] = handle;
-    return handle;
-  }
-
-  void finish(String tabId) => _handles.remove(tabId);
-
-  void cancel(String tabId, {String reason = 'User cancelled request'}) {
-    final handle = _handles[tabId];
-    if (handle != null && !handle.isCancelled) {
-      handle.cancel(reason);
-    }
-  }
-
-  /// Cancel the in-flight request (if any) and drop the handle.
-  void cancelAndFinish(String tabId) {
-    cancel(tabId);
-    finish(tabId);
-  }
-
-  void cancelAll() {
-    for (final handle in _handles.values) {
-      if (!handle.isCancelled) handle.cancel('Bloc closed');
-    }
-    _handles.clear();
-  }
-}
 
 class TabsBloc extends Bloc<TabsEvent, TabsState> {
   TabsBloc({
@@ -82,7 +50,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   /// each send. Nullable so tests can construct the bloc without it.
   final GetRequestRulesUseCase? _getRequestRulesUseCase;
 
-  final _RequestManager _requests = _RequestManager();
+  final RequestManager _requests = RequestManager();
 
   /// Tabs edited since the last flush. The debounce timer persists only these
   /// (via `putTab`), never the whole list — full rewrites serialize every
