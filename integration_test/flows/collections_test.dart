@@ -9,7 +9,7 @@ import '../support/app_harness.dart';
 
 /// Flows for the collections tree: saving the active request as a node,
 /// creating a folder, and deleting a node through its context menu. Tree node
-/// labels render upper-cased.
+/// labels render verbatim (as typed — no upper-casing).
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -21,13 +21,13 @@ void main() {
     await $(const ValueKey('save_request_button')).tap();
     await enterPromptText($, 'Req One');
     await $('SAVE').tap();
-    expect($('REQ ONE'), findsWidgets);
+    expect($('Req One'), findsWidgets);
 
     // Create a top-level folder.
     await $(const ValueKey('new_folder_button')).tap();
     await enterPromptText($, 'Folder One');
     await $('CREATE').tap();
-    expect($('FOLDER ONE'), findsWidgets);
+    expect($('Folder One'), findsWidgets);
   });
 
   patrolWidgetTest('deletes a saved request via its menu', ($) async {
@@ -36,7 +36,7 @@ void main() {
     await $(const ValueKey('save_request_button')).tap();
     await enterPromptText($, 'Temp');
     await $('SAVE').tap();
-    expect($('TEMP'), findsWidgets);
+    expect($('Temp'), findsWidgets);
 
     // Open the (only) node's context menu and delete it (confirm). The node row
     // is the sole `more_vert` source in the tree, so it being gone afterwards

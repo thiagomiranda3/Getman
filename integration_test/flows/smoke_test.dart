@@ -17,6 +17,12 @@ void main() {
     await bootGetman($);
 
     expect($(const ValueKey('tabs')), findsOneWidget);
-    expect($('https://httpbin.org/get'), findsOneWidget);
+    // The seeded URL shows in both the URL field and the tab title (the title
+    // falls back to the URL when the request is unnamed), so scope the match to
+    // the URL field rather than the whole tree.
+    expect(
+      $(const ValueKey('url_field')).$('https://httpbin.org/get'),
+      findsOneWidget,
+    );
   });
 }
