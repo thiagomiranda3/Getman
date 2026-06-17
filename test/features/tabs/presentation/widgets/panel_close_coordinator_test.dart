@@ -446,4 +446,108 @@ void main() {
     expect(find.text('CLOSE PANEL?'), findsNothing);
     verifyNever(() => tabsBloc.add(any(that: isA<RemovePanel>())));
   });
+
+  // (new) unlinked tab: SAVE → CONFIRM name prompt → RemovePanel -----------
+  testWidgets(
+    'dirty + REVIEW & SAVE: unlinked tab, confirm name prompt → '
+    'SaveRequestToCollection + UpdateTab + RemovePanel',
+    (tester) async {
+      // Tab with no collectionNodeId (unlinked)
+      final tab1 = _tab('t1');
+      final p1 = _panel(_panelId, [tab1]);
+      final p2 = _panel(_panel2Id, [_tab('t2')]);
+      when(() => tabsBloc.state).thenReturn(_state(panels: [p1, p2]));
+
+      final dirtyChecker = _FakeDirtyChecker(isDirty: (_) => true);
+
+      await tester.pumpWidget(
+        _host(
+          tester,
+          tabsBloc: tabsBloc,
+          collectionsBloc: collectionsBloc,
+          dirtyChecker: dirtyChecker,
+          panelId: _panelId,
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('close_panel_trigger')));
+      await tester.pumpAndSettle();
+
+      // Summary dialog → REVIEW & SAVE
+      await tester.tap(find.text('REVIEW & SAVE…'));
+      await tester.pumpAndSettle();
+
+      // Per-tab dialog → SAVE
+      await tester.tap(find.text('SAVE'));
+      await tester.pumpAndSettle();
+
+      // Name prompt appears — clear pre-filled text, enter a name, confirm
+      expect(find.byKey(const ValueKey('name_prompt_field')), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('name_prompt_field')),
+        'My New Request',
+      );
+      await tester.tap(find.text('SAVE'));
+      await tester.pumpAndSettle();
+
+      // SaveRequestToCollection and UpdateTab must have been dispatched
+      verify(
+        () => collectionsBloc.add(any(that: isA<SaveRequestToCollection>())),
+      ).called(1);
+      verify(
+        () => tabsBloc.add(any(that: isA<UpdateTab>())),
+      ).called(1);
+
+      // Panel must be closed
+      verify(() => tabsBloc.add(const RemovePanel(_panelId))).called(1);
+    },
+  );
+
+  // (new) unlinked tab: SAVE → CANCEL name prompt → panel stays ------------
+  testWidgets(
+    'dirty + REVIEW & SAVE: unlinked tab, cancel name prompt → '
+    'no SaveRequestToCollection and no RemovePanel',
+    (tester) async {
+      // Tab with no collectionNodeId (unlinked)
+      final tab1 = _tab('t1');
+      final p1 = _panel(_panelId, [tab1]);
+      final p2 = _panel(_panel2Id, [_tab('t2')]);
+      when(() => tabsBloc.state).thenReturn(_state(panels: [p1, p2]));
+
+      final dirtyChecker = _FakeDirtyChecker(isDirty: (_) => true);
+
+      await tester.pumpWidget(
+        _host(
+          tester,
+          tabsBloc: tabsBloc,
+          collectionsBloc: collectionsBloc,
+          dirtyChecker: dirtyChecker,
+          panelId: _panelId,
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('close_panel_trigger')));
+      await tester.pumpAndSettle();
+
+      // Summary dialog → REVIEW & SAVE
+      await tester.tap(find.text('REVIEW & SAVE…'));
+      await tester.pumpAndSettle();
+
+      // Per-tab dialog → SAVE
+      await tester.tap(find.text('SAVE'));
+      await tester.pumpAndSettle();
+
+      // Name prompt appears — CANCEL it
+      expect(find.byKey(const ValueKey('name_prompt_field')), findsOneWidget);
+      await tester.tap(find.text('CANCEL'));
+      await tester.pumpAndSettle();
+
+      // No save dispatched to collectionsBloc
+      verifyNever(
+        () => collectionsBloc.add(any(that: isA<SaveRequestToCollection>())),
+      );
+      // Panel must NOT be closed
+      verifyNever(() => tabsBloc.add(const RemovePanel(_panelId)));
+    },
+  );
 }

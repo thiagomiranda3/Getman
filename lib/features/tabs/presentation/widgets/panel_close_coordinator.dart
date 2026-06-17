@@ -49,7 +49,7 @@ Future<void> closePanelWithSavePrompt(
       title: 'CLOSE PANEL?',
       message: 'Close "${panel.name}" and its ${panel.tabs.length} tabs?',
       confirmLabel: 'CLOSE',
-      onConfirm: () => context.read<TabsBloc>().add(RemovePanel(panelId)),
+      onConfirm: () => tabsBloc.add(RemovePanel(panelId)),
     );
     return;
   }
@@ -100,7 +100,7 @@ Future<void> closePanelWithSavePrompt(
       return; // no-op
 
     case _SummaryAction.discardAll:
-      context.read<TabsBloc>().add(RemovePanel(panelId));
+      tabsBloc.add(RemovePanel(panelId));
       return;
 
     case _SummaryAction.review:
@@ -153,8 +153,13 @@ Future<void> closePanelWithSavePrompt(
         continue; // skip this tab, move on
 
       case _PerTabAction.save:
-        await _saveTab(context, tab, collectionsBloc: collectionsBloc);
+        final saved = await _saveTab(
+          context,
+          tab,
+          collectionsBloc: collectionsBloc,
+        );
         if (!context.mounted) return;
+        if (!saved) return; // name prompt cancelled → abort close
     }
   }
 
@@ -166,7 +171,11 @@ Future<void> closePanelWithSavePrompt(
 /// Saves [tab] to its linked collection node (if it has one) or prompts the
 /// user for a name. Mirrors `_handleSave` / `_showSaveDialog` in
 /// `request_view.dart` exactly.
-Future<void> _saveTab(
+///
+/// Returns `true` if the save actually happened, or `false` if the user
+/// cancelled the name prompt on an unlinked tab (so the caller can abort the
+/// panel-close without discarding unsaved work).
+Future<bool> _saveTab(
   BuildContext context,
   HttpRequestTabEntity tab, {
   required CollectionsBloc collectionsBloc,
@@ -181,7 +190,7 @@ Future<void> _saveTab(
     );
     if (savedNode != null) {
       collectionsBloc.add(UpdateNodeRequest(nodeId, tab.config.copyWith()));
-      return;
+      return true;
     }
     // Node was deleted while the tab was open — drop the stale link.
     tabsBloc.add(
@@ -190,13 +199,15 @@ Future<void> _saveTab(
   }
 
   // Unlinked tab (or stale link cleared above) → prompt for a name.
-  if (!context.mounted) return;
+  if (!context.mounted) return false;
+  var saved = false;
   await NamePromptDialog.show(
     context,
     title: 'SAVE TO COLLECTION',
     initialText: 'NEW REQUEST',
     hintText: 'REQUEST NAME',
     onConfirm: (name) {
+      saved = true;
       final newNodeId = const Uuid().v4();
       collectionsBloc.add(
         SaveRequestToCollection(name, tab.config.copyWith(), id: newNodeId),
@@ -208,6 +219,7 @@ Future<void> _saveTab(
       );
     },
   );
+  return saved;
 }
 
 enum _SummaryAction { discardAll, review, cancel }
