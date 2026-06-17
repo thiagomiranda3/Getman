@@ -314,11 +314,23 @@ void main() {
         const UpdateNodeVariables('f1', {'base': 'x'}, {'base'}),
       ),
       expect: () => [
-        isA<CollectionsState>().having(
-          (s) => CollectionsTreeHelper.findNode(s.collections, 'f1')!.variables,
-          'variables',
-          {'base': 'x'},
-        ),
+        isA<CollectionsState>()
+            .having(
+              (s) => CollectionsTreeHelper.findNode(
+                s.collections,
+                'f1',
+              )!.variables,
+              'variables',
+              {'base': 'x'},
+            )
+            .having(
+              (s) => CollectionsTreeHelper.findNode(
+                s.collections,
+                'f1',
+              )!.secretKeys,
+              'secretKeys',
+              {'base'},
+            ),
       ],
     );
 

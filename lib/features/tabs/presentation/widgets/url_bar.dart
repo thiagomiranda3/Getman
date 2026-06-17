@@ -13,6 +13,7 @@ import 'package:getman/core/utils/request_variable_resolver.dart';
 import 'package:getman/core/utils/variable_resolution_helper.dart';
 import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
 import 'package:getman/features/environments/domain/logic/active_environment_helper.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
@@ -150,6 +151,10 @@ class _UrlBarState extends State<UrlBar> {
         BlocListener<SettingsBloc, SettingsState>(
           listenWhen: (p, n) =>
               p.settings.activeEnvironmentId != n.settings.activeEnvironmentId,
+          listener: (ctx, _) => _syncHighlight(ctx),
+        ),
+        BlocListener<CollectionsBloc, CollectionsState>(
+          listenWhen: (p, n) => p.collections != n.collections,
           listener: (ctx, _) => _syncHighlight(ctx),
         ),
       ],

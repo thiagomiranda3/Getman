@@ -62,7 +62,7 @@ class WorkspaceCollectionSerializer {
           e.key: folder.secretKeys.contains(e.key) ? '' : e.value,
       };
       if (folder.secretKeys.isNotEmpty) {
-        json['secretKeys'] = folder.secretKeys.toList();
+        json['secretKeys'] = folder.secretKeys.toList()..sort();
       }
     }
     return json;
