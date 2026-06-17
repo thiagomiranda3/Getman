@@ -1,4 +1,3 @@
-// lib/core/ui/widgets/variable_autocomplete.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:getman/core/theme/app_theme.dart';
