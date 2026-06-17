@@ -317,6 +317,14 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
             ),
           ),
           PopupMenuItem(
+            onTap: () => tabsBloc.add(CloseTabsToTheLeft(tab.tabId)),
+            child: _buildMenuItem(
+              context,
+              Icons.keyboard_double_arrow_left,
+              'CLOSE TO THE LEFT',
+            ),
+          ),
+          PopupMenuItem(
             onTap: () => tabsBloc.add(CloseTabsToTheRight(tab.tabId)),
             child: _buildMenuItem(
               context,

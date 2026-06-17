@@ -39,6 +39,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     on<UpdateTab>(_onUpdateTab);
     on<CloseOtherTabs>(_onCloseOtherTabs);
     on<CloseTabsToTheRight>(_onCloseTabsToTheRight);
+    on<CloseTabsToTheLeft>(_onCloseTabsToTheLeft);
     on<DuplicateTab>(_onDuplicateTab);
     on<SendRequest>(_onSendRequest);
     on<CancelRequest>(_onCancelRequest);
@@ -290,6 +291,31 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     if (newActiveIndex > index) {
       newActiveIndex = index;
     }
+    emit(
+      state.copyWith(
+        tabs: newTabs,
+        activeIndex: newActiveIndex,
+      ),
+    );
+    _dirtyTabIds.removeAll(removedIds);
+    await _guardWrite(() => _repository.deleteTabs(removedIds));
+    await _persistOrder();
+  }
+
+  Future<void> _onCloseTabsToTheLeft(
+    CloseTabsToTheLeft event,
+    Emitter<TabsState> emit,
+  ) async {
+    final index = state.tabs.indexWhere((t) => t.tabId == event.tabId);
+    if (index <= 0) return;
+    final newTabs = state.tabs.sublist(index);
+    final removedIds = state.tabs
+        .sublist(0, index)
+        .map((t) => t.tabId)
+        .toList(growable: false);
+    // Every kept tab shifts left by `index` positions, so move the active
+    // index by the same amount; clamp to 0 if it pointed at a removed tab.
+    final newActiveIndex = (state.activeIndex - index).clamp(0, newTabs.length);
     emit(
       state.copyWith(
         tabs: newTabs,

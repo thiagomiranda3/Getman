@@ -186,6 +186,20 @@ void main() {
     );
 
     test(
+      'CloseTabsToTheLeft deletes the removed tabs and rewrites the order',
+      () async {
+        await loadWith([tab('a'), tab('b'), tab('c')]);
+        bloc.add(const CloseTabsToTheLeft('c'));
+        await pumpEventQueue();
+
+        verify(() => repository.deleteTabs(['a', 'b'])).called(1);
+        verify(() => repository.saveTabOrder(['c'])).called(1);
+        verifyNever(() => repository.putTab(any()));
+        verifyNever(() => repository.saveTabs(any()));
+      },
+    );
+
+    test(
       'UpdateTab marks the tab dirty and the flush persists only that tab',
       () async {
         await loadWith([tab('a'), tab('b')]);
@@ -308,6 +322,63 @@ void main() {
 
         expect(bloc.state.tabs.map((t) => t.tabId), ['a']);
         expect(bloc.state.activeIndex, 0);
+      },
+    );
+
+    test(
+      'CloseTabsToTheLeft keeps the addressed tab and everything right of it',
+      () async {
+        await loadWith([tab('a'), tab('b'), tab('c'), tab('d')]);
+        // Active sits on the addressed tab; it must stay selected after the
+        // left tabs collapse onto index 0.
+        bloc.add(const SetActiveIndex(2));
+        await Future<void>.delayed(Duration.zero);
+
+        bloc.add(const CloseTabsToTheLeft('c'));
+        await Future<void>.delayed(Duration.zero);
+
+        expect(bloc.state.tabs.map((t) => t.tabId), ['c', 'd']);
+        expect(bloc.state.activeIndex, 0);
+      },
+    );
+
+    test('CloseTabsToTheLeft on the first tab is a no-op', () async {
+      await loadWith([tab('a'), tab('b'), tab('c')]);
+      bloc.add(const SetActiveIndex(2));
+      await Future<void>.delayed(Duration.zero);
+
+      bloc.add(const CloseTabsToTheLeft('a'));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(bloc.state.tabs.map((t) => t.tabId), ['a', 'b', 'c']);
+      expect(bloc.state.activeIndex, 2);
+      verifyNever(() => repository.deleteTabs(any()));
+    });
+
+    test('CloseTabsToTheLeft for an unknown id is a no-op', () async {
+      await loadWith([tab('a'), tab('b')]);
+      bloc.add(const CloseTabsToTheLeft('ghost'));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(bloc.state.tabs.map((t) => t.tabId), ['a', 'b']);
+      verifyNever(() => repository.deleteTabs(any()));
+    });
+
+    test(
+      'CloseTabsToTheLeft shifts activeIndex left when it was on a kept '
+      'right-side tab',
+      () async {
+        await loadWith([tab('a'), tab('b'), tab('c'), tab('d')]);
+        // Active is on 'd' (index 3), to the right of the addressed 'c'.
+        bloc.add(const SetActiveIndex(3));
+        await Future<void>.delayed(Duration.zero);
+
+        bloc.add(const CloseTabsToTheLeft('c'));
+        await Future<void>.delayed(Duration.zero);
+
+        // Two left tabs removed → 'd' moves from index 3 to index 1.
+        expect(bloc.state.tabs.map((t) => t.tabId), ['c', 'd']);
+        expect(bloc.state.activeIndex, 1);
       },
     );
 

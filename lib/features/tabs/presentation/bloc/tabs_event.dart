@@ -79,6 +79,13 @@ class CloseTabsToTheRight extends TabsEvent {
   List<Object?> get props => [tabId];
 }
 
+class CloseTabsToTheLeft extends TabsEvent {
+  const CloseTabsToTheLeft(this.tabId);
+  final String tabId;
+  @override
+  List<Object?> get props => [tabId];
+}
+
 class DuplicateTab extends TabsEvent {
   const DuplicateTab(this.tabId);
   final String tabId;
