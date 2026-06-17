@@ -49,23 +49,43 @@ class WorkspaceCollectionSerializer {
     CollectionNodeEntity folder,
     List<String> childOrder,
   ) {
-    return {
+    final json = <String, dynamic>{
       'id': folder.id,
       'name': folder.name,
       'isFavorite': folder.isFavorite,
       'childOrder': childOrder,
     };
+    if (folder.variables.isNotEmpty) {
+      // Secret values are masked to empty so secrets never land in git.
+      json['variables'] = {
+        for (final e in folder.variables.entries)
+          e.key: folder.secretKeys.contains(e.key) ? '' : e.value,
+      };
+      if (folder.secretKeys.isNotEmpty) {
+        json['secretKeys'] = folder.secretKeys.toList();
+      }
+    }
+    return json;
   }
 
   static CollectionNodeEntity folderFromJson(
     Map<String, dynamic> json,
     List<CollectionNodeEntity> children,
   ) {
+    final rawVars = json['variables'];
+    final variables = rawVars is Map
+        ? rawVars.map((k, v) => MapEntry('$k', v is String ? v : '${v ?? ''}'))
+        : const <String, String>{};
+    final secretKeys = ((json['secretKeys'] as List?) ?? const [])
+        .map((e) => '$e')
+        .toSet();
     return CollectionNodeEntity(
       id: (json['id'] as String?) ?? '',
       name: (json['name'] as String?) ?? 'Folder',
       isFavorite: json['isFavorite'] == true,
       children: children,
+      variables: variables,
+      secretKeys: secretKeys,
     );
   }
 

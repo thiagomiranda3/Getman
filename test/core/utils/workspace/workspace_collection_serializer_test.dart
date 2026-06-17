@@ -109,4 +109,25 @@ void main() {
       expect(WorkspaceCollectionSerializer.rootOrder(json), ['x', 'y']);
     });
   });
+
+  group('folder variables', () {
+    test('round-trips variables; masks secret values', () {
+      const folder = CollectionNodeEntity(
+        id: 'f1',
+        name: 'API',
+        variables: {'base': 'https://api.example.com', 'token': 'sk-secret'},
+        secretKeys: {'token'},
+      );
+
+      final json = WorkspaceCollectionSerializer.folderToJson(folder, const []);
+      final restored = WorkspaceCollectionSerializer.folderFromJson(
+        json,
+        const [],
+      );
+
+      expect(restored.variables['base'], 'https://api.example.com');
+      expect(restored.variables['token'], ''); // secret masked
+      expect(restored.secretKeys, contains('token'));
+    });
+  });
 }
