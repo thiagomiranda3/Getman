@@ -16,6 +16,7 @@ Future<CompareTarget?> _open(
   WidgetTester tester, {
   required List<CompareTarget> examples,
   required List<CompareTarget> history,
+  List<CompareTarget> timeline = const [],
 }) async {
   CompareTarget? result;
   await tester.pumpWidget(
@@ -30,8 +31,11 @@ Future<CompareTarget?> _open(
             onPressed: () async {
               result = await showDialog<CompareTarget>(
                 context: context,
-                builder: (_) =>
-                    CompareTargetPicker(examples: examples, history: history),
+                builder: (_) => CompareTargetPicker(
+                  examples: examples,
+                  history: history,
+                  timeline: timeline,
+                ),
               );
             },
             child: const Text('open'),
@@ -72,6 +76,34 @@ void main() {
     expect(find.text('RECENT (this request)'), findsOneWidget);
     expect(find.text('200 · 14:03'), findsOneWidget);
     expect(find.text('GET /users · 200'), findsOneWidget);
+  });
+
+  testWidgets('shows the previous-responses section when timeline is set', (
+    tester,
+  ) async {
+    await _open(
+      tester,
+      examples: const [],
+      history: const [],
+      timeline: [
+        CompareTarget(
+          id: 't1',
+          source: CompareTargetSource.timeline,
+          label: 'Response 200',
+          subtitle: '12 ms · 14:03',
+          response: _resp(200),
+        ),
+      ],
+    );
+    expect(find.text('PREVIOUS RESPONSES (this tab)'), findsOneWidget);
+    expect(find.text('Response 200'), findsOneWidget);
+  });
+
+  testWidgets('hides the previous-responses section when timeline empty', (
+    tester,
+  ) async {
+    await _open(tester, examples: const [], history: const []);
+    expect(find.text('PREVIOUS RESPONSES (this tab)'), findsNothing);
   });
 
   testWidgets('an empty section shows None', (tester) async {

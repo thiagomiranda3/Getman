@@ -104,6 +104,18 @@ class _UrlBarState extends State<UrlBar> {
     );
   }
 
+  /// Builds the SEND event carrying both the resolved env vars and the
+  /// user's response-history settings (the bloc holds no settings reference).
+  SendRequest _sendEvent(BuildContext context, String tabId) {
+    final settings = context.read<SettingsBloc>().state.settings;
+    return SendRequest(
+      tabId: tabId,
+      envVars: _activeVariables(context),
+      responseHistoryLimit: settings.responseHistoryLimit,
+      saveLargeResponsesInHistory: settings.saveLargeResponsesInHistory,
+    );
+  }
+
   // Gathers the layered variable context (env + collection) from live bloc
   // state at call time. Used by both _showVariablePopover and _urlSuggestions
   // so neither duplicates the bloc reads.
@@ -338,10 +350,7 @@ class _UrlBarState extends State<UrlBar> {
                                         CancelRequest(tab.tabId),
                                       )
                                     : () => context.read<TabsBloc>().add(
-                                        SendRequest(
-                                          tabId: tab.tabId,
-                                          envVars: _activeVariables(context),
-                                        ),
+                                        _sendEvent(context, tab.tabId),
                                       ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: tab.isSending

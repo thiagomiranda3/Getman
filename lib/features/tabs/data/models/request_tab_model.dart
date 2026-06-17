@@ -1,5 +1,6 @@
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/features/history/data/models/request_config_model.dart';
+import 'package:getman/features/tabs/data/models/stored_response_model.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:uuid/uuid.dart';
@@ -18,6 +19,7 @@ class HttpRequestTabModel extends HiveObject {
     this.collectionNodeId,
     this.collectionName,
     String? tabId,
+    this.responseHistory,
   }) : tabId = tabId ?? const Uuid().v4();
 
   factory HttpRequestTabModel.fromEntity(HttpRequestTabEntity entity) =>
@@ -31,6 +33,9 @@ class HttpRequestTabModel extends HiveObject {
         collectionNodeId: entity.collectionNodeId,
         collectionName: entity.collectionName,
         tabId: entity.tabId,
+        responseHistory: entity.responseHistory
+            .map(StoredResponseModel.fromEntity)
+            .toList(),
       );
   @HiveField(0)
   HttpRequestConfig config;
@@ -59,6 +64,12 @@ class HttpRequestTabModel extends HiveObject {
   @HiveField(8)
   String tabId;
 
+  /// Time-travel history, newest-first. Null on tabs persisted before this
+  /// field existed (treated as empty). The currently-displayed response is
+  /// stored flat (fields 1–4); this list is the rest of the recent sends.
+  @HiveField(9)
+  List<StoredResponseModel>? responseHistory;
+
   HttpRequestTabEntity toEntity() => HttpRequestTabEntity(
     config: config.toEntity(),
     // The Hive layout keeps the four response columns flat (typeId 2 is
@@ -75,5 +86,7 @@ class HttpRequestTabModel extends HiveObject {
     collectionNodeId: collectionNodeId,
     collectionName: collectionName,
     tabId: tabId,
+    responseHistory:
+        responseHistory?.map((m) => m.toEntity()).toList() ?? const [],
   );
 }

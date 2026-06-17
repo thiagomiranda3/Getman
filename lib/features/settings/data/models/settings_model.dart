@@ -32,6 +32,8 @@ class SettingsModel extends HiveObject {
     this.clientCertPassphrase,
     this.workspacePath,
     this.workspaceBookmark,
+    this.responseHistoryLimit = 5,
+    this.saveLargeResponsesInHistory = true,
   });
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) => SettingsModel(
@@ -59,6 +61,9 @@ class SettingsModel extends HiveObject {
     clientCertPassphrase: json['clientCertPassphrase'] as String?,
     workspacePath: json['workspacePath'] as String?,
     workspaceBookmark: json['workspaceBookmark'] as String?,
+    responseHistoryLimit: json['responseHistoryLimit'] as int? ?? 5,
+    saveLargeResponsesInHistory:
+        json['saveLargeResponsesInHistory'] as bool? ?? true,
   );
 
   factory SettingsModel.fromEntity(SettingsEntity entity) => SettingsModel(
@@ -85,6 +90,8 @@ class SettingsModel extends HiveObject {
     clientCertPassphrase: entity.clientCertPassphrase,
     workspacePath: entity.workspacePath,
     workspaceBookmark: entity.workspaceBookmark,
+    responseHistoryLimit: entity.responseHistoryLimit,
+    saveLargeResponsesInHistory: entity.saveLargeResponsesInHistory,
   );
   @HiveField(0, defaultValue: 100)
   int historyLimit;
@@ -155,6 +162,12 @@ class SettingsModel extends HiveObject {
   @HiveField(22, defaultValue: false)
   bool reduceVisualEffects;
 
+  @HiveField(23, defaultValue: 5)
+  int responseHistoryLimit;
+
+  @HiveField(24, defaultValue: true)
+  bool saveLargeResponsesInHistory;
+
   SettingsModel copyWith({
     int? historyLimit,
     bool? saveResponseInHistory,
@@ -179,6 +192,8 @@ class SettingsModel extends HiveObject {
     Object? clientCertPassphrase = _unchanged,
     Object? workspacePath = _unchanged,
     Object? workspaceBookmark = _unchanged,
+    int? responseHistoryLimit,
+    bool? saveLargeResponsesInHistory,
   }) {
     return SettingsModel(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -220,6 +235,9 @@ class SettingsModel extends HiveObject {
       workspaceBookmark: identical(workspaceBookmark, _unchanged)
           ? this.workspaceBookmark
           : workspaceBookmark as String?,
+      responseHistoryLimit: responseHistoryLimit ?? this.responseHistoryLimit,
+      saveLargeResponsesInHistory:
+          saveLargeResponsesInHistory ?? this.saveLargeResponsesInHistory,
     );
   }
 
@@ -247,6 +265,8 @@ class SettingsModel extends HiveObject {
     'clientCertPassphrase': clientCertPassphrase,
     'workspacePath': workspacePath,
     'workspaceBookmark': workspaceBookmark,
+    'responseHistoryLimit': responseHistoryLimit,
+    'saveLargeResponsesInHistory': saveLargeResponsesInHistory,
   };
 
   SettingsEntity toEntity() => SettingsEntity(
@@ -273,5 +293,7 @@ class SettingsModel extends HiveObject {
     clientCertPassphrase: clientCertPassphrase,
     workspacePath: workspacePath,
     workspaceBookmark: workspaceBookmark,
+    responseHistoryLimit: responseHistoryLimit,
+    saveLargeResponsesInHistory: saveLargeResponsesInHistory,
   );
 }

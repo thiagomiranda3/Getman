@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/compare_target_picker.dart';
@@ -219,6 +220,33 @@ class ResponseBodyControls extends StatelessWidget {
     return out;
   }
 
+  /// Earlier responses from this tab's time-travel history (newest-first),
+  /// excluding the currently-displayed one and metadata-only placeholders.
+  List<CompareTarget> _timelineTargets(
+    BuildContext context,
+    HttpRequestTabEntity tab,
+  ) {
+    final current = tab.response;
+    final out = <CompareTarget>[];
+    for (final entry in tab.responseHistory) {
+      final r = entry.response;
+      if (r == current) continue;
+      if (r.body == kResponseBodyTooLargePlaceholder) continue;
+      out.add(
+        CompareTarget(
+          id: entry.id,
+          source: CompareTargetSource.timeline,
+          label: 'Response ${r.statusCode}',
+          subtitle:
+              '${r.durationMs} ms · '
+              '${_hhmm(DateTime.fromMillisecondsSinceEpoch(entry.capturedAt))}',
+          response: r,
+        ),
+      );
+    }
+    return out;
+  }
+
   Widget _compareButton(BuildContext context) {
     return BlocBuilder<TabsBloc, TabsState>(
       buildWhen: (prev, next) {
@@ -227,7 +255,8 @@ class ResponseBodyControls extends StatelessWidget {
         return (p?.response == null) != (n?.response == null) ||
             p?.collectionNodeId != n?.collectionNodeId ||
             p?.config.method != n?.config.method ||
-            p?.config.url != n?.config.url;
+            p?.config.url != n?.config.url ||
+            p?.responseHistory.length != n?.responseHistory.length;
       },
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
@@ -236,7 +265,8 @@ class ResponseBodyControls extends StatelessWidget {
         }
         final hasTargets =
             _exampleTargets(context, tab.collectionNodeId).isNotEmpty ||
-            _historyTargets(context, tab.config).isNotEmpty;
+            _historyTargets(context, tab.config).isNotEmpty ||
+            _timelineTargets(context, tab).isNotEmpty;
         return IconButton(
           key: const ValueKey('compare_response_button'),
           tooltip: hasTargets
@@ -260,11 +290,16 @@ class ResponseBodyControls extends StatelessWidget {
 
     final examples = _exampleTargets(context, tab.collectionNodeId);
     final history = _historyTargets(context, tab.config);
-    if (examples.isEmpty && history.isEmpty) return;
+    final timeline = _timelineTargets(context, tab);
+    if (examples.isEmpty && history.isEmpty && timeline.isEmpty) return;
 
     final target = await showDialog<CompareTarget>(
       context: context,
-      builder: (_) => CompareTargetPicker(examples: examples, history: history),
+      builder: (_) => CompareTargetPicker(
+        examples: examples,
+        history: history,
+        timeline: timeline,
+      ),
     );
     if (target == null) return;
     if (!context.mounted) return;

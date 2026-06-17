@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer';
 
+import 'package:collection/collection.dart';
 // Imported only for `compute` (evaluates rules off the UI isolate for large
 // bodies). There is no Flutter-free equivalent — Isolate.run is unsupported on
 // web, which this app targets — so this import must stay.
@@ -8,6 +9,7 @@ import 'dart:developer';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/failures.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/utils/perf_trace.dart';
@@ -15,6 +17,7 @@ import 'package:getman/features/chaining/domain/entities/request_rules_entity.da
 import 'package:getman/features/chaining/domain/logic/rules_runner.dart';
 import 'package:getman/features/chaining/domain/usecases/request_rules_usecases.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/features/tabs/domain/entities/response_history_entry.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
 import 'package:getman/features/tabs/presentation/bloc/request_manager.dart';
@@ -42,6 +45,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     on<CloseTabsToTheLeft>(_onCloseTabsToTheLeft);
     on<DuplicateTab>(_onDuplicateTab);
     on<SendRequest>(_onSendRequest);
+    on<ViewResponseHistoryEntry>(_onViewResponseHistoryEntry);
     on<CancelRequest>(_onCancelRequest);
   }
   final TabsRepository _repository;
@@ -391,9 +395,11 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       _applyToTab(
         emit,
         tabId,
-        (live) => live.copyWith(
-          isSending: false,
-          response: response,
+        (live) => _recordResponse(
+          live,
+          response,
+          event.responseHistoryLimit,
+          saveLarge: event.saveLargeResponsesInHistory,
         ),
       );
       _markResponseDirty(tabId);
@@ -415,9 +421,11 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       _applyToTab(
         emit,
         tabId,
-        (live) => live.copyWith(
-          isSending: false,
-          response: errorResponse,
+        (live) => _recordResponse(
+          live,
+          errorResponse,
+          event.responseHistoryLimit,
+          saveLarge: event.saveLargeResponsesInHistory,
         ),
       );
       _markResponseDirty(tabId);
@@ -431,6 +439,67 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       log('SendRequest failed unexpectedly: $e', name: 'TabsBloc');
       _applyToTab(emit, tabId, (live) => live.copyWith(isSending: false));
     }
+  }
+
+  /// Sets [response] as the tab's displayed response and prepends it to the
+  /// time-travel history (newest-first), trimmed to [limit]. A [limit] of 0
+  /// disables history (clears any accumulated entries). When [saveLarge] is
+  /// false, a history entry whose body exceeds the large-viewer threshold is
+  /// stored as a placeholder (the displayed [response] still keeps the full
+  /// body); on-disk capping at 1 MiB happens at the persistence boundary.
+  HttpRequestTabEntity _recordResponse(
+    HttpRequestTabEntity live,
+    HttpResponseEntity response,
+    int limit, {
+    required bool saveLarge,
+  }) {
+    if (limit <= 0) {
+      return live.copyWith(
+        isSending: false,
+        response: response,
+        responseHistory: const [],
+      );
+    }
+    final stored =
+        !saveLarge && response.body.length > kLargeResponseViewerChars
+        ? response.copyWithBody(kResponseBodyTooLargePlaceholder)
+        : response;
+    final entry = ResponseHistoryEntry(
+      id: _uuid.v4(),
+      response: stored,
+      capturedAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    final history = [entry, ...live.responseHistory];
+    return live.copyWith(
+      isSending: false,
+      response: response,
+      responseHistory: history.length > limit
+          ? history.sublist(0, limit)
+          : history,
+    );
+  }
+
+  /// Time-travel: swap the displayed response to the chosen history entry
+  /// without mutating the history. No-op if the tab or entry is gone.
+  void _onViewResponseHistoryEntry(
+    ViewResponseHistoryEntry event,
+    Emitter<TabsState> emit,
+  ) {
+    final tab = state.tabs.byId(event.tabId);
+    if (tab == null) return;
+    final entry = tab.responseHistory.firstWhereOrNull(
+      (e) => e.id == event.entryId,
+    );
+    if (entry == null) return;
+    emit(
+      state.copyWith(
+        tabs: _replaceTabById(
+          state.tabs,
+          tab.copyWith(response: entry.response),
+        ),
+      ),
+    );
+    _markResponseDirty(event.tabId);
   }
 
   /// Schedule a debounced persist for the tab that just received a response

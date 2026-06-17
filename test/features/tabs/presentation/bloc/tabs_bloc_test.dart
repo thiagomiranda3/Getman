@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/failures.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/features/chaining/domain/entities/assertion.dart';
@@ -562,6 +563,208 @@ void main() {
           emitsThrough(
             predicate<TabsState>(
               (s) => s.tabs.single.tabId == tabId && !s.tabs.single.isSending,
+            ),
+          ),
+        );
+      },
+    );
+  });
+
+  group('response history (time-travel)', () {
+    HttpResponseEntity resp(int code, String body) => HttpResponseEntity(
+      statusCode: code,
+      body: body,
+      headers: const {},
+      durationMs: code,
+    );
+
+    test('records each send as a newest-first history entry', () async {
+      await loadWith([tab('a')]);
+      var n = 0;
+      stubSend(() async => resp(200, 'r${n++}'));
+
+      bloc.add(const SendRequest(tabId: 'a'));
+      await expectLater(
+        bloc.stream,
+        emitsThrough(
+          predicate<TabsState>((s) {
+            final t = s.tabs.single;
+            return !t.isSending &&
+                t.responseHistory.length == 1 &&
+                t.responseHistory.first.response.body == 'r0' &&
+                t.response?.body == 'r0';
+          }),
+        ),
+      );
+
+      bloc.add(const SendRequest(tabId: 'a'));
+      await expectLater(
+        bloc.stream,
+        emitsThrough(
+          predicate<TabsState>((s) {
+            final t = s.tabs.single;
+            return !t.isSending &&
+                t.responseHistory.length == 2 &&
+                t.responseHistory[0].response.body == 'r1' &&
+                t.responseHistory[1].response.body == 'r0' &&
+                t.response?.body == 'r1';
+          }),
+        ),
+      );
+    });
+
+    test('trims history to the limit, dropping the oldest', () async {
+      await loadWith([tab('a')]);
+      var n = 0;
+      stubSend(() async => resp(200, 'r${n++}'));
+
+      for (var i = 0; i < 3; i++) {
+        bloc.add(const SendRequest(tabId: 'a', responseHistoryLimit: 2));
+        await expectLater(
+          bloc.stream,
+          emitsThrough(
+            predicate<TabsState>(
+              (s) =>
+                  !s.tabs.single.isSending &&
+                  s.tabs.single.responseHistory.first.response.body == 'r$i',
+            ),
+          ),
+        );
+      }
+      expect(
+        bloc.state.tabs.single.responseHistory.map((e) => e.response.body),
+        ['r2', 'r1'],
+      );
+    });
+
+    test('responseHistoryLimit 0 keeps history empty', () async {
+      await loadWith([tab('a')]);
+      stubSend(() async => resp(200, 'x'));
+
+      bloc.add(const SendRequest(tabId: 'a', responseHistoryLimit: 0));
+      await expectLater(
+        bloc.stream,
+        emitsThrough(
+          predicate<TabsState>((s) {
+            final t = s.tabs.single;
+            return !t.isSending &&
+                t.response?.body == 'x' &&
+                t.responseHistory.isEmpty;
+          }),
+        ),
+      );
+    });
+
+    test('records an error response in history', () async {
+      await loadWith([tab('a')]);
+      stubSend(
+        () async => throw const NetworkFailure(
+          'refused',
+          type: NetworkFailureType.connection,
+        ),
+      );
+
+      bloc.add(const SendRequest(tabId: 'a'));
+      await expectLater(
+        bloc.stream,
+        emitsThrough(
+          predicate<TabsState>((s) {
+            final t = s.tabs.single;
+            return t.responseHistory.length == 1 &&
+                t.responseHistory.first.response.statusCode == 0;
+          }),
+        ),
+      );
+    });
+
+    test('a cancelled request records no history entry', () async {
+      await loadWith([tab('a')]);
+      stubSend(
+        () async => throw const NetworkFailure(
+          'cancelled',
+          type: NetworkFailureType.cancelled,
+        ),
+      );
+
+      bloc.add(const SendRequest(tabId: 'a'));
+      await expectLater(
+        bloc.stream,
+        emitsThrough(
+          predicate<TabsState>(
+            (s) => !s.tabs.single.isSending && s.tabs.single.response == null,
+          ),
+        ),
+      );
+      expect(bloc.state.tabs.single.responseHistory, isEmpty);
+    });
+
+    test(
+      'ViewResponseHistoryEntry swaps displayed response, history unchanged',
+      () async {
+        await loadWith([tab('a')]);
+        var n = 0;
+        stubSend(() async => resp(200, 'r${n++}'));
+
+        bloc.add(const SendRequest(tabId: 'a'));
+        await pumpEventQueue();
+        bloc.add(const SendRequest(tabId: 'a'));
+        await pumpEventQueue();
+
+        final hist = bloc.state.tabs.single.responseHistory; // [r1, r0]
+        expect(bloc.state.tabs.single.response?.body, 'r1');
+        final olderId = hist[1].id;
+
+        bloc.add(ViewResponseHistoryEntry(tabId: 'a', entryId: olderId));
+        await pumpEventQueue();
+
+        final t = bloc.state.tabs.single;
+        expect(t.response?.body, 'r0');
+        expect(t.responseHistory, hist);
+      },
+    );
+
+    test(
+      'saveLargeResponsesInHistory false stores large entries as placeholder',
+      () async {
+        await loadWith([tab('a')]);
+        final big = 'x' * (kLargeResponseViewerChars + 1);
+        stubSend(() async => resp(200, big));
+
+        bloc.add(
+          const SendRequest(tabId: 'a', saveLargeResponsesInHistory: false),
+        );
+        await expectLater(
+          bloc.stream,
+          emitsThrough(
+            predicate<TabsState>((s) {
+              final t = s.tabs.single;
+              return !t.isSending &&
+                  // Displayed response keeps the full body...
+                  t.response?.body == big &&
+                  // ...but the history entry is metadata-only.
+                  t.responseHistory.single.response.body ==
+                      kResponseBodyTooLargePlaceholder;
+            }),
+          ),
+        );
+      },
+    );
+
+    test(
+      'saveLargeResponsesInHistory true (default) keeps large entries',
+      () async {
+        await loadWith([tab('a')]);
+        final big = 'x' * (kLargeResponseViewerChars + 1);
+        stubSend(() async => resp(200, big));
+
+        bloc.add(const SendRequest(tabId: 'a'));
+        await expectLater(
+          bloc.stream,
+          emitsThrough(
+            predicate<TabsState>(
+              (s) =>
+                  !s.tabs.single.isSending &&
+                  s.tabs.single.responseHistory.single.response.body == big,
             ),
           ),
         );

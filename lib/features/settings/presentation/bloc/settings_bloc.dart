@@ -54,6 +54,16 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
         (s) => s.copyWith(alwaysPrettifyLargeResponses: e.value),
       ),
     );
+    on<UpdateResponseHistoryLimit>(
+      (e, emit) => _apply(
+        emit,
+        (s) => s.copyWith(responseHistoryLimit: _clampHistoryDepth(e.limit)),
+      ),
+    );
+    on<UpdateSaveLargeResponsesInHistory>(
+      (e, emit) =>
+          _apply(emit, (s) => s.copyWith(saveLargeResponsesInHistory: e.value)),
+    );
     on<UpdateSplitRatio>(
       (e, emit) => _apply(emit, (s) => s.copyWith(splitRatio: e.ratio)),
     );
@@ -127,6 +137,10 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   // maxRedirects is 0 while followRedirects is on (it has no "0 = don't follow"
   // semantic — disable redirects via the FOLLOW REDIRECTS toggle instead).
   static int _clampRedirects(int v) => v < 1 ? 1 : v;
+
+  /// Response-history depth: 0 disables the feature, capped at 50 to bound the
+  /// per-tab storage footprint.
+  static int _clampHistoryDepth(int v) => v.clamp(0, 50);
 
   Future<void> _apply(
     Emitter<SettingsState> emit,

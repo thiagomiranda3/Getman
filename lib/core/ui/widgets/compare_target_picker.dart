@@ -5,7 +5,7 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 
 /// Where a compare target came from.
-enum CompareTargetSource { example, history }
+enum CompareTargetSource { example, history, timeline }
 
 /// A selectable response to diff the current tab against. Carries the
 /// reconstructed [response] so the caller does no rebuild work after a pick.
@@ -35,11 +35,15 @@ class CompareTargetPicker extends StatelessWidget {
   const CompareTargetPicker({
     required this.examples,
     required this.history,
+    this.timeline = const [],
     super.key,
   });
 
   final List<CompareTarget> examples;
   final List<CompareTarget> history;
+
+  /// Earlier responses from this tab's time-travel history.
+  final List<CompareTarget> timeline;
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +55,10 @@ class CompareTargetPicker extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (timeline.isNotEmpty) ...[
+              _section(context, 'PREVIOUS RESPONSES (this tab)', timeline),
+              SizedBox(height: context.appLayout.sectionSpacing / 2),
+            ],
             _section(context, 'SAVED EXAMPLES', examples),
             SizedBox(height: context.appLayout.sectionSpacing / 2),
             _section(context, 'RECENT (this request)', history),

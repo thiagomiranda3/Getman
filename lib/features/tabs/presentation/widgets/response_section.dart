@@ -9,6 +9,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_body_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_cookies_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_headers_view.dart';
+import 'package:getman/features/tabs/presentation/widgets/response/response_history_timeline.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_metadata_item.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_tests_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.dart'
@@ -47,7 +48,8 @@ class ResponseSection extends StatelessWidget {
         return p.isSending != n.isSending ||
             p.response?.statusCode != n.response?.statusCode ||
             p.response?.durationMs != n.response?.durationMs ||
-            p.response?.body.length != n.response?.body.length;
+            p.response?.body.length != n.response?.body.length ||
+            p.responseHistory.length != n.responseHistory.length;
       },
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
@@ -170,6 +172,11 @@ class ResponseSection extends StatelessWidget {
                       value: formatBytes(responseSizeBytes(response)),
                       color: theme.colorScheme.secondary,
                       layout: layout,
+                    ),
+                    ResponseHistoryTimeline(
+                      tabId: tabId,
+                      history: tab.responseHistory,
+                      current: response,
                     ),
                   ],
                 ),

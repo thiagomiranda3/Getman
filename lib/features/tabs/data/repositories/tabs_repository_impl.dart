@@ -51,18 +51,39 @@ class TabsRepositoryImpl implements TabsRepository {
         await localDataSource.saveOrder(orderedTabIds);
       });
 
-  /// Maps the entity to its Hive model, replacing an over-limit response body
-  /// with [kResponseBodyTooLargePlaceholder]. The in-memory session keeps the
-  /// full body — only the on-disk copy is capped (see persistence_limits.dart).
+  /// Maps the entity to its Hive model, replacing any over-limit response body
+  /// — the displayed response and every time-travel history entry — with
+  /// [kResponseBodyTooLargePlaceholder]. The in-memory session keeps the full
+  /// bodies; only the on-disk copy is capped (see persistence_limits.dart).
   HttpRequestTabModel _toPersistableModel(HttpRequestTabEntity entity) {
-    final response = entity.response;
-    final capped =
-        response != null &&
-            response.body.length > kMaxPersistedResponseBodyChars
-        ? entity.copyWith(
-            response: response.copyWithBody(kResponseBodyTooLargePlaceholder),
-          )
-        : entity;
+    var capped = entity;
+
+    final response = capped.response;
+    if (response != null &&
+        response.body.length > kMaxPersistedResponseBodyChars) {
+      capped = capped.copyWith(
+        response: response.copyWithBody(kResponseBodyTooLargePlaceholder),
+      );
+    }
+
+    if (capped.responseHistory.any(
+      (e) => e.response.body.length > kMaxPersistedResponseBodyChars,
+    )) {
+      capped = capped.copyWith(
+        responseHistory: capped.responseHistory
+            .map(
+              (e) => e.response.body.length > kMaxPersistedResponseBodyChars
+                  ? e.copyWith(
+                      response: e.response.copyWithBody(
+                        kResponseBodyTooLargePlaceholder,
+                      ),
+                    )
+                  : e,
+            )
+            .toList(),
+      );
+    }
+
     return HttpRequestTabModel.fromEntity(capped);
   }
 

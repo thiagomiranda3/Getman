@@ -34,6 +34,7 @@ class SettingsDialog extends StatefulWidget {
 
 class _SettingsDialogState extends State<SettingsDialog> {
   late final TextEditingController _historyLimitController;
+  late final TextEditingController _responseHistoryLimitController;
   late final TextEditingController _connectTimeoutController;
   late final TextEditingController _sendTimeoutController;
   late final TextEditingController _receiveTimeoutController;
@@ -46,6 +47,9 @@ class _SettingsDialogState extends State<SettingsDialog> {
     final s = context.read<SettingsBloc>().state.settings;
     _historyLimitController = TextEditingController(
       text: s.historyLimit.toString(),
+    );
+    _responseHistoryLimitController = TextEditingController(
+      text: s.responseHistoryLimit.toString(),
     );
     _connectTimeoutController = TextEditingController(
       text: s.connectTimeoutMs.toString(),
@@ -65,6 +69,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
   @override
   void dispose() {
     _historyLimitController.dispose();
+    _responseHistoryLimitController.dispose();
     _connectTimeoutController.dispose();
     _sendTimeoutController.dispose();
     _receiveTimeoutController.dispose();
@@ -153,6 +158,61 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     value: settings.alwaysPrettifyLargeResponses,
                     onChanged: (val) => context.read<SettingsBloc>().add(
                       UpdateAlwaysPrettifyLargeResponses(value: val),
+                    ),
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.history, size: layout.iconSize),
+                    title: Text(
+                      'RESPONSE HISTORY (PER TAB)',
+                      style: TextStyle(
+                        fontSize: layout.fontSizeNormal,
+                        fontWeight: context.appTypography.titleWeight,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Recent responses kept for time-travel (0 = off)',
+                      style: TextStyle(fontSize: layout.fontSizeSmall),
+                    ),
+                    trailing: SizedBox(
+                      width: 80,
+                      child: TextField(
+                        key: const ValueKey('response_history_limit_field'),
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: layout.inputPadding,
+                            vertical: layout.inputPaddingVertical,
+                          ),
+                        ),
+                        controller: _responseHistoryLimitController,
+                        onChanged: (val) {
+                          final limit = int.tryParse(val);
+                          if (limit != null) {
+                            context.read<SettingsBloc>().add(
+                              UpdateResponseHistoryLimit(limit),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                  SwitchListTile(
+                    key: const ValueKey('save_large_responses_switch'),
+                    secondary: Icon(Icons.save_alt, size: layout.iconSize),
+                    title: Text(
+                      'SAVE LARGE RESPONSES IN HISTORY',
+                      style: TextStyle(
+                        fontSize: layout.fontSizeNormal,
+                        fontWeight: context.appTypography.titleWeight,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Off keeps big bodies out of history (metadata only)',
+                      style: TextStyle(fontSize: layout.fontSizeSmall),
+                    ),
+                    value: settings.saveLargeResponsesInHistory,
+                    onChanged: (val) => context.read<SettingsBloc>().add(
+                      UpdateSaveLargeResponsesInHistory(value: val),
                     ),
                   ),
                   const Divider(),

@@ -14,6 +14,7 @@ import 'package:getman/features/history/data/models/request_config_model.dart';
 import 'package:getman/features/settings/data/models/settings_model.dart';
 import 'package:getman/features/tabs/data/models/multipart_field_model.dart';
 import 'package:getman/features/tabs/data/models/request_tab_model.dart';
+import 'package:getman/features/tabs/data/models/stored_response_model.dart';
 
 extension HiveRegistrar on HiveInterface {
   void registerAdapters() {
@@ -28,6 +29,7 @@ extension HiveRegistrar on HiveInterface {
     registerAdapter(SavedExampleModelAdapter());
     registerAdapter(SettingsModelAdapter());
     registerAdapter(StoredCookieModelAdapter());
+    registerAdapter(StoredResponseModelAdapter());
   }
 }
 
@@ -44,5 +46,6 @@ extension IsolatedHiveRegistrar on IsolatedHiveInterface {
     registerAdapter(SavedExampleModelAdapter());
     registerAdapter(SettingsModelAdapter());
     registerAdapter(StoredCookieModelAdapter());
+    registerAdapter(StoredResponseModelAdapter());
   }
 }

@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/error/failures.dart';
+import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';
 import 'package:getman/features/chaining/domain/usecases/request_rules_usecases.dart';
 import 'package:getman/features/chaining/presentation/bloc/rules_event.dart';
 import 'package:getman/features/chaining/presentation/bloc/rules_state.dart';
@@ -18,6 +19,7 @@ class RulesBloc extends Bloc<RulesEvent, RulesState> {
        super(const RulesState()) {
     on<LoadRules>(_onLoad);
     on<SaveRules>(_onSave);
+    on<AddExtractionRule>(_onAddExtractionRule);
   }
   final GetRequestRulesUseCase _getRequestRulesUseCase;
   final SaveRequestRulesUseCase _saveRequestRulesUseCase;
@@ -40,6 +42,30 @@ class RulesBloc extends Bloc<RulesEvent, RulesState> {
       await _saveRequestRulesUseCase(event.rules);
     } on PersistenceFailure catch (f) {
       log('SaveRules failed: ${f.message}', name: 'RulesBloc');
+    }
+  }
+
+  Future<void> _onAddExtractionRule(
+    AddExtractionRule event,
+    Emitter<RulesState> emit,
+  ) async {
+    // Load fresh so we append onto the persisted rules rather than whatever
+    // happens to be in state (which may be a different config's rules).
+    final RequestRulesEntity current;
+    try {
+      current = await _getRequestRulesUseCase(event.configId);
+    } on PersistenceFailure catch (f) {
+      log('AddExtractionRule load failed: ${f.message}', name: 'RulesBloc');
+      return;
+    }
+    final updated = current.copyWith(
+      extractionRules: [...current.extractionRules, event.rule],
+    );
+    emit(RulesState(rules: updated));
+    try {
+      await _saveRequestRulesUseCase(updated);
+    } on PersistenceFailure catch (f) {
+      log('AddExtractionRule save failed: ${f.message}', name: 'RulesBloc');
     }
   }
 }

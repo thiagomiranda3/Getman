@@ -26,13 +26,14 @@ class HttpRequestTabModelAdapter extends TypeAdapter<HttpRequestTabModel> {
       collectionNodeId: fields[6] as String?,
       collectionName: fields[7] as String?,
       tabId: fields[8] as String?,
+      responseHistory: (fields[9] as List?)?.cast<StoredResponseModel>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, HttpRequestTabModel obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.config)
       ..writeByte(1)
@@ -50,7 +51,9 @@ class HttpRequestTabModelAdapter extends TypeAdapter<HttpRequestTabModel> {
       ..writeByte(7)
       ..write(obj.collectionName)
       ..writeByte(8)
-      ..write(obj.tabId);
+      ..write(obj.tabId)
+      ..writeByte(9)
+      ..write(obj.responseHistory);
   }
 
   @override

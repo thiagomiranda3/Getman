@@ -29,9 +29,20 @@ class SettingsEntity extends Equatable {
     this.clientCertPassphrase,
     this.workspacePath,
     this.workspaceBookmark,
+    this.responseHistoryLimit = 5,
+    this.saveLargeResponsesInHistory = true,
   });
   final int historyLimit;
   final bool saveResponseInHistory;
+
+  /// How many recent responses to keep per tab for time-travel. `0` disables
+  /// the feature (no history accumulated, timeline hidden). Clamped on input.
+  final int responseHistoryLimit;
+
+  /// When `true` (default), large response bodies are kept in time-travel
+  /// history (subject to the 1 MiB on-disk cap). When `false`, history entries
+  /// over the large-viewer threshold are stored metadata-only.
+  final bool saveLargeResponsesInHistory;
 
   /// When `true`, response bodies over the large-viewer threshold are
   /// prettified and syntax-highlighted automatically instead of falling back
@@ -103,6 +114,8 @@ class SettingsEntity extends Equatable {
     Object? clientCertPassphrase = _unchanged,
     Object? workspacePath = _unchanged,
     Object? workspaceBookmark = _unchanged,
+    int? responseHistoryLimit,
+    bool? saveLargeResponsesInHistory,
   }) {
     return SettingsEntity(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -144,6 +157,9 @@ class SettingsEntity extends Equatable {
       workspaceBookmark: identical(workspaceBookmark, _unchanged)
           ? this.workspaceBookmark
           : workspaceBookmark as String?,
+      responseHistoryLimit: responseHistoryLimit ?? this.responseHistoryLimit,
+      saveLargeResponsesInHistory:
+          saveLargeResponsesInHistory ?? this.saveLargeResponsesInHistory,
     );
   }
 
@@ -186,5 +202,7 @@ class SettingsEntity extends Equatable {
     clientCertPassphrase,
     workspacePath,
     workspaceBookmark,
+    responseHistoryLimit,
+    saveLargeResponsesInHistory,
   ];
 }

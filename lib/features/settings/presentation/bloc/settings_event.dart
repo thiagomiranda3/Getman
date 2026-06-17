@@ -56,6 +56,20 @@ class UpdateAlwaysPrettifyLargeResponses extends SettingsEvent {
   List<Object?> get props => [value];
 }
 
+class UpdateResponseHistoryLimit extends SettingsEvent {
+  const UpdateResponseHistoryLimit(this.limit);
+  final int limit;
+  @override
+  List<Object?> get props => [limit];
+}
+
+class UpdateSaveLargeResponsesInHistory extends SettingsEvent {
+  const UpdateSaveLargeResponsesInHistory({required this.value});
+  final bool value;
+  @override
+  List<Object?> get props => [value];
+}
+
 class UpdateSplitRatio extends SettingsEvent {
   const UpdateSplitRatio(this.ratio);
   final double ratio;

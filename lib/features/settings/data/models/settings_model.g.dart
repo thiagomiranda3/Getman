@@ -44,13 +44,19 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       clientCertPassphrase: fields[21] as String?,
       workspacePath: fields[15] as String?,
       workspaceBookmark: fields[16] as String?,
+      responseHistoryLimit: fields[23] == null
+          ? 5
+          : (fields[23] as num).toInt(),
+      saveLargeResponsesInHistory: fields[24] == null
+          ? true
+          : fields[24] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, SettingsModel obj) {
     writer
-      ..writeByte(23)
+      ..writeByte(25)
       ..writeByte(0)
       ..write(obj.historyLimit)
       ..writeByte(1)
@@ -96,7 +102,11 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       ..writeByte(21)
       ..write(obj.clientCertPassphrase)
       ..writeByte(22)
-      ..write(obj.reduceVisualEffects);
+      ..write(obj.reduceVisualEffects)
+      ..writeByte(23)
+      ..write(obj.responseHistoryLimit)
+      ..writeByte(24)
+      ..write(obj.saveLargeResponsesInHistory);
   }
 
   @override

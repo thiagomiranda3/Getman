@@ -12,6 +12,7 @@ import 'package:getman/features/tabs/data/datasources/tabs_local_data_source.dar
 import 'package:getman/features/tabs/data/models/request_tab_model.dart';
 import 'package:getman/features/tabs/data/repositories/tabs_repository_impl.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/features/tabs/domain/entities/response_history_entry.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockTabsLocalDataSource extends Mock implements TabsLocalDataSource {}
@@ -107,6 +108,46 @@ void main() {
           verify(() => dataSource.saveTabs(captureAny())).captured.single
               as List<HttpRequestTabModel>;
       expect(models.single.responseBody, kResponseBodyTooLargePlaceholder);
+    });
+
+    test('putTab caps over-limit bodies in history entries too', () async {
+      when(() => dataSource.putTab(any())).thenAnswer((_) async {});
+      final tab = HttpRequestTabEntity(
+        tabId: 't',
+        config: const HttpRequestConfigEntity(id: 't'),
+        response: const HttpResponseEntity(
+          statusCode: 200,
+          body: 'small',
+          headers: {},
+          durationMs: 1,
+        ),
+        responseHistory: [
+          ResponseHistoryEntry(
+            id: 'e1',
+            response: HttpResponseEntity(
+              statusCode: 200,
+              body: 'x' * (kMaxPersistedResponseBodyChars + 1),
+              headers: const {},
+              durationMs: 1,
+            ),
+            capturedAt: 1,
+          ),
+        ],
+      );
+
+      await repository.putTab(tab);
+
+      final model =
+          verify(() => dataSource.putTab(captureAny())).captured.single
+              as HttpRequestTabModel;
+      expect(model.responseBody, 'small');
+      expect(
+        model.responseHistory!.single.body,
+        kResponseBodyTooLargePlaceholder,
+      );
+      // Metadata on the capped history entry survives.
+      expect(model.responseHistory!.single.statusCode, 200);
+      expect(model.responseHistory!.single.id, 'e1');
     });
   });
 

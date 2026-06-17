@@ -99,11 +99,41 @@ class DuplicateTab extends TabsEvent {
 /// `ActiveEnvironmentHelper.variablesFor(...)` — an empty map sends `{{var}}`
 /// placeholders to the network verbatim.
 class SendRequest extends TabsEvent {
-  const SendRequest({required this.tabId, this.envVars = const {}});
+  const SendRequest({
+    required this.tabId,
+    this.envVars = const {},
+    this.responseHistoryLimit = 5,
+    this.saveLargeResponsesInHistory = true,
+  });
   final String tabId;
   final Map<String, String> envVars;
+
+  /// How many recent responses to retain for time-travel (0 disables history).
+  /// Carried on the event (like [envVars]) because the dispatcher reads it from
+  /// `SettingsBloc`; the bloc holds no settings reference.
+  final int responseHistoryLimit;
+
+  /// When false, history entries whose body exceeds the large-viewer threshold
+  /// are persisted metadata-only (the in-session copy stays full).
+  final bool saveLargeResponsesInHistory;
   @override
-  List<Object?> get props => [tabId, envVars];
+  List<Object?> get props => [
+    tabId,
+    envVars,
+    responseHistoryLimit,
+    saveLargeResponsesInHistory,
+  ];
+}
+
+/// Swaps the tab's displayed [HttpRequestTabEntity.response] to the history
+/// entry with [entryId] without mutating the history list (time-travel).
+/// Identity-addressed like every other tab event (CLAUDE.md §4.2).
+class ViewResponseHistoryEntry extends TabsEvent {
+  const ViewResponseHistoryEntry({required this.tabId, required this.entryId});
+  final String tabId;
+  final String entryId;
+  @override
+  List<Object?> get props => [tabId, entryId];
 }
 
 class CancelRequest extends TabsEvent {

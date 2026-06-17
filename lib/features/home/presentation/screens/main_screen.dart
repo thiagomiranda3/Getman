@@ -234,16 +234,16 @@ class _MainScreenState extends State<MainScreen> {
                     if (activeIndex >= 0 &&
                         activeIndex < tabs.length &&
                         !tabs[activeIndex].isSending) {
+                      final settings = context
+                          .read<SettingsBloc>()
+                          .state
+                          .settings;
                       final envVars = RequestVariableResolver.variablesFor(
                         environments: context
                             .read<EnvironmentsBloc>()
                             .state
                             .environments,
-                        activeEnvironmentId: context
-                            .read<SettingsBloc>()
-                            .state
-                            .settings
-                            .activeEnvironmentId,
+                        activeEnvironmentId: settings.activeEnvironmentId,
                         collections: context
                             .read<CollectionsBloc>()
                             .state
@@ -254,6 +254,9 @@ class _MainScreenState extends State<MainScreen> {
                         SendRequest(
                           tabId: tabs[activeIndex].tabId,
                           envVars: envVars,
+                          responseHistoryLimit: settings.responseHistoryLimit,
+                          saveLargeResponsesInHistory:
+                              settings.saveLargeResponsesInHistory,
                         ),
                       );
                     }

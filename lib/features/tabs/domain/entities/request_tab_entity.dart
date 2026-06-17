@@ -4,6 +4,7 @@ import 'package:getman/core/domain/entities/assertion_result.dart';
 import 'package:getman/core/domain/entities/extraction_result.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/http_response.dart';
+import 'package:getman/features/tabs/domain/entities/response_history_entry.dart';
 
 // Sentinel used by copyWith to distinguish "not provided" from "explicitly
 // null".
@@ -32,11 +33,14 @@ class HttpRequestTabEntity extends Equatable {
     this.collectionName,
     this.extractionResults = const [],
     this.assertionResults = const [],
+    this.responseHistory = const [],
   });
   final HttpRequestConfigEntity config;
 
-  /// Last response received on this tab, or null when nothing has been sent
-  /// (or the last send was cancelled before completing).
+  /// Currently displayed response on this tab, or null when nothing has been
+  /// sent (or the last send was cancelled before completing). Defaults to the
+  /// newest send; time-travel (`ViewResponseHistoryEntry`) swaps it to an older
+  /// [responseHistory] entry without mutating the history.
   final HttpResponseEntity? response;
   final bool isSending;
   final String? collectionNodeId;
@@ -48,6 +52,10 @@ class HttpRequestTabEntity extends Equatable {
   final List<ExtractionResult> extractionResults;
   final List<AssertionResult> assertionResults;
 
+  /// Recent responses for time-travel, newest-first. Capped to the user's
+  /// `responseHistoryLimit`. The head mirrors [response] after a fresh send.
+  final List<ResponseHistoryEntry> responseHistory;
+
   HttpRequestTabEntity copyWith({
     HttpRequestConfigEntity? config,
     Object? response = _unset,
@@ -57,6 +65,7 @@ class HttpRequestTabEntity extends Equatable {
     String? tabId,
     List<ExtractionResult>? extractionResults,
     List<AssertionResult>? assertionResults,
+    List<ResponseHistoryEntry>? responseHistory,
   }) {
     return HttpRequestTabEntity(
       config: config ?? this.config,
@@ -73,6 +82,7 @@ class HttpRequestTabEntity extends Equatable {
       tabId: tabId ?? this.tabId,
       extractionResults: extractionResults ?? this.extractionResults,
       assertionResults: assertionResults ?? this.assertionResults,
+      responseHistory: responseHistory ?? this.responseHistory,
     );
   }
 
@@ -86,5 +96,6 @@ class HttpRequestTabEntity extends Equatable {
     tabId,
     extractionResults,
     assertionResults,
+    responseHistory,
   ];
 }

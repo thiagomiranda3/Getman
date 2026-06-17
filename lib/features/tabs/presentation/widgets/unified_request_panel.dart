@@ -11,6 +11,7 @@ import 'package:getman/features/tabs/presentation/widgets/auth_tab_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_config_section.dart'
     show RequestConfigSection;
 import 'package:getman/features/tabs/presentation/widgets/request_editor_tabs.dart';
+import 'package:getman/features/tabs/presentation/widgets/response/response_history_timeline.dart';
 import 'package:getman/features/tabs/presentation/widgets/response_area.dart';
 import 'package:getman/features/tabs/presentation/widgets/response_section.dart'
     show ResponseSection;
@@ -136,7 +137,9 @@ class _StatusRibbon extends StatelessWidget {
       buildWhen: (prev, next) {
         final p = prev.tabs.byId(tabId);
         final n = next.tabs.byId(tabId);
-        return p?.response != n?.response || p?.isSending != n?.isSending;
+        return p?.response != n?.response ||
+            p?.isSending != n?.isSending ||
+            p?.responseHistory.length != n?.responseHistory.length;
       },
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
@@ -165,6 +168,11 @@ class _StatusRibbon extends StatelessWidget {
                 _Pill(
                   label: formatBytes(responseSizeBytes(response)),
                   color: theme.colorScheme.secondary,
+                ),
+                ResponseHistoryTimeline(
+                  tabId: tabId,
+                  history: tab.responseHistory,
+                  current: response,
                 ),
               ],
             ],

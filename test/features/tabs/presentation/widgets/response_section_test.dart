@@ -28,6 +28,7 @@ import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/features/tabs/presentation/widgets/response/json_tree_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response_section.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:re_editor/re_editor.dart';
@@ -386,6 +387,29 @@ void main() {
 
     // Still an editor after switching to raw.
     expect(find.byType(CodeEditor), findsOneWidget);
+  });
+
+  testWidgets('TREE toggle renders a collapsible JSON tree', (tester) async {
+    const tabId = 'tab5b';
+    final tab = _tabWithBody(tabId, '{"ok":true}');
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+    final controller = CodeLineEditingController();
+    addTearDown(controller.dispose);
+
+    await _pump(tester, bloc: bloc, tabId: tabId, controller: controller);
+    // Let the async body decode complete so TREE becomes available.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('TREE'), findsOneWidget);
+    await tester.tap(find.text('TREE'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(JsonTreeView), findsOneWidget);
+    expect(find.text('ok'), findsOneWidget);
   });
 
   testWidgets('copy button puts the body on the clipboard and shows feedback', (
