@@ -28,10 +28,13 @@ class TabChip extends StatelessWidget {
       buildWhen: (prev, next) =>
           prev.activeIndex != next.activeIndex ||
           prev.tabs.length != next.tabs.length ||
+          prev.activePanelId != next.activePanelId ||
+          prev.activePanel?.name != next.activePanel?.name ||
           _activeTab(prev)?.displayTitle != _activeTab(next)?.displayTitle,
       builder: (context, state) {
         final tabs = state.tabs;
         final activeIndex = state.activeIndex;
+        final panelName = state.activePanel?.name ?? '';
         final title = _activeTab(state)?.displayTitle ?? 'NO TABS';
 
         return InkWell(
@@ -61,7 +64,9 @@ class TabChip extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    tabs.isEmpty ? '0' : '${activeIndex + 1}/${tabs.length} ▾',
+                    tabs.isEmpty
+                        ? '0'
+                        : '$panelName · ${activeIndex + 1}/${tabs.length} ▾',
                     style: TextStyle(
                       color: theme.colorScheme.onPrimary,
                       fontSize: layout.fontSizeNormal,

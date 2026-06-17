@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
+import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
+import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
@@ -42,13 +46,16 @@ class TabSwitcherSheet extends StatelessWidget {
     final layout = context.appLayout;
 
     return BlocBuilder<TabsBloc, TabsState>(
-      // The sheet only renders the tab list + active highlight; skip rebuilds
-      // for emissions that change neither (e.g. an isLoading-only flip).
+      // The sheet renders panels + tab list; rebuild when any of these change.
       buildWhen: (prev, next) =>
-          prev.tabs != next.tabs || prev.activeIndex != next.activeIndex,
+          prev.tabs != next.tabs ||
+          prev.activeIndex != next.activeIndex ||
+          prev.panels != next.panels ||
+          prev.activePanelId != next.activePanelId,
       builder: (context, state) {
         final tabs = state.tabs;
         final activeIndex = state.activeIndex;
+        final panels = state.panels;
 
         return FractionallySizedBox(
           heightFactor: 0.85,
@@ -70,6 +77,7 @@ class TabSwitcherSheet extends StatelessWidget {
               child: Column(
                 children: [
                   _Header(count: tabs.length),
+                  _PanelRow(panels: panels, activePanelId: state.activePanelId),
                   Expanded(
                     child: tabs.isEmpty
                         ? Center(
@@ -98,6 +106,7 @@ class TabSwitcherSheet extends StatelessWidget {
                                 tab: tab,
                                 index: index,
                                 isActive: index == activeIndex,
+                                panels: panels,
                                 onTap: () {
                                   context.read<TabsBloc>().add(
                                     SetActiveIndex(index),
@@ -181,6 +190,173 @@ class _Header extends StatelessWidget {
   }
 }
 
+/// Horizontally scrollable row of panel chips, shown above the tab list.
+class _PanelRow extends StatelessWidget {
+  const _PanelRow({
+    required this.panels,
+    required this.activePanelId,
+  });
+  final List<PanelEntity> panels;
+  final String activePanelId;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final layout = context.appLayout;
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: theme.dividerColor,
+            width: layout.borderThin,
+          ),
+        ),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.symmetric(
+          horizontal: layout.pagePadding / 2,
+          vertical: 8,
+        ),
+        child: Row(
+          children: [
+            for (final panel in panels)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _PanelChip(
+                  key: ValueKey('panel_chip_${panel.id}'),
+                  panel: panel,
+                  isActive: panel.id == activePanelId,
+                ),
+              ),
+            const _AddPanelChip(key: ValueKey('sheet_add_panel')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A single panel chip inside the panel row.
+class _PanelChip extends StatelessWidget {
+  const _PanelChip({
+    required this.panel,
+    required this.isActive,
+    super.key,
+  });
+  final PanelEntity panel;
+  final bool isActive;
+
+  void _openRename(BuildContext context) {
+    unawaited(
+      NamePromptDialog.show(
+        context,
+        title: 'RENAME PANEL',
+        initialText: panel.name,
+        onConfirm: (value) =>
+            context.read<TabsBloc>().add(RenamePanel(panel.id, value)),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final layout = context.appLayout;
+
+    final foreground = isActive
+        ? theme.colorScheme.onPrimary
+        : theme.colorScheme.onSurface;
+    final background = isActive
+        ? theme.primaryColor
+        : theme.colorScheme.surface;
+
+    return Material(
+      color: background,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: theme.dividerColor, width: layout.borderThin),
+        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+      ),
+      child: InkWell(
+        onTap: () => context.read<TabsBloc>().add(SetActivePanel(panel.id)),
+        onDoubleTap: () => _openRename(context),
+        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                panel.name,
+                style: TextStyle(
+                  fontSize: layout.fontSizeNormal,
+                  fontWeight: isActive
+                      ? context.appTypography.displayWeight
+                      : context.appTypography.bodyWeight,
+                  color: foreground,
+                ),
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                icon: Icon(Icons.edit, size: layout.iconSize - 2),
+                onPressed: () => _openRename(context),
+                tooltip: 'RENAME',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                color: foreground,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The trailing "+ New panel" chip in the panel row.
+class _AddPanelChip extends StatelessWidget {
+  const _AddPanelChip({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final layout = context.appLayout;
+    return Material(
+      color: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: theme.dividerColor, width: layout.borderThin),
+        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+      ),
+      child: InkWell(
+        onTap: () => context.read<TabsBloc>().add(const AddPanel()),
+        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.add,
+                size: layout.iconSize - 2,
+                color: theme.colorScheme.onSurface,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'NEW PANEL',
+                style: TextStyle(
+                  fontSize: layout.fontSizeNormal,
+                  fontWeight: context.appTypography.bodyWeight,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TabRow extends StatelessWidget {
   const _TabRow({
     required this.tab,
@@ -188,6 +364,7 @@ class _TabRow extends StatelessWidget {
     required this.isActive,
     required this.onTap,
     required this.onClose,
+    required this.panels,
     super.key,
   });
   final HttpRequestTabEntity tab;
@@ -195,12 +372,16 @@ class _TabRow extends StatelessWidget {
   final bool isActive;
   final VoidCallback onTap;
   final VoidCallback onClose;
+  final List<PanelEntity> panels;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
     final title = tab.displayTitle;
+    // Only show the move popup when there are 2+ panels (one to move from, one
+    // to move to). With a single panel there is nowhere to move to.
+    final hasMultiplePanels = panels.length > 1;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -236,6 +417,12 @@ class _TabRow extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (hasMultiplePanels)
+                  _MoveToPanelButton(
+                    tab: tab,
+                    panels: panels,
+                    isActive: isActive,
+                  ),
                 IconButton(
                   icon: Icon(
                     Icons.close,
@@ -270,6 +457,63 @@ class _TabRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Popup menu button for moving a tab to another panel.
+class _MoveToPanelButton extends StatelessWidget {
+  const _MoveToPanelButton({
+    required this.tab,
+    required this.panels,
+    required this.isActive,
+  });
+  final HttpRequestTabEntity tab;
+  final List<PanelEntity> panels;
+  final bool isActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final layout = context.appLayout;
+    final iconColor = isActive
+        ? theme.colorScheme.onPrimary
+        : theme.colorScheme.onSurface;
+
+    return PopupMenuButton<_MoveTarget>(
+      key: ValueKey('tab_move_panel_${tab.tabId}'),
+      icon: Icon(Icons.open_with, size: layout.iconSize, color: iconColor),
+      tooltip: 'MOVE TO PANEL',
+      onSelected: (target) {
+        if (target.newPanel) {
+          context.read<TabsBloc>().add(MoveTabToNewPanel(tab.tabId));
+        } else {
+          context.read<TabsBloc>().add(
+            MoveTabToPanel(tab.tabId, target.panelId!),
+          );
+        }
+      },
+      itemBuilder: (context) => [
+        for (final panel in panels)
+          PopupMenuItem<_MoveTarget>(
+            key: ValueKey('tab_move_to_panel_${panel.id}'),
+            value: _MoveTarget(panelId: panel.id),
+            child: Text(panel.name),
+          ),
+        PopupMenuItem<_MoveTarget>(
+          key: ValueKey('tab_move_to_new_panel_${tab.tabId}'),
+          value: const _MoveTarget(newPanel: true),
+          child: const Text('NEW PANEL'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Simple value class to discriminate between "move to existing panel" and
+/// "move to a brand-new panel" inside the popup menu.
+class _MoveTarget {
+  const _MoveTarget({this.panelId, this.newPanel = false});
+  final String? panelId;
+  final bool newPanel;
 }
 
 class _Footer extends StatelessWidget {
