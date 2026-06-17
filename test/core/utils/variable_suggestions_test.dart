@@ -1,4 +1,3 @@
-// ignore_for_file: lines_longer_than_80_chars
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/utils/variable_resolution_helper.dart';
 import 'package:getman/core/utils/variable_suggestions.dart';
@@ -64,7 +63,7 @@ void main() {
       expect(_names(out), ['x']);
     });
 
-    test('does not suggest the \$randomUuid alias', () {
+    test(r'does not suggest the $randomUuid alias', () {
       expect(kSuggestableDynamicNames, isNot(contains(r'$randomUuid')));
       expect(kSuggestableDynamicNames, contains(r'$randomUUID'));
     });

@@ -33,7 +33,7 @@ void main() {
       expect(detectActiveVariableQuery('{{ab cd', 7), isNull);
     });
 
-    test('dynamic var with leading \$', () {
+    test(r'dynamic var with leading $', () {
       final q = detectActiveVariableQuery(r'{{$gu', 5);
       expect(q!.query, r'$gu');
     });
