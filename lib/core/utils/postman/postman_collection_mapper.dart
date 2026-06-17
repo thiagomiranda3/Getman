@@ -20,7 +20,7 @@ class PostmanCollectionMapper {
     final items = rootNode.isFolder
         ? rootNode.children.map(_nodeToItem).toList()
         : [_nodeToItem(rootNode)];
-    final collection = {
+    final collection = <String, dynamic>{
       'info': {
         '_postman_id': _uuid.v4(),
         'name': rootNode.name,
@@ -29,6 +29,12 @@ class PostmanCollectionMapper {
       },
       'item': items,
     };
+    if (rootNode.isFolder && rootNode.variables.isNotEmpty) {
+      collection['variable'] = _variablesToPostman(
+        rootNode.variables,
+        rootNode.secretKeys,
+      );
+    }
     return const JsonEncoder.withIndent('  ').convert(collection);
   }
 
@@ -67,21 +73,41 @@ class PostmanCollectionMapper {
         .whereType<Map<dynamic, dynamic>>()
         .map((m) => _itemToNode(m.cast<String, dynamic>()))
         .toList();
+    final vars = _variablesFromPostman(parsed['variable']);
     return CollectionNodeEntity(
       id: _uuid.v4(),
       name: name,
       children: children,
+      variables: vars.variables,
+      secretKeys: vars.secretKeys,
     );
   }
 
   // ---------- export helpers ----------
 
+  static List<Map<String, dynamic>> _variablesToPostman(
+    Map<String, String> variables,
+    Set<String> secretKeys,
+  ) {
+    return [
+      for (final e in variables.entries)
+        if (secretKeys.contains(e.key))
+          {'key': e.key, 'value': '', 'type': 'secret'}
+        else
+          {'key': e.key, 'value': e.value, 'type': 'default'},
+    ];
+  }
+
   static Map<String, dynamic> _nodeToItem(CollectionNodeEntity node) {
     if (node.isFolder) {
-      return {
+      final item = <String, dynamic>{
         'name': node.name,
         'item': node.children.map(_nodeToItem).toList(),
       };
+      if (node.variables.isNotEmpty) {
+        item['variable'] = _variablesToPostman(node.variables, node.secretKeys);
+      }
+      return item;
     }
     return {
       'name': node.name,
@@ -177,6 +203,23 @@ class PostmanCollectionMapper {
 
   // ---------- import helpers ----------
 
+  static ({Map<String, String> variables, Set<String> secretKeys})
+  _variablesFromPostman(dynamic raw) {
+    final variables = <String, String>{};
+    final secretKeys = <String>{};
+    if (raw is List) {
+      for (final entry in raw.whereType<Map<dynamic, dynamic>>()) {
+        if (entry['disabled'] == true) continue;
+        final key = entry['key'];
+        if (key is! String || key.isEmpty) continue;
+        final value = entry['value'];
+        variables[key] = value is String ? value : (value?.toString() ?? '');
+        if (entry['type'] == 'secret') secretKeys.add(key);
+      }
+    }
+    return (variables: variables, secretKeys: secretKeys);
+  }
+
   static CollectionNodeEntity _itemToNode(Map<String, dynamic> item) {
     final name = (item['name'] as String?) ?? 'Untitled';
     final nestedItems = item['item'];
@@ -185,10 +228,13 @@ class PostmanCollectionMapper {
           .whereType<Map<dynamic, dynamic>>()
           .map((m) => _itemToNode(m.cast<String, dynamic>()))
           .toList();
+      final vars = _variablesFromPostman(item['variable']);
       return CollectionNodeEntity(
         id: _uuid.v4(),
         name: name,
         children: children,
+        variables: vars.variables,
+        secretKeys: vars.secretKeys,
       );
     }
     final request = item['request'];

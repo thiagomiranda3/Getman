@@ -332,6 +332,39 @@ void main() {
     });
   });
 
+  group('collection variables', () {
+    test('round-trips folder + nested variables, masking secrets', () {
+      const inner = CollectionNodeEntity(
+        id: 'f2',
+        name: 'inner',
+        variables: {'token': 'sk-secret', 'page': '2'},
+        secretKeys: {'token'},
+      );
+      const root = CollectionNodeEntity(
+        id: 'f1',
+        name: 'API',
+        variables: {'base': 'https://api.example.com'},
+        children: [inner],
+      );
+
+      final json = PostmanCollectionMapper.toJson(root);
+      expect(json, contains('"variable"'));
+
+      final restored = PostmanCollectionMapper.fromJson(json);
+
+      // Root collection vars land on the imported root folder.
+      expect(restored.variables['base'], 'https://api.example.com');
+
+      final restoredInner = restored.children.firstWhere(
+        (c) => c.name == 'inner',
+      );
+      expect(restoredInner.variables['page'], '2');
+      // secret value is masked on export -> empty on import, key still secret.
+      expect(restoredInner.variables['token'], '');
+      expect(restoredInner.secretKeys, contains('token'));
+    });
+  });
+
   group('round-trip', () {
     test('export then import preserves names and request details', () {
       const originalLeaf = CollectionNodeEntity(
