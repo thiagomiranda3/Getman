@@ -7,6 +7,7 @@ import 'package:getman/features/chaining/domain/entities/assertion.dart';
 import 'package:getman/features/chaining/domain/entities/extraction_rule.dart';
 import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';
 import 'package:getman/features/chaining/domain/usecases/request_rules_usecases.dart';
+import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
@@ -24,6 +25,8 @@ class MockGetRequestRulesUseCase extends Mock
 
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 
+class _FakePanel extends Fake implements PanelEntity {}
+
 void main() {
   late MockTabsRepository repository;
   late MockSendRequestUseCase sendRequestUseCase;
@@ -31,6 +34,7 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(_FakeConfig());
+    registerFallbackValue(_FakePanel());
     registerFallbackValue(
       const HttpRequestTabEntity(
         tabId: 'fallback',
@@ -46,6 +50,14 @@ void main() {
     when(() => repository.putTab(any())).thenAnswer((_) async {});
     when(() => repository.deleteTabs(any())).thenAnswer((_) async {});
     when(() => repository.saveTabOrder(any())).thenAnswer((_) async {});
+    // Panel-aware persistence stubs (Task 4): the bloc now reads/writes panels.
+    when(() => repository.getPanels()).thenAnswer((_) async => <PanelEntity>[]);
+    when(() => repository.getActivePanelId()).thenAnswer((_) async => null);
+    when(() => repository.putPanel(any())).thenAnswer((_) async {});
+    when(() => repository.deletePanels(any())).thenAnswer((_) async {});
+    when(
+      () => repository.savePanelMeta(any(), any()),
+    ).thenAnswer((_) async {});
     bloc = TabsBloc(
       repository: repository,
       sendRequestUseCase: sendRequestUseCase,
@@ -64,8 +76,32 @@ void main() {
   Matcher hasTabId(String id) =>
       isA<HttpRequestTabEntity>().having((t) => t.tabId, 'tabId', id);
 
+  Matcher hasPanelTabIds(List<String> ids) => isA<PanelEntity>().having(
+    (p) => p.tabs.map((t) => t.tabId).toList(),
+    'tab ids',
+    ids,
+  );
+
+  /// Seed the bloc with [tabs] as the active panel ("p1") and drive a load.
+  ///
+  /// An empty list mirrors a true first run (no persisted panels), so the bloc
+  /// seeds its own "Panel 1" with the sample request.
   Future<void> loadWith(List<HttpRequestTabEntity> tabs) async {
-    when(() => repository.getTabs()).thenAnswer((_) async => tabs);
+    if (tabs.isEmpty) {
+      when(
+        () => repository.getPanels(),
+      ).thenAnswer((_) async => <PanelEntity>[]);
+      when(() => repository.getActivePanelId()).thenAnswer((_) async => null);
+    } else {
+      final panel = PanelEntity(
+        id: 'p1',
+        name: 'Panel 1',
+        tabs: tabs,
+        activeTabId: tabs.first.tabId,
+      );
+      when(() => repository.getPanels()).thenAnswer((_) async => [panel]);
+      when(() => repository.getActivePanelId()).thenAnswer((_) async => 'p1');
+    }
     bloc.add(const LoadTabs());
     await expectLater(
       bloc.stream,
@@ -97,22 +133,28 @@ void main() {
     });
 
     test(
-      'persists the auto-created tab and its order on a fresh boot',
+      'persists the auto-created tab and the seeded panel on a fresh boot',
       () async {
         await loadWith([]);
         await pumpEventQueue();
 
         final id = bloc.state.tabs.single.tabId;
         verify(() => repository.putTab(any(that: hasTabId(id)))).called(1);
-        verify(() => repository.saveTabOrder([id])).called(1);
+        verify(
+          () => repository.putPanel(any(that: hasPanelTabIds([id]))),
+        ).called(1);
+        verify(
+          () => repository.savePanelMeta([bloc.state.activePanelId], any()),
+        ).called(1);
         verifyNever(() => repository.saveTabs(any()));
+        verifyNever(() => repository.saveTabOrder(any()));
       },
     );
   });
 
   group('incremental persistence', () {
     test(
-      'AddTab persists the new tab and the order, never the full list',
+      'AddTab persists the new tab and the panel, never the full list',
       () async {
         await loadWith([tab('a')]);
         bloc.add(const AddTab());
@@ -120,83 +162,106 @@ void main() {
 
         final newId = bloc.state.tabs.last.tabId;
         verify(() => repository.putTab(any(that: hasTabId(newId)))).called(1);
-        verify(() => repository.saveTabOrder(['a', newId])).called(1);
+        verify(
+          () => repository.putPanel(any(that: hasPanelTabIds(['a', newId]))),
+        ).called(1);
         verifyNever(() => repository.saveTabs(any()));
+        verifyNever(() => repository.saveTabOrder(any()));
       },
     );
 
-    test('RemoveTab deletes the tab and rewrites only the order', () async {
+    test('RemoveTab deletes the tab and rewrites only the panel', () async {
       await loadWith([tab('a'), tab('b'), tab('c')]);
       bloc.add(const RemoveTab('c'));
       await pumpEventQueue();
 
       verify(() => repository.deleteTabs(['c'])).called(1);
-      verify(() => repository.saveTabOrder(['a', 'b'])).called(1);
+      verify(
+        () => repository.putPanel(any(that: hasPanelTabIds(['a', 'b']))),
+      ).called(1);
       verifyNever(() => repository.putTab(any()));
       verifyNever(() => repository.saveTabs(any()));
+      verifyNever(() => repository.saveTabOrder(any()));
     });
 
-    test('DuplicateTab persists the copy and the order', () async {
+    test('DuplicateTab persists the copy and the panel', () async {
       await loadWith([tab('a'), tab('b')]);
       bloc.add(const DuplicateTab('a'));
       await pumpEventQueue();
 
       final copyId = bloc.state.tabs[1].tabId;
       verify(() => repository.putTab(any(that: hasTabId(copyId)))).called(1);
-      verify(() => repository.saveTabOrder(['a', copyId, 'b'])).called(1);
+      verify(
+        () => repository.putPanel(
+          any(that: hasPanelTabIds(['a', copyId, 'b'])),
+        ),
+      ).called(1);
       verifyNever(() => repository.saveTabs(any()));
+      verifyNever(() => repository.saveTabOrder(any()));
     });
 
-    test('ReorderTabs persists only the order', () async {
+    test('ReorderTabs persists only the panel', () async {
       await loadWith([tab('a'), tab('b'), tab('c')]);
       bloc.add(const ReorderTabs(0, 3));
       await pumpEventQueue();
 
-      verify(() => repository.saveTabOrder(['b', 'c', 'a'])).called(1);
+      verify(
+        () => repository.putPanel(any(that: hasPanelTabIds(['b', 'c', 'a']))),
+      ).called(1);
       verifyNever(() => repository.putTab(any()));
       verifyNever(() => repository.deleteTabs(any()));
       verifyNever(() => repository.saveTabs(any()));
+      verifyNever(() => repository.saveTabOrder(any()));
     });
 
     test(
-      'CloseOtherTabs deletes the removed tabs and rewrites the order',
+      'CloseOtherTabs deletes the removed tabs and rewrites the panel',
       () async {
         await loadWith([tab('a'), tab('b'), tab('c')]);
         bloc.add(const CloseOtherTabs('b'));
         await pumpEventQueue();
 
         verify(() => repository.deleteTabs(['a', 'c'])).called(1);
-        verify(() => repository.saveTabOrder(['b'])).called(1);
+        verify(
+          () => repository.putPanel(any(that: hasPanelTabIds(['b']))),
+        ).called(1);
         verifyNever(() => repository.putTab(any()));
         verifyNever(() => repository.saveTabs(any()));
+        verifyNever(() => repository.saveTabOrder(any()));
       },
     );
 
     test(
-      'CloseTabsToTheRight deletes the removed tabs and rewrites the order',
+      'CloseTabsToTheRight deletes the removed tabs and rewrites the panel',
       () async {
         await loadWith([tab('a'), tab('b'), tab('c')]);
         bloc.add(const CloseTabsToTheRight('a'));
         await pumpEventQueue();
 
         verify(() => repository.deleteTabs(['b', 'c'])).called(1);
-        verify(() => repository.saveTabOrder(['a'])).called(1);
+        verify(
+          () => repository.putPanel(any(that: hasPanelTabIds(['a']))),
+        ).called(1);
         verifyNever(() => repository.putTab(any()));
         verifyNever(() => repository.saveTabs(any()));
+        verifyNever(() => repository.saveTabOrder(any()));
       },
     );
 
     test(
-      'CloseTabsToTheLeft deletes the removed tabs and rewrites the order',
+      'CloseTabsToTheLeft deletes the removed tabs and rewrites the panel',
       () async {
         await loadWith([tab('a'), tab('b'), tab('c')]);
         bloc.add(const CloseTabsToTheLeft('c'));
         await pumpEventQueue();
 
         verify(() => repository.deleteTabs(['a', 'b'])).called(1);
-        verify(() => repository.saveTabOrder(['c'])).called(1);
+        verify(
+          () => repository.putPanel(any(that: hasPanelTabIds(['c']))),
+        ).called(1);
         verifyNever(() => repository.putTab(any()));
         verifyNever(() => repository.saveTabs(any()));
+        verifyNever(() => repository.saveTabOrder(any()));
       },
     );
 
@@ -799,7 +864,17 @@ void main() {
         );
         addTearDown(ruleBloc.close);
 
-        when(() => repository.getTabs()).thenAnswer((_) async => [tab('t1')]);
+        when(() => repository.getPanels()).thenAnswer(
+          (_) async => [
+            PanelEntity(
+              id: 'p1',
+              name: 'Panel 1',
+              tabs: [tab('t1')],
+              activeTabId: 't1',
+            ),
+          ],
+        );
+        when(() => repository.getActivePanelId()).thenAnswer((_) async => 'p1');
         ruleBloc.add(const LoadTabs());
         await ruleBloc.stream.firstWhere(
           (s) => !s.isLoading && s.tabs.isNotEmpty,
@@ -851,7 +926,17 @@ void main() {
         );
         addTearDown(ruleBloc.close);
 
-        when(() => repository.getTabs()).thenAnswer((_) async => [tab('t1')]);
+        when(() => repository.getPanels()).thenAnswer(
+          (_) async => [
+            PanelEntity(
+              id: 'p1',
+              name: 'Panel 1',
+              tabs: [tab('t1')],
+              activeTabId: 't1',
+            ),
+          ],
+        );
+        when(() => repository.getActivePanelId()).thenAnswer((_) async => 'p1');
         ruleBloc.add(const LoadTabs());
         await ruleBloc.stream.firstWhere(
           (s) => !s.isLoading && s.tabs.isNotEmpty,

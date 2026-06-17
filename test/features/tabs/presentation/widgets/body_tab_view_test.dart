@@ -8,6 +8,7 @@ import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
@@ -24,12 +25,24 @@ class MockSendRequestUseCase extends Mock implements SendRequestUseCase {}
 
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 
+class _FakePanel extends Fake implements PanelEntity {}
+
 Future<TabsBloc> _loadedBloc(
   MockTabsRepository repository,
   MockSendRequestUseCase useCase,
   HttpRequestTabEntity tab,
 ) async {
-  when(() => repository.getTabs()).thenAnswer((_) async => [tab]);
+  when(() => repository.getPanels()).thenAnswer(
+    (_) async => [
+      PanelEntity(
+        id: 'p1',
+        name: 'Panel 1',
+        tabs: [tab],
+        activeTabId: tab.tabId,
+      ),
+    ],
+  );
+  when(() => repository.getActivePanelId()).thenAnswer((_) async => 'p1');
   final bloc = TabsBloc(repository: repository, sendRequestUseCase: useCase)
     ..add(const LoadTabs());
   await bloc.stream.firstWhere((s) => !s.isLoading && s.tabs.isNotEmpty);
@@ -63,6 +76,7 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(_FakeConfig());
+    registerFallbackValue(_FakePanel());
     registerFallbackValue(
       const HttpRequestTabEntity(
         tabId: 'fallback',
@@ -78,6 +92,11 @@ void main() {
     when(() => repository.putTab(any())).thenAnswer((_) async {});
     when(() => repository.deleteTabs(any())).thenAnswer((_) async {});
     when(() => repository.saveTabOrder(any())).thenAnswer((_) async {});
+    when(() => repository.putPanel(any())).thenAnswer((_) async {});
+    when(() => repository.deletePanels(any())).thenAnswer((_) async {});
+    when(
+      () => repository.savePanelMeta(any(), any()),
+    ).thenAnswer((_) async {});
   });
 
   HttpRequestTabEntity tab(

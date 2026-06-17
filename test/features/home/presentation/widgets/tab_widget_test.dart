@@ -12,6 +12,7 @@ import 'package:getman/features/collections/presentation/bloc/collections_bloc.d
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/home/presentation/widgets/tab_widget.dart';
+import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
@@ -26,6 +27,23 @@ class MockSendRequestUseCase extends Mock implements SendRequestUseCase {}
 class MockCollectionsRepository extends Mock implements CollectionsRepository {}
 
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
+
+class _FakePanel extends Fake implements PanelEntity {}
+
+/// Stub the panel reads so [LoadTabs] surfaces [tab] in the active panel.
+void _stubLoad(MockTabsRepository repo, HttpRequestTabEntity tab) {
+  when(() => repo.getPanels()).thenAnswer(
+    (_) async => [
+      PanelEntity(
+        id: 'p1',
+        name: 'Panel 1',
+        tabs: [tab],
+        activeTabId: tab.tabId,
+      ),
+    ],
+  );
+  when(() => repo.getActivePanelId()).thenAnswer((_) async => 'p1');
+}
 
 HttpRequestTabEntity _linkedTab() => const HttpRequestTabEntity(
   tabId: 'tab1',
@@ -46,6 +64,7 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(_FakeConfig());
+    registerFallbackValue(_FakePanel());
     registerFallbackValue(<CollectionNodeEntity>[]);
     registerFallbackValue(
       const HttpRequestTabEntity(
@@ -63,6 +82,11 @@ void main() {
     when(() => tabsRepo.putTab(any())).thenAnswer((_) async {});
     when(() => tabsRepo.deleteTabs(any())).thenAnswer((_) async {});
     when(() => tabsRepo.saveTabOrder(any())).thenAnswer((_) async {});
+    when(() => tabsRepo.putPanel(any())).thenAnswer((_) async {});
+    when(() => tabsRepo.deletePanels(any())).thenAnswer((_) async {});
+    when(
+      () => tabsRepo.savePanelMeta(any(), any()),
+    ).thenAnswer((_) async {});
     when(
       () => collectionsRepo.getCollections(),
     ).thenAnswer((_) async => const []);
@@ -70,7 +94,7 @@ void main() {
   });
 
   Future<void> pumpTab(WidgetTester tester, HttpRequestTabEntity tab) async {
-    when(() => tabsRepo.getTabs()).thenAnswer((_) async => [tab]);
+    _stubLoad(tabsRepo, tab);
     final tabsBloc = TabsBloc(
       repository: tabsRepo,
       sendRequestUseCase: sendUseCase,
@@ -165,7 +189,7 @@ void main() {
     'chrome (no borderRadius-on-non-uniform-border lerp)',
     (tester) async {
       final tab = _linkedTab();
-      when(() => tabsRepo.getTabs()).thenAnswer((_) async => [tab]);
+      _stubLoad(tabsRepo, tab);
       final tabsBloc = TabsBloc(
         repository: tabsRepo,
         sendRequestUseCase: sendUseCase,

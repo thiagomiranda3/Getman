@@ -21,6 +21,7 @@ import 'package:getman/features/history/presentation/bloc/history_state.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
@@ -39,6 +40,8 @@ class MockSaveSettingsUseCase extends Mock implements SaveSettingsUseCase {}
 class MockCollectionsRepository extends Mock implements CollectionsRepository {}
 
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
+
+class _FakePanel extends Fake implements PanelEntity {}
 
 // Minimal empty HistoryBloc so the response pane's Compare button finds it in
 // scope; no history -> the only compare target here is the saved example.
@@ -66,6 +69,7 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(_FakeConfig());
+    registerFallbackValue(_FakePanel());
     registerFallbackValue(<CollectionNodeEntity>[]);
     registerFallbackValue(
       const HttpRequestTabEntity(
@@ -84,6 +88,11 @@ void main() {
     when(() => tabsRepo.putTab(any())).thenAnswer((_) async {});
     when(() => tabsRepo.deleteTabs(any())).thenAnswer((_) async {});
     when(() => tabsRepo.saveTabOrder(any())).thenAnswer((_) async {});
+    when(() => tabsRepo.putPanel(any())).thenAnswer((_) async {});
+    when(() => tabsRepo.deletePanels(any())).thenAnswer((_) async {});
+    when(
+      () => tabsRepo.savePanelMeta(any(), any()),
+    ).thenAnswer((_) async {});
     when(
       () => collectionsRepo.getCollections(),
     ).thenAnswer((_) async => const []);
@@ -94,7 +103,17 @@ void main() {
     WidgetTester tester,
     HttpRequestTabEntity tab,
   ) async {
-    when(() => tabsRepo.getTabs()).thenAnswer((_) async => [tab]);
+    when(() => tabsRepo.getPanels()).thenAnswer(
+      (_) async => [
+        PanelEntity(
+          id: 'p1',
+          name: 'Panel 1',
+          tabs: [tab],
+          activeTabId: tab.tabId,
+        ),
+      ],
+    );
+    when(() => tabsRepo.getActivePanelId()).thenAnswer((_) async => 'p1');
     final tabsBloc = TabsBloc(
       repository: tabsRepo,
       sendRequestUseCase: sendUseCase,

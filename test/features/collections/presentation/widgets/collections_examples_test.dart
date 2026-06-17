@@ -14,6 +14,7 @@ import 'package:getman/features/collections/domain/usecases/collections_usecases
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/collections_list.dart';
+import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
@@ -29,6 +30,8 @@ class MockSendRequestUseCase extends Mock implements SendRequestUseCase {}
 
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 
+class _FakePanel extends Fake implements PanelEntity {}
+
 void main() {
   late MockCollectionsRepository collectionsRepo;
   late MockTabsRepository tabsRepo;
@@ -37,6 +40,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(<CollectionNodeEntity>[]);
     registerFallbackValue(_FakeConfig());
+    registerFallbackValue(_FakePanel());
     registerFallbackValue(
       const HttpRequestTabEntity(
         tabId: 'fallback',
@@ -58,6 +62,15 @@ void main() {
     when(() => tabsRepo.putTab(any())).thenAnswer((_) async {});
     when(() => tabsRepo.deleteTabs(any())).thenAnswer((_) async {});
     when(() => tabsRepo.saveTabOrder(any())).thenAnswer((_) async {});
+    // Panel-aware load: no persisted panels -> first-run seed (the example
+    // tests only assert on the collections list, not the seeded tab).
+    when(() => tabsRepo.getPanels()).thenAnswer((_) async => <PanelEntity>[]);
+    when(() => tabsRepo.getActivePanelId()).thenAnswer((_) async => null);
+    when(() => tabsRepo.putPanel(any())).thenAnswer((_) async {});
+    when(() => tabsRepo.deletePanels(any())).thenAnswer((_) async {});
+    when(
+      () => tabsRepo.savePanelMeta(any(), any()),
+    ).thenAnswer((_) async {});
   });
 
   final example = SavedExampleEntity(
