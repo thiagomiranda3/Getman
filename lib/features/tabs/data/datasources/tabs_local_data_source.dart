@@ -127,8 +127,12 @@ class TabsLocalDataSourceImpl implements TabsLocalDataSource {
 
   @override
   Future<String?> getActivePanelId() async {
-    final v = _metaBox().get(activePanelKey);
-    return v is String ? v : null;
+    try {
+      final v = _metaBox().get(activePanelKey);
+      return v is String ? v : null;
+    } catch (e) {
+      throw PersistenceException('Failed to read active panel id', cause: e);
+    }
   }
 
   @override

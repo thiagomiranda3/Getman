@@ -135,4 +135,84 @@ void main() {
     expect(bloc.state.tabs, hasLength(1));
     expect(bloc.state.activePanelId, bloc.state.panels.single.id);
   });
+
+  group('empty-panels guard (pre-LoadTabs)', () {
+    // All active-panel-scoped handlers must no-op — not throw — when
+    // dispatched before LoadTabs fills state.panels (initial TabsState is
+    // empty).
+    test('SetActiveIndex does not throw on empty panels', () async {
+      final bloc = buildBloc();
+      addTearDown(bloc.close);
+      expect(
+        () => bloc.add(const SetActiveIndex(0)),
+        returnsNormally,
+      );
+      // Give the handler a tick to complete.
+      await Future<void>.delayed(Duration.zero);
+      expect(bloc.state.panels, isEmpty); // state unchanged
+    });
+
+    test('AddTab does not throw on empty panels', () async {
+      final bloc = buildBloc();
+      addTearDown(bloc.close);
+      expect(() => bloc.add(const AddTab()), returnsNormally);
+      await Future<void>.delayed(Duration.zero);
+      expect(bloc.state.panels, isEmpty);
+    });
+
+    test('ReorderTabs does not throw on empty panels', () async {
+      final bloc = buildBloc();
+      addTearDown(bloc.close);
+      expect(
+        () => bloc.add(const ReorderTabs(0, 1)),
+        returnsNormally,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(bloc.state.panels, isEmpty);
+    });
+
+    test('CloseOtherTabs does not throw on empty panels', () async {
+      final bloc = buildBloc();
+      addTearDown(bloc.close);
+      expect(
+        () => bloc.add(const CloseOtherTabs('x')),
+        returnsNormally,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(bloc.state.panels, isEmpty);
+    });
+
+    test('CloseTabsToTheRight does not throw on empty panels', () async {
+      final bloc = buildBloc();
+      addTearDown(bloc.close);
+      expect(
+        () => bloc.add(const CloseTabsToTheRight('x')),
+        returnsNormally,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(bloc.state.panels, isEmpty);
+    });
+
+    test('CloseTabsToTheLeft does not throw on empty panels', () async {
+      final bloc = buildBloc();
+      addTearDown(bloc.close);
+      expect(
+        () => bloc.add(const CloseTabsToTheLeft('x')),
+        returnsNormally,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(bloc.state.panels, isEmpty);
+    });
+
+    test('DuplicateTab does not throw on empty panels', () async {
+      final bloc = buildBloc();
+      addTearDown(bloc.close);
+      expect(
+        () => bloc.add(const DuplicateTab('x')),
+        returnsNormally,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(bloc.state.panels, isEmpty);
+    });
+  });
 }

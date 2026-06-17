@@ -273,6 +273,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   }
 
   Future<void> _onAddTab(AddTab event, Emitter<TabsState> emit) async {
+    if (state.panels.isEmpty) return;
     // Global dedup: if a tab for this node is already open in any panel, switch
     // to it instead of opening a duplicate.
     if (event.collectionNodeId != null) {
@@ -333,6 +334,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     SetActiveIndex event,
     Emitter<TabsState> emit,
   ) async {
+    if (state.panels.isEmpty) return;
     final active = _activePanel;
     if (event.index < 0 || event.index >= active.tabs.length) return;
     final updated = active.copyWith(
@@ -346,6 +348,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     ReorderTabs event,
     Emitter<TabsState> emit,
   ) async {
+    if (state.panels.isEmpty) return;
     final active = _activePanel;
     final tabs = [...active.tabs];
     var newIndex = event.newIndex;
@@ -368,6 +371,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     CloseOtherTabs event,
     Emitter<TabsState> emit,
   ) async {
+    if (state.panels.isEmpty) return;
     final active = _activePanel;
     if (active.tabs.length <= 1) return;
     final keep = active.tabs.byId(event.tabId);
@@ -387,6 +391,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     CloseTabsToTheRight event,
     Emitter<TabsState> emit,
   ) async {
+    if (state.panels.isEmpty) return;
     final active = _activePanel;
     final index = active.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index == -1 || index >= active.tabs.length - 1) return;
@@ -410,6 +415,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     CloseTabsToTheLeft event,
     Emitter<TabsState> emit,
   ) async {
+    if (state.panels.isEmpty) return;
     final active = _activePanel;
     final index = active.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index <= 0) return;
@@ -433,6 +439,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     DuplicateTab event,
     Emitter<TabsState> emit,
   ) async {
+    if (state.panels.isEmpty) return;
     final active = _activePanel;
     final index = active.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index == -1) return;
