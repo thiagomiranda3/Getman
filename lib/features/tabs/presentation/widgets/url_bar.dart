@@ -5,12 +5,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/ui/widgets/variable_autocomplete.dart';
 import 'package:getman/core/ui/widgets/variable_highlight_controller.dart';
 import 'package:getman/core/ui/widgets/variable_hover_popover.dart';
 import 'package:getman/core/utils/curl_utils.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/core/utils/request_variable_resolver.dart';
 import 'package:getman/core/utils/variable_resolution_helper.dart';
+import 'package:getman/core/utils/variable_suggestions.dart';
 import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
@@ -102,11 +104,17 @@ class _UrlBarState extends State<UrlBar> {
     );
   }
 
-  // Resolves the full active environment (not just its variables, as
-  // _activeVariables does) because the popover needs the name + secretKeys to
-  // mask secrets and label the source. Both read live bloc state at call time.
-  void _showVariablePopover(String name, Offset globalPosition) {
-    if (!mounted) return;
+  // Gathers the layered variable context (env + collection) from live bloc
+  // state at call time. Used by both _showVariablePopover and _urlSuggestions
+  // so neither duplicates the bloc reads.
+  ({
+    Map<String, String> envVars,
+    Set<String> envSecrets,
+    String? envName,
+    Map<String, String> collectionVars,
+    Set<String> collectionSecrets,
+  })
+  _layeredContext() {
     final envState = context.read<EnvironmentsBloc>().state;
     final settings = context.read<SettingsBloc>().state.settings;
     final env = ActiveEnvironmentHelper.activeEnvironment(
@@ -120,13 +128,47 @@ class _UrlBarState extends State<UrlBar> {
             context.read<CollectionsBloc>().state.collections,
             tab!.collectionNodeId!,
           );
+    return (
+      envVars: env?.variables ?? const {},
+      envSecrets: env?.secretKeys ?? const {},
+      envName: env?.name,
+      collectionVars: collected.variables,
+      collectionSecrets: collected.secretKeys,
+    );
+  }
+
+  List<VariableSuggestion> _urlSuggestions(String query) {
+    final ctx = _layeredContext();
+    return buildVariableSuggestions(
+      query: query,
+      userVariableNames: <String>{
+        ...ctx.envVars.keys,
+        ...ctx.collectionVars.keys,
+      },
+      classify: (name) => VariableResolutionHelper.classifyLayered(
+        name: name,
+        collectionVariables: ctx.collectionVars,
+        collectionSecrets: ctx.collectionSecrets,
+        environmentVariables: ctx.envVars,
+        environmentSecrets: ctx.envSecrets,
+        environmentName: ctx.envName,
+      ),
+    );
+  }
+
+  // Resolves the full active environment (not just its variables, as
+  // _activeVariables does) because the popover needs the name + secretKeys to
+  // mask secrets and label the source. Both read live bloc state at call time.
+  void _showVariablePopover(String name, Offset globalPosition) {
+    if (!mounted) return;
+    final ctx = _layeredContext();
     final data = VariableResolutionHelper.classifyLayered(
       name: name,
-      collectionVariables: collected.variables,
-      collectionSecrets: collected.secretKeys,
-      environmentVariables: env?.variables ?? const {},
-      environmentSecrets: env?.secretKeys ?? const {},
-      environmentName: env?.name,
+      collectionVariables: ctx.collectionVars,
+      collectionSecrets: ctx.collectionSecrets,
+      environmentVariables: ctx.envVars,
+      environmentSecrets: ctx.envSecrets,
+      environmentName: ctx.envName,
     );
     _hoverController.showFor(context, data, globalPosition);
   }
@@ -226,28 +268,35 @@ class _UrlBarState extends State<UrlBar> {
                           ),
                           SizedBox(width: gap),
                           Expanded(
-                            child: TextField(
-                              key: const ValueKey('url_field'),
+                            child: VariableAutocomplete(
                               controller: _urlController,
                               focusNode: _urlFocusNode,
-                              style: TextStyle(
-                                fontSize: layout.fontSizeTitle,
-                                fontWeight: FontWeight.w600,
-                                color: theme.colorScheme.onSurface,
+                              suggestionsFor: _urlSuggestions,
+                              onAccepted: (value) =>
+                                  _handleUrlChanged(context, tab, value),
+                              child: TextField(
+                                key: const ValueKey('url_field'),
+                                controller: _urlController,
+                                focusNode: _urlFocusNode,
+                                style: TextStyle(
+                                  fontSize: layout.fontSizeTitle,
+                                  fontWeight: FontWeight.w600,
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                                decoration: const InputDecoration(
+                                  hintText: 'Enter URL or paste cURL...',
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  isDense: true,
+                                  filled: false,
+                                ),
+                                keyboardType: TextInputType.url,
+                                autocorrect: false,
+                                enableSuggestions: false,
+                                onChanged: (val) =>
+                                    _handleUrlChanged(context, tab, val),
                               ),
-                              decoration: const InputDecoration(
-                                hintText: 'Enter URL or paste cURL...',
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                isDense: true,
-                                filled: false,
-                              ),
-                              keyboardType: TextInputType.url,
-                              autocorrect: false,
-                              enableSuggestions: false,
-                              onChanged: (val) =>
-                                  _handleUrlChanged(context, tab, val),
                             ),
                           ),
                           SizedBox(width: gap),

@@ -1,8 +1,10 @@
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/core/ui/widgets/key_value_list_editor.dart';
+import 'package:getman/core/ui/widgets/variable_hover_popover.dart';
 
 const _mapEquality = MapEquality<String, String>();
 
@@ -224,6 +226,85 @@ void main() {
       expect(reported, {'TOKEN'});
     });
   });
+
+  testWidgets('value field shows {{var}} autocomplete when a '
+      'variableContext is provided', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: brutalistTheme(Brightness.light),
+        home: Scaffold(
+          body: KeyValueListEditor<Map<String, String>>(
+            items: const <String, String>{},
+            decode: (map) => [for (final e in map.entries) (e.key, e.value)],
+            encode: (rows) => {
+              for (final (key, value) in rows)
+                if (key.isNotEmpty) key: value,
+            },
+            equals: const MapEquality<String, String>().equals,
+            variableContext: const VariableHoverContext(
+              variables: {'baseUrl': 'https://x', 'token': 't'},
+              environmentName: 'Dev',
+            ),
+            onChanged: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    // First (empty) row's value field.
+    await tester.enterText(find.widgetWithText(TextField, 'VALUE').first, '{{');
+    await tester.pumpAndSettle();
+    expect(find.text('baseUrl'), findsOneWidget);
+    expect(find.text('token'), findsOneWidget);
+  });
+
+  testWidgets(
+    'accepting a {{var}} suggestion persists via onChanged '
+    '(programmatic accept skips TextField.onChanged)',
+    (tester) async {
+      Map<String, String>? emitted;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: brutalistTheme(Brightness.light),
+          home: Scaffold(
+            body: KeyValueListEditor<Map<String, String>>(
+              items: const <String, String>{'X': ''},
+              decode: (map) => [for (final e in map.entries) (e.key, e.value)],
+              encode: (rows) => {
+                for (final (key, value) in rows)
+                  if (key.isNotEmpty) key: value,
+              },
+              equals: const MapEquality<String, String>().equals,
+              variableContext: const VariableHoverContext(
+                variables: {'baseUrl': 'https://x'},
+                environmentName: 'Dev',
+              ),
+              onChanged: (map) => emitted = map,
+            ),
+          ),
+        ),
+      );
+
+      // The row for key 'X' is the first VALUE field (index 0).
+      await tester.enterText(
+        find.widgetWithText(TextField, 'VALUE').first,
+        '{{',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('baseUrl'), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      expect(
+        emitted,
+        {'X': '{{baseUrl}}'},
+        reason:
+            'accepting a suggestion must emit via onChanged (onAccepted path)',
+      );
+    },
+  );
 }
 
 class _SecretHarness extends StatefulWidget {

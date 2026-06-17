@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
+import 'package:getman/core/ui/widgets/variable_autocomplete.dart';
 import 'package:getman/core/ui/widgets/variable_highlight_controller.dart';
 import 'package:getman/core/ui/widgets/variable_hover_popover.dart';
 import 'package:getman/core/utils/variable_resolution_helper.dart';
+import 'package:getman/core/utils/variable_suggestions.dart';
 
 /// Generic editable key/value row list backing the params, headers, and
 /// environment-variable editors. The canonical value type [T] (ordered list,
@@ -175,6 +177,7 @@ class _KeyValueListEditorState<T extends Object>
 
         final varContext = widget.variableContext;
         final valController = _valControllers[index];
+        VariableSuggestionsProvider? valueSuggestionsFor;
         if (varContext != null &&
             valController is VariableHighlightController) {
           final palette = context.appPalette;
@@ -191,6 +194,16 @@ class _KeyValueListEditorState<T extends Object>
               unresolved: palette.variableUnresolved,
             )
             ..updateVariables(varContext.variables);
+          valueSuggestionsFor = (query) => buildVariableSuggestions(
+            query: query,
+            userVariableNames: varContext.variables.keys,
+            classify: (name) => VariableResolutionHelper.classify(
+              name: name,
+              variables: varContext.variables,
+              secretKeys: varContext.secretKeys,
+              environmentName: varContext.environmentName,
+            ),
+          );
         }
 
         return _KeyValueRow(
@@ -206,6 +219,7 @@ class _KeyValueListEditorState<T extends Object>
               keyText.isNotEmpty &&
               secrets.contains(keyText),
           onToggleSecret: secrets == null ? null : () => _toggleSecret(index),
+          valueSuggestionsFor: valueSuggestionsFor,
           onKeyChanged: (val) {
             if (index == _keyControllers.length - 1 && val.isNotEmpty) {
               setState(_addEmptyRow);
@@ -243,6 +257,7 @@ class _KeyValueRow extends StatefulWidget {
     this.showSecretToggle = false,
     this.isSecret = false,
     this.onToggleSecret,
+    this.valueSuggestionsFor,
   });
   final int rowIndex;
   final String? fieldPrefix;
@@ -255,6 +270,7 @@ class _KeyValueRow extends StatefulWidget {
   final bool showSecretToggle;
   final bool isSecret;
   final VoidCallback? onToggleSecret;
+  final VariableSuggestionsProvider? valueSuggestionsFor;
 
   @override
   State<_KeyValueRow> createState() => _KeyValueRowState();
@@ -263,6 +279,13 @@ class _KeyValueRow extends StatefulWidget {
 class _KeyValueRowState extends State<_KeyValueRow> {
   bool _isHovered = false;
   bool _revealed = false;
+  final FocusNode _valueFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _valueFocusNode.dispose();
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(_KeyValueRow oldWidget) {
@@ -302,6 +325,7 @@ class _KeyValueRowState extends State<_KeyValueRow> {
           ? null
           : ValueKey('${widget.fieldPrefix}_val_${widget.rowIndex}'),
       style: textStyle,
+      focusNode: _valueFocusNode,
       obscureText: widget.isSecret && !_revealed,
       decoration: InputDecoration(
         hintText: 'VALUE',
@@ -325,6 +349,15 @@ class _KeyValueRowState extends State<_KeyValueRow> {
       enableSuggestions: false,
       onChanged: widget.onValChanged,
     );
+    final valueFieldWithAutocomplete = widget.valueSuggestionsFor == null
+        ? valueField
+        : VariableAutocomplete(
+            controller: widget.valController,
+            focusNode: _valueFocusNode,
+            suggestionsFor: widget.valueSuggestionsFor!,
+            onAccepted: widget.onValChanged,
+            child: valueField,
+          );
     final secretButton = widget.showSecretToggle
         ? context.appDecoration.wrapInteractive(
             child: IconButton(
@@ -388,14 +421,14 @@ class _KeyValueRowState extends State<_KeyValueRow> {
                     ],
                   ),
                   SizedBox(height: widget.layout.tabSpacing),
-                  valueField,
+                  valueFieldWithAutocomplete,
                 ],
               )
             : Row(
                 children: [
                   Expanded(child: keyField),
                   SizedBox(width: widget.layout.isCompact ? 8 : 12),
-                  Expanded(child: valueField),
+                  Expanded(child: valueFieldWithAutocomplete),
                   SizedBox(width: widget.layout.isCompact ? 4 : 8),
                   ?secretButton,
                   deleteButton,
