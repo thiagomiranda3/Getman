@@ -108,7 +108,7 @@ Mandatory rules:
 | 0 | `SettingsModel` | `settings` | Single key `'current'`; loaded synchronously in `main()` |
 | 1 | `HttpRequestConfig` | `history` | Shared between history and collection nodes |
 | 2 | `HttpRequestTabModel` | `tabs` | Tab state including response cache |
-| 3 | `CollectionNode` | `collections` | Nested (children list stored as `HiveField(3)`); `String? description` at `HiveField(6)`; `List<SavedExampleModel> examples` at `HiveField(7)` (next free: 8) |
+| 3 | `CollectionNode` | `collections` | Nested (children list stored as `HiveField(3)`); `String? description` at `HiveField(6)`; `List<SavedExampleModel> examples` at `HiveField(7)`; `Map<String,String> variables` at `HiveField(8)`; `List<String> secretKeys` at `HiveField(9)` (next free: 10) |
 | 4 | `EnvironmentModel` | `environments` | Flat list; `variables` is `Map<String, String>` at `HiveField(2)`; `List<String> secretKeys` at `HiveField(3)` (next free: 4) |
 | 5 | `MultipartFieldModel` | (embedded) | Multipart/form-data field; nested inside `HttpRequestConfig` |
 | 6 | `StoredCookieModel` | `cookies` | Cookie jar; keyed by `domain\|path\|name` (one put/delete per cookie) |

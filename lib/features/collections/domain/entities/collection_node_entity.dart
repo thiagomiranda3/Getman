@@ -12,6 +12,8 @@ class CollectionNodeEntity extends Equatable {
     this.isFavorite = false,
     this.description,
     this.examples = const [],
+    this.variables = const {},
+    this.secretKeys = const {},
   });
   final String id;
   final String name;
@@ -27,6 +29,15 @@ class CollectionNodeEntity extends Equatable {
   /// from [children] so tree-walk logic never treats an example as a tree node.
   final List<SavedExampleEntity> examples;
 
+  /// Collection-scoped variables for a folder. A request inherits the merge of
+  /// every ancestor folder's variables (deepest wins), overlaid by the active
+  /// environment at send time. Empty for leaf (request) nodes.
+  final Map<String, String> variables;
+
+  /// Names within [variables] flagged secret (masked in the editor + on
+  /// export).
+  final Set<String> secretKeys;
+
   CollectionNodeEntity copyWith({
     String? name,
     bool? isFolder,
@@ -35,6 +46,8 @@ class CollectionNodeEntity extends Equatable {
     bool? isFavorite,
     String? description,
     List<SavedExampleEntity>? examples,
+    Map<String, String>? variables,
+    Set<String>? secretKeys,
   }) {
     return CollectionNodeEntity(
       id: id,
@@ -45,6 +58,8 @@ class CollectionNodeEntity extends Equatable {
       isFavorite: isFavorite ?? this.isFavorite,
       description: description ?? this.description,
       examples: examples ?? this.examples,
+      variables: variables ?? this.variables,
+      secretKeys: secretKeys ?? this.secretKeys,
     );
   }
 
@@ -58,5 +73,7 @@ class CollectionNodeEntity extends Equatable {
     isFavorite,
     description,
     examples,
+    variables,
+    secretKeys,
   ];
 }

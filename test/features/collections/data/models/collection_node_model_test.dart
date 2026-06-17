@@ -152,4 +152,32 @@ void main() {
       expect(a == b, isFalse);
     });
   });
+
+  group('variables + secretKeys', () {
+    test('CollectionNode round-trips variables and secretKeys', () {
+      const entity = CollectionNodeEntity(
+        id: 'f1',
+        name: 'API',
+        variables: {'base_url': 'https://api.example.com', 'token': 'sk-1'},
+        secretKeys: {'token'},
+      );
+
+      final restored = CollectionNode.fromEntity(entity).toEntity();
+
+      expect(restored.variables, entity.variables);
+      expect(restored.secretKeys, entity.secretKeys);
+      expect(restored, entity); // Equatable includes the new fields
+    });
+
+    test('CollectionNodeEntity.copyWith replaces variables and secretKeys', () {
+      const entity = CollectionNodeEntity(id: 'f1', name: 'API');
+      final next = entity.copyWith(
+        variables: {'k': 'v'},
+        secretKeys: {'k'},
+      );
+      expect(next.variables, {'k': 'v'});
+      expect(next.secretKeys, {'k'});
+      expect(entity.variables, isEmpty); // original untouched
+    });
+  });
 }

@@ -17,9 +17,13 @@ class CollectionNode extends HiveObject {
     this.isFavorite = false,
     this.description,
     List<SavedExampleModel>? examples,
+    Map<String, String>? variables,
+    List<String>? secretKeys,
   }) : id = id ?? const Uuid().v4(),
        children = children ?? [],
-       examples = examples ?? [];
+       examples = examples ?? [],
+       variables = variables ?? {},
+       secretKeys = secretKeys ?? [];
 
   factory CollectionNode.fromEntity(CollectionNodeEntity entity) =>
       CollectionNode(
@@ -33,6 +37,8 @@ class CollectionNode extends HiveObject {
         isFavorite: entity.isFavorite,
         description: entity.description,
         examples: entity.examples.map(SavedExampleModel.fromEntity).toList(),
+        variables: Map<String, String>.from(entity.variables),
+        secretKeys: entity.secretKeys.toList(),
       );
   @HiveField(0)
   String id;
@@ -58,6 +64,12 @@ class CollectionNode extends HiveObject {
   @HiveField(7)
   List<SavedExampleModel> examples;
 
+  @HiveField(8)
+  Map<String, String> variables;
+
+  @HiveField(9)
+  List<String> secretKeys;
+
   CollectionNodeEntity toEntity() => CollectionNodeEntity(
     id: id,
     name: name,
@@ -67,5 +79,7 @@ class CollectionNode extends HiveObject {
     isFavorite: isFavorite,
     description: description,
     examples: examples.map((e) => e.toEntity()).toList(),
+    variables: Map<String, String>.from(variables),
+    secretKeys: secretKeys.toSet(),
   );
 }
