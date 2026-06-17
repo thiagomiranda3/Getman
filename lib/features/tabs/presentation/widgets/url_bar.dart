@@ -9,7 +9,10 @@ import 'package:getman/core/ui/widgets/variable_highlight_controller.dart';
 import 'package:getman/core/ui/widgets/variable_hover_popover.dart';
 import 'package:getman/core/utils/curl_utils.dart';
 import 'package:getman/core/utils/json_utils.dart';
+import 'package:getman/core/utils/request_variable_resolver.dart';
 import 'package:getman/core/utils/variable_resolution_helper.dart';
+import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/environments/domain/logic/active_environment_helper.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
@@ -88,9 +91,13 @@ class _UrlBarState extends State<UrlBar> {
   Map<String, String> _activeVariables(BuildContext context) {
     final envState = context.read<EnvironmentsBloc>().state;
     final settings = context.read<SettingsBloc>().state.settings;
-    return ActiveEnvironmentHelper.variablesFor(
-      envState.environments,
-      settings.activeEnvironmentId,
+    final collections = context.read<CollectionsBloc>().state.collections;
+    final tab = context.read<TabsBloc>().state.tabs.byId(widget.tabId);
+    return RequestVariableResolver.variablesFor(
+      environments: envState.environments,
+      activeEnvironmentId: settings.activeEnvironmentId,
+      collections: collections,
+      collectionNodeId: tab?.collectionNodeId,
     );
   }
 
@@ -105,10 +112,19 @@ class _UrlBarState extends State<UrlBar> {
       envState.environments,
       settings.activeEnvironmentId,
     );
-    final data = VariableResolutionHelper.classify(
+    final tab = context.read<TabsBloc>().state.tabs.byId(widget.tabId);
+    final collected = tab?.collectionNodeId == null
+        ? (variables: const <String, String>{}, secretKeys: const <String>{})
+        : CollectionsTreeHelper.collectVariables(
+            context.read<CollectionsBloc>().state.collections,
+            tab!.collectionNodeId!,
+          );
+    final data = VariableResolutionHelper.classifyLayered(
       name: name,
-      variables: env?.variables ?? const {},
-      secretKeys: env?.secretKeys ?? const {},
+      collectionVariables: collected.variables,
+      collectionSecrets: collected.secretKeys,
+      environmentVariables: env?.variables ?? const {},
+      environmentSecrets: env?.secretKeys ?? const {},
       environmentName: env?.name,
     );
     _hoverController.showFor(context, data, globalPosition);

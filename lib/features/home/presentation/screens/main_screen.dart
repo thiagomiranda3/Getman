@@ -9,10 +9,10 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
+import 'package:getman/core/utils/request_variable_resolver.dart';
 import 'package:getman/features/chaining/presentation/widgets/chaining_write_back_listener.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/command_palette/presentation/widgets/command_palette.dart';
-import 'package:getman/features/environments/domain/logic/active_environment_helper.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/widgets/environment_selector.dart';
 import 'package:getman/features/environments/presentation/widgets/quick_env_switcher.dart';
@@ -234,13 +234,21 @@ class _MainScreenState extends State<MainScreen> {
                     if (activeIndex >= 0 &&
                         activeIndex < tabs.length &&
                         !tabs[activeIndex].isSending) {
-                      final envVars = ActiveEnvironmentHelper.variablesFor(
-                        context.read<EnvironmentsBloc>().state.environments,
-                        context
+                      final envVars = RequestVariableResolver.variablesFor(
+                        environments: context
+                            .read<EnvironmentsBloc>()
+                            .state
+                            .environments,
+                        activeEnvironmentId: context
                             .read<SettingsBloc>()
                             .state
                             .settings
                             .activeEnvironmentId,
+                        collections: context
+                            .read<CollectionsBloc>()
+                            .state
+                            .collections,
+                        collectionNodeId: tabs[activeIndex].collectionNodeId,
                       );
                       context.read<TabsBloc>().add(
                         SendRequest(
