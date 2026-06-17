@@ -72,4 +72,70 @@ void main() {
       expect(r.environmentName, isNull);
     });
   });
+
+  group('VariableResolutionHelper.classifyLayered', () {
+    test('environment value wins over collection', () {
+      final r = VariableResolutionHelper.classifyLayered(
+        name: 'base',
+        collectionVariables: const {'base': 'collection'},
+        collectionSecrets: const {},
+        environmentVariables: const {'base': 'env'},
+        environmentSecrets: const {},
+        environmentName: 'Prod',
+      );
+      expect(r.kind, VariableValueKind.resolved);
+      expect(r.value, 'env');
+      expect(r.environmentName, 'Prod');
+    });
+
+    test('collection-only value resolves with Collection source', () {
+      final r = VariableResolutionHelper.classifyLayered(
+        name: 'only_c',
+        collectionVariables: const {'only_c': 'c'},
+        collectionSecrets: const {},
+        environmentVariables: const {},
+        environmentSecrets: const {},
+        environmentName: 'Prod',
+      );
+      expect(r.kind, VariableValueKind.resolved);
+      expect(r.value, 'c');
+      expect(r.environmentName, 'Collection');
+    });
+
+    test('collection secret is masked as secret kind', () {
+      final r = VariableResolutionHelper.classifyLayered(
+        name: 'tok',
+        collectionVariables: const {'tok': 's3cret'},
+        collectionSecrets: const {'tok'},
+        environmentVariables: const {},
+        environmentSecrets: const {},
+        environmentName: null,
+      );
+      expect(r.kind, VariableValueKind.secret);
+      expect(r.value, 's3cret');
+      expect(r.environmentName, 'Collection');
+    });
+
+    test('unknown name falls back to dynamic then unresolved', () {
+      final dyn = VariableResolutionHelper.classifyLayered(
+        name: r'$guid',
+        collectionVariables: const {},
+        collectionSecrets: const {},
+        environmentVariables: const {},
+        environmentSecrets: const {},
+        environmentName: 'Prod',
+      );
+      expect(dyn.kind, VariableValueKind.dynamicValue);
+
+      final missing = VariableResolutionHelper.classifyLayered(
+        name: 'nope',
+        collectionVariables: const {},
+        collectionSecrets: const {},
+        environmentVariables: const {},
+        environmentSecrets: const {},
+        environmentName: 'Prod',
+      );
+      expect(missing.kind, VariableValueKind.unresolved);
+    });
+  });
 }

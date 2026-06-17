@@ -65,4 +65,51 @@ class VariableResolutionHelper {
       environmentName: environmentName,
     );
   }
+
+  /// Like [classify] but aware of both layers: the active environment overrides
+  /// the collection layer (env wins). A collection-sourced value reports its
+  /// source as `'Collection'` via [ResolvedVariable.environmentName] so the
+  /// hover tooltip renders `from Collection`.
+  static ResolvedVariable classifyLayered({
+    required String name,
+    required Map<String, String> collectionVariables,
+    required Set<String> collectionSecrets,
+    required Map<String, String> environmentVariables,
+    required Set<String> environmentSecrets,
+    required String? environmentName,
+  }) {
+    if (environmentVariables.containsKey(name)) {
+      return ResolvedVariable(
+        name: name,
+        kind: environmentSecrets.contains(name)
+            ? VariableValueKind.secret
+            : VariableValueKind.resolved,
+        value: environmentVariables[name],
+        environmentName: environmentName,
+      );
+    }
+    if (collectionVariables.containsKey(name)) {
+      return ResolvedVariable(
+        name: name,
+        kind: collectionSecrets.contains(name)
+            ? VariableValueKind.secret
+            : VariableValueKind.resolved,
+        value: collectionVariables[name],
+        environmentName: 'Collection',
+      );
+    }
+    if (EnvironmentResolver.isDynamic(name)) {
+      return ResolvedVariable(
+        name: name,
+        kind: VariableValueKind.dynamicValue,
+        value: EnvironmentResolver.resolveDynamic(name),
+        environmentName: environmentName,
+      );
+    }
+    return ResolvedVariable(
+      name: name,
+      kind: VariableValueKind.unresolved,
+      environmentName: environmentName,
+    );
+  }
 }
