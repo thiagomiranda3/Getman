@@ -142,3 +142,40 @@ class CancelRequest extends TabsEvent {
   @override
   List<Object?> get props => [tabId];
 }
+
+class AddPanel extends TabsEvent {
+  const AddPanel({this.name});
+  final String? name;
+  @override
+  List<Object?> get props => [name];
+}
+
+class RemovePanel extends TabsEvent {
+  const RemovePanel(this.panelId);
+  final String panelId;
+  @override
+  List<Object?> get props => [panelId];
+}
+
+class RenamePanel extends TabsEvent {
+  const RenamePanel(this.panelId, this.name);
+  final String panelId;
+  final String name;
+  @override
+  List<Object?> get props => [panelId, name];
+}
+
+class SetActivePanel extends TabsEvent {
+  const SetActivePanel(this.panelId);
+  final String panelId;
+  @override
+  List<Object?> get props => [panelId];
+}
+
+class ReorderPanels extends TabsEvent {
+  const ReorderPanels(this.oldIndex, this.newIndex);
+  final int oldIndex;
+  final int newIndex;
+  @override
+  List<Object?> get props => [oldIndex, newIndex];
+}

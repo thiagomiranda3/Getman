@@ -48,6 +48,11 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     on<SendRequest>(_onSendRequest);
     on<ViewResponseHistoryEntry>(_onViewResponseHistoryEntry);
     on<CancelRequest>(_onCancelRequest);
+    on<AddPanel>(_onAddPanel);
+    on<RemovePanel>(_onRemovePanel);
+    on<RenamePanel>(_onRenamePanel);
+    on<SetActivePanel>(_onSetActivePanel);
+    on<ReorderPanels>(_onReorderPanels);
   }
   final TabsRepository _repository;
   final SendRequestUseCase _sendRequestUseCase;
@@ -175,10 +180,17 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     return p.copyWith(tabs: [blank], activeTabId: id);
   }
 
-  // Used by the panel events landing in Tasks 5–6 (AddPanel/RenamePanel).
-  // ignore: unused_element
-  String _nextPanelName() {
-    final used = state.panels.map((p) => p.name).toSet();
+  String _nextPanelName() => _nextPanelNameExcluding(null);
+
+  /// Returns the first "Panel N" name not in use, optionally ignoring the panel
+  /// with [excludeId] (used when a rename-to-empty wants to reclaim the panel's
+  /// own slot — e.g. "Panel 1" renamed to "" resets to "Panel 1" rather than
+  /// skipping to "Panel 2").
+  String _nextPanelNameExcluding(String? excludeId) {
+    final used = state.panels
+        .where((p) => p.id != excludeId)
+        .map((p) => p.name)
+        .toSet();
     var n = 1;
     while (used.contains('Panel $n')) {
       n++;
@@ -660,5 +672,90 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
 
   void _onCancelRequest(CancelRequest event, Emitter<TabsState> emit) {
     _requests.cancel(event.tabId);
+  }
+
+  Future<void> _onAddPanel(AddPanel event, Emitter<TabsState> emit) async {
+    final panelId = _uuid.v4();
+    final tabId = _uuid.v4();
+    final blank = HttpRequestTabEntity(
+      tabId: tabId,
+      config: HttpRequestConfigEntity(id: tabId),
+    );
+    final panel = PanelEntity(
+      id: panelId,
+      name: event.name ?? _nextPanelName(),
+      tabs: [blank],
+      activeTabId: tabId,
+    );
+    emit(_derive([...state.panels, panel], panelId));
+    await _guardWrite(() => _repository.putTab(blank));
+    await _persistPanel(panel);
+    await _persistPanelMeta();
+  }
+
+  Future<void> _onRemovePanel(
+    RemovePanel event,
+    Emitter<TabsState> emit,
+  ) async {
+    if (state.panels.length <= 1) return;
+    final idx = state.panels.indexWhere((p) => p.id == event.panelId);
+    if (idx == -1) return;
+    final removed = state.panels[idx];
+    for (final t in removed.tabs) {
+      _requests.cancelAndFinish(t.tabId);
+      _dirtyTabIds.remove(t.tabId);
+    }
+    final newPanels = [...state.panels]..removeAt(idx);
+    var activeId = state.activePanelId;
+    if (activeId == event.panelId) {
+      activeId = newPanels[(idx - 1).clamp(0, newPanels.length - 1)].id;
+    }
+    emit(_derive(newPanels, activeId));
+    await _guardWrite(
+      () => _repository.deleteTabs(removed.tabs.map((t) => t.tabId).toList()),
+    );
+    await _guardWrite(() => _repository.deletePanels([event.panelId]));
+    await _persistPanelMeta();
+  }
+
+  Future<void> _onRenamePanel(
+    RenamePanel event,
+    Emitter<TabsState> emit,
+  ) async {
+    final panel = state.panels.byId(event.panelId);
+    if (panel == null) return;
+    final trimmed = event.name.trim();
+    // When the name is blanked, reset to a "Panel N" auto-name. Exclude the
+    // panel being renamed from the used-names set so it can reclaim its own
+    // slot (e.g. renaming "Panel 1" to "" resets back to "Panel 1").
+    final name = trimmed.isEmpty
+        ? _nextPanelNameExcluding(event.panelId)
+        : trimmed;
+    final updated = panel.copyWith(name: name);
+    emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
+    await _persistPanel(updated);
+  }
+
+  Future<void> _onSetActivePanel(
+    SetActivePanel event,
+    Emitter<TabsState> emit,
+  ) async {
+    if (state.panels.byId(event.panelId) == null) return;
+    if (event.panelId == state.activePanelId) return;
+    emit(_derive(state.panels, event.panelId));
+    await _persistPanelMeta();
+  }
+
+  Future<void> _onReorderPanels(
+    ReorderPanels event,
+    Emitter<TabsState> emit,
+  ) async {
+    final panels = [...state.panels];
+    var newIndex = event.newIndex;
+    if (event.oldIndex < newIndex) newIndex -= 1;
+    final item = panels.removeAt(event.oldIndex);
+    panels.insert(newIndex, item);
+    emit(_derive(panels, state.activePanelId));
+    await _persistPanelMeta();
   }
 }

@@ -136,6 +136,130 @@ void main() {
     expect(bloc.state.activePanelId, bloc.state.panels.single.id);
   });
 
+  // ---------------------------------------------------------------------------
+  // Task 5: Panel lifecycle events
+  // ---------------------------------------------------------------------------
+  //
+  // blocTest's `build:` parameter expects a synchronous `B Function()`.
+  // buildLoadedBloc is async (it awaits stream events), so we use a late
+  // variable populated in `setUp` and return it synchronously from `build`.
+  // The helpers themselves are unchanged — only the wiring is adapted.
+
+  group('AddPanel', () {
+    late TabsBloc prebuilt;
+    setUp(() async => prebuilt = await buildLoadedBloc());
+
+    blocTest<TabsBloc, TabsState>(
+      'creates a "Panel N" with one blank tab and activates it',
+      build: () => prebuilt,
+      act: (b) => b.add(const AddPanel()),
+      verify: (b) {
+        expect(b.state.panels.length, 2);
+        expect(b.state.panels.last.name, 'Panel 2');
+        expect(b.state.panels.last.tabs.length, 1);
+        expect(b.state.activePanelId, b.state.panels.last.id);
+      },
+    );
+  });
+
+  group('RemovePanel', () {
+    late TabsBloc prebuilt;
+    setUp(() async => prebuilt = await buildLoadedBloc());
+
+    blocTest<TabsBloc, TabsState>(
+      'is rejected when only one panel remains',
+      build: () => prebuilt,
+      act: (b) => b.add(RemovePanel(b.state.panels.single.id)),
+      verify: (b) => expect(b.state.panels.length, 1),
+    );
+
+    blocTest<TabsBloc, TabsState>(
+      'of the active panel switches to a neighbor',
+      build: () => prebuilt,
+      act: (b) {
+        b.add(const AddPanel()); // now 2 panels, panel 2 active
+        final p2 = b.state.panels.last.id;
+        b.add(RemovePanel(p2));
+      },
+      verify: (b) {
+        expect(b.state.panels.length, 1);
+        expect(b.state.activePanelId, b.state.panels.single.id);
+      },
+    );
+  });
+
+  group('RenamePanel', () {
+    late TabsBloc prebuilt;
+    setUp(() async => prebuilt = await buildLoadedBloc());
+
+    blocTest<TabsBloc, TabsState>(
+      'with empty name resets to default "Panel N"',
+      build: () => prebuilt,
+      act: (b) => b.add(RenamePanel(b.state.panels.single.id, '   ')),
+      verify: (b) => expect(b.state.panels.single.name, 'Panel 1'),
+    );
+  });
+
+  group('SetActivePanel', () {
+    late TabsBloc prebuilt;
+    setUp(() async => prebuilt = await buildLoadedBloc());
+
+    blocTest<TabsBloc, TabsState>(
+      "restores that panel's remembered active tab",
+      build: () => prebuilt,
+      act: (b) {
+        final p1 = b.state.panels.single.id;
+        b
+          ..add(const AddPanel()) // creates + activates Panel 2
+          ..add(SetActivePanel(p1)); // back to Panel 1
+      },
+      verify: (b) => expect(b.state.activePanelId, b.state.panels.first.id),
+    );
+  });
+
+  // Carry-forward from Task 4 review: cross-panel resolution
+  // (_replaceTabAcrossPanels) must work when the owning panel is NOT active.
+  test(
+    'UpdateTab resolves across panels when owning panel is not active',
+    () async {
+      final bloc = await buildLoadedBloc();
+      addTearDown(bloc.close);
+
+      // Capture panel 1's id and its single tab.
+      final panel1Id = bloc.state.panels.single.id;
+
+      // Add panel 2 — it becomes active.
+      bloc.add(const AddPanel());
+      await bloc.stream.firstWhere((s) => s.panels.length == 2);
+
+      // Capture panel 2's tab id.
+      final panel2Tab = bloc.state.panels.last.tabs.single;
+
+      // Switch back to panel 1 — panel 2 is now non-active.
+      bloc.add(SetActivePanel(panel1Id));
+      await bloc.stream.firstWhere((s) => s.activePanelId == panel1Id);
+
+      // Mutate panel 2's tab (which is in a non-active panel).
+      final updatedTab = panel2Tab.copyWith(
+        config: panel2Tab.config.copyWith(url: 'https://changed.dev'),
+      );
+      bloc.add(UpdateTab(updatedTab));
+      // UpdateTab is synchronous — give it one microtask to emit.
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        bloc.state.panels[1].tabs.single.config.url,
+        'https://changed.dev',
+        reason: '_replaceTabAcrossPanels must update the tab in panel 2',
+      );
+      expect(
+        bloc.state.activePanelId,
+        panel1Id,
+        reason: 'active panel must remain panel 1',
+      );
+    },
+  );
+
   group('empty-panels guard (pre-LoadTabs)', () {
     // All active-panel-scoped handlers must no-op — not throw — when
     // dispatched before LoadTabs fills state.panels (initial TabsState is
