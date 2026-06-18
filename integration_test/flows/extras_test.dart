@@ -59,6 +59,7 @@ void main() {
     // Clear all cookies from Settings. The COOKIES row is far down the dialog's
     // scroll view, so bring its CLEAR button into view first.
     await openSettings($);
+    await openSettingsTab($, 'NETWORK');
     final clearButton = find.text('CLEAR');
     await $.tester.ensureVisible(clearButton);
     await $.pumpAndSettle();

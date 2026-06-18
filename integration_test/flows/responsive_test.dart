@@ -80,10 +80,14 @@ void main() {
     await bootGetman($);
     await openSettings($);
     expect($('SETTINGS'), findsWidgets);
+    expect($(const ValueKey('settingstab_tab_GENERAL')), findsWidgets);
+    expect($(const ValueKey('history_limit_field')), findsWidgets);
 
     // Shrink to phone — the dialog should become full-screen, not overflow.
     await resizeWindow($, const Size(620, 900));
     expect($('SETTINGS'), findsWidgets);
+    // Full-screen dialog keeps the tab strip + GENERAL pane (no overflow).
+    expect($(const ValueKey('settingstab_tab_GENERAL')), findsWidgets);
 
     // Grow back to desktop — still intact.
     await resizeWindow($, kE2eWindowSize);

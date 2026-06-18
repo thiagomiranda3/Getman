@@ -51,6 +51,7 @@ void main() {
     await bootGetman($);
 
     await openSettings($);
+    await openSettingsTab($, 'NETWORK');
     await $(const ValueKey('receive_timeout_field')).enterText('500');
     await $.pumpAndSettle();
     await $('CLOSE').tap();

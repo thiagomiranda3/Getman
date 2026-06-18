@@ -31,6 +31,7 @@ import 'flows/response_views_test.dart' as response_views;
 import 'flows/responsive_test.dart' as responsive;
 import 'flows/saved_examples_test.dart' as saved_examples;
 import 'flows/settings_network_test.dart' as settings_network;
+import 'flows/settings_tabs_test.dart' as settings_tabs;
 import 'flows/settings_test.dart' as settings;
 import 'flows/smoke_test.dart' as smoke;
 import 'flows/tab_management_test.dart' as tab_management;
@@ -86,6 +87,7 @@ void main() {
   code_export_edits.main();
   settings.main();
   settings_network.main();
+  settings_tabs.main();
   response_views.main();
   response_views_deep.main();
   responsive.main();

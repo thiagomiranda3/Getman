@@ -16,6 +16,7 @@ void main() {
     await bootGetman($);
 
     await openSettings($);
+    await openSettingsTab($, 'APPEARANCE');
     // Default theme is BRUTALIST.
     expect($('BRUTALIST'), findsWidgets);
 
@@ -29,6 +30,7 @@ void main() {
   patrolWidgetTest('toggles dark mode', ($) async {
     await bootGetman($);
     await openSettings($);
+    await openSettingsTab($, 'APPEARANCE');
 
     // The DARK MODE row shows a sun/moon icon that flips with the setting.
     final wasDark = $(find.byIcon(Icons.dark_mode)).exists;

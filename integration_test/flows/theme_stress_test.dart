@@ -58,6 +58,7 @@ void main() {
     // Toggle REDUCE VISUAL EFFECTS several times in one settings session — this
     // is the path that previously crashed (SingleTicker controller recreate).
     await openSettings($);
+    await openSettingsTab($, 'APPEARANCE');
     for (var i = 0; i < 4; i++) {
       await $(
         const ValueKey('reduce_effects_switch'),

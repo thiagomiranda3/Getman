@@ -41,6 +41,7 @@ void main() {
     // ancestor into view (ensureVisible targets the right scrollable; a blind
     // drag can grab the response pane behind the modal).
     await openSettings($);
+    await openSettingsTab($, 'NETWORK');
     final manageButton = find.byKey(const ValueKey('cookies_manage_button'));
     await $.tester.ensureVisible(manageButton);
     await $.pumpAndSettle();

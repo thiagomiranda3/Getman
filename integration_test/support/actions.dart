@@ -191,6 +191,17 @@ Future<void> openSettings(PatrolTester $) async {
   await slowMo($);
 }
 
+/// Taps a Settings dialog tab by its [label]
+/// (`GENERAL`/`APPEARANCE`/`NETWORK`/`WORKSPACE`). Assumes Settings is open.
+/// Animation-safe (themes may animate forever, so no `pumpAndSettle`).
+Future<void> openSettingsTab(PatrolTester $, String label) async {
+  await $(
+    ValueKey('settingstab_tab_$label'),
+  ).tap(settlePolicy: SettlePolicy.noSettle);
+  await pumpFrames($);
+  await slowMo($);
+}
+
 /// Opens the active-environment selector popup menu.
 Future<void> openEnvironmentSelector(PatrolTester $) async {
   await $(const ValueKey('environment_selector')).tap();
@@ -275,6 +286,7 @@ Future<void> sendShortcut(
 /// (button label + menu item), making the finder ambiguous.
 Future<void> setTheme(PatrolTester $, String displayName) async {
   await openSettings($);
+  await openSettingsTab($, 'APPEARANCE');
   await $(
     const ValueKey('theme_dropdown'),
   ).tap(settlePolicy: SettlePolicy.noSettle);
@@ -291,6 +303,7 @@ Future<void> setTheme(PatrolTester $, String displayName) async {
 /// Animation-safe (see [setTheme]).
 Future<void> toggleSettingRow(PatrolTester $, String label) async {
   await openSettings($);
+  await openSettingsTab($, 'APPEARANCE');
   await $(label).tap(settlePolicy: SettlePolicy.noSettle);
   await pumpFrames($);
   await $('CLOSE').tap(settlePolicy: SettlePolicy.noSettle);
