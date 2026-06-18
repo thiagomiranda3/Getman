@@ -12,9 +12,9 @@ void main() {
 
     test('includes fontSizeCode and fontSizeSubtitle', () {
       expect(AppLayout.normal.fontSizeCode, 13.0);
-      expect(AppLayout.compact.fontSizeCode, 12.0);
+      expect(AppLayout.compact.fontSizeCode, 13.0);
       expect(AppLayout.normal.fontSizeSubtitle, 18.0);
-      expect(AppLayout.compact.fontSizeSubtitle, 14.0);
+      expect(AppLayout.compact.fontSizeSubtitle, 16.0);
     });
 
     test('copyWith preserves non-overridden fields', () {

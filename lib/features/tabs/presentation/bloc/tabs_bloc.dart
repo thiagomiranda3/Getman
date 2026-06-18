@@ -169,19 +169,6 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     }).toList();
   }
 
-  /// Invariant 2: a panel is never empty. Seeds + persists a blank NEW REQUEST
-  /// tab if [p] has none, returning the non-empty panel.
-  PanelEntity _ensureNonEmpty(PanelEntity p) {
-    if (p.tabs.isNotEmpty) return p;
-    final id = _uuid.v4();
-    final blank = HttpRequestTabEntity(
-      tabId: id,
-      config: HttpRequestConfigEntity(id: id),
-    );
-    unawaited(_guardWrite(() => _repository.putTab(blank)));
-    return p.copyWith(tabs: [blank], activeTabId: id);
-  }
-
   String _nextPanelName() => _nextPanelNameExcluding(null);
 
   /// Returns the first "Panel N" name not in use, optionally ignoring the panel
@@ -253,15 +240,14 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         return;
       }
 
-      // Sanitize transient flags + enforce the >=1-tab invariant per panel.
+      // Sanitize transient flags. Panels may be empty (a workspace the user
+      // closed every tab in) — they round-trip empty, never re-seeded.
       panels = panels
           .map(
-            (p) => _ensureNonEmpty(
-              p.copyWith(
-                tabs: p.tabs
-                    .map((t) => t.isSending ? t.copyWith(isSending: false) : t)
-                    .toList(),
-              ),
+            (p) => p.copyWith(
+              tabs: p.tabs
+                  .map((t) => t.isSending ? t.copyWith(isSending: false) : t)
+                  .toList(),
             ),
           )
           .toList();
@@ -332,11 +318,15 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final removedIdx = owner.tabs.indexWhere((t) => t.tabId == event.tabId);
     final remaining = [...owner.tabs]..removeAt(removedIdx);
     var updated = owner.copyWith(tabs: remaining);
-    if (owner.activeTabId == event.tabId && remaining.isNotEmpty) {
-      final newActive = remaining[removedIdx.clamp(0, remaining.length - 1)];
-      updated = updated.copyWith(activeTabId: newActive.tabId);
+    // Re-point activeTabId only when the closed tab was active. An emptied
+    // panel resets it to '' (the panel shows the "NO OPEN TABS" placeholder).
+    if (owner.activeTabId == event.tabId) {
+      updated = updated.copyWith(
+        activeTabId: remaining.isEmpty
+            ? ''
+            : remaining[removedIdx.clamp(0, remaining.length - 1)].tabId,
+      );
     }
-    updated = _ensureNonEmpty(updated);
 
     emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     _dirtyTabIds.remove(event.tabId);
@@ -678,19 +668,15 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
 
   Future<void> _onAddPanel(AddPanel event, Emitter<TabsState> emit) async {
     final panelId = _uuid.v4();
-    final tabId = _uuid.v4();
-    final blank = HttpRequestTabEntity(
-      tabId: tabId,
-      config: HttpRequestConfigEntity(id: tabId),
-    );
+    // A new panel starts empty (no seeded tab) — it shows the "NO OPEN TABS"
+    // placeholder until the user adds a request.
     final panel = PanelEntity(
       id: panelId,
       name: event.name ?? _nextPanelName(),
-      tabs: [blank],
-      activeTabId: tabId,
+      tabs: const [],
+      activeTabId: '',
     );
     emit(_derive([...state.panels, panel], panelId));
-    await _guardWrite(() => _repository.putTab(blank));
     await _persistPanel(panel);
     await _persistPanelMeta();
   }
@@ -761,10 +747,10 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     await _persistPanelMeta();
   }
 
-  /// Removes [tabId] from its owning panel, fixing the panel's active tab and
-  /// auto-seeding a blank if it empties. Returns (updatedSource, movedTab) or
-  /// null if the tab isn't found. Persistence of the source is the
-  /// caller's job.
+  /// Removes [tabId] from its owning panel, fixing the panel's active tab.
+  /// The source may empty out (it is left empty, not re-seeded). Returns
+  /// (updatedSource, movedTab) or null if the tab isn't found. Persistence of
+  /// the source is the caller's job.
   ({PanelEntity source, HttpRequestTabEntity tab})? _detachTab(String tabId) {
     final source = state.panels.firstWhereOrNull(
       (p) => p.tabs.any((t) => t.tabId == tabId),
@@ -774,12 +760,13 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final tab = source.tabs[removedIdx];
     final remaining = [...source.tabs]..removeAt(removedIdx);
     var updated = source.copyWith(tabs: remaining);
-    if (source.activeTabId == tabId && remaining.isNotEmpty) {
+    if (source.activeTabId == tabId) {
       updated = updated.copyWith(
-        activeTabId: remaining[removedIdx.clamp(0, remaining.length - 1)].tabId,
+        activeTabId: remaining.isEmpty
+            ? ''
+            : remaining[removedIdx.clamp(0, remaining.length - 1)].tabId,
       );
     }
-    updated = _ensureNonEmpty(updated);
     return (source: updated, tab: tab);
   }
 

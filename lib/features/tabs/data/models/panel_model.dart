@@ -34,8 +34,8 @@ class PanelModel extends HiveObject {
   String activeTabId;
 
   /// Rebuilds the entity by mapping [orderedTabIds] through [tabsById].
-  /// Ids with no live tab are skipped (the bloc auto-seeds a blank if this
-  /// empties a panel — see TabsBloc invariant 2).
+  /// Ids with no live tab are skipped; the panel may rebuild empty (the bloc
+  /// no longer re-seeds — an empty panel shows the "NO OPEN TABS" placeholder).
   PanelEntity toEntity(Map<String, HttpRequestTabEntity> tabsById) {
     final tabs = <HttpRequestTabEntity>[];
     for (final id in orderedTabIds) {

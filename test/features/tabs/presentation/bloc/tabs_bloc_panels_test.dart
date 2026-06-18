@@ -150,13 +150,14 @@ void main() {
     setUp(() async => prebuilt = await buildLoadedBloc());
 
     blocTest<TabsBloc, TabsState>(
-      'creates a "Panel N" with one blank tab and activates it',
+      'creates an empty "Panel N" and activates it',
       build: () => prebuilt,
       act: (b) => b.add(const AddPanel()),
       verify: (b) {
         expect(b.state.panels.length, 2);
         expect(b.state.panels.last.name, 'Panel 2');
-        expect(b.state.panels.last.tabs.length, 1);
+        expect(b.state.panels.last.tabs, isEmpty);
+        expect(b.state.panels.last.activeTabId, '');
         expect(b.state.activePanelId, b.state.panels.last.id);
       },
     );
@@ -228,11 +229,13 @@ void main() {
       // Capture panel 1's id and its single tab.
       final panel1Id = bloc.state.panels.single.id;
 
-      // Add panel 2 — it becomes active.
+      // Add panel 2 — it becomes active (and starts empty).
       bloc.add(const AddPanel());
       await bloc.stream.firstWhere((s) => s.panels.length == 2);
 
-      // Capture panel 2's tab id.
+      // Give panel 2 a tab to mutate (it is the active panel right now).
+      bloc.add(const AddTab());
+      await bloc.stream.firstWhere((s) => s.panels.last.tabs.length == 1);
       final panel2Tab = bloc.state.panels.last.tabs.single;
 
       // Switch back to panel 1 — panel 2 is now non-active.
@@ -277,7 +280,7 @@ void main() {
         bloc.add(const AddTab());
         await bloc.stream.firstWhere((s) => s.panels.first.tabs.length == 2);
 
-        // Create Panel 2 — it becomes active.
+        // Create Panel 2 — it becomes active (and starts empty).
         bloc.add(const AddPanel());
         await bloc.stream.firstWhere((s) => s.panels.length == 2);
         final p2 = bloc.state.panels[1].id;
@@ -286,39 +289,40 @@ void main() {
         bloc.add(SetActivePanel(p1));
         await bloc.stream.firstWhere((s) => s.activePanelId == p1);
 
-        // Move Panel 1's last tab to Panel 2.
+        // Move Panel 1's last tab into the empty Panel 2.
         final movingId = bloc.state.panels.byId(p1)!.tabs.last.tabId;
         bloc.add(MoveTabToPanel(movingId, p2));
-        await bloc.stream.firstWhere(
-          (s) => s.panels.byId(p2)!.tabs.length == 2,
-        );
-
-        expect(bloc.state.activePanelId, bloc.state.panels.first.id);
-        expect(bloc.state.panels[1].tabs.length, 2);
-      },
-    );
-
-    test(
-      'moving the last tab out of a panel auto-seeds a blank tab',
-      () async {
-        final bloc = await buildLoadedBloc();
-        addTearDown(bloc.close);
-
-        // Create Panel 2 — it becomes active with one tab.
-        bloc.add(const AddPanel());
-        await bloc.stream.firstWhere((s) => s.panels.length == 2);
-        final p2 = bloc.state.panels.last.id;
-        final p1 = bloc.state.panels.first.id;
-        final onlyTab = bloc.state.panels.last.tabs.single.tabId;
-
-        // Move Panel 2's only tab to Panel 1 — empties Panel 2 → auto-seed.
-        bloc.add(MoveTabToPanel(onlyTab, p1));
-        // Wait until the source panel has been re-seeded (1 tab again).
         await bloc.stream.firstWhere(
           (s) => s.panels.byId(p2)!.tabs.length == 1,
         );
 
-        expect(bloc.state.panels.byId(p2)!.tabs.length, 1);
+        expect(bloc.state.activePanelId, bloc.state.panels.first.id);
+        expect(bloc.state.panels[1].tabs.single.tabId, movingId);
+      },
+    );
+
+    test(
+      'moving the last tab out of a panel leaves the source empty',
+      () async {
+        final bloc = await buildLoadedBloc();
+        addTearDown(bloc.close);
+
+        // Panel 1 starts with one tab; create Panel 2 (now empty + active).
+        bloc.add(const AddPanel());
+        await bloc.stream.firstWhere((s) => s.panels.length == 2);
+        final p2 = bloc.state.panels.last.id;
+        final p1 = bloc.state.panels.first.id;
+        final onlyTab = bloc.state.panels.first.tabs.single.tabId;
+
+        // Move Panel 1's only tab to Panel 2 — Panel 1 must go empty, not
+        // re-seed a blank.
+        bloc.add(MoveTabToPanel(onlyTab, p2));
+        await bloc.stream.firstWhere(
+          (s) => s.panels.byId(p1)!.tabs.isEmpty,
+        );
+
+        expect(bloc.state.panels.byId(p1)!.tabs, isEmpty);
+        expect(bloc.state.panels.byId(p1)!.activeTabId, '');
       },
     );
   });
@@ -347,6 +351,25 @@ void main() {
         expect(bloc.state.activePanelId, p1); // stayed put
       },
     );
+  });
+
+  group('RemoveTab (last tab in a panel)', () {
+    test('leaves the panel empty rather than re-seeding a blank', () async {
+      final bloc = await buildLoadedBloc();
+      addTearDown(bloc.close);
+
+      // buildLoadedBloc settles into one panel with one tab.
+      final onlyTab = bloc.state.panels.single.tabs.single.tabId;
+
+      bloc.add(RemoveTab(onlyTab));
+      await bloc.stream.firstWhere((s) => s.panels.single.tabs.isEmpty);
+
+      expect(bloc.state.panels.single.tabs, isEmpty);
+      expect(bloc.state.panels.single.activeTabId, '');
+      // The derived active-panel view is empty too — the UI shows the
+      // "NO OPEN TABS" placeholder.
+      expect(bloc.state.tabs, isEmpty);
+    });
   });
 
   group('empty-panels guard (pre-LoadTabs)', () {

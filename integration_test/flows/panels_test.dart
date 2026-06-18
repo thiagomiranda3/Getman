@@ -84,7 +84,7 @@ void main() {
   // -------------------------------------------------------------------------
 
   patrolWidgetTest(
-    '(1) new panel via footer becomes active with one blank tab',
+    '(1) new panel via footer becomes active and empty',
     ($) async {
       await bootGetman($);
       expect(_panels($).length, 1);
@@ -100,8 +100,13 @@ void main() {
       );
       expect(
         tabCount($),
-        1,
-        reason: 'a new panel auto-seeds exactly one blank tab',
+        0,
+        reason: 'a new panel starts empty (no seeded tab)',
+      );
+      expect(
+        $('NO OPEN TABS'),
+        findsWidgets,
+        reason: 'the empty panel shows the placeholder',
       );
     },
   );
@@ -115,7 +120,7 @@ void main() {
 
     expect(_panels($).length, 2);
     expect(_activePanelName($), 'Panel 2');
-    expect(tabCount($), 1);
+    expect(tabCount($), 0, reason: 'a new panel starts empty');
   });
 
   patrolWidgetTest(
@@ -129,8 +134,9 @@ void main() {
       await enterUrl($, 'https://p1.example.com/second');
       expect(activeUrl($), 'https://p1.example.com/second');
 
-      // New panel → blank tab. Type a URL so we can recognise it later.
+      // New panel starts empty → add a tab, then type a URL to recognise it.
       await _addPanelViaMenu($);
+      await newTab($);
       await enterUrl($, 'https://p2.example.com/only');
       expect(_activePanelName($), 'Panel 2');
 
@@ -317,7 +323,7 @@ void main() {
     ($) async {
       await bootGetman($);
       await enterUrl($, 'https://mover.example.com/tab');
-      await _addPanelViaMenu($); // Panel 2 (active, 1 blank tab)
+      await _addPanelViaMenu($); // Panel 2 (active, empty)
       await _switchToPanel($, 'Panel 1');
       expect(tabCount($), 1);
 
@@ -330,9 +336,10 @@ void main() {
       await $(ValueKey('tab_move_to_panel_$targetId')).tap();
       await $.pumpAndSettle();
 
-      // Source auto-seeds a blank (never empty); the moved tab is gone from it.
-      expect(_panels($).firstWhere((p) => p.name == 'Panel 1').tabs.length, 1);
-      expect(activeUrl($), isNot('https://mover.example.com/tab'));
+      // Source goes empty (no re-seed); the moved tab is gone from it.
+      expect(_panels($).firstWhere((p) => p.name == 'Panel 1').tabs, isEmpty);
+      expect(tabCount($), 0);
+      expect($('NO OPEN TABS'), findsWidgets);
 
       // It now lives in Panel 2.
       await _switchToPanel($, 'Panel 2');
@@ -453,7 +460,7 @@ void main() {
     },
   );
 
-  patrolWidgetTest('(14) moving the last tab out auto-seeds a blank', (
+  patrolWidgetTest('(14) moving the last tab out leaves the source empty', (
     $,
   ) async {
     await bootGetman($);
@@ -464,19 +471,19 @@ void main() {
 
     final targetId = _panelIdByName($, 'Panel 2');
 
-    // Move Panel 1's only tab to Panel 2 → Panel 1 must auto-seed a blank.
+    // Move Panel 1's only tab to Panel 2 → Panel 1 goes empty, no re-seed.
     await openTabMenu($, 0);
     await $(const ValueKey('tab_context_move_to_panel')).tap();
     await $.pumpAndSettle();
     await $(ValueKey('tab_move_to_panel_$targetId')).tap();
     await $.pumpAndSettle();
 
-    expect(_panels($).firstWhere((p) => p.name == 'Panel 1').tabs.length, 1);
-    expect(tabCount($), 1);
+    expect(_panels($).firstWhere((p) => p.name == 'Panel 1').tabs, isEmpty);
+    expect(tabCount($), 0);
     expect(
-      activeUrl($),
-      isEmpty,
-      reason: 'the auto-seeded blank tab has an empty URL',
+      $('NO OPEN TABS'),
+      findsWidgets,
+      reason: 'the emptied panel shows the placeholder',
     );
   });
 
@@ -486,7 +493,7 @@ void main() {
 
   patrolWidgetTest('(15) close a clean panel after a confirm', ($) async {
     await bootGetman($);
-    await _addPanelViaMenu($); // Panel 2 (clean blank tab)
+    await _addPanelViaMenu($); // Panel 2 (empty, nothing dirty)
     expect(_panels($).length, 2);
 
     final id = _panelIdByName($, 'Panel 2');
@@ -505,8 +512,10 @@ void main() {
 
   patrolWidgetTest('(16) dirty panel → Discard all & close', ($) async {
     await bootGetman($);
-    // Make Panel 2 dirty: a tab whose config differs from the default blank.
-    await _addPanelViaMenu($); // Panel 2 active
+    // Make Panel 2 dirty: add a tab (new panels start empty), then give it a
+    // config that differs from the default blank.
+    await _addPanelViaMenu($); // Panel 2 active (empty)
+    await newTab($);
     await enterUrl($, 'https://dirty.example.com/unsaved');
     await $.pumpAndSettle();
     final id = _panelIdByName($, 'Panel 2');
@@ -527,7 +536,8 @@ void main() {
     '(17) dirty panel → Review & save (save unlinked) then close',
     ($) async {
       await bootGetman($);
-      await _addPanelViaMenu($); // Panel 2 active
+      await _addPanelViaMenu($); // Panel 2 active (empty)
+      await newTab($);
       await enterUrl($, 'https://review.example.com/unlinked');
       await $.pumpAndSettle();
       final id = _panelIdByName($, 'Panel 2');
@@ -561,7 +571,8 @@ void main() {
     '(18) dirty panel → Review & save → Cancel review keeps the panel',
     ($) async {
       await bootGetman($);
-      await _addPanelViaMenu($); // Panel 2 active
+      await _addPanelViaMenu($); // Panel 2 active (empty)
+      await newTab($);
       await enterUrl($, 'https://keep.example.com/unsaved');
       await $.pumpAndSettle();
       final id = _panelIdByName($, 'Panel 2');
@@ -600,34 +611,37 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
-  // Step 6 — Auto-seed & active-tab memory (flows 20-21)
+  // Step 6 — Empty workspace & active-tab memory (flows 20-21)
   // -------------------------------------------------------------------------
 
   patrolWidgetTest(
-    '(20) closing a panels last tab auto-seeds a blank',
+    "(20) closing a panel's last tab leaves it empty",
     ($) async {
       await bootGetman($);
       await enterUrl($, 'https://seed.example.com/only');
       expect(tabCount($), 1);
 
-      // Close the only tab (clean, empty config diverges only by URL — but the
-      // dirty checker compares against the default config; close still works
-      // and the panel re-seeds a blank rather than going empty).
+      // Close the only tab (the URL makes it diverge from the default config,
+      // so the dirty checker may prompt; either way the panel goes empty rather
+      // than re-seeding a blank).
       final closeButtons = find.byWidgetPredicate((w) {
         final k = w.key;
         return k is ValueKey<String> && k.value.startsWith('tab_close_');
       });
       await $(closeButtons).first.tap();
       await $.pumpAndSettle();
-      // A dirty single-tab close may prompt; if so, discard it.
-      if ($('DISCARD').exists) {
-        await $('DISCARD').tap();
+      // The tab diverges from the default config → "UNSAVED CHANGES" prompt;
+      // confirm it so the tab actually closes.
+      if ($('CLOSE ANYWAY').exists) {
+        await $('CLOSE ANYWAY').tap();
         await $.pumpAndSettle();
       }
 
-      // Panel never goes empty — exactly one (blank) tab remains.
-      expect(_panels($).single.tabs.length, 1);
-      expect(tabCount($), 1);
+      // The panel is now empty and shows the placeholder (the old zero-tabs
+      // state) — it is NOT re-seeded with a blank tab.
+      expect(_panels($).single.tabs, isEmpty);
+      expect(tabCount($), 0);
+      expect($('NO OPEN TABS'), findsWidgets);
     },
   );
 
@@ -646,8 +660,10 @@ void main() {
     await $.pumpAndSettle();
     expect(activeUrl($), 'https://p1.example.com/b');
 
-    // Panel 2: 2 tabs, leave the SECOND active.
+    // Panel 2: 2 tabs, leave the SECOND active (new panels start empty, so add
+    // the first tab explicitly).
     await _addPanelViaMenu($);
+    await newTab($);
     await enterUrl($, 'https://p2.example.com/x');
     await newTab($);
     await enterUrl($, 'https://p2.example.com/y');
@@ -744,7 +760,9 @@ void main() {
       await enterPromptText($, 'Beta');
       await $('SAVE').tap();
       await $.pumpAndSettle();
-      // Save the tab so it links to a node, then edit → dirty (*).
+      // New panels start empty — add Beta's single tab, then save it so it
+      // links to a node, then edit → dirty (*).
+      await newTab($);
       await enterUrl($, 'https://beta.example.com/saved');
       await $(const ValueKey('save_request_button')).tap();
       await enterPromptText($, 'Beta Req');

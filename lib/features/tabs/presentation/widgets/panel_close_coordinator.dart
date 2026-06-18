@@ -44,10 +44,15 @@ Future<void> closePanelWithSavePrompt(
 
   // --- 3. No dirty tabs → simple confirm -------------------------------------
   if (dirty.isEmpty) {
+    final count = panel.tabs.length;
+    // A panel may be empty (zero tabs); drop the "and its N tabs" clause then.
+    final message = count == 0
+        ? 'Close "${panel.name}"?'
+        : 'Close "${panel.name}" and its $count tab${count == 1 ? '' : 's'}?';
     await ConfirmDialog.show(
       context,
       title: 'CLOSE PANEL?',
-      message: 'Close "${panel.name}" and its ${panel.tabs.length} tabs?',
+      message: message,
       confirmLabel: 'CLOSE',
       onConfirm: () => tabsBloc.add(RemovePanel(panelId)),
     );

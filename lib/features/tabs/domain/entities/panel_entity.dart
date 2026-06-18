@@ -8,8 +8,10 @@ extension PanelListLookup on Iterable<PanelEntity> {
 }
 
 /// A virtual-desktop workspace grouping request tabs. Only the active panel's
-/// tabs are shown in the tab strip. Invariant (enforced in TabsBloc): [tabs]
-/// is never empty and [activeTabId] always names a tab in [tabs].
+/// tabs are shown in the tab strip. [tabs] may be empty — a workspace whose
+/// tabs were all closed (or a freshly created panel); the UI then shows the
+/// "NO OPEN TABS" placeholder. When non-empty, [activeTabId] names a tab in
+/// [tabs]; it is `''` while the panel is empty.
 class PanelEntity extends Equatable {
   const PanelEntity({
     required this.id,
