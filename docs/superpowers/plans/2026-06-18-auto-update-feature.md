@@ -1197,6 +1197,7 @@ import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/updates/presentation/update_controller.dart';
 import 'package:getman/features/updates/presentation/update_phase.dart';
+import 'package:provider/provider.dart';
 
 class UpdateDialog extends StatelessWidget {
   const UpdateDialog({
@@ -1220,7 +1221,7 @@ class UpdateDialog extends StatelessWidget {
   }) {
     return showDialog<void>(
       context: context,
-      builder: (_) => RepositoryProvider.value(
+      builder: (_) => ChangeNotifierProvider<UpdateController>.value(
         value: controller,
         child: BlocProvider.value(
           value: settingsBloc,
@@ -1665,13 +1666,20 @@ In the `sl` cascade (e.g. after the Home registrations, before the trailing `Url
 
 - [ ] **Step 2: Expose the controller via RepositoryProvider**
 
-In `main.dart`, add import:
+In `main.dart`, add imports:
 ```dart
 import 'package:getman/features/updates/presentation/update_controller.dart';
+import 'package:provider/provider.dart';
 ```
-Add to the `MultiRepositoryProvider.providers` list:
+Add to the `MultiRepositoryProvider.providers` list a `ChangeNotifierProvider`
+(NOT a `RepositoryProvider` — `UpdateController` is a `ChangeNotifier`, and
+providing a `Listenable` through `RepositoryProvider.value` trips provider's
+`debugCheckInvalidValueType` assertion in debug builds). `ChangeNotifierProvider`
+is a `SingleChildWidget`, so it slots into the `MultiRepositoryProvider.providers`
+list directly; the `.value` constructor does NOT dispose the controller (correct —
+it's a get_it singleton):
 ```dart
-        RepositoryProvider<UpdateController>.value(
+        ChangeNotifierProvider<UpdateController>.value(
           value: di.sl<UpdateController>(),
         ),
 ```
