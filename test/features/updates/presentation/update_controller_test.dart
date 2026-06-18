@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/features/updates/domain/entities/release_info.dart';
 import 'package:getman/features/updates/domain/repositories/update_repository.dart';
 import 'package:getman/features/updates/presentation/update_controller.dart';
+import 'package:getman/features/updates/presentation/update_phase.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockRepo extends Mock implements UpdateRepository {}
@@ -34,4 +35,27 @@ void main() {
     expect(controller.manualInFlight, isTrue);
     expect(called, isTrue);
   });
+
+  test(
+    'a phase-only updateFromGate does not wipe a previously-set '
+    'latestVersion/changelog',
+    () {
+      // The gate sets the version+changelog from updat's chip builder...
+      controller.updateFromGate(
+        phase: UpdatePhase.checking,
+        latestVersion: '1.4.0',
+        changelog: 'notes',
+      );
+      expect(controller.latestVersion, '1.4.0');
+      expect(controller.changelog, 'notes');
+
+      // ...then `_onStatus` issues a phase-only update right before reading
+      // `latestVersion` to decide whether to prompt. That call must not clobber
+      // the version back to null (the bug that suppressed the update dialog).
+      controller.updateFromGate(phase: UpdatePhase.available);
+      expect(controller.latestVersion, '1.4.0');
+      expect(controller.changelog, 'notes');
+      expect(controller.phase, UpdatePhase.available);
+    },
+  );
 }

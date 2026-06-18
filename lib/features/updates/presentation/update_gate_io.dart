@@ -141,6 +141,9 @@ class _UpdateGateState extends State<UpdateGate> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final mapped = _mapPhase(status);
+      // Capture the phase we're leaving before updateFromGate overwrites it, so
+      // an error after a download can be distinguished from a failed check.
+      final wasDownloading = controller.phase == UpdatePhase.downloading;
       controller.updateFromGate(phase: mapped);
 
       switch (mapped) {
@@ -152,9 +155,17 @@ class _UpdateGateState extends State<UpdateGate> {
             showAppSnackBar(context, "You're on the latest version.");
           }
         case UpdatePhase.error:
-          if (controller.manualInFlight) {
+          // Always surface a failed download (the user explicitly pressed
+          // UPDATE NOW) so it never silently does nothing; a failed background
+          // check stays quiet unless it was a manual check.
+          if (controller.manualInFlight || wasDownloading) {
             controller.manualInFlight = false;
-            showAppSnackBar(context, "Couldn't check for updates.");
+            showAppSnackBar(
+              context,
+              wasDownloading
+                  ? 'Update download failed. Please try again later.'
+                  : "Couldn't check for updates.",
+            );
           }
         case UpdatePhase.readyToInstall:
           unawaited(_launchInstaller());
@@ -169,7 +180,12 @@ class _UpdateGateState extends State<UpdateGate> {
 
   void _maybePrompt(BuildContext context, UpdateController controller) {
     final settings = context.read<SettingsBloc>().state.settings;
-    final latest = controller.latestVersion;
+    // Source the version from the synchronously-cached release (set during the
+    // fetch, before any updat status callback) rather than `latestVersion`,
+    // which is only populated by a separate post-frame callback and may not be
+    // set yet when this prompt decision runs.
+    final latest =
+        controller.cachedRelease?.version ?? controller.latestVersion;
     final manual = controller.manualInFlight;
     controller.manualInFlight = false;
     final prompt = shouldPromptForUpdate(
@@ -197,7 +213,13 @@ class _UpdateGateState extends State<UpdateGate> {
     if (path == null) return;
     try {
       if (Platform.isMacOS) {
+        // Mount the .dmg, then quit: macOS won't let the user replace a
+        // running .app bundle, so the app must exit for the drag-install to
+        // succeed. The mounted volume + Finder window are owned by the system
+        // and survive our exit.
         await Process.run('open', [path]);
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+        exit(0);
       } else if (Platform.isWindows) {
         await Process.start(path, [], mode: ProcessStartMode.detached);
         exit(0);

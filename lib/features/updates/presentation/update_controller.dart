@@ -50,11 +50,15 @@ class UpdateController extends ChangeNotifier {
       this.phase = phase;
       changed = true;
     }
-    if (latestVersion != this.latestVersion) {
+    // Null params mean "unchanged" (e.g. the gate's phase-only `_onStatus`
+    // call). Without this guard, a phase-only update wipes the version +
+    // changelog the chip builder set — which left `_maybePrompt` reading a null
+    // version and silently suppressing the update dialog.
+    if (latestVersion != null && latestVersion != this.latestVersion) {
       this.latestVersion = latestVersion;
       changed = true;
     }
-    if (changelog != this.changelog) {
+    if (changelog != null && changelog != this.changelog) {
       this.changelog = changelog;
       changed = true;
     }
