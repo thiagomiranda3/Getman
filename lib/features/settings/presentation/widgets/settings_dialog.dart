@@ -449,7 +449,8 @@ class _SettingsDialogState extends State<SettingsDialog>
 
 /// A single labelled settings row with a uniform vertical rhythm: a leading
 /// icon + title, an optional [trailing] control on the right, an optional
-/// [subtitle], and an optional full-width [below] control (text fields).
+/// [subtitle], and an optional full-width [below] control (e.g. the proxy
+/// text field).
 class _SettingRow extends StatelessWidget {
   const _SettingRow({
     required this.title,

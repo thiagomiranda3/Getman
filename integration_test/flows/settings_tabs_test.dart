@@ -44,7 +44,10 @@ void main() {
     await openDrawer($);
     await openSettings($);
 
+    // GENERAL is the default pane in the full-screen branch too.
     expect($(const ValueKey('settingstab_tab_NETWORK')), findsWidgets);
+    expect($(const ValueKey('history_limit_field')), findsWidgets);
+
     await openSettingsTab($, 'NETWORK');
     expect($('VERIFY SSL'), findsWidgets);
 
