@@ -108,6 +108,17 @@ class _SettingsDialogState extends State<SettingsDialog>
 
         final tabbed = Column(
           children: [
+            // Grayed separator under the dialog title, with breathing room so
+            // the active tab's filled indicator clears the SETTINGS text.
+            SizedBox(height: layout.tabSpacing),
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.2),
+            ),
+            SizedBox(height: layout.tabSpacing),
             BrandedTabBar(
               controller: _tabController,
               labels: _tabLabels,
