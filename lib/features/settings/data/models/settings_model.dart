@@ -34,6 +34,8 @@ class SettingsModel extends HiveObject {
     this.workspaceBookmark,
     this.responseHistoryLimit = 5,
     this.saveLargeResponsesInHistory = true,
+    this.checkForUpdatesOnStartup = true,
+    this.skippedUpdateVersion,
   });
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) => SettingsModel(
@@ -64,6 +66,8 @@ class SettingsModel extends HiveObject {
     responseHistoryLimit: json['responseHistoryLimit'] as int? ?? 5,
     saveLargeResponsesInHistory:
         json['saveLargeResponsesInHistory'] as bool? ?? true,
+    checkForUpdatesOnStartup: json['checkForUpdatesOnStartup'] as bool? ?? true,
+    skippedUpdateVersion: json['skippedUpdateVersion'] as String?,
   );
 
   factory SettingsModel.fromEntity(SettingsEntity entity) => SettingsModel(
@@ -92,6 +96,8 @@ class SettingsModel extends HiveObject {
     workspaceBookmark: entity.workspaceBookmark,
     responseHistoryLimit: entity.responseHistoryLimit,
     saveLargeResponsesInHistory: entity.saveLargeResponsesInHistory,
+    checkForUpdatesOnStartup: entity.checkForUpdatesOnStartup,
+    skippedUpdateVersion: entity.skippedUpdateVersion,
   );
   @HiveField(0, defaultValue: 100)
   int historyLimit;
@@ -168,6 +174,12 @@ class SettingsModel extends HiveObject {
   @HiveField(24, defaultValue: true)
   bool saveLargeResponsesInHistory;
 
+  @HiveField(25, defaultValue: true)
+  bool checkForUpdatesOnStartup;
+
+  @HiveField(26)
+  String? skippedUpdateVersion;
+
   SettingsModel copyWith({
     int? historyLimit,
     bool? saveResponseInHistory,
@@ -194,6 +206,8 @@ class SettingsModel extends HiveObject {
     Object? workspaceBookmark = _unchanged,
     int? responseHistoryLimit,
     bool? saveLargeResponsesInHistory,
+    bool? checkForUpdatesOnStartup,
+    Object? skippedUpdateVersion = _unchanged,
   }) {
     return SettingsModel(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -238,6 +252,11 @@ class SettingsModel extends HiveObject {
       responseHistoryLimit: responseHistoryLimit ?? this.responseHistoryLimit,
       saveLargeResponsesInHistory:
           saveLargeResponsesInHistory ?? this.saveLargeResponsesInHistory,
+      checkForUpdatesOnStartup:
+          checkForUpdatesOnStartup ?? this.checkForUpdatesOnStartup,
+      skippedUpdateVersion: identical(skippedUpdateVersion, _unchanged)
+          ? this.skippedUpdateVersion
+          : skippedUpdateVersion as String?,
     );
   }
 
@@ -267,6 +286,8 @@ class SettingsModel extends HiveObject {
     'workspaceBookmark': workspaceBookmark,
     'responseHistoryLimit': responseHistoryLimit,
     'saveLargeResponsesInHistory': saveLargeResponsesInHistory,
+    'checkForUpdatesOnStartup': checkForUpdatesOnStartup,
+    'skippedUpdateVersion': skippedUpdateVersion,
   };
 
   SettingsEntity toEntity() => SettingsEntity(
@@ -295,5 +316,7 @@ class SettingsModel extends HiveObject {
     workspaceBookmark: workspaceBookmark,
     responseHistoryLimit: responseHistoryLimit,
     saveLargeResponsesInHistory: saveLargeResponsesInHistory,
+    checkForUpdatesOnStartup: checkForUpdatesOnStartup,
+    skippedUpdateVersion: skippedUpdateVersion,
   );
 }

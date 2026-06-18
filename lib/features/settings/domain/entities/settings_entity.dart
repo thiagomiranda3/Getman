@@ -31,6 +31,8 @@ class SettingsEntity extends Equatable {
     this.workspaceBookmark,
     this.responseHistoryLimit = 5,
     this.saveLargeResponsesInHistory = true,
+    this.checkForUpdatesOnStartup = true,
+    this.skippedUpdateVersion,
   });
   final int historyLimit;
   final bool saveResponseInHistory;
@@ -90,6 +92,15 @@ class SettingsEntity extends Equatable {
   /// platforms / when no workspace is connected.
   final String? workspaceBookmark;
 
+  /// When `true` (default), Getman checks GitHub Releases once on startup and
+  /// prompts if a newer version exists. Off = no automatic check (manual only).
+  final bool checkForUpdatesOnStartup;
+
+  /// The version string the user chose "Skip this version" for; the startup
+  /// check won't prompt again for exactly this version.
+  /// `null` = nothing skipped.
+  final String? skippedUpdateVersion;
+
   SettingsEntity copyWith({
     int? historyLimit,
     bool? saveResponseInHistory,
@@ -116,6 +127,8 @@ class SettingsEntity extends Equatable {
     Object? workspaceBookmark = _unchanged,
     int? responseHistoryLimit,
     bool? saveLargeResponsesInHistory,
+    bool? checkForUpdatesOnStartup,
+    Object? skippedUpdateVersion = _unchanged,
   }) {
     return SettingsEntity(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -160,6 +173,11 @@ class SettingsEntity extends Equatable {
       responseHistoryLimit: responseHistoryLimit ?? this.responseHistoryLimit,
       saveLargeResponsesInHistory:
           saveLargeResponsesInHistory ?? this.saveLargeResponsesInHistory,
+      checkForUpdatesOnStartup:
+          checkForUpdatesOnStartup ?? this.checkForUpdatesOnStartup,
+      skippedUpdateVersion: identical(skippedUpdateVersion, _unchanged)
+          ? this.skippedUpdateVersion
+          : skippedUpdateVersion as String?,
     );
   }
 
@@ -204,5 +222,7 @@ class SettingsEntity extends Equatable {
     workspaceBookmark,
     responseHistoryLimit,
     saveLargeResponsesInHistory,
+    checkForUpdatesOnStartup,
+    skippedUpdateVersion,
   ];
 }

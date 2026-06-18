@@ -50,13 +50,15 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       saveLargeResponsesInHistory: fields[24] == null
           ? true
           : fields[24] as bool,
+      checkForUpdatesOnStartup: fields[25] == null ? true : fields[25] as bool,
+      skippedUpdateVersion: fields[26] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, SettingsModel obj) {
     writer
-      ..writeByte(25)
+      ..writeByte(27)
       ..writeByte(0)
       ..write(obj.historyLimit)
       ..writeByte(1)
@@ -106,7 +108,11 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       ..writeByte(23)
       ..write(obj.responseHistoryLimit)
       ..writeByte(24)
-      ..write(obj.saveLargeResponsesInHistory);
+      ..write(obj.saveLargeResponsesInHistory)
+      ..writeByte(25)
+      ..write(obj.checkForUpdatesOnStartup)
+      ..writeByte(26)
+      ..write(obj.skippedUpdateVersion);
   }
 
   @override

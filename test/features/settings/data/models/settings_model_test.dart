@@ -249,4 +249,25 @@ void main() {
       },
     );
   });
+
+  group('SettingsModel checkForUpdatesOnStartup + skippedUpdateVersion', () {
+    test('round-trips checkForUpdatesOnStartup and skippedUpdateVersion', () {
+      const entity = SettingsEntity(
+        checkForUpdatesOnStartup: false,
+        skippedUpdateVersion: '1.2.3',
+      );
+      final model = SettingsModel.fromEntity(entity);
+      expect(model.checkForUpdatesOnStartup, isFalse);
+      expect(model.skippedUpdateVersion, '1.2.3');
+
+      final back = model.toEntity();
+      expect(back.checkForUpdatesOnStartup, isFalse);
+      expect(back.skippedUpdateVersion, '1.2.3');
+    });
+
+    test('checkForUpdatesOnStartup defaults to true', () {
+      expect(const SettingsEntity().checkForUpdatesOnStartup, isTrue);
+      expect(const SettingsEntity().skippedUpdateVersion, isNull);
+    });
+  });
 }
