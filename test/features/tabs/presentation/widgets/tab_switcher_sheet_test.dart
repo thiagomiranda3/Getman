@@ -118,6 +118,39 @@ void main() {
       // There should be one edit icon per panel chip (2 panels → 2 icons).
       expect(find.byIcon(Icons.edit), findsNWidgets(2));
     });
+
+    testWidgets(
+      'empty rename submission dispatches RenamePanel with empty string',
+      (tester) async {
+        await _pumpSheet(tester, bloc);
+
+        // Open the rename dialog for p1 via the edit icon inside the p1 chip.
+        final editButton = find.byIcon(Icons.edit).first;
+        await tester.ensureVisible(editButton);
+        await tester.tap(editButton);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        // Verify the dialog is open before proceeding.
+        expect(find.text('RENAME PANEL'), findsOneWidget);
+
+        // The dialog is open — clear whatever initial text is pre-filled.
+        await tester.enterText(
+          find.byKey(const ValueKey('name_prompt_field')),
+          '',
+        );
+        await tester.pumpAndSettle();
+
+        // With allowEmpty: true the SAVE button must be enabled — tap it.
+        await tester.tap(find.text('SAVE'));
+        await tester.pumpAndSettle();
+
+        // The bloc should have received RenamePanel with an empty name.
+        // The bloc itself resets empty names to "Panel N"; at this layer we
+        // only verify that the event is dispatched with the empty string.
+        verify(() => bloc.add(const RenamePanel('p1', ''))).called(1);
+      },
+    );
   });
 
   group('move to panel affordance', () {
@@ -176,6 +209,34 @@ void main() {
         await tester.pumpAndSettle();
 
         verify(() => bloc.add(const MoveTabToNewPanel('t1'))).called(1);
+      },
+    );
+
+    testWidgets(
+      'move popup excludes the owning panel; other panels + New panel present',
+      (tester) async {
+        // Two-panel state: p1 is active and owns t1; p2 owns t2/t3.
+        await _pumpSheet(tester, bloc);
+
+        // Open the move popup for t1 (owned by p1).
+        await tester.tap(find.byKey(const ValueKey('tab_move_panel_t1')));
+        await tester.pumpAndSettle();
+
+        // The owning panel (p1 / 'Panel 1') must NOT appear as a destination.
+        expect(
+          find.byKey(const ValueKey('tab_move_to_panel_p1')),
+          findsNothing,
+        );
+        // The other panel (p2 / 'Work') MUST appear.
+        expect(
+          find.byKey(const ValueKey('tab_move_to_panel_p2')),
+          findsOneWidget,
+        );
+        // The 'New panel' entry must still be present.
+        expect(
+          find.byKey(const ValueKey('tab_move_to_new_panel_t1')),
+          findsOneWidget,
+        );
       },
     );
   });

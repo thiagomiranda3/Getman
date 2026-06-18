@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -253,6 +254,7 @@ class _PanelChip extends StatelessWidget {
         context,
         title: 'RENAME PANEL',
         initialText: panel.name,
+        allowEmpty: true,
         onConfirm: (value) =>
             context.read<TabsBloc>().add(RenamePanel(panel.id, value)),
       ),
@@ -491,19 +493,28 @@ class _MoveToPanelButton extends StatelessWidget {
           );
         }
       },
-      itemBuilder: (context) => [
-        for (final panel in panels)
+      itemBuilder: (context) {
+        // Exclude the panel that currently owns this tab so the user cannot
+        // "move" a tab to its own panel (mirrors the desktop context submenu).
+        final ownerPanelId = panels
+            .where((p) => p.tabs.any((t) => t.tabId == tab.tabId))
+            .map((p) => p.id)
+            .firstOrNull;
+        final otherPanels = panels.where((p) => p.id != ownerPanelId).toList();
+        return [
+          for (final panel in otherPanels)
+            PopupMenuItem<_MoveTarget>(
+              key: ValueKey('tab_move_to_panel_${panel.id}'),
+              value: _MoveTarget(panelId: panel.id),
+              child: Text(panel.name),
+            ),
           PopupMenuItem<_MoveTarget>(
-            key: ValueKey('tab_move_to_panel_${panel.id}'),
-            value: _MoveTarget(panelId: panel.id),
-            child: Text(panel.name),
+            key: ValueKey('tab_move_to_new_panel_${tab.tabId}'),
+            value: const _MoveTarget(newPanel: true),
+            child: const Text('NEW PANEL'),
           ),
-        PopupMenuItem<_MoveTarget>(
-          key: ValueKey('tab_move_to_new_panel_${tab.tabId}'),
-          value: const _MoveTarget(newPanel: true),
-          child: const Text('NEW PANEL'),
-        ),
-      ],
+        ];
+      },
     );
   }
 }
