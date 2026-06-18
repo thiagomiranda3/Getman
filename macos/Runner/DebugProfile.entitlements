@@ -2,15 +2,22 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- The App Sandbox is intentionally disabled (see Release.entitlements):
-	     keep the debug build's behavior consistent with release so the in-app
-	     updater can be exercised locally. allow-jit + network.server remain for
-	     the Dart VM service / hot reload. -->
+	<!-- The App Sandbox MUST stay enabled (see Release.entitlements): debug
+	     mirrors release so file access + the data container path match. allow-jit
+	     + network.server are for the Dart VM service / hot reload. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
 	<key>com.apple.security.cs.allow-jit</key>
 	<true/>
 	<key>com.apple.security.network.server</key>
 	<true/>
 	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<key>com.apple.security.files.bookmarks.app-scope</key>
+	<true/>
+	<key>com.apple.security.files.downloads.read-write</key>
 	<true/>
 </dict>
 </plist>

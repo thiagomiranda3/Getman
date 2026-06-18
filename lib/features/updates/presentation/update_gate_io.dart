@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
@@ -29,6 +30,12 @@ class _UpdateGateState extends State<UpdateGate> {
   String? _downloadPath;
 
   static const _appName = 'getman';
+
+  /// Native macOS channel that opens the downloaded installer via NSWorkspace
+  /// (sandbox-safe). Registered in `macos/Runner/MainFlutterWindow.swift`.
+  static const MethodChannel _installerChannel = MethodChannel(
+    'getman/installer',
+  );
 
   bool get _supported =>
       Platform.isMacOS || Platform.isWindows || Platform.isLinux;
@@ -213,11 +220,15 @@ class _UpdateGateState extends State<UpdateGate> {
     if (path == null) return;
     try {
       if (Platform.isMacOS) {
-        // Mount the .dmg, then quit: macOS won't let the user replace a
-        // running .app bundle, so the app must exit for the drag-install to
-        // succeed. The mounted volume + Finder window are owned by the system
-        // and survive our exit.
-        await Process.run('open', [path]);
+        // The App Sandbox forbids exec'ing `/usr/bin/open`, so mount the .dmg
+        // via the native NSWorkspace channel (brokered by LaunchServices,
+        // permitted under the sandbox) instead of Process.run. Then quit:
+        // macOS won't let the user replace a running .app bundle, so the app
+        // must exit for the drag-install to succeed. The mounted volume +
+        // Finder window are owned by the system and survive our exit.
+        await _installerChannel.invokeMethod<bool>('openInstaller', {
+          'path': path,
+        });
         await Future<void>.delayed(const Duration(milliseconds: 500));
         exit(0);
       } else if (Platform.isWindows) {

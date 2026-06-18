@@ -6,6 +6,8 @@ class MainFlutterWindow: NSWindow {
   private let workspaceBookmarkPlugin = WorkspaceBookmarkPlugin()
   // Retained so its handler stays alive (test-only window sizing channel).
   private var testWindowChannel: FlutterMethodChannel?
+  // Retained so its handler stays alive (in-app updater installer launch).
+  private var installerChannel: FlutterMethodChannel?
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -38,6 +40,25 @@ class MainFlutterWindow: NSWindow {
       result(nil)
     }
     testWindowChannel = channel
+
+    // Installer channel: the App Sandbox forbids exec'ing `/usr/bin/open`, so
+    // the Dart updater asks us to open the downloaded .dmg via NSWorkspace,
+    // which is brokered by LaunchServices and permitted under the sandbox.
+    let installer = FlutterMethodChannel(
+      name: "getman/installer",
+      binaryMessenger: flutterViewController.registrar(forPlugin: "Installer").messenger)
+    installer.setMethodCallHandler { call, result in
+      guard call.method == "openInstaller",
+        let args = call.arguments as? [String: Any],
+        let path = args["path"] as? String
+      else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      let ok = NSWorkspace.shared.open(URL(fileURLWithPath: path))
+      result(ok)
+    }
+    installerChannel = installer
 
     super.awakeFromNib()
   }

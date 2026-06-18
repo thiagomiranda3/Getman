@@ -19,9 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Auto-update reliability** — the detected version and changelog are no longer
   cleared by intermediate progress updates; download failures now surface an
-  error instead of failing silently; the update prompt reliably reads the latest
-  release version (timing fix); and on macOS the app now exits cleanly so the
-  downloaded installer can replace the running app.
+  error instead of failing silently; and the update prompt reliably reads the
+  latest release version (timing fix).
+- **macOS: keep the App Sandbox enabled** — the updater now launches the
+  downloaded installer through `NSWorkspace` (sandbox-safe) and then quits,
+  instead of disabling the sandbox. Disabling it had relocated the app's data
+  directory (making saved collections/history/environments look lost) and broke
+  file import/export; with the sandbox restored, your data and file dialogs work
+  as before and updates still install.
 
 ## [1.0.0] - 2026-06-15
 
