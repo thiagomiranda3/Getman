@@ -277,6 +277,7 @@ ThemeData classicTheme(
       shape,
       typography,
       decoration,
+      const AppMotion(),
       const AppCopy(emptyResponse: 'No response yet.'),
     ],
   );

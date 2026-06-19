@@ -374,6 +374,7 @@ ThemeData rpgTheme(
       shape,
       typography,
       decoration,
+      const AppMotion(),
       const AppCopy(emptyResponse: 'CAST SEND TO SUMMON A RESPONSE'),
     ],
   );

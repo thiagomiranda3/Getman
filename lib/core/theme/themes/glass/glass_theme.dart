@@ -291,6 +291,7 @@ ThemeData glassTheme(
       shape,
       typography,
       effectiveDecoration,
+      const AppMotion(),
       const AppCopy(emptyResponse: 'SEND A REQUEST TO SEE THE RESPONSE'),
     ],
   );

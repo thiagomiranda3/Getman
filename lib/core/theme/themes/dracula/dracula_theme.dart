@@ -306,6 +306,7 @@ ThemeData draculaTheme(
       shape,
       typography,
       decoration,
+      const AppMotion(),
       const AppCopy(emptyResponse: 'SEND A REQUEST TO SEE THE RESPONSE'),
     ],
   );

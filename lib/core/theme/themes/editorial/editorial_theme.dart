@@ -274,6 +274,7 @@ ThemeData editorialTheme(
       shape,
       typography,
       decoration,
+      const AppMotion(),
       const AppCopy(emptyResponse: 'Awaiting the first response'),
     ],
   );

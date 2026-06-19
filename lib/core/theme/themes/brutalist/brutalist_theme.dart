@@ -283,6 +283,7 @@ ThemeData brutalistTheme(
       shape,
       typography,
       decoration,
+      const AppMotion(),
       const AppCopy(emptyResponse: 'HIT SEND TO GET A RESPONSE'),
     ],
   );
