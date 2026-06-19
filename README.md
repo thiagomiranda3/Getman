@@ -5,10 +5,12 @@
 # Getman
 
 A fast, native HTTP client for desktop and the web — built with Flutter,
-wrapped in a choice of three deliberately opinionated visual themes.
+wrapped in six visual themes that **react to your requests** with motion and
+optional sound.
 
 **Live demo:** https://thiagomiranda3.github.io/Getman/
 **Download:** [latest release for macOS, Windows, Linux](https://github.com/thiagomiranda3/Getman/releases/latest)
+**Full feature docs:** [the wiki](https://github.com/thiagomiranda3/Getman/wiki)
 
 ---
 
@@ -22,35 +24,45 @@ telemetry, and everything you do is persisted locally in a Hive database on
 your machine. Open it, send a request, close it — same as `curl`, but with
 tabs, history, and a proper JSON viewer.
 
-It also doesn't look like every other dev tool. The default **Brutalist**
-theme leans hard into thick borders, hard shadows, and uppercase display
-type; **Editorial** is a quieter, long-form reading aesthetic; **Arcane
-Quest** is a tongue-in-cheek fantasy RPG skin. Pick one from the settings
-dialog — they all share the same engine.
+It also doesn't look like every other dev tool. Ships six full themes: the
+calm, native-style **Classic** (the default); **Brutalist** (thick borders,
+hard shadows, uppercase type); **Editorial** (a quieter, long-form reading
+aesthetic); **Arcane Quest** (a tongue-in-cheek fantasy RPG skin); **Dracula**
+(the popular dark palette); and **Liquid Glass** (Apple-inspired frosted-glass
+panels with real backdrop blur). Pick one from the settings dialog — they all
+share the same engine. And they're not static: each theme **reacts to what you
+do** — a flourish on a `200`, a different effect on a `500`, a themed send
+ritual, animated backgrounds, and optional sound cues.
 
 ## Features
 
 - **Tabbed request workspace.** Every request is a tab with its own
   method, URL, headers, params, body, and response. Tabs persist across
   restarts (debounced saves, no surprise data loss).
+- **Tab panels (virtual desktops).** Group tabs into named panels and switch
+  between them like virtual desktops for your requests — move tabs between
+  panels, reorder, and jump with the keyboard.
 - **Collections tree** with drag-and-drop reordering, folders, favorites,
-  rename/delete, free-text descriptions per folder or request, and per-node
-  "save" to snapshot the current tab's request.
+  rename/delete, free-text descriptions per folder or request, per-node
+  "save" to snapshot the current tab, and **saved examples** — capture a
+  request+response pair on a node and reopen it later as an unlinked tab.
 - **Request history** with automatic dedup by method + URL + body, a
   configurable size limit, and newest-first ordering.
-- **Environments.** Define named variable sets (`API_HOST`, `TOKEN`, …) and
-  reference them anywhere — URL, query params, headers, or body — with
-  `{{var}}` syntax. The URL bar highlights each token live (green for
-  resolved, red for unknown). The active environment is one click away in
-  the top bar. Flag any variable as **secret** to mask its value in the
-  editor (with a reveal toggle) and redact it on export.
+- **Environments & variables.** Define named variable sets (`API_HOST`,
+  `TOKEN`, …) and reference them anywhere — URL, query params, headers, or
+  body — with `{{var}}` syntax. The URL bar highlights each token live (green
+  for resolved, red for unknown), and the active environment is one click away
+  in the top bar. Flag any variable as **secret** to mask + redact it. Built-in
+  **dynamic variables** (`{{$guid}}`, `{{$timestamp}}`, `{{$randomInt}}`, …)
+  resolve at send time, and **collection-scoped variables** let a folder define
+  vars its requests inherit (the active environment wins on conflict).
 - **Postman import / export.** Bring your existing `.json` collections in,
   or export Getman collections to share with teammates who still use
   Postman.
 - **cURL paste.** Paste a `curl https://…` command into the URL bar and
   Getman parses it into method, URL, headers, and body in one step.
 - **Authentication.** Bearer, Basic, and API-key (header or query) auth,
-  resolved with `{{variables}}` at send time.
+  resolved with `{{variables}}` at send time, inheritable from a parent folder.
 - **Request bodies.** Raw, `x-www-form-urlencoded`, `multipart/form-data`
   with file uploads, and binary.
 - **Code generation.** Export any request as cURL, JavaScript `fetch`,
@@ -59,28 +71,40 @@ dialog — they all share the same engine.
 - **No-code tests & chaining.** Capture a value from one response (JSONPath,
   header, or regex) into an environment variable, and assert on status,
   time, body, or headers — all without writing a script.
+- **Rich response viewer.** Pretty / raw / **collapsible JSON tree** (copy a
+  value, copy its JSONPath, or one-click **extract to `{{var}}`**), plus
+  headers, cookies, and test results. **Per-tab response time-travel** keeps
+  recent responses so you can step back through them, and a **compare/diff**
+  view shows exactly what changed between two responses. Copy the body or save
+  it to a file.
 - **Persistent cookie jar.** Per-domain cookies are sent automatically on
   later requests, so session-based auth just works — with a manager dialog
   to inspect and delete individual cookies (grouped by domain).
 - **Git-friendly workspace (desktop).** Mirror collections to a folder of
   readable JSON files you can commit and review in PRs.
-- **Command palette.** `Cmd/Ctrl+K` to jump to any saved request, switch
-  environment, or change theme.
+- **Command palette.** `Cmd/Ctrl+K` to fuzzy-jump to any saved request,
+  environment, theme, or recent history entry — and `Cmd/Ctrl+E` to switch
+  environment directly.
 - **Realtime.** WebSocket and Server-Sent Events with a live message log.
-- **Configurable networking.** Timeouts, follow-redirects, SSL verification,
-  and proxy — all in Settings.
+- **Configurable networking.** Timeouts, follow-redirects (with a
+  max-redirects cap), SSL verification, HTTP proxy, and **client-certificate
+  (mTLS)** — all in Settings.
 - **JSON editor, not a textarea.** Request and response bodies use
   `re_editor` with syntax highlighting, a built-in find panel, and a
-  one-keystroke beautifier (Ctrl/Cmd+B). Copy the response or save it
-  straight to a file.
+  one-keystroke beautifier (Ctrl/Cmd+B).
 - **Cancel in-flight requests.** Long-running call? Hit cancel — the Dio
   client is torn down cleanly and no stale response arrives five minutes
   later.
-- **Three themes.** Brutalist, Editorial, Arcane Quest — swap live without
-  a restart. Compact mode tightens spacing on smaller displays.
-- **Keyboard-driven.** Send, save, beautify, open/close tabs, switch
-  between tabs (Ctrl+Tab or Cmd/Ctrl+1–9), and jump to the URL bar — all
-  without leaving the home row.
+- **Six reactive themes.** Classic (the calm default), Brutalist, Editorial,
+  Arcane Quest, Dracula, and Liquid Glass — swap live without a restart. The
+  themes **react to your requests**: a success flourish, a distinct error
+  effect, a themed send ritual, animated backgrounds, and optional sound cues.
+  Compact mode tightens spacing; **Reduce Visual Effects** turns the motion off.
+- **Auto-update (desktop).** Checks GitHub for a newer release on startup and
+  offers to update; toggle it off in Settings.
+- **Keyboard-driven.** Send, save, beautify, open/close/switch tabs, manage
+  panels, switch environment, and jump to the URL bar — all without leaving
+  the home row.
 - **Local-first, private.** No accounts, no cloud, no telemetry. All data
   lives in a Hive store in your app-data directory.
 
@@ -88,9 +112,9 @@ dialog — they all share the same engine.
 
 | Platform    | Download                                                                                           |
 |-------------|----------------------------------------------------------------------------------------------------|
-| macOS       | `getman-vX.Y.Z-macos-arm64.zip` — unzip, drag `Getman.app` into `/Applications`                    |
-| Windows     | `getman-vX.Y.Z-windows-x64.zip` — unzip anywhere, run `getman.exe`                                 |
-| Linux (x64) | `getman-vX.Y.Z-linux-x64.tar.gz` — `tar -xzf … && ./getman`                                        |
+| macOS       | `getman-vX.Y.Z-macos-arm64.dmg` — open it, drag `Getman.app` into `/Applications`                  |
+| Windows     | `getman-vX.Y.Z-windows-x64-setup.exe` — run the Inno Setup installer                               |
+| Linux (x64) | `getman-vX.Y.Z-linux-x86_64.AppImage` — `chmod +x getman-*.AppImage && ./getman-*.AppImage`        |
 | Web         | [Open the live demo](https://thiagomiranda3.github.io/Getman/) (CORS applies — see note below)     |
 
 Grab them from the [Releases page](https://github.com/thiagomiranda3/Getman/releases/latest).
@@ -110,9 +134,13 @@ Windows: click "More info" → "Run anyway".
 | Save to collection | `Cmd + S`            | `Ctrl + S`            |
 | Beautify JSON body | `Cmd + B`            | `Ctrl + B`            |
 | Command palette    | `Cmd + K`            | `Ctrl + K`            |
+| Switch environment | `Cmd + E`            | `Ctrl + E`            |
 | Focus URL bar      | `Cmd + L`            | `Ctrl + L`            |
 | Next / previous tab| `Ctrl + Tab` / `+Shift` | `Ctrl + Tab` / `+Shift` |
 | Jump to tab 1–9    | `Cmd + 1…9`          | `Ctrl + 1…9`          |
+| New panel          | `Cmd + Shift + N`    | `Ctrl + Shift + N`    |
+| Next / previous panel | `Cmd + Shift + ]` / `[` | `Ctrl + Shift + ]` / `[` |
+| Jump to panel 1–9  | `Cmd + Shift + 1…9`  | `Ctrl + Shift + 1…9`  |
 
 ## Running from source
 
@@ -139,9 +167,15 @@ dart run build_runner build --delete-conflicting-outputs
 Before opening a PR:
 
 ```sh
-fvm flutter analyze        # must report: No issues found!
-fvm flutter test           # must be 100% green
+fvm flutter analyze                    # very_good_analysis — 0 issues
+fvm dart run custom_lint               # Getman architecture rules
+fvm dart run bloc_tools:bloc lint lib  # bloc_lint
+fvm dart format lib test tools         # formatter (the commit hook enforces it)
+fvm flutter test                       # must be 100% green
 ```
+
+The `.githooks/pre-commit` hook runs the analysis + format gate automatically —
+enable it once per clone with `git config core.hooksPath .githooks`.
 
 Project layout, architectural rules, and feature-level invariants live in
 [`CLAUDE.md`](./CLAUDE.md) — worth reading before your first non-trivial
@@ -225,6 +259,8 @@ must exactly match the repo name's casing.
   also ship Intel, add a second job on `macos-13` or build a universal
   binary.
 - **x86\_64 only** on Linux. Add an arm64 runner if you need Linux-arm.
-- **No auto-update.** Users re-download from Releases. Adding an updater
-  (e.g. Sparkle on macOS, `auto_updater` package cross-platform) is a
-  separate project.
+- **Auto-update is browser-assisted on macOS.** The app detects new releases
+  on startup and prompts, but because builds are unsigned, "Update now" on
+  macOS opens the release asset in your browser to download manually (a
+  quarantined unsigned `.dmg` would otherwise be flagged "damaged") rather than
+  installing in place. Code signing would let it update fully in-app.
