@@ -37,23 +37,32 @@ class _BrutalReactionOverlayState extends State<_BrutalReactionOverlay>
 
   void _onReaction(ThemeReaction r) {
     if (r.kind == ThemeReactionKind.sendStarted) return;
-    _label = switch (r.kind) {
+    final label = switch (r.kind) {
       ThemeReactionKind.cancelled => 'CANCELLED',
       ThemeReactionKind.networkError => 'FAILED',
       _ => '${r.statusCode ?? 0}',
     };
-    _isError = r.isError;
+    final isError = r.isError;
     _stamp?.dispose();
-    final c =
+    // Declare first so the closure can close over the variable reference.
+    late final AnimationController c;
+    c =
         AnimationController(
           vsync: this,
           duration: const Duration(milliseconds: 900),
         )..addStatusListener((s) {
           if (s == AnimationStatus.completed && mounted) {
-            setState(() {});
+            if (_stamp == c) {
+              setState(() => _stamp = null);
+              c.dispose();
+            }
           }
         });
-    setState(() => _stamp = c);
+    setState(() {
+      _label = label;
+      _isError = isError;
+      _stamp = c;
+    });
     unawaited(c.forward());
   }
 

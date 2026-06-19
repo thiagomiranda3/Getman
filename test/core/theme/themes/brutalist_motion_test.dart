@@ -15,6 +15,7 @@ void main() {
   testWidgets('stamp on success shows the status code text', (tester) async {
     final motion = brutalistMotion(reduceEffects: false);
     final controller = ThemeReactionController();
+    addTearDown(controller.dispose);
     await tester.pumpWidget(
       MaterialApp(
         theme: brutalistTheme(Brightness.light),
@@ -37,7 +38,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.text('200'), findsOneWidget);
     await tester.pump(const Duration(seconds: 1));
-    controller.dispose();
   });
 
   test('reduced effects => identity', () {
