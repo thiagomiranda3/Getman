@@ -20,57 +20,66 @@ class _FakeTabsBloc extends Cubit<TabsState> implements TabsBloc {
 }
 
 class _FakeSettingsBloc extends Cubit<SettingsState> implements SettingsBloc {
-  _FakeSettingsBloc() : super(const SettingsState(settings: SettingsEntity()));
+  _FakeSettingsBloc(SettingsEntity s) : super(SettingsState(settings: s));
   @override
   dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
 }
 
-class _NoOpSound implements ThemeSoundService {
+class _RecordingSound implements ThemeSoundService {
+  final calls = <String>[];
   @override
-  Future<void> play(String themeId, ThemeReaction r) async {}
+  Future<void> play(String themeId, ThemeReaction r) async =>
+      calls.add('$themeId:${r.kind.name}');
   @override
   void dispose() {}
 }
 
 void main() {
-  testWidgets('fires controller once per reactionSeq increase', (tester) async {
-    final bloc = _FakeTabsBloc();
+  testWidgets('plays sound only when enabled', (tester) async {
+    final tabs = _FakeTabsBloc();
     final controller = ThemeReactionController();
-    final fired = <ThemeReactionKind>[];
-    controller.addListener(() => fired.add(controller.latest!.kind));
+    final sound = _RecordingSound();
 
-    await tester.pumpWidget(
-      MultiBlocProvider(
-        providers: [
-          BlocProvider<TabsBloc>.value(value: bloc),
-          BlocProvider<SettingsBloc>.value(value: _FakeSettingsBloc()),
-        ],
-        child: MultiRepositoryProvider(
+    Future<void> pumpWith({required bool enabled}) async {
+      final settings = _FakeSettingsBloc(
+        SettingsEntity(enableThemeSounds: enabled, themeId: 'rpg'),
+      );
+      await tester.pumpWidget(
+        MultiBlocProvider(
           providers: [
-            ChangeNotifierProvider<ThemeReactionController>.value(
-              value: controller,
-            ),
-            RepositoryProvider<ThemeSoundService>.value(value: _NoOpSound()),
+            BlocProvider<TabsBloc>.value(value: tabs),
+            BlocProvider<SettingsBloc>.value(value: settings),
           ],
-          child: const MaterialApp(
-            home: ThemeReactionListener(child: SizedBox()),
+          child: MultiRepositoryProvider(
+            providers: [
+              ChangeNotifierProvider<ThemeReactionController>.value(
+                value: controller,
+              ),
+              RepositoryProvider<ThemeSoundService>.value(value: sound),
+            ],
+            child: const MaterialApp(
+              home: ThemeReactionListener(child: SizedBox()),
+            ),
           ),
         ),
-      ),
-    );
+      );
+    }
 
-    expect(fired, isEmpty);
-
-    bloc.push(
+    await pumpWith(enabled: false);
+    tabs.push(
       const TabsState(
         reactionSeq: 1,
-        lastReaction: ThemeReaction(kind: ThemeReactionKind.sendStarted),
+        lastReaction: ThemeReaction(
+          kind: ThemeReactionKind.success,
+          statusCode: 200,
+        ),
       ),
     );
     await tester.pump();
-    expect(fired, [ThemeReactionKind.sendStarted]);
+    expect(sound.calls, isEmpty);
 
-    bloc.push(
+    await pumpWith(enabled: true);
+    tabs.push(
       const TabsState(
         reactionSeq: 2,
         lastReaction: ThemeReaction(
@@ -80,26 +89,9 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(
-      fired,
-      [ThemeReactionKind.sendStarted, ThemeReactionKind.success],
-    );
+    expect(sound.calls, ['rpg:success']);
 
-    // An emit that doesn't change reactionSeq does NOT re-fire.
-    bloc.push(
-      const TabsState(
-        reactionSeq: 2,
-        isLoading: true,
-        lastReaction: ThemeReaction(
-          kind: ThemeReactionKind.success,
-          statusCode: 200,
-        ),
-      ),
-    );
-    await tester.pump();
-    expect(fired.length, 2);
-
-    await bloc.close();
+    await tabs.close();
     controller.dispose();
   });
 }
