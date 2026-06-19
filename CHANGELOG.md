@@ -5,6 +5,18 @@ All notable changes to **Getman** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-06-19
+
+### Fixed
+
+- **Paste cURL on Windows and the web** — pasting a multi-line `curl` command
+  (one that uses `\` line continuations) into the URL bar now fills in the
+  method, headers, and body on every platform. Previously only the URL was
+  populated on Windows and the web build: the single-line URL field collapses
+  the pasted newlines to spaces, and the parser mistook each collapsed `\`
+  continuation for an escaped space and dropped the flags that followed. The
+  parser now treats a collapsed continuation the same as a real newline.
+
 ## [1.4.0] - 2026-06-18
 
 ### Added

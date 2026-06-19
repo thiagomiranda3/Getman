@@ -158,6 +158,49 @@ curl --location 'http://test.com/dynamics/websocket-metric' \
       expect(config.body, 'payload');
     });
 
+    test(
+      'parses when line-continuation newlines are collapsed to spaces '
+      '(single-line text field paste on web/Windows)',
+      () {
+        // A single-line TextField on web/Windows collapses pasted newlines to
+        // spaces, so each trailing `\` line continuation arrives as `\ `
+        // (backslash-space). macOS keeps the newline. The parser must treat the
+        // collapsed form identically — otherwise every flag after the URL is
+        // swallowed (only the URL survives) and the method falls back to GET.
+        const multiline =
+            "curl --location 'https://api.dev/orders' \\\n"
+            "--header 'Content-Type: application/json' \\\n"
+            '--data \'{"id": 1, "name": "widget"}\'';
+        final collapsed = multiline.replaceAll('\n', ' ');
+
+        final config = CurlUtils.parse(collapsed, id: 'collapsed');
+        expect(config, isNotNull);
+        expect(config!.method, 'POST');
+        expect(config.url, 'https://api.dev/orders');
+        expect(config.headers['Content-Type'], 'application/json');
+        expect(config.bodyType, BodyType.raw);
+        final decoded = jsonDecode(config.body) as Map<String, dynamic>;
+        expect(decoded['id'], 1);
+        expect(decoded['name'], 'widget');
+      },
+    );
+
+    test(
+      'mid-token escaped space stays a literal space (not a continuation)',
+      () {
+        // `\ ` inside a token (an unquoted path with a space) must remain a
+        // genuine escaped space — only a backslash at a token boundary is a
+        // collapsed line continuation.
+        final config = CurlUtils.parse(
+          r'curl https://api.dev/x -T /tmp/My\ Files/data.bin',
+          id: 'escaped-space',
+        );
+        expect(config, isNotNull);
+        expect(config!.method, 'PUT');
+        expect(config.bodyFilePath, '/tmp/My Files/data.bin');
+      },
+    );
+
     test('double-quoted values support escapes and span newlines', () {
       final config = CurlUtils.parse(
         r'curl https://api.dev -d "line\"quote"',

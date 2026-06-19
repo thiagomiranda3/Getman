@@ -495,6 +495,16 @@ class CurlUtils {
             i += 3;
             continue;
           }
+          if (!hasToken && (next == 0x20 || next == 0x09)) {
+            // A backslash at a token boundary followed by horizontal whitespace
+            // is a line continuation whose newline was collapsed to a space by
+            // a single-line text field on paste — web/Windows do this, macOS
+            // keeps the newline. Drop it like a real `\`+newline so the trailing
+            // flags aren't swallowed. A mid-token `\ ` (hasToken) is left as a
+            // genuine escaped space below.
+            i += 2;
+            continue;
+          }
           // Escape the next char (e.g. `\ ` -> space inside a token).
           hasToken = true;
           buffer.writeCharCode(next);
