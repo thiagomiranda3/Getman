@@ -77,8 +77,21 @@ theme's identity:
   safety).
 - [ ] **`cancelled`** — a "dispelled/aborted" cue (often a gentle reverse/fizzle,
   or nothing).
-- [ ] **Latency (`durationMs`)** — optional but high-value: does a slow response
-  feel different from a fast one? (See BACKLOG VM-A1.)
+- [ ] **Latency (`durationMs`)** — high-value and already wired: does a slow
+  response feel different from a fast one? Use the shipped
+  `latencyWeight(durationMs)` (0→1) from `lib/core/theme/motion/latency_weight.dart`
+  to scale a resolution effect's intensity/duration, and `inFlightTension(elapsedMs)`
+  for a live build-up on the SEND control (drive it from `sendAffordance`'s
+  `isSending` + a local `_build` controller). **Build-controller restart guard:**
+  edge-detect on the old widget — `if (widget.isSending && !old.isSending)
+  forward(from:0); else if (!widget.isSending && old.isSending) stop()+reset` —
+  NOT `!_build.isAnimating` (that flickers on long sends). All loud themes follow
+  this.
+- [ ] **Status-code personalities (`statusCode`)** — also wired: map the exact
+  code via `flavorFor(reaction)` → `StatusReactionFlavor`
+  (`lib/core/theme/motion/status_reaction_flavor.dart`), then render each flavor
+  in your theme's idiom (loud themes do bespoke effects; calm themes just tint /
+  blink-count the pulse). Reuse the classifier — don't re-derive HTTP semantics.
 - [ ] **Ambient background** — does this theme have *living* motion behind the
   app? (loud: yes; calm: no.) Implemented in the theme's `scaffoldBackground`
   painter, with a **separate static variant for `reduceEffects`**.

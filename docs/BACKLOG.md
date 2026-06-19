@@ -14,13 +14,20 @@
 
 ## Current state
 - Branch `dev` (pushed to `origin/dev`). `fvm flutter analyze` / `custom_lint` /
-  `bloc_lint` all 0 issues; `fvm flutter test` green (**~1219**).
+  `bloc_lint` all 0 issues; `fvm flutter test` green (**~1263**).
 - The **theme reactive-motion** feature shipped (commits `17f7ad5..ace6b6e`): the
   `AppMotion` extension, the `ThemeReaction`/`ThemeReactionController`/
   `ThemeReactionListener` spine, per-theme reaction overlays + send rituals,
   ambient enrichments, a theme-switch transition, and opt-in themed sound
   (`enableThemeSounds`, HiveField 27). Everything below in **🎨 Themes, Visuals
   & Motion** builds on that infrastructure.
+- **VM-A1 + VM-A2 shipped** (commits `5e42afc..3ac2922`, on `dev`, unmerged):
+  latency-reactive effects (in-flight build-up on SEND + resolution scaled by
+  `durationMs`) and status-code micro-personalities via the shared pure-Dart
+  `StatusReactionFlavor` classifier + `latencyWeight`/`inFlightTension`
+  (`lib/core/theme/motion/`). Loud themes full, calm themes restrained; codes
+  201/204/304/401/403/404/408/429/500/503. No spine change. Wiki synced
+  (`Themes-and-Appearance`). **VM-A3** below was split off from this work.
 
 ---
 
@@ -29,40 +36,13 @@
 ## 🎨 Themes, Visuals & Motion
 
 > **Read [`docs/THEME_AUTHORING.md`](THEME_AUTHORING.md) before touching these.**
-> The reactive spine (`lib/core/theme/motion/`, `AppMotion`) already captures
-> more than the overlays use — notably `ThemeReaction.durationMs` (latency) and
-> the exact `statusCode`. The cheapest, most original wins are A1–A2.
+> The reactive spine (`lib/core/theme/motion/`, `AppMotion`) drives all of this.
+> **VM-A1 + VM-A2 shipped** (see Current state) — they added the shared
+> `StatusReactionFlavor` classifier (`flavorFor`) + `latencyWeight`/
+> `inFlightTension` helpers in `lib/core/theme/motion/`; new themes/effects
+> should reuse those rather than re-deriving status/latency semantics.
 
 ### A. Express the data we already capture (highest leverage)
-
-> **VM-A1 + VM-A2 are designed** — see
-> [`docs/superpowers/specs/2026-06-19-vm-a1-a2-latency-status-reactions-design.md`](superpowers/specs/2026-06-19-vm-a1-a2-latency-status-reactions-design.md)
-> (shared `StatusReactionFlavor` classifier + `latencyWeight`; loud full + calm
-> restrained; codes 201/204/304/401/403/404/408/429/500/503). VM-A3 below was
-> split off from that design.
-
-#### VM-A1 — Latency-reactive effects
-- **Idea**: scale every effect by response time. A 20 ms response = a crisp
-  snap; a 3 s response = the send ritual visibly *strains* and the success
-  effect lands as relief/triumph. Make the *wait itself* expressive — the rune
-  ring fills, the liquid level rises, a tension meter builds while in-flight and
-  resolves on arrival.
-- **Seam**: `ThemeReaction.durationMs` is already carried into the overlays but
-  unused. For the live in-flight build-up, the overlay needs an "in-flight
-  since" signal — either extend `ThemeReactionController` to expose an in-flight
-  start, or drive it from `AppMotion.sendAffordance`'s `isSending` (already
-  wired) with an internal stopwatch/ticker.
-- **Effort**: M.
-
-#### VM-A2 — Status-code micro-personalities
-- **Idea**: go finer than success/4xx/5xx. `201 Created` = a "spawn" flourish,
-  `204` = a quiet poof, `304` = a déjà-vu shimmer, `401/403` = a
-  shield-block/locked-door (distinct from `404`'s dissolve), `429` = a
-  throttle/cooldown pulse. Each common code gets a micro-reaction.
-- **Seam**: `ThemeReaction.statusCode` + `kindForStatus` (coarse today). Either
-  add finer `ThemeReactionKind`s or let each theme's `reactionOverlay` map
-  notable codes to bespoke effects. Keep the default fallback for unmapped codes.
-- **Effort**: M.
 
 #### VM-A3 — Client-side timeout / network-failure sub-personalities
 - **Idea**: give *transport* failures their own themed reaction, distinct from
