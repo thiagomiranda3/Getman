@@ -134,6 +134,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       (e, emit) =>
           _apply(emit, (s) => s.copyWith(skippedUpdateVersion: e.version)),
     );
+    on<UpdateEnableThemeSounds>(
+      (e, emit) => _apply(emit, (s) => s.copyWith(enableThemeSounds: e.value)),
+    );
   }
   final SaveSettingsUseCase _saveSettingsUseCase;
 

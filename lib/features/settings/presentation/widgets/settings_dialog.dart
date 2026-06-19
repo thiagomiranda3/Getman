@@ -283,6 +283,15 @@ class _SettingsDialogState extends State<SettingsDialog>
         value: settings.reduceVisualEffects,
         onChanged: (v) => bloc.add(UpdateReduceVisualEffects(value: v)),
       ),
+      _switch(
+        context,
+        switchKey: const ValueKey('theme_sounds_switch'),
+        title: 'THEME SOUNDS',
+        icon: Icons.volume_up,
+        subtitle: 'Play themed sound effects on send & response',
+        value: settings.enableThemeSounds,
+        onChanged: (v) => bloc.add(UpdateEnableThemeSounds(value: v)),
+      ),
     ]);
   }
 

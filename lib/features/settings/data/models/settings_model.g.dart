@@ -52,13 +52,14 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
           : fields[24] as bool,
       checkForUpdatesOnStartup: fields[25] == null ? true : fields[25] as bool,
       skippedUpdateVersion: fields[26] as String?,
+      enableThemeSounds: fields[27] == null ? false : fields[27] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, SettingsModel obj) {
     writer
-      ..writeByte(27)
+      ..writeByte(28)
       ..writeByte(0)
       ..write(obj.historyLimit)
       ..writeByte(1)
@@ -112,7 +113,9 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       ..writeByte(25)
       ..write(obj.checkForUpdatesOnStartup)
       ..writeByte(26)
-      ..write(obj.skippedUpdateVersion);
+      ..write(obj.skippedUpdateVersion)
+      ..writeByte(27)
+      ..write(obj.enableThemeSounds);
   }
 
   @override
