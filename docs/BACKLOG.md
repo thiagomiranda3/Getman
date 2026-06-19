@@ -35,6 +35,12 @@
 
 ### A. Express the data we already capture (highest leverage)
 
+> **VM-A1 + VM-A2 are designed** — see
+> [`docs/superpowers/specs/2026-06-19-vm-a1-a2-latency-status-reactions-design.md`](superpowers/specs/2026-06-19-vm-a1-a2-latency-status-reactions-design.md)
+> (shared `StatusReactionFlavor` classifier + `latencyWeight`; loud full + calm
+> restrained; codes 201/204/304/401/403/404/408/429/500/503). VM-A3 below was
+> split off from that design.
+
 #### VM-A1 — Latency-reactive effects
 - **Idea**: scale every effect by response time. A 20 ms response = a crisp
   snap; a 3 s response = the send ritual visibly *strains* and the success
@@ -57,6 +63,22 @@
   add finer `ThemeReactionKind`s or let each theme's `reactionOverlay` map
   notable codes to bespoke effects. Keep the default fallback for unmapped codes.
 - **Effort**: M.
+
+#### VM-A3 — Client-side timeout / network-failure sub-personalities
+- **Idea**: give *transport* failures their own themed reaction, distinct from
+  the generic `networkError` — a client-side timeout
+  (`send`/`receive`/`connection` timeout) should *feel* like running out of time
+  (a clock-out / mana-drain / sag), separate from a connection refusal or a bad
+  cert. (Server-sent **HTTP 408** is already handled by VM-A2's classifier, since
+  `validateStatus: (_) => true` routes it through the success path with a real
+  status; this item is specifically the *no-HTTP-status* transport failures.)
+- **Seam**: the error path in `TabsBloc._onSendRequest` (`on NetworkFailure`)
+  currently fires a bare `ThemeReaction(kind: networkError)` with no status. Thread
+  the `NetworkFailureType` (or add a finer `ThemeReactionKind`) through
+  `ThemeReaction` → the per-theme `reactionOverlay` (which would extend the
+  `StatusReactionFlavor` classifier added in VM-A2). Small pure-Dart spine change.
+- **Effort**: S–M. **Split off from** VM-A1/VM-A2 (design
+  `docs/superpowers/specs/2026-06-19-vm-a1-a2-latency-status-reactions-design.md`).
 
 ### B. Extend reactions to more app moments
 
