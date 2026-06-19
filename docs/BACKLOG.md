@@ -3,8 +3,9 @@
 > **How this is organized.** Open work is grouped **by feature type** in the
 > "Open backlog" section below. Each item has an ID (stable across reorgs),
 > a one-line idea, the **seam** (the real code hook it plugs into), and a rough
-> effort (S/M/L). Shipped work + the working agreement are preserved at the
-> bottom as historical reference.
+> effort (S/M/L). This backlog tracks **open work only** — completed items are
+> dropped (git history + `CLAUDE.md` are the record of what shipped). The
+> working agreement is at the bottom.
 >
 > **Themes/visuals work:** before starting any item under
 > **🎨 Themes, Visuals & Motion** — or creating/altering any theme — read
@@ -289,91 +290,3 @@
    **For theme/motion work, follow [`docs/THEME_AUTHORING.md`](THEME_AUTHORING.md).**
 6. After any `@HiveType`/`@HiveField` change: `dart run build_runner build
    --delete-conflicting-outputs`, then re-run analyze + tests.
-
----
-
-# Shipped (historical reference)
-
-> Detailed records of completed passes. Kept for resume context; the live source
-> of truth is the code + `CLAUDE.md`.
-
-## ✅ Theme reactive motion ("theme juice") — June 2026
-Shipped on `dev` (`17f7ad5..ace6b6e`, 20 tasks via subagent-driven development,
-each spec+quality reviewed, broad whole-branch review passed):
-`ThemeReaction` (pure-Dart value type) + `ThemeReactionController` (ChangeNotifier
-bus) + a transient `TabsState` reaction signal emitted by `TabsBloc` + a
-widget-layer `ThemeReactionListener`; the **`AppMotion`** 7th `ThemeExtension`
-(`reactionOverlay` + `sendAffordance`, identity defaults); per-theme motion
-(Glass ripple/crack/liquid-send, Arcane sparkle-shower/runic-crack+shake/
-rune-ring, Brutalist stamp/glitch-shake, restrained calm pulses for Classic/
-Editorial/Dracula); ambient enrichments (Arcane shooting-stars/constellations/
-cursor-parallax, Glass cursor-sheen); a theme-switch sweep; opt-in
-`enableThemeSounds` (HiveField 27) + web-safe `ThemeSoundService`. All gated by
-`reduceVisualEffects`.
-
-## ✅ LOW-wins + medium-features pass (June 2026, session 2)
-- **LOW**: **L3** (`AppShape.sheetRadius`), **L4** (`ValueKey(node.id)` on tree
-  tiles), **L5** (RPG painter Paint/Path hoisted), **L6** (save-response-to-file +
-  generalized `saveJsonFileWithFeedback`), **L7** (Ctrl+Tab / Ctrl+Shift+Tab /
-  Cmd+Ctrl+1–9 tab switching), **L8** (Cmd/Ctrl+L focus-URL via DI
-  `UrlFocusRegistry`), **L9** (Node axios / Go net/http / Java OkHttp code-gen).
-- **MEDIUM**: **M6** (split `response_section.dart` → `response/`), **M7** (repo-impl
-  + `RealtimeService` SSE/WS tests via injectable WS factory), **M10 descriptions**
-  (`description` on `CollectionNode` typeId 3 `@HiveField(6)`), **M11** (secret env
-  vars — `secretKeys` typeId 4 `@HiveField(3)`), **M12** (cookie manager dialog +
-  `CookieStore.remove`).
-
-## ✅ Migration + features + perf pass (June 2026, session 3)
-- **M5** — collections tree migrated `flutter_fancy_tree_view` →
-  `two_dimensional_scrollables` (`TreeView`), preserving H2 id-keyed expansion,
-  drag-and-drop, search, indentation.
-- **M10 examples** — saved request+response examples on leaf nodes
-  (`SavedExampleEntity`, typeId 10 + `CollectionNode` `@HiveField(7)`).
-- **L11** — configurable `maxRedirects` (`@HiveField 18`) + client-cert mTLS
-  (`@HiveField 19/20/21`, `SecurityContext` native-only with web stub).
-- **L12** — collections persist keyed by root id (+ legacy int-key migration); a
-  per-root diff rewrites only changed roots.
-- **L10** — god-file splits: `RealtimeButton`/`UrlOverflowMenu`/
-  `RequestKindMethodSelector`, `TabChip`/`EmptyTabsPlaceholder`,
-  `EnvironmentListTile`/`EnvironmentEditor`.
-
-## ✅ Backlog+refactor pass (June 2026)
-- **Refactors**: `NetworkCancelHandle`→pure `cancel_handle.dart` (**M2**);
-  `dart:developer` log in `send_request_use_case` — domain Flutter-free (**M3**);
-  `HeaderUtils` extracted; shared `AuthApplication` seam;
-  `HttpResponseEntity.copyWithBody`; `ConfirmDialog` for the workspace-import
-  prompt; `app_theme.dart` split into `extensions/`; reusable `HoverHighlight`.
-- **Bugs**: **H1** (Postman multipart+urlencoded round-trip), **H2** (tree
-  expansion keyed by node.id), **M1** (missing multipart file → error response),
-  **L1** (empty basic-auth skip), **L2** (multipart contentType applied).
-- **Perf**: **M4** (O(1) dirty check via `CollectionsState.configById`),
-  tab-switcher `buildWhen`.
-
-## Shipped item detail (the original H/M/L write-ups)
-
-> Preserved verbatim from the pre-reorg backlog for traceability.
-
-### ✅ H1 — Postman export/import drops multipart & urlencoded form bodies
-- Files: `lib/core/utils/postman/postman_collection_mapper.dart`. Export switched
-  on `config.bodyType` (formdata/urlencoded), mirrored in `_parseBody`. Verified
-  by a round-trip test.
-### ✅ H2 — Collections folder tree collapses on ANY mutation
-- Own expansion state keyed by `node.id` (`Set<String>` reseeded each rebuild),
-  replacing value-keyed `toggledNodes`. Widget-tested.
-### ✅ M1 — Multipart send with a missing/deleted file fails silently
-- File-read errors surfaced as a synthetic error `HttpResponseEntity` (status 0).
-### ✅ M2 — `NetworkCancelHandle` domain-purity leak
-- Extracted to pure `lib/core/network/cancel_handle.dart`; `NetworkService`
-  adapts to Dio's `CancelToken` internally.
-### ✅ M3 — `send_request_use_case` Flutter import
-- Replaced `debugPrint` with `dart:developer` `log()`.
-### ✅ M4 — Tab-strip dirty-check storm
-- Precomputed `Map<String,HttpRequestConfigEntity>` on `CollectionsState`;
-  `TabDirtyChecker` does O(1) lookup.
-### ✅ M5 — tree lib migration (see pass above).
-### ✅ M6 — `response_section.dart` god file → `response/` siblings.
-### ✅ M7 — untested critical paths (realtime/repo impls) — key paths covered.
-### ✅ M10 — descriptions + examples (see passes above).
-### ✅ M11 — secret/masked env vars.
-### ✅ M12 — cookie-jar manager UI.
-### ✅ L1–L12 — see the pass summaries above.
