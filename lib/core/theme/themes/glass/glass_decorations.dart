@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' show ImageFilter;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/themes/glass/glass_palette.dart';
@@ -178,6 +179,13 @@ class _GlassWallpaperState extends State<GlassWallpaper>
   // notifies, so the painter paints exactly one static frame at zero cost.
   late final AnimationController _controller;
 
+  // Normalized (0..1) pointer position for the specular sheen.
+  // Only wired to a MouseRegion when animate is true; static mode skips it
+  // entirely so reduced-effects stays zero per-frame cost.
+  final ValueNotifier<Offset> _pointer = ValueNotifier<Offset>(
+    const Offset(0.5, 0.35),
+  );
+
   @override
   void initState() {
     super.initState();
@@ -218,6 +226,7 @@ class _GlassWallpaperState extends State<GlassWallpaper>
   void dispose() {
     if (widget.animate) WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
+    _pointer.dispose();
     super.dispose();
   }
 
@@ -233,32 +242,68 @@ class _GlassWallpaperState extends State<GlassWallpaper>
     // Stopped (reduced mode) the controller never notifies -> one static frame;
     // running it drives the drift. Either way it's a valid repaint listenable.
     final t = _controller;
-    return Stack(
+    final stack = Stack(
       children: [
         Positioned.fill(
           child: RepaintBoundary(
             child: CustomPaint(
-              painter: _GlassMeshPainter(t: t, base: base, blobs: blobs),
+              painter: _GlassMeshPainter(
+                t: t,
+                base: base,
+                blobs: blobs,
+                // Pass pointer only in animated mode: reduced-effects gets null
+                // so the painter doesn't subscribe and stays zero-cost.
+                pointer: widget.animate ? _pointer : null,
+              ),
             ),
           ),
         ),
         widget.child,
       ],
     );
+    // MouseRegion is only attached in animated mode.  The static (reduced-
+    // effects) path returns the Stack unwrapped so pointer moves never trigger
+    // a repaint there.
+    if (!widget.animate) return stack;
+    return MouseRegion(
+      onHover: (e) {
+        final size = context.size;
+        if (size == null) return;
+        _pointer.value = Offset(
+          e.localPosition.dx / size.width,
+          e.localPosition.dy / size.height,
+        );
+      },
+      child: stack,
+    );
   }
 }
 
 /// Paints the glass mesh wallpaper: a base fill plus three drifting
-/// radial-gradient blobs. Mirrors `rpg_decorations.dart`'s `_StarfieldPainter`
-/// — a reused `Paint`, repaint driven by the animation, and zero per-frame
-/// widget allocation (the previous widget-tree approach rebuilt three
-/// `DecoratedBox`es every frame).
+/// radial-gradient blobs, and (in animated mode only) a soft specular sheen
+/// that follows the cursor. Mirrors `rpg_decorations.dart`'s
+/// `_StarfieldPainter` — a reused `Paint`, repaint driven by the animation,
+/// and zero per-frame widget allocation (the previous widget-tree approach
+/// rebuilt three `DecoratedBox`es every frame).
+///
+/// [pointer] is null in reduced-effects mode: the repaint listenable only
+/// includes `t` then, so pointer moves never cause a repaint in static mode.
 class _GlassMeshPainter extends CustomPainter {
-  _GlassMeshPainter({required this.t, required this.base, required this.blobs})
-    : super(repaint: t);
+  _GlassMeshPainter({
+    required this.t,
+    required this.base,
+    required this.blobs,
+    this.pointer,
+  }) : super(
+         repaint: pointer == null ? t : Listenable.merge([t, pointer]),
+       );
+
   final Animation<double> t;
   final Color base;
   final List<Color> blobs;
+
+  /// Non-null only in animated mode; drives the specular sheen position.
+  final ValueListenable<Offset>? pointer;
 
   // Reused across blobs/frames — only `.shader` changes per blob.
   final Paint _paint = Paint();
@@ -289,11 +334,36 @@ class _GlassMeshPainter extends CustomPainter {
       ).createShader(blobRect);
       canvas.drawRect(rect, _paint);
     }
+
+    // Specular sheen: only in animated mode (pointer != null).
+    // A soft radial near-white highlight that follows the cursor, blended with
+    // BlendMode.plus so it brightens the mesh rather than covering it.
+    // Colors.white is allowed here — lib/core/theme is exempt from the
+    // avoid_hardcoded_brand_colors lint.
+    final ptr = pointer;
+    if (ptr != null) {
+      final p = ptr.value;
+      final center = Offset(p.dx * size.width, p.dy * size.height);
+      final sheen = Paint()
+        ..blendMode = BlendMode.plus
+        ..shader =
+            RadialGradient(
+              colors: [
+                // theme-internal near-white highlight; Colors.white is allowed
+                // under lib/core/theme (exempt from avoid_hardcoded_brand_colors).
+                Colors.white.withValues(alpha: 0.06),
+                const Color(0x00000000),
+              ],
+            ).createShader(
+              Rect.fromCircle(center: center, radius: size.shortestSide * 0.6),
+            );
+      canvas.drawRect(rect, sheen);
+    }
   }
 
   @override
   bool shouldRepaint(covariant _GlassMeshPainter old) =>
-      old.base != base || old.blobs != blobs;
+      old.base != base || old.blobs != blobs || old.pointer != pointer;
 }
 
 // C0-continuous oscillation in -1..1 (no dart:math import in the hot path).
