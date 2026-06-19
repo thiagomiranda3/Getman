@@ -71,4 +71,65 @@ void main() {
     await tester.pump(const Duration(seconds: 1)); // let controllers finish
     controller.dispose();
   });
+
+  testWidgets('A1: glass send shows a rising liquid level while sending', (
+    tester,
+  ) async {
+    final motion = glassMotion(reduceEffects: false);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: motion.sendAffordance(
+                context,
+                isSending: true,
+                child: const SizedBox(
+                  width: 100,
+                  height: 40,
+                  key: ValueKey('s'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byKey(const ValueKey('s')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('A1: slow vs fast success both resolve cleanly', (tester) async {
+    final motion = glassMotion(reduceEffects: false);
+    final controller = ThemeReactionController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: motion.reactionOverlay(
+              context,
+              controller: controller,
+              child: const Text('app'),
+            ),
+          ),
+        ),
+      ),
+    );
+    controller.fire(
+      const ThemeReaction(
+        kind: ThemeReactionKind.success,
+        statusCode: 200,
+        durationMs: 2900,
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('app'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
+    expect(tester.takeException(), isNull);
+    controller.dispose();
+  });
 }
