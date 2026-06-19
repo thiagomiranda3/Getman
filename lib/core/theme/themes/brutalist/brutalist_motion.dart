@@ -5,8 +5,41 @@ import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/motion/latency_weight.dart';
 import 'package:getman/core/theme/motion/reaction_stage.dart';
+import 'package:getman/core/theme/motion/status_reaction_flavor.dart';
 import 'package:getman/core/theme/motion/theme_reaction.dart';
 import 'package:getman/core/theme/motion/theme_reaction_controller.dart';
+
+/// How a flavor renders as a brutalist stamp. Pure data → unit-testable.
+class StampSpec {
+  const StampSpec({
+    this.thuds = 1,
+    this.doubled = false,
+    this.sag = false,
+    this.flicker = false,
+    this.scatter = false,
+    this.barrier = false,
+    this.quiet = false,
+  });
+  final int thuds; // re-slam count (429 throttle)
+  final bool doubled; // ghosted echo (304)
+  final bool sag; // droops downward (408)
+  final bool flicker; // brown-out (503)
+  final bool scatter; // shatters apart (404)
+  final bool barrier; // bar slammed across (401/403)
+  final bool quiet; // smaller, no shake (204)
+}
+
+StampSpec stampSpecFor(StatusReactionFlavor f) => switch (f) {
+  StatusReactionFlavor.noContent => const StampSpec(quiet: true),
+  StatusReactionFlavor.notModified => const StampSpec(doubled: true),
+  StatusReactionFlavor.timeout => const StampSpec(sag: true),
+  StatusReactionFlavor.serviceUnavailable => const StampSpec(flicker: true),
+  StatusReactionFlavor.notFound => const StampSpec(scatter: true),
+  StatusReactionFlavor.unauthorized ||
+  StatusReactionFlavor.forbidden => const StampSpec(barrier: true),
+  StatusReactionFlavor.rateLimited => const StampSpec(thuds: 3),
+  _ => const StampSpec(),
+};
 
 /// Brutalist motion: a giant status-code ink-stamp thuds onto the screen, a
 /// glitch-shake on errors, and a hard "STAMP" slam on the SEND button. Identity
@@ -36,10 +69,12 @@ class _BrutalReactionOverlayState extends State<_BrutalReactionOverlay>
   String _label = '';
   bool _isError = false;
   double _weight = 0;
+  StampSpec _spec = const StampSpec();
 
   void _onReaction(ThemeReaction r) {
     if (r.kind == ThemeReactionKind.sendStarted) return;
     _weight = latencyWeight(r.durationMs);
+    _spec = stampSpecFor(flavorFor(r));
     final label = switch (r.kind) {
       ThemeReactionKind.cancelled => 'CANCELLED',
       ThemeReactionKind.networkError => 'FAILED',
@@ -105,28 +140,61 @@ class _BrutalReactionOverlayState extends State<_BrutalReactionOverlay>
                 final alpha = t < 0.6
                     ? 1.0
                     : (1 - (t - 0.6) / 0.4).clamp(0.0, 1.0);
-                return Transform.translate(
-                  offset: Offset(_shakeDx(t), 0),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      child!,
-                      IgnorePointer(
+                final reps = _spec.thuds;
+                final pulse = reps <= 1
+                    ? inT
+                    : Curves.easeOutBack.transform(
+                        ((t * reps) % 1.0).clamp(0.0, 1.0),
+                      );
+                final baseScale = _spec.thuds > 1
+                    ? (2.4 + 0.8 * _weight) - 1.2 * pulse
+                    : scale;
+                final flickerA = _spec.flicker
+                    ? (0.4 + 0.6 * (0.5 + 0.5 * math.sin(t * math.pi * 14)))
+                    : 1.0;
+                final sagDy = _spec.sag ? Curves.easeIn.transform(t) * 60 : 0.0;
+                final scatterK = _spec.scatter
+                    ? Curves.easeOut.transform(t)
+                    : 0.0;
+                final stampWidget = IgnorePointer(
+                  child: Opacity(
+                    opacity: (alpha * flickerA).clamp(0.0, 1.0),
+                    child: Transform.translate(
+                      offset: Offset(0, sagDy),
+                      child: Transform.scale(
+                        scale: baseScale * (1 + scatterK * 0.6),
+                        child: Transform.rotate(
+                          angle: -0.12,
+                          child: _spec.barrier
+                              ? _BarrierStamp(label: _label, color: color)
+                              : _StampLabel(label: _label, color: color),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+                final ghost = _spec.doubled
+                    ? IgnorePointer(
                         child: Opacity(
-                          opacity: alpha,
-                          child: Transform.scale(
-                            scale: scale,
-                            child: Transform.rotate(
-                              angle: -0.12,
-                              child: _StampLabel(
-                                label: _label,
-                                color: color,
+                          opacity: (alpha * 0.35).clamp(0.0, 1.0),
+                          child: Transform.translate(
+                            offset: const Offset(10, 8),
+                            child: Transform.scale(
+                              scale: baseScale,
+                              child: Transform.rotate(
+                                angle: -0.12,
+                                child: _StampLabel(label: _label, color: color),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      )
+                    : const SizedBox.shrink();
+                return Transform.translate(
+                  offset: Offset(_spec.quiet ? 0 : _shakeDx(t), 0),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [child!, ghost, stampWidget],
                   ),
                 );
               },
@@ -154,6 +222,27 @@ class _StampLabel extends StatelessWidget {
           letterSpacing: 4,
         ),
       ),
+    );
+  }
+}
+
+/// The status code with a thick bar slammed across it — "blocked".
+class _BarrierStamp extends StatelessWidget {
+  const _BarrierStamp({required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        _StampLabel(label: label, color: color),
+        Transform.rotate(
+          angle: 0.18,
+          child: Container(width: 220, height: 18, color: color),
+        ),
+      ],
     );
   }
 }

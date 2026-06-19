@@ -1,6 +1,7 @@
 // test/core/theme/themes/brutalist_motion_test.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/theme/motion/status_reaction_flavor.dart';
 import 'package:getman/core/theme/motion/theme_reaction.dart';
 import 'package:getman/core/theme/motion/theme_reaction_controller.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_motion.dart';
@@ -104,6 +105,53 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('app'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
+    expect(tester.takeException(), isNull);
+    controller.dispose();
+  });
+
+  test('A2: stampSpecFor encodes the flavor matrix', () {
+    expect(stampSpecFor(StatusReactionFlavor.notModified).doubled, isTrue);
+    expect(stampSpecFor(StatusReactionFlavor.rateLimited).thuds, 3);
+    expect(stampSpecFor(StatusReactionFlavor.timeout).sag, isTrue);
+    expect(
+      stampSpecFor(StatusReactionFlavor.serviceUnavailable).flicker,
+      isTrue,
+    );
+    expect(stampSpecFor(StatusReactionFlavor.notFound).scatter, isTrue);
+    expect(stampSpecFor(StatusReactionFlavor.unauthorized).barrier, isTrue);
+    expect(stampSpecFor(StatusReactionFlavor.forbidden).barrier, isTrue);
+    expect(stampSpecFor(StatusReactionFlavor.ok).thuds, 1);
+  });
+
+  testWidgets('A2: overlay survives every mapped status code', (tester) async {
+    final motion = brutalistMotion(reduceEffects: false);
+    final controller = ThemeReactionController();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: brutalistTheme(Brightness.light),
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: motion.reactionOverlay(
+              context,
+              controller: controller,
+              child: const Text('app'),
+            ),
+          ),
+        ),
+      ),
+    );
+    for (final code in [201, 204, 304, 401, 403, 404, 408, 429, 500, 503]) {
+      controller.fire(
+        ThemeReaction(
+          kind: ThemeReaction.kindForStatus(code),
+          statusCode: code,
+          durationMs: 500,
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(find.text('app'), findsOneWidget, reason: 'code=$code');
+    }
     await tester.pump(const Duration(seconds: 2));
     expect(tester.takeException(), isNull);
     controller.dispose();
