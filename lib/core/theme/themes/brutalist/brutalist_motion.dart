@@ -190,7 +190,7 @@ class _BrutalStampSendState extends State<_BrutalStampSend>
   @override
   void didUpdateWidget(_BrutalStampSend old) {
     super.didUpdateWidget(old);
-    if (widget.isSending && !_build.isAnimating && _build.value == 0) {
+    if (widget.isSending && !_build.isAnimating) {
       unawaited(_build.forward(from: 0));
     } else if (!widget.isSending && _build.value != 0) {
       _build
@@ -231,6 +231,7 @@ class _BrutalStampSendState extends State<_BrutalStampSend>
                         (_build.value * kTensionFullMs).round(),
                       ),
                       color: accent,
+                      phase: _build.value,
                     ),
                   ),
                 ),
@@ -245,23 +246,42 @@ class _BrutalStampSendState extends State<_BrutalStampSend>
 /// A hard fill bar along the bottom edge: width grows with tension; a marching
 /// dash pattern conveys "working".
 class _MarchingBarPainter extends CustomPainter {
-  _MarchingBarPainter({required this.tension, required this.color});
+  _MarchingBarPainter({
+    required this.tension,
+    required this.color,
+    required this.phase,
+  });
   final double tension;
   final Color color;
+
+  /// Drives the march: 0→1 as the build controller advances.
+  final double phase;
 
   @override
   void paint(Canvas canvas, Size size) {
     const h = 4.0;
+    const dash = 10.0;
+    const dashPitch = dash * 2; // gap == dash width
     final y = size.height - h;
     final w = size.width * (0.15 + 0.85 * tension);
     final paint = Paint()..color = color;
-    const dash = 10.0;
-    for (var x = 0.0; x < w; x += dash * 2) {
+
+    // Clip so dashes never paint outside the bar bounds.
+    canvas
+      ..save()
+      ..clipRect(Rect.fromLTWH(0, y, w, h));
+
+    // Phase offset in [0, dashPitch) so the pattern wraps smoothly.
+    final offset = (phase * dashPitch) % dashPitch;
+    // Start one pitch before 0 so a partial dash can march in from the left.
+    for (var x = -dashPitch + offset; x < w; x += dashPitch) {
       canvas.drawRect(Rect.fromLTWH(x, y, dash, h), paint);
     }
+
+    canvas.restore();
   }
 
   @override
   bool shouldRepaint(covariant _MarchingBarPainter old) =>
-      old.tension != tension || old.color != color;
+      old.tension != tension || old.color != color || old.phase != phase;
 }

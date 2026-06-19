@@ -45,47 +45,35 @@ void main() {
     expect(motion.runtimeType.toString(), 'AppMotion');
   });
 
-  testWidgets('A1: send affordance build-up starts/stops cleanly', (
+  testWidgets('A1: send build-up starts and stops via didUpdateWidget', (
     tester,
   ) async {
     final motion = brutalistMotion(reduceEffects: false);
-    const sending = true;
+    late StateSetter setOuter;
+    var sending = true;
     await tester.pumpWidget(
       StatefulBuilder(
-        builder: (context, setState) => MaterialApp(
-          theme: brutalistTheme(Brightness.light),
-          home: Scaffold(
-            body: Center(
-              child: motion.sendAffordance(
-                context,
-                isSending: sending,
-                child: const Text('SEND'),
+        builder: (context, ss) {
+          setOuter = ss;
+          return MaterialApp(
+            theme: brutalistTheme(Brightness.light),
+            home: Scaffold(
+              body: Center(
+                child: motion.sendAffordance(
+                  context,
+                  isSending: sending,
+                  child: const Text('SEND'),
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('SEND'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-    // Rebuild with isSending=false to exercise the stop/reset path.
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: brutalistTheme(Brightness.light),
-        home: Builder(
-          builder: (context) => Scaffold(
-            body: Center(
-              child: motion.sendAffordance(
-                context,
-                isSending: false,
-                child: const Text('SEND'),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    // Flip isSending in place — triggers didUpdateWidget stop/reset path.
+    setOuter(() => sending = false);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
