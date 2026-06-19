@@ -90,6 +90,7 @@ class _BrutalReactionOverlayState extends State<_BrutalReactionOverlay>
           ? widget.child
           : AnimatedBuilder(
               animation: stamp,
+              child: widget.child, // hoisted — not rebuilt per frame
               builder: (_, child) {
                 final t = stamp.value;
                 // Stamp: scale from big->1 in 0..0.18 (the "thud"), hold,
@@ -104,7 +105,7 @@ class _BrutalReactionOverlayState extends State<_BrutalReactionOverlay>
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      widget.child,
+                      child!,
                       IgnorePointer(
                         child: Opacity(
                           opacity: alpha,

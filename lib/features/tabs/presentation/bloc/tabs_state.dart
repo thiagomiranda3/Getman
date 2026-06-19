@@ -49,6 +49,10 @@ class TabsState extends Equatable {
     reactionSeq,
   ];
 
+  /// Note: [lastReaction] cannot be cleared back to null via copyWith by design
+  /// — the ThemeReactionListener keys on [reactionSeq] increasing, never on
+  /// [lastReaction] becoming null, so `lastReaction ?? this.lastReaction` is
+  /// intentional.
   TabsState copyWith({
     List<PanelEntity>? panels,
     String? activePanelId,

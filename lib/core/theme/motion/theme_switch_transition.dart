@@ -68,7 +68,8 @@ class _ThemeSwitchTransitionState extends State<ThemeSwitchTransition>
   }
 }
 
-/// A diagonal accent sweep that wipes across (0..0.5) then reveals (0.5..1).
+/// A horizontal accent sweep that wipes left→right (0..0.5) then reveals
+/// (0.5..1).
 class _SweepPainter extends CustomPainter {
   _SweepPainter({required this.t, required this.color});
   final double t;

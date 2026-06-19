@@ -81,12 +81,13 @@ class _RpgReactionOverlayState extends State<_RpgReactionOverlay>
       onReaction: _onReaction,
       child: AnimatedBuilder(
         animation: Listenable.merge(_effects.map((e) => e.controller).toList()),
-        builder: (context, _) {
+        child: widget.child, // hoisted — not rebuilt per frame
+        builder: (context, child) {
           return Transform.translate(
             offset: Offset(_shakeDx(), 0),
             child: Stack(
               children: [
-                widget.child,
+                child!,
                 for (final e in _effects)
                   Positioned.fill(
                     child: IgnorePointer(
