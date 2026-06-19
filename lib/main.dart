@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/audio/theme_sound_service.dart';
 import 'package:getman/core/di/injection_container.dart' as di;
 import 'package:getman/core/navigation/app_router.dart';
 import 'package:getman/core/navigation/intents.dart';
@@ -190,6 +191,9 @@ class MyApp extends StatelessWidget {
         RepositoryProvider<CookieStore>.value(value: di.sl<CookieStore>()),
         RepositoryProvider<WorkspaceSyncService>.value(
           value: di.sl<WorkspaceSyncService>(),
+        ),
+        RepositoryProvider<ThemeSoundService>.value(
+          value: di.sl<ThemeSoundService>(),
         ),
         ChangeNotifierProvider<ThemeReactionController>.value(
           value: di.sl<ThemeReactionController>(),

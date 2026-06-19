@@ -7,6 +7,7 @@ environment:
   sdk: ^3.11.4
 
 dependencies:
+  audioplayers: ^6.1.0
   collection: ^1.18.0
   cupertino_icons: ^1.0.8
   dio: ^5.8.0+1
@@ -67,3 +68,9 @@ flutter:
     # no font is ever fetched over HTTP at runtime. Licenses live alongside
     # in assets/google_fonts/licenses/ (OFL).
     - assets/google_fonts/
+    - assets/sounds/classic/
+    - assets/sounds/brutalist/
+    - assets/sounds/editorial/
+    - assets/sounds/rpg/
+    - assets/sounds/dracula/
+    - assets/sounds/glass/
