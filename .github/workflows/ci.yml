@@ -5,9 +5,11 @@ on:
     branches: [master]
   pull_request:
 
+# Read-only: this workflow runs PR code (including from forks), so it must not
+# hold a write token. The sticky comment is posted by the separate "CI Comment"
+# workflow (workflow_run), which runs trusted code from master.
 permissions:
   contents: read
-  pull-requests: write
 
 env:
   FLUTTER_VERSION: '3.41.6'
@@ -59,6 +61,9 @@ jobs:
         continue-on-error: true
         run: flutter test 2>&1 | tee test.log
 
+      # Build the comment body + record the PR number into an artifact. The
+      # comment itself is posted by the CI Comment workflow (it has the write
+      # token this job deliberately lacks).
       - name: Build summary comment
         if: github.event_name == 'pull_request'
         env:
@@ -67,6 +72,7 @@ jobs:
           BLOC_LINT: ${{ steps.bloc_lint.outcome }}
           FORMAT: ${{ steps.format.outcome }}
           TEST: ${{ steps.test.outcome }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           icon() { [ "$1" = success ] && printf '✅ Passed' || printf '❌ Failed'; }
           all_pass=true
@@ -112,13 +118,17 @@ jobs:
 
           echo "_Updated for \`${GITHUB_SHA::7}\` · [view run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})_" >> comment.md
 
-      - name: Post sticky comment
+          printf '%s' "$PR_NUMBER" > number.txt
+
+      - name: Upload comment artifact
         if: github.event_name == 'pull_request'
-        continue-on-error: true # commenting is denied for fork PRs (read-only token)
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: actions/upload-artifact@v4
         with:
-          header: getman-ci-summary
-          path: comment.md
+          name: ci-comment
+          path: |
+            comment.md
+            number.txt
+          if-no-files-found: error
 
       - name: Fail if any check failed
         if: >-
