@@ -343,80 +343,87 @@ class _UrlBarState extends State<UrlBar> {
                             SizedBox(width: smallGap),
                           ],
                           if (tab.config.kind == RequestKind.http)
-                            context.appDecoration.wrapInteractive(
-                              child: ElevatedButton(
-                                onPressed: tab.isSending
-                                    ? () => context.read<TabsBloc>().add(
-                                        CancelRequest(tab.tabId),
-                                      )
-                                    : () => context.read<TabsBloc>().add(
-                                        _sendEvent(context, tab.tabId),
-                                      ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: tab.isSending
-                                      ? theme.colorScheme.error
-                                      : null,
-                                  foregroundColor: tab.isSending
-                                      ? theme.colorScheme.onError
-                                      : null,
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: isNarrow
-                                        ? 12
-                                        : layout.buttonPaddingHorizontal,
-                                    vertical: isNarrow
-                                        ? 10
-                                        : layout.buttonPaddingVertical,
-                                  ),
-                                  minimumSize: Size.zero,
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 300),
-                                  transitionBuilder: (child, animation) =>
-                                      ScaleTransition(
-                                        scale: animation,
-                                        child: FadeTransition(
-                                          opacity: animation,
-                                          child: child,
-                                        ),
-                                      ),
-                                  child: tab.isSending
-                                      ? Row(
-                                          key: const ValueKey('cancel'),
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            SizedBox(
-                                              width: layout.smallIconSize,
-                                              height: layout.smallIconSize,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color:
-                                                    theme.colorScheme.onError,
-                                              ),
-                                            ),
-                                            SizedBox(width: isNarrow ? 4 : 8),
-                                            Text(
-                                              isNarrow ? 'STOP' : 'CANCEL',
-                                              style: TextStyle(
-                                                fontSize: layout.fontSizeTitle,
-                                                fontWeight: context
-                                                    .appTypography
-                                                    .displayWeight,
-                                              ),
-                                            ),
-                                          ],
+                            context.appMotion.sendAffordance(
+                              context,
+                              isSending: tab.isSending,
+                              child: context.appDecoration.wrapInteractive(
+                                child: ElevatedButton(
+                                  onPressed: tab.isSending
+                                      ? () => context.read<TabsBloc>().add(
+                                          CancelRequest(tab.tabId),
                                         )
-                                      : Text(
-                                          'SEND',
-                                          key: const ValueKey('send'),
-                                          style: TextStyle(
-                                            fontSize: layout.fontSizeTitle,
-                                            fontWeight: context
-                                                .appTypography
-                                                .displayWeight,
+                                      : () => context.read<TabsBloc>().add(
+                                          _sendEvent(context, tab.tabId),
+                                        ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: tab.isSending
+                                        ? theme.colorScheme.error
+                                        : null,
+                                    foregroundColor: tab.isSending
+                                        ? theme.colorScheme.onError
+                                        : null,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: isNarrow
+                                          ? 12
+                                          : layout.buttonPaddingHorizontal,
+                                      vertical: isNarrow
+                                          ? 10
+                                          : layout.buttonPaddingVertical,
+                                    ),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 300),
+                                    transitionBuilder: (child, animation) =>
+                                        ScaleTransition(
+                                          scale: animation,
+                                          child: FadeTransition(
+                                            opacity: animation,
+                                            child: child,
                                           ),
                                         ),
+                                    child: tab.isSending
+                                        ? Row(
+                                            key: const ValueKey('cancel'),
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              SizedBox(
+                                                width: layout.smallIconSize,
+                                                height: layout.smallIconSize,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: theme
+                                                          .colorScheme
+                                                          .onError,
+                                                    ),
+                                              ),
+                                              SizedBox(width: isNarrow ? 4 : 8),
+                                              Text(
+                                                isNarrow ? 'STOP' : 'CANCEL',
+                                                style: TextStyle(
+                                                  fontSize:
+                                                      layout.fontSizeTitle,
+                                                  fontWeight: context
+                                                      .appTypography
+                                                      .displayWeight,
+                                                ),
+                                              ),
+                                            ],
+                                          )
+                                        : Text(
+                                            'SEND',
+                                            key: const ValueKey('send'),
+                                            style: TextStyle(
+                                              fontSize: layout.fontSizeTitle,
+                                              fontWeight: context
+                                                  .appTypography
+                                                  .displayWeight,
+                                            ),
+                                          ),
+                                  ),
                                 ),
                               ),
                             )

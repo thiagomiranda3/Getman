@@ -272,9 +272,13 @@ class MyApp extends StatelessWidget {
                       builder: (context, child) {
                         return Focus(
                           autofocus: true,
-                          child: context.appDecoration.scaffoldBackground(
+                          child: context.appMotion.reactionOverlay(
                             context,
-                            child: child ?? const SizedBox.shrink(),
+                            controller: context.read<ThemeReactionController>(),
+                            child: context.appDecoration.scaffoldBackground(
+                              context,
+                              child: child ?? const SizedBox.shrink(),
+                            ),
                           ),
                         );
                       },
