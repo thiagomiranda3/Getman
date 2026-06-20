@@ -96,7 +96,12 @@ class CodeGenService {
       url: url,
       headers: headers,
       bodyType: config.bodyType,
-      rawBody: resolve(config.body),
+      rawBody: config.bodyType == BodyType.graphql
+          ? _graphqlEnvelope(
+              resolve(config.body),
+              resolve(config.graphqlVariables),
+            )
+          : resolve(config.body),
       formFields: formFields,
       binaryPath: config.bodyFilePath,
     );
@@ -104,6 +109,24 @@ class CodeGenService {
 
   /// Default resolver: pass `{{vars}}` through verbatim (template output).
   static String _identity(String value) => value;
+
+  /// Builds the GraphQL wire body `{"query":...,"variables":...}` as a JSON
+  /// string. Lenient (code-gen never fails): invalid/blank variables → `{}`.
+  static String _graphqlEnvelope(String query, String variablesText) {
+    Object? variables = const <String, dynamic>{};
+    final t = variablesText.trim();
+    if (t.isNotEmpty) {
+      try {
+        variables = jsonDecode(t);
+      } on FormatException {
+        variables = const <String, dynamic>{};
+      }
+    }
+    return jsonEncode(<String, dynamic>{
+      'query': query,
+      'variables': variables,
+    });
+  }
 
   // ---- cURL ----
 
@@ -117,6 +140,7 @@ class CodeGenService {
       case BodyType.none:
         break;
       case BodyType.raw:
+      case BodyType.graphql:
         if (e.rawBody.isNotEmpty) {
           b.write(" \\\n  --data '${_shellSq(e.rawBody)}'");
         }
@@ -148,6 +172,7 @@ class CodeGenService {
       case BodyType.none:
         break;
       case BodyType.raw:
+      case BodyType.graphql:
         if (e.rawBody.isNotEmpty) {
           opts.write('  body: ${_jsString(e.rawBody)},\n');
         }
@@ -194,6 +219,7 @@ class CodeGenService {
       case BodyType.none:
         break;
       case BodyType.raw:
+      case BodyType.graphql:
         if (e.rawBody.isNotEmpty) {
           b.write('data = ${_pyString(e.rawBody)}\n');
           extra.add('data=data');
@@ -248,6 +274,7 @@ class CodeGenService {
       case BodyType.none:
         break;
       case BodyType.raw:
+      case BodyType.graphql:
         if (e.rawBody.isNotEmpty) {
           opts.write('  data: ${_jsString(e.rawBody)},\n');
         }
@@ -309,6 +336,7 @@ class CodeGenService {
       case BodyType.none:
         break;
       case BodyType.raw:
+      case BodyType.graphql:
         if (e.rawBody.isNotEmpty) {
           imports.add('strings');
           body.write(
@@ -373,6 +401,7 @@ class CodeGenService {
       case BodyType.none:
         break;
       case BodyType.raw:
+      case BodyType.graphql:
         if (e.rawBody.isNotEmpty) {
           final ct = _contentTypeOf(e.headers, 'application/json');
           final rawLiteral = _dqString(e.rawBody);

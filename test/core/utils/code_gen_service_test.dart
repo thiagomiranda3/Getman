@@ -353,4 +353,24 @@ void main() {
       expect(out, contains('.add("a", "1")'));
     });
   });
+
+  group('graphql body', () {
+    test('cURL emits the GraphQL JSON envelope with application/json', () {
+      const config = HttpRequestConfigEntity(
+        id: 'gq',
+        method: 'POST',
+        url: 'https://api.example.com/graphql',
+        bodyType: BodyType.graphql,
+        body: 'query { me { id } }',
+        graphqlVariables: '{"x":1}',
+        headers: {},
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.curl);
+      expect(out, contains('application/json'));
+      expect(out, contains('"query"'));
+      expect(out, contains('query { me { id } }'));
+      expect(out, contains('"variables"'));
+      expect(out, contains('"x":1'));
+    });
+  });
 }

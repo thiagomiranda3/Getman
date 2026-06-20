@@ -483,4 +483,36 @@ void main() {
       },
     );
   });
+
+  group('graphql body round-trip', () {
+    test('export -> import preserves query + variables + body type', () {
+      const leaf = CollectionNodeEntity(
+        id: 'leaf',
+        name: 'GQL',
+        isFolder: false,
+        config: HttpRequestConfigEntity(
+          id: 'cfg',
+          method: 'POST',
+          url: 'https://api.example.com/graphql',
+          bodyType: BodyType.graphql,
+          body: 'query { me { id } }',
+          graphqlVariables: '{"limit":5}',
+        ),
+      );
+      const root = CollectionNodeEntity(
+        id: 'root',
+        name: 'Coll',
+        children: [leaf],
+      );
+
+      final imported = PostmanCollectionMapper.fromJson(
+        PostmanCollectionMapper.toJson(root),
+      );
+      final reLeaf = imported.children.single;
+      expect(reLeaf.isFolder, isFalse);
+      expect(reLeaf.config!.bodyType, BodyType.graphql);
+      expect(reLeaf.config!.body, 'query { me { id } }');
+      expect(reLeaf.config!.graphqlVariables, '{"limit":5}');
+    });
+  });
 }

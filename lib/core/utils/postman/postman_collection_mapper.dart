@@ -198,6 +198,14 @@ class PostmanCollectionMapper {
           'mode': 'file',
           'file': {'src': path},
         };
+      case BodyType.graphql:
+        return {
+          'mode': 'graphql',
+          'graphql': {
+            'query': config.body,
+            'variables': config.graphqlVariables,
+          },
+        };
     }
   }
 
@@ -271,6 +279,7 @@ class PostmanCollectionMapper {
       bodyType: body.bodyType,
       formFields: body.formFields,
       bodyFilePath: body.bodyFilePath,
+      graphqlVariables: body.graphqlVariables,
     );
   }
 
@@ -349,6 +358,7 @@ class PostmanCollectionMapper {
   static ({
     BodyType bodyType,
     String body,
+    String graphqlVariables,
     List<MultipartFieldEntity> formFields,
     String? bodyFilePath,
   })
@@ -360,6 +370,7 @@ class PostmanCollectionMapper {
           return (
             bodyType: BodyType.raw,
             body: raw is String ? raw : '',
+            graphqlVariables: '',
             formFields: const [],
             bodyFilePath: null,
           );
@@ -367,6 +378,7 @@ class PostmanCollectionMapper {
           return (
             bodyType: BodyType.urlencoded,
             body: '',
+            graphqlVariables: '',
             formFields: _parseFormList(body['urlencoded'], multipart: false),
             bodyFilePath: null,
           );
@@ -374,6 +386,7 @@ class PostmanCollectionMapper {
           return (
             bodyType: BodyType.multipart,
             body: '',
+            graphqlVariables: '',
             formFields: _parseFormList(body['formdata'], multipart: true),
             bodyFilePath: null,
           );
@@ -383,14 +396,27 @@ class PostmanCollectionMapper {
           return (
             bodyType: BodyType.binary,
             body: '',
+            graphqlVariables: '',
             formFields: const [],
             bodyFilePath: src is String && src.isNotEmpty ? src : null,
+          );
+        case 'graphql':
+          final gql = body['graphql'];
+          final query = gql is Map ? gql['query'] : null;
+          final vars = gql is Map ? gql['variables'] : null;
+          return (
+            bodyType: BodyType.graphql,
+            body: query is String ? query : '',
+            graphqlVariables: vars is String ? vars : '',
+            formFields: const [],
+            bodyFilePath: null,
           );
       }
     }
     return (
       bodyType: BodyType.raw,
       body: '',
+      graphqlVariables: '',
       formFields: const [],
       bodyFilePath: null,
     );

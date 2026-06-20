@@ -14,10 +14,12 @@ class RequestConfigSection extends StatelessWidget {
   const RequestConfigSection({
     required this.tabId,
     required this.bodyController,
+    required this.variablesController,
     super.key,
   });
   final String tabId;
   final CodeLineEditingController bodyController;
+  final CodeLineEditingController variablesController;
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +44,11 @@ class RequestConfigSection extends StatelessWidget {
                     ParamsTabView(tabId: tabId),
                     AuthTabView(tabId: tabId),
                     HeadersTabView(tabId: tabId),
-                    BodyTabView(tabId: tabId, controller: bodyController),
+                    BodyTabView(
+                      tabId: tabId,
+                      controller: bodyController,
+                      variablesController: variablesController,
+                    ),
                     RulesTabView(key: ValueKey('rules_$tabId'), tabId: tabId),
                   ],
                 ),

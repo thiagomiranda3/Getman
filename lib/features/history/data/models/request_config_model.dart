@@ -22,6 +22,7 @@ class HttpRequestConfig extends HiveObject {
     this.bodyType = 'raw',
     List<MultipartFieldModel>? formFields,
     this.bodyFilePath,
+    this.graphqlVariables = '',
     this.kind = 0,
     this.responseBody,
     this.responseHeaders,
@@ -53,6 +54,7 @@ class HttpRequestConfig extends HiveObject {
             .map(MultipartFieldModel.fromEntity)
             .toList(),
         bodyFilePath: entity.bodyFilePath,
+        graphqlVariables: entity.graphqlVariables,
         kind: entity.kind.wire,
         responseBody: entity.responseBody,
         responseHeaders: entity.responseHeaders,
@@ -110,6 +112,9 @@ class HttpRequestConfig extends HiveObject {
   @HiveField(14, defaultValue: 0)
   int kind;
 
+  @HiveField(15, defaultValue: '')
+  String graphqlVariables;
+
   HttpRequestConfigEntity toEntity() {
     // Lazy migration: if a legacy record stored params in the separate map,
     // merge them into the URL's query string. Next save writes params back
@@ -131,6 +136,7 @@ class HttpRequestConfig extends HiveObject {
       bodyType: BodyType.fromWire(bodyType),
       formFields: formFields.map((f) => f.toEntity()).toList(),
       bodyFilePath: bodyFilePath,
+      graphqlVariables: graphqlVariables,
       kind: RequestKind.fromWire(kind),
       responseBody: responseBody,
       responseHeaders: responseHeaders,

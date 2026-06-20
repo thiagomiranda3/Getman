@@ -7,6 +7,7 @@ import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/features/tabs/data/request_serializer.dart';
 
 void main() {
@@ -323,6 +324,85 @@ void main() {
         headers.keys.any((k) => k.toLowerCase() == 'content-type'),
         isFalse,
       );
+    });
+  });
+
+  group('RequestSerializer.buildBody graphql', () {
+    test(
+      'builds {query, variables} envelope and forces application/json',
+      () async {
+        const config = HttpRequestConfigEntity(
+          id: 'g1',
+          bodyType: BodyType.graphql,
+          body: 'query { me { id } }',
+          graphqlVariables: '{"limit": 5}',
+          headers: {},
+        );
+        final headers = <String, String>{};
+        final data = await RequestSerializer.buildBody(
+          config: config,
+          headers: headers,
+          envVars: const {},
+        );
+        expect(data, {
+          'query': 'query { me { id } }',
+          'variables': {'limit': 5},
+        });
+        expect(headers['Content-Type'], 'application/json');
+      },
+    );
+
+    test('blank variables become an empty object', () async {
+      const config = HttpRequestConfigEntity(
+        id: 'g2',
+        bodyType: BodyType.graphql,
+        body: 'query { x }',
+        graphqlVariables: '  ',
+        headers: {},
+      );
+      final data = await RequestSerializer.buildBody(
+        config: config,
+        headers: <String, String>{},
+        envVars: const {},
+      );
+      expect(data, {'query': 'query { x }', 'variables': <String, dynamic>{}});
+    });
+
+    test('invalid variables JSON throws GraphqlVariablesException', () async {
+      const config = HttpRequestConfigEntity(
+        id: 'g3',
+        bodyType: BodyType.graphql,
+        body: 'query { x }',
+        graphqlVariables: '{not json',
+        headers: {},
+      );
+      await expectLater(
+        () => RequestSerializer.buildBody(
+          config: config,
+          headers: <String, String>{},
+          envVars: const {},
+        ),
+        throwsA(isA<GraphqlVariablesException>()),
+      );
+    });
+
+    test('resolves {{vars}} in query and variables', () async {
+      const config = HttpRequestConfigEntity(
+        id: 'g4',
+        bodyType: BodyType.graphql,
+        body: 'query { u(id: "{{id}}") }',
+        graphqlVariables: '{"n": "{{name}}"}',
+        headers: {},
+      );
+      final data = await RequestSerializer.buildBody(
+        config: config,
+        headers: <String, String>{},
+        envVars: const {'id': '42', 'name': 'ada'},
+      );
+      expect(data, {
+        'query': 'query { u(id: "42") }',
+        'variables': {'n': 'ada'},
+      });
     });
   });
 }

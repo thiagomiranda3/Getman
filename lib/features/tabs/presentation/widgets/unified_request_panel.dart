@@ -27,11 +27,13 @@ class UnifiedRequestPanel extends StatefulWidget {
   const UnifiedRequestPanel({
     required this.tabId,
     required this.bodyController,
+    required this.variablesController,
     required this.responseController,
     super.key,
   });
   final String tabId;
   final CodeLineEditingController bodyController;
+  final CodeLineEditingController variablesController;
   final CodeLineEditingController responseController;
 
   @override
@@ -103,6 +105,7 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel>
                     BodyTabView(
                       tabId: widget.tabId,
                       controller: widget.bodyController,
+                      variablesController: widget.variablesController,
                     ),
                     RulesTabView(
                       key: ValueKey('rules_${widget.tabId}'),

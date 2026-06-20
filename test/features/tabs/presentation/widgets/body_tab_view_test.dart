@@ -55,13 +55,19 @@ Future<CodeLineEditingController> _pump(
   String tabId,
 ) async {
   final controller = CodeLineEditingController();
+  final variablesController = CodeLineEditingController();
+  addTearDown(variablesController.dispose);
   await tester.pumpWidget(
     MaterialApp(
       theme: brutalistTheme(Brightness.light),
       home: Scaffold(
         body: BlocProvider.value(
           value: bloc,
-          child: BodyTabView(tabId: tabId, controller: controller),
+          child: BodyTabView(
+            tabId: tabId,
+            controller: controller,
+            variablesController: variablesController,
+          ),
         ),
       ),
     ),
@@ -191,5 +197,23 @@ void main() {
 
     // multipart rows expose an attach-file toggle (urlencoded does not).
     expect(find.byIcon(Icons.attach_file), findsOneWidget);
+  });
+
+  testWidgets('GRAPHQL shows the query + variables panes', (tester) async {
+    final bloc = await _loadedBloc(
+      repository,
+      sendRequestUseCase,
+      tab(BodyType.graphql),
+    );
+    addTearDown(bloc.close);
+
+    final controller = await _pump(tester, bloc, 't');
+    addTearDown(controller.dispose);
+
+    expect(find.text('GRAPHQL'), findsOneWidget);
+    expect(find.text('QUERY'), findsOneWidget);
+    expect(find.text('VARIABLES (JSON)'), findsOneWidget);
+    // Two code editors: query + variables.
+    expect(find.byType(CodeEditor), findsNWidgets(2));
   });
 }

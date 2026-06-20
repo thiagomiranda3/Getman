@@ -136,4 +136,18 @@ void main() {
       expect(http == ws, isTrue);
     });
   });
+
+  group('graphql body', () {
+    test('graphqlVariables survives entity -> model -> entity', () {
+      const entity = HttpRequestConfigEntity(
+        id: 'x',
+        bodyType: BodyType.graphql,
+        body: 'query { x }',
+        graphqlVariables: '{"a":1}',
+      );
+      final back = HttpRequestConfig.fromEntity(entity).toEntity();
+      expect(back.bodyType, BodyType.graphql);
+      expect(back.graphqlVariables, '{"a":1}');
+    });
+  });
 }

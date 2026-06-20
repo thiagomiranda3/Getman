@@ -24,6 +24,7 @@ class HttpRequestConfigEntity extends Equatable {
     this.bodyType = BodyType.raw,
     this.formFields = const [],
     this.bodyFilePath,
+    this.graphqlVariables = '',
     this.kind = RequestKind.http,
     this.responseBody,
     this.responseHeaders,
@@ -45,6 +46,10 @@ class HttpRequestConfigEntity extends Equatable {
 
   /// Filesystem path for a `binary` body (desktop/mobile only).
   final String? bodyFilePath;
+
+  /// Variables JSON text for a `graphql` body. Empty for other body types.
+  /// The query itself reuses [body].
+  final String graphqlVariables;
 
   /// The protocol this request speaks (HTTP / WebSocket / SSE).
   final RequestKind kind;
@@ -75,6 +80,7 @@ class HttpRequestConfigEntity extends Equatable {
     BodyType? bodyType,
     List<MultipartFieldEntity>? formFields,
     Object? bodyFilePath = _unset,
+    String? graphqlVariables,
     RequestKind? kind,
     Object? responseBody = _unset,
     Object? responseHeaders = _unset,
@@ -98,6 +104,7 @@ class HttpRequestConfigEntity extends Equatable {
       bodyFilePath: identical(bodyFilePath, _unset)
           ? this.bodyFilePath
           : bodyFilePath as String?,
+      graphqlVariables: graphqlVariables ?? this.graphqlVariables,
       kind: kind ?? this.kind,
       responseBody: identical(responseBody, _unset)
           ? this.responseBody
@@ -125,6 +132,7 @@ class HttpRequestConfigEntity extends Equatable {
     bodyType,
     formFields,
     bodyFilePath,
+    graphqlVariables,
     kind,
     responseBody,
     responseHeaders,

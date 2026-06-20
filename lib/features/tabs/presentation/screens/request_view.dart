@@ -44,6 +44,7 @@ class RequestView extends StatefulWidget {
 
 class _RequestViewState extends State<RequestView> {
   late final CodeLineEditingController _bodyController;
+  late final CodeLineEditingController _graphqlVarsController;
   late final CodeLineEditingController _responseController;
   // Live drag ratio. A ValueNotifier (not setState) so dragging the splitter
   // only re-runs the Flex layout — the captured request/response panes (and
@@ -56,8 +57,10 @@ class _RequestViewState extends State<RequestView> {
   void initState() {
     super.initState();
     _bodyController = createJsonCodeController();
+    _graphqlVarsController = createJsonCodeController();
     _responseController = createJsonCodeController();
     _bodyController.addListener(_onBodyChanged);
+    _graphqlVarsController.addListener(_onGraphqlVarsChanged);
   }
 
   @override
@@ -67,6 +70,24 @@ class _RequestViewState extends State<RequestView> {
     if (tab != null && _bodyController.text != tab.config.body) {
       _bodyController.text = tab.config.body;
     }
+    if (tab != null &&
+        _graphqlVarsController.text != tab.config.graphqlVariables) {
+      _graphqlVarsController.text = tab.config.graphqlVariables;
+    }
+  }
+
+  void _onGraphqlVarsChanged() {
+    final tabsBloc = context.read<TabsBloc>();
+    final tab = tabsBloc.state.tabs.byId(widget.tabId);
+    if (tab == null) return;
+    final newText = _graphqlVarsController.text;
+    if (tab.config.graphqlVariables == newText) return;
+
+    tabsBloc.add(
+      UpdateTab(
+        tab.copyWith(config: tab.config.copyWith(graphqlVariables: newText)),
+      ),
+    );
   }
 
   void _onBodyChanged() {
@@ -88,6 +109,9 @@ class _RequestViewState extends State<RequestView> {
     _bodyController
       ..removeListener(_onBodyChanged)
       ..dispose();
+    _graphqlVarsController
+      ..removeListener(_onGraphqlVarsChanged)
+      ..dispose();
     _responseController.dispose();
     _localSplitRatio.dispose();
     super.dispose();
@@ -107,12 +131,17 @@ class _RequestViewState extends State<RequestView> {
           listenWhen: (prev, next) {
             final p = prev.tabs.byId(widget.tabId);
             final n = next.tabs.byId(widget.tabId);
-            return p?.config.body != n?.config.body;
+            return p?.config.body != n?.config.body ||
+                p?.config.graphqlVariables != n?.config.graphqlVariables;
           },
           listener: (context, state) {
             final tab = state.tabs.byId(widget.tabId);
-            if (tab != null && _bodyController.text != tab.config.body) {
+            if (tab == null) return;
+            if (_bodyController.text != tab.config.body) {
               _bodyController.text = tab.config.body;
+            }
+            if (_graphqlVarsController.text != tab.config.graphqlVariables) {
+              _graphqlVarsController.text = tab.config.graphqlVariables;
             }
           },
           buildWhen: (prev, next) {
@@ -159,6 +188,7 @@ class _RequestViewState extends State<RequestView> {
                             ? UnifiedRequestPanel(
                                 tabId: widget.tabId,
                                 bodyController: _bodyController,
+                                variablesController: _graphqlVarsController,
                                 responseController: _responseController,
                               )
                             : LayoutBuilder(
@@ -172,6 +202,7 @@ class _RequestViewState extends State<RequestView> {
                                   final requestPane = RequestConfigSection(
                                     tabId: widget.tabId,
                                     bodyController: _bodyController,
+                                    variablesController: _graphqlVarsController,
                                   );
                                   final responsePane = ResponseArea(
                                     tabId: widget.tabId,

@@ -297,9 +297,15 @@ class _HeadersTabViewState extends State<HeadersTabView> {
 /// [FormDataEditor]; binary picks a file. The selector + sub-editor are shared
 /// by both the split-pane and unified phone layouts.
 class BodyTabView extends StatelessWidget {
-  const BodyTabView({required this.tabId, required this.controller, super.key});
+  const BodyTabView({
+    required this.tabId,
+    required this.controller,
+    required this.variablesController,
+    super.key,
+  });
   final String tabId;
   final CodeLineEditingController controller;
+  final CodeLineEditingController variablesController;
 
   @override
   Widget build(BuildContext context) {
@@ -334,6 +340,11 @@ class BodyTabView extends StatelessWidget {
         return FormDataEditor(tabId: tabId, allowFiles: true);
       case BodyType.binary:
         return _BinaryBodyPicker(tabId: tabId);
+      case BodyType.graphql:
+        return _GraphqlBodyEditor(
+          queryController: controller,
+          variablesController: variablesController,
+        );
     }
   }
 }
@@ -349,6 +360,7 @@ class _BodyTypeSelector extends StatelessWidget {
     BodyType.urlencoded: 'FORM',
     BodyType.multipart: 'MULTIPART',
     BodyType.binary: 'BINARY',
+    BodyType.graphql: 'GRAPHQL',
   };
 
   @override
@@ -364,21 +376,22 @@ class _BodyTypeSelector extends StatelessWidget {
         runSpacing: layout.tabSpacing,
         children: [
           for (final type in BodyType.values)
-            _BodyTypeChip(
-              key: ValueKey('bodytype_${_labels[type]!}'),
-              label: _labels[type]!,
-              active: type == active,
-              onTap: () {
-                final bloc = context.read<TabsBloc>();
-                final tab = bloc.state.tabs.byId(tabId);
-                if (tab == null || tab.config.bodyType == type) return;
-                bloc.add(
-                  UpdateTab(
-                    tab.copyWith(config: tab.config.copyWith(bodyType: type)),
-                  ),
-                );
-              },
-            ),
+            if (_labels.containsKey(type))
+              _BodyTypeChip(
+                key: ValueKey('bodytype_${_labels[type]!}'),
+                label: _labels[type]!,
+                active: type == active,
+                onTap: () {
+                  final bloc = context.read<TabsBloc>();
+                  final tab = bloc.state.tabs.byId(tabId);
+                  if (tab == null || tab.config.bodyType == type) return;
+                  bloc.add(
+                    UpdateTab(
+                      tab.copyWith(config: tab.config.copyWith(bodyType: type)),
+                    ),
+                  );
+                },
+              ),
         ],
       ),
     );
@@ -475,6 +488,73 @@ class _RawBodyEditor extends StatelessWidget {
             ),
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// Dual-pane GraphQL editor: QUERY on top (reuses the body controller bound to
+/// `config.body`), VARIABLES (JSON) below (its own controller + beautify, since
+/// variables are JSON).
+class _GraphqlBodyEditor extends StatelessWidget {
+  const _GraphqlBodyEditor({
+    required this.queryController,
+    required this.variablesController,
+  });
+  final CodeLineEditingController queryController;
+  final CodeLineEditingController variablesController;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          flex: 3,
+          child: _GraphqlPane(
+            label: 'QUERY',
+            child: JsonCodeEditor(controller: queryController),
+          ),
+        ),
+        Expanded(
+          flex: 2,
+          child: _GraphqlPane(
+            label: 'VARIABLES (JSON)',
+            child: _RawBodyEditor(controller: variablesController),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GraphqlPane extends StatelessWidget {
+  const _GraphqlPane({required this.label, required this.child});
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final layout = context.appLayout;
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: layout.pagePadding,
+            vertical: layout.isCompact ? 4 : 6,
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: layout.fontSizeSmall,
+              fontWeight: context.appTypography.displayWeight,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+          ),
+        ),
+        Expanded(child: child),
       ],
     );
   }

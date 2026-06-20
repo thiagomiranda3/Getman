@@ -52,8 +52,19 @@ verified with a real CFE compile per working-agreement #4; the mTLS change also 
   `RequestKindMethodSelector` (url_bar), `TabChip`/`EmptyTabsPlaceholder` (main_screen),
   `EnvironmentListTile`/`EnvironmentEditor` (environments_dialog) into their own public files.
 
-Remaining: the big deferred features **H3** (OAuth2), **H4** (collection runner), **M8**
-(GraphQL body), **M9** (pre-request scripts).
+Remaining: the big deferred features **H3** (OAuth2), **H4** (collection runner),
+**M9** (pre-request scripts).
+
+## ✅ Done in the GraphQL pass (June 2026)
+Shipped on `feat/graphql-body` (TDD, one concern per commit, analyze/custom_lint/
+bloc_lint clean + full suite green):
+- **M8** — `graphql` `BodyType`: dual-pane QUERY + VARIABLES (JSON) editor; send posts
+  `{query,variables}` as `application/json` with `{{var}}` resolved in both panes;
+  invalid variables surface a status-0 error response (never silent). New
+  `graphqlVariables` field on the request config (entity + Hive model typeId 1
+  `@HiveField(15)`; query reuses `body`). Round-trips through code-gen (all 6 targets),
+  Postman import/export, and the git workspace mirror. Spec + plan under
+  `docs/superpowers/`.
 
 ## ✅ Done in the backlog+refactor pass (June 2026)
 Foundational refactors + all bugs + two perf items are shipped on `dev`:
@@ -162,10 +173,10 @@ cheap LOW wins to bank momentum, then features/refactors as scoped.
 - **Fix**: Prioritize `realtime_service` (mock Dio + a fake `WebSocketChannel`; assert frame logging, SSE cancel path, teardown). Repo-impl tests are quick (mock data source, assert exception→Failure). `request_rules_repository_impl` has an untested `rules.isEmpty → deleteRules` branch.
 - **Effort**: M.
 
-### M8 — GraphQL body type
-- **Files**: `body_type.dart:4`, `request_config_entity.dart`, `request_serializer.dart`, `request_editor_tabs.dart`.
-- **Fix**: Add a `graphql` `BodyType` (new wire string for back-compat); store query + variables JSON; serialize `{query,variables}` with `application/json` at send; dual-pane editor.
-- **Effort**: M.
+### ✅ M8 (DONE) — GraphQL body type
+- **Files**: `body_type.dart`, `request_config_entity.dart`, `request_config_model.dart` (`@HiveField(15)`), `request_serializer.dart`, `request_editor_tabs.dart`, `request_view.dart`, `body_type_utils.dart`, `code_gen_service.dart`, `postman_collection_mapper.dart`, `workspace_collection_serializer.dart`.
+- **Fix**: Added a `graphql` `BodyType` (wire `'graphql'`, back-compat); query reuses `body`, variables in a new `graphqlVariables` field; serializes `{query,variables}` as `application/json` at send; dual-pane editor; invalid variables → status-0 error response. Round-trips code-gen / Postman / workspace mirror.
+- **Effort**: M. Spec + plan under `docs/superpowers/`.
 
 ### M9 — Pre-request scripts (no-code)
 - **Files**: `lib/features/chaining/…` (post-response only today), send pipeline in `tabs_bloc.dart`.

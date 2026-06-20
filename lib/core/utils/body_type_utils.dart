@@ -29,6 +29,10 @@ class BodyTypeUtils {
             'application/octet-stream',
           );
         }
+      case BodyType.graphql:
+        if (!HeaderUtils.hasCustomContentType(headers)) {
+          HeaderUtils.setHeader(headers, 'Content-Type', 'application/json');
+        }
       case BodyType.none:
       case BodyType.raw:
         break;

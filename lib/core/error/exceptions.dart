@@ -21,3 +21,15 @@ class FileBodyException implements Exception {
   String toString() =>
       'Could not read file: $path${cause != null ? ' ($cause)' : ''}';
 }
+
+/// Thrown when a GraphQL request's variables pane holds non-empty text that is
+/// not valid JSON. Pure (no dart:io) so it can cross the data→network boundary;
+/// the repository maps it to a status-0 NetworkFailure so the user sees a real
+/// error response instead of an uncaught throw.
+class GraphqlVariablesException implements Exception {
+  GraphqlVariablesException(this.detail);
+  final String detail;
+
+  @override
+  String toString() => 'GraphQL variables are not valid JSON: $detail';
+}

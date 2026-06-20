@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:getman/core/domain/auth_application.dart';
 import 'package:getman/core/domain/entities/auth_config.dart';
@@ -106,6 +108,23 @@ class RequestSerializer {
         if (path == null || path.isEmpty) return null;
         BodyTypeUtils.applyContentType(headers, BodyType.binary);
         return _readBytes(path);
+      case BodyType.graphql:
+        BodyTypeUtils.applyContentType(headers, BodyType.graphql);
+        final varsText = r(config.graphqlVariables).trim();
+        Object? variables;
+        if (varsText.isEmpty) {
+          variables = const <String, dynamic>{};
+        } else {
+          try {
+            variables = jsonDecode(varsText);
+          } on FormatException catch (e) {
+            throw GraphqlVariablesException(e.message);
+          }
+        }
+        return <String, dynamic>{
+          'query': r(config.body),
+          'variables': variables,
+        };
     }
   }
 

@@ -177,6 +177,14 @@ class TabsRepositoryImpl implements TabsRepository {
         type: NetworkFailureType.unknown,
         statusCode: 0,
       );
+    } on GraphqlVariablesException catch (e) {
+      // Invalid GraphQL variables are a real, user-visible error — surface as a
+      // status-0 NetworkFailure so the response panel + history show it.
+      throw NetworkFailure(
+        e.toString(),
+        type: NetworkFailureType.unknown,
+        statusCode: 0,
+      );
     }
 
     return networkService.request(

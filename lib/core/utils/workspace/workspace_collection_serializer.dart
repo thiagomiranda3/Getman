@@ -111,6 +111,7 @@ class WorkspaceCollectionSerializer {
     'headers': c.headers,
     'body': c.body,
     'bodyType': c.bodyType.wire,
+    if (c.graphqlVariables.isNotEmpty) 'graphqlVariables': c.graphqlVariables,
     'auth': c.auth,
     if (c.formFields.isNotEmpty)
       'formFields': [
@@ -134,6 +135,7 @@ class WorkspaceCollectionSerializer {
       headers: ((json['headers'] as Map?) ?? const {}).cast<String, String>(),
       body: (json['body'] as String?) ?? '',
       bodyType: BodyType.fromWire(json['bodyType'] as String?),
+      graphqlVariables: (json['graphqlVariables'] as String?) ?? '',
       auth: ((json['auth'] as Map?) ?? const {}).cast<String, String>(),
       formFields: [
         for (final Map<String, dynamic> m
