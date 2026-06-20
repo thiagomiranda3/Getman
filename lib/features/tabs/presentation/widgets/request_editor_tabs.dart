@@ -23,6 +23,7 @@ import 'package:getman/features/tabs/presentation/widgets/request_config_section
     show RequestConfigSection;
 import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.dart'
     show UnifiedRequestPanel;
+import 'package:getman/features/tabs/presentation/widgets/variable_code_autocomplete.dart';
 import 'package:re_editor/re_editor.dart';
 
 /// The three request-editor tab bodies (PARAMS / HEADERS / BODY), shared by
@@ -294,7 +295,7 @@ class BodyTabView extends StatelessWidget {
       case BodyType.none:
         return const _EmptyBodyHint();
       case BodyType.raw:
-        return _RawBodyEditor(controller: controller);
+        return _RawBodyEditor(tabId: tabId, controller: controller);
       case BodyType.urlencoded:
         return FormDataEditor(tabId: tabId, allowFiles: false);
       case BodyType.multipart:
@@ -411,7 +412,8 @@ class _BodyTypeChip extends StatelessWidget {
 }
 
 class _RawBodyEditor extends StatelessWidget {
-  const _RawBodyEditor({required this.controller});
+  const _RawBodyEditor({required this.tabId, required this.controller});
+  final String tabId;
   final CodeLineEditingController controller;
 
   @override
@@ -420,7 +422,16 @@ class _RawBodyEditor extends StatelessWidget {
     final layout = context.appLayout;
     return Stack(
       children: [
-        JsonCodeEditor(controller: controller),
+        // The variable context rebuilds on env/collection change, recreating
+        // the prompts builder with the fresh context so env switches apply.
+        // The Beautify overlay stays outside the autocomplete wrap.
+        TabVariableContextBuilder(
+          tabId: tabId,
+          builder: (context, varContext) => wrapBodyWithVariableAutocomplete(
+            contextProvider: () => varContext,
+            child: JsonCodeEditor(controller: controller),
+          ),
+        ),
         Positioned(
           top: 8,
           right: 8,
