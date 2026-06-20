@@ -18,20 +18,116 @@ import 'package:flutter/material.dart';
 import 'package:getman/core/theme/extensions/app_components.dart';
 import 'package:getman/core/theme/extensions/app_components_defaults.dart';
 
+/// True when an [AurisScheme] is present on the active theme. Every `Auris*`
+/// widget force-unwraps `Theme.of(context).extension<AurisScheme>()!`, so the
+/// slots below must only build them when the scheme is actually attached.
+///
+/// This guards against transitional `ThemeData`s that carry AURIS's
+/// [AppComponents] (whose `lerp` returns `this`, so it survives any theme
+/// cross-fade) but NOT [AurisScheme] (dropped when the other theme lacks it).
+/// In that window each slot falls back to the shared default rendering instead
+/// of throwing a null-check error on every frame.
+bool _hasAurisScheme(BuildContext context) =>
+    Theme.of(context).extension<AurisScheme>() != null;
+
 /// Returns the AURIS [AppComponents]: the shared defaults with each surface
-/// overridden by its `Auris*` counterpart.
+/// overridden by its `Auris*` counterpart — but only while [AurisScheme] is
+/// attached; otherwise each slot delegates to the default
+/// (see [_hasAurisScheme]).
 AppComponents aurisComponents() {
-  return defaultAppComponents().copyWith(
-    surface: _aurisSurface,
-    methodBadge: _aurisMethodBadge,
-    statusBadge: _aurisStatusBadge,
-    metric: _aurisMetric,
-    toggle: _aurisToggle,
-    logView: _aurisLogView,
-    dataRow: _aurisDataRow,
-    select: _aurisSelect,
-    statusBanner: _aurisStatusBanner,
-    pendingIndicator: _aurisPendingIndicator,
+  final fallback = defaultAppComponents();
+  return fallback.copyWith(
+    surface: (context, {required child, title, code, accent = false}) =>
+        _hasAurisScheme(context)
+        ? _aurisSurface(
+            context,
+            child: child,
+            title: title,
+            code: code,
+            accent: accent,
+          )
+        : fallback.surface(
+            context,
+            child: child,
+            title: title,
+            code: code,
+            accent: accent,
+          ),
+    methodBadge: (context, {required method, small = false}) =>
+        _hasAurisScheme(context)
+        ? _aurisMethodBadge(context, method: method, small: small)
+        : fallback.methodBadge(context, method: method, small: small),
+    statusBadge: (context, {required statusCode}) => _hasAurisScheme(context)
+        ? _aurisStatusBadge(context, statusCode: statusCode)
+        : fallback.statusBadge(context, statusCode: statusCode),
+    metric: (context, {required label, required value, unit, delta}) =>
+        _hasAurisScheme(context)
+        ? _aurisMetric(
+            context,
+            label: label,
+            value: value,
+            unit: unit,
+            delta: delta,
+          )
+        : fallback.metric(
+            context,
+            label: label,
+            value: value,
+            unit: unit,
+            delta: delta,
+          ),
+    toggle: (context, {required value, required onChanged, label}) =>
+        _hasAurisScheme(context)
+        ? _aurisToggle(
+            context,
+            value: value,
+            onChanged: onChanged,
+            label: label,
+          )
+        : fallback.toggle(
+            context,
+            value: value,
+            onChanged: onChanged,
+            label: label,
+          ),
+    logView: (context, {required lines, title, controller}) =>
+        _hasAurisScheme(context)
+        ? _aurisLogView(
+            context,
+            lines: lines,
+            title: title,
+            controller: controller,
+          )
+        : fallback.logView(
+            context,
+            lines: lines,
+            title: title,
+            controller: controller,
+          ),
+    dataRow: (context, {required label, required value, highlight = false}) =>
+        _hasAurisScheme(context)
+        ? _aurisDataRow(
+            context,
+            label: label,
+            value: value,
+            highlight: highlight,
+          )
+        : fallback.dataRow(
+            context,
+            label: label,
+            value: value,
+            highlight: highlight,
+          ),
+    select: (context, spec) => _hasAurisScheme(context)
+        ? _aurisSelect(context, spec)
+        : fallback.select(context, spec),
+    statusBanner: (context, {required state, required message}) =>
+        _hasAurisScheme(context)
+        ? _aurisStatusBanner(context, state: state, message: message)
+        : fallback.statusBanner(context, state: state, message: message),
+    pendingIndicator: (context, {label}) => _hasAurisScheme(context)
+        ? _aurisPendingIndicator(context, label: label)
+        : fallback.pendingIndicator(context, label: label),
   );
 }
 

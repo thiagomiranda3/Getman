@@ -16,16 +16,31 @@ BoxDecoration aurisPanelBox(
   double? offset,
   BorderRadius? borderRadius,
 }) {
-  final scheme = Theme.of(context).extension<AurisScheme>()!;
+  final theme = Theme.of(context);
   final layout = context.appLayout;
+  final radius =
+      borderRadius ?? BorderRadius.circular(context.appShape.panelRadius);
+  // Transitional theme guard: AppDecoration.lerp returns `this`, so this auris
+  // closure can run while AurisScheme has been dropped (see _hasAurisScheme in
+  // auris_components.dart). Fall back to a plain themed box, not a throw.
+  final scheme = theme.extension<AurisScheme>();
+  if (scheme == null) {
+    return BoxDecoration(
+      color: color ?? theme.cardColor,
+      border: Border.all(
+        color: theme.dividerColor,
+        width: borderWidth ?? layout.borderThin,
+      ),
+      borderRadius: radius,
+    );
+  }
   return BoxDecoration(
     color: color ?? scheme.surfacePanel,
     border: Border.all(
       color: scheme.borderResting,
       width: borderWidth ?? layout.borderThin,
     ),
-    borderRadius:
-        borderRadius ?? BorderRadius.circular(context.appShape.panelRadius),
+    borderRadius: radius,
   );
 }
 
@@ -37,8 +52,24 @@ BoxDecoration aurisTabShape(
   required bool hovered,
   required bool isFirst,
 }) {
-  final scheme = Theme.of(context).extension<AurisScheme>()!;
+  final theme = Theme.of(context);
   final layout = context.appLayout;
+  // Transitional theme guard (see aurisPanelBox): degrade to a plain themed tab
+  // when AurisScheme is absent rather than throwing on every frame.
+  final scheme = theme.extension<AurisScheme>();
+  if (scheme == null) {
+    return BoxDecoration(
+      color: active
+          ? theme.cardColor
+          : (hovered ? theme.hoverColor : Colors.transparent),
+      border: Border(
+        bottom: BorderSide(
+          color: active ? theme.primaryColor : Colors.transparent,
+          width: layout.borderThick,
+        ),
+      ),
+    );
+  }
 
   final Color bg;
   if (active) {
@@ -161,7 +192,11 @@ class _AurisWallpaperState extends State<AurisWallpaper>
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).extension<AurisScheme>()!;
+    // Transitional theme guard (see aurisPanelBox): this wraps the WHOLE app
+    // via scaffoldBackground, so if AurisScheme is momentarily absent we render
+    // the child plain (no ambient) rather than throwing across the entire tree.
+    final scheme = Theme.of(context).extension<AurisScheme>();
+    if (scheme == null) return widget.child;
 
     final stack = Stack(
       children: [
