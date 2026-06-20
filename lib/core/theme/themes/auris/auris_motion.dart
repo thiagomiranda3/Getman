@@ -576,14 +576,20 @@ class _AurisSendAffordance extends StatefulWidget {
 class _AurisSendAffordanceState extends State<_AurisSendAffordance>
     with TickerProviderStateMixin {
   /// Drives the in-flight tension build-up (0 → 1 over kTensionFullMs).
-  late final AnimationController _build = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: kTensionFullMs),
-  );
+  /// Eagerly initialized in initState — NOT a lazy `late final = …` field.
+  /// build() returns the child early when not sending, so a lazy controller
+  /// would stay uninitialized and dispose()'s `.dispose()` would force the
+  /// initializer to run inside dispose (illegal TickerMode ancestor lookup on a
+  /// deactivated element). See send_affordance_dispose_test.
+  late final AnimationController _build;
 
   @override
   void initState() {
     super.initState();
+    _build = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: kTensionFullMs),
+    );
     if (widget.isSending) unawaited(_build.forward(from: 0));
   }
 
