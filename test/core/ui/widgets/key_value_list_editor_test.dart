@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/core/ui/widgets/key_value_list_editor.dart';
-import 'package:getman/core/ui/widgets/variable_hover_popover.dart';
+import 'package:getman/core/utils/layered_variable_context.dart';
 
 const _mapEquality = MapEquality<String, String>();
 
@@ -241,8 +241,8 @@ void main() {
                 if (key.isNotEmpty) key: value,
             },
             equals: const MapEquality<String, String>().equals,
-            variableContext: const VariableHoverContext(
-              variables: {'baseUrl': 'https://x', 'token': 't'},
+            variableContext: const LayeredVariableContext(
+              environmentVariables: {'baseUrl': 'https://x', 'token': 't'},
               environmentName: 'Dev',
             ),
             onChanged: (_) {},
@@ -276,8 +276,8 @@ void main() {
                   if (key.isNotEmpty) key: value,
               },
               equals: const MapEquality<String, String>().equals,
-              variableContext: const VariableHoverContext(
-                variables: {'baseUrl': 'https://x'},
+              variableContext: const LayeredVariableContext(
+                environmentVariables: {'baseUrl': 'https://x'},
                 environmentName: 'Dev',
               ),
               onChanged: (map) => emitted = map,

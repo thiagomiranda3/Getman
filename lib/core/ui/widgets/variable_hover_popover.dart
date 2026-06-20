@@ -1,30 +1,8 @@
 import 'dart:async';
 
-import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/utils/variable_resolution_helper.dart';
-
-/// Active-environment data passed into a value field (or the URL bar) to enable
-/// `{{var}}` highlighting + hover resolution. Null disables the feature.
-class VariableHoverContext extends Equatable {
-  const VariableHoverContext({
-    this.variables = const {},
-    this.secretKeys = const {},
-    this.environmentName,
-  });
-
-  final Map<String, String> variables;
-
-  /// Names flagged secret in the active environment — masked in the popover.
-  final Set<String> secretKeys;
-
-  /// Active environment display name; null when no environment is active.
-  final String? environmentName;
-
-  @override
-  List<Object?> get props => [variables, secretKeys, environmentName];
-}
 
 /// The hover card. Not a stock Tooltip — secrets need an interactive reveal
 /// toggle and the card must stay open while the pointer is over it.

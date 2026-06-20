@@ -1,10 +1,11 @@
 // Widget tests for the row⇄bulk edit toggle on the PARAMS and HEADERS tabs.
 //
 // Both tab views require a TabsBloc (the canonical value + UpdateTab path),
-// plus SettingsBloc + EnvironmentsBloc (read by _VariableContextBuilder even
-// when no environment is active). The toggle flips between the row editor
-// (KeyValueListEditor) and the bulk editor (BulkKvEditor); both feed the same
-// encode/decode closures, so the round-trip is lossless.
+// plus SettingsBloc + EnvironmentsBloc + CollectionsBloc (read by
+// TabVariableContextBuilder even when no environment/collection is active).
+// The toggle flips between the row editor (KeyValueListEditor) and the bulk
+// editor (BulkKvEditor); both feed the same encode/decode closures, so the
+// round-trip is lossless.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -13,6 +14,9 @@ import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/core/ui/widgets/bulk_kv_editor.dart';
 import 'package:getman/core/ui/widgets/key_value_list_editor.dart';
+import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 import 'package:getman/features/environments/domain/usecases/environments_usecases.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
@@ -45,6 +49,11 @@ class MockPutEnvironmentUseCase extends Mock implements PutEnvironmentUseCase {}
 class MockDeleteEnvironmentUseCase extends Mock
     implements DeleteEnvironmentUseCase {}
 
+class MockGetCollectionsUseCase extends Mock implements GetCollectionsUseCase {}
+
+class MockSaveCollectionsUseCase extends Mock
+    implements SaveCollectionsUseCase {}
+
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 
 class _FakePanel extends Fake implements PanelEntity {}
@@ -69,6 +78,17 @@ EnvironmentsBloc _environmentsBloc() {
     saveEnvironmentsUseCase: MockSaveEnvironmentsUseCase(),
     putEnvironmentUseCase: MockPutEnvironmentUseCase(),
     deleteEnvironmentUseCase: MockDeleteEnvironmentUseCase(),
+  );
+}
+
+/// A [CollectionsBloc] with no collections — required by
+/// TabVariableContextBuilder even when the tab has no linked node.
+CollectionsBloc _collectionsBloc() {
+  final get = MockGetCollectionsUseCase();
+  when(get.call).thenAnswer((_) async => const <CollectionNodeEntity>[]);
+  return CollectionsBloc(
+    getCollectionsUseCase: get,
+    saveCollectionsUseCase: MockSaveCollectionsUseCase(),
   );
 }
 
@@ -126,13 +146,15 @@ void main() {
   });
 
   Future<void> pumpTab(WidgetTester tester, TabsBloc bloc, Widget child) async {
-    // Build the settings + environments blocs eagerly (their mock use-case
-    // stubbing must not run inside a BlocProvider `create:` callback during
-    // pump — mocktail forbids calling `when` mid-stub).
+    // Build the settings + environments + collections blocs eagerly (their mock
+    // use-case stubbing must not run inside a BlocProvider `create:` callback
+    // during pump — mocktail forbids calling `when` mid-stub).
     final settingsBloc = _settingsBloc(const SettingsEntity());
     addTearDown(settingsBloc.close);
     final environmentsBloc = _environmentsBloc();
     addTearDown(environmentsBloc.close);
+    final collectionsBloc = _collectionsBloc();
+    addTearDown(collectionsBloc.close);
     await tester.pumpWidget(
       MaterialApp(
         theme: brutalistTheme(Brightness.light),
@@ -142,6 +164,7 @@ void main() {
               BlocProvider.value(value: bloc),
               BlocProvider<SettingsBloc>.value(value: settingsBloc),
               BlocProvider<EnvironmentsBloc>.value(value: environmentsBloc),
+              BlocProvider<CollectionsBloc>.value(value: collectionsBloc),
             ],
             child: child,
           ),

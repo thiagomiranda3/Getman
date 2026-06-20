@@ -8,16 +8,11 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/bulk_kv_editor.dart';
 import 'package:getman/core/ui/widgets/key_value_list_editor.dart';
-import 'package:getman/core/ui/widgets/variable_hover_popover.dart';
+import 'package:getman/core/ui/widgets/tab_variable_context_builder.dart';
 import 'package:getman/core/utils/bulk_kv_codec.dart';
 import 'package:getman/core/utils/equality.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/core/utils/path_utils.dart';
-import 'package:getman/features/environments/domain/logic/active_environment_helper.dart';
-import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
-import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
-import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
-import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
@@ -33,42 +28,6 @@ import 'package:re_editor/re_editor.dart';
 /// The three request-editor tab bodies (PARAMS / HEADERS / BODY), shared by
 /// the split-pane [RequestConfigSection] and the phone [UnifiedRequestPanel]
 /// so both layouts stay behaviorally identical.
-
-/// Recomputes the active-environment [VariableHoverContext] and rebuilds when
-/// the environment set or the active-environment id changes, so value-field
-/// hover popovers always reflect the current environment.
-class _VariableContextBuilder extends StatelessWidget {
-  const _VariableContextBuilder({required this.builder});
-
-  final Widget Function(BuildContext, VariableHoverContext) builder;
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<SettingsBloc, SettingsState>(
-      buildWhen: (p, n) =>
-          p.settings.activeEnvironmentId != n.settings.activeEnvironmentId,
-      builder: (context, settingsState) {
-        return BlocBuilder<EnvironmentsBloc, EnvironmentsState>(
-          buildWhen: (p, n) => p.environments != n.environments,
-          builder: (context, envState) {
-            final env = ActiveEnvironmentHelper.activeEnvironment(
-              envState.environments,
-              settingsState.settings.activeEnvironmentId,
-            );
-            return builder(
-              context,
-              VariableHoverContext(
-                variables: env?.variables ?? const {},
-                secretKeys: env?.secretKeys ?? const {},
-                environmentName: env?.name,
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-}
 
 /// Small header above the params/headers editor body offering the row⇄bulk
 /// toggle. [bulk] is the current mode; [onToggle] flips it. The icon/label
@@ -191,7 +150,8 @@ class _ParamsTabViewState extends State<ParamsTabView> {
                       onChanged: (text) =>
                           emit(encode(BulkKvCodec.parse(text))),
                     )
-                  : _VariableContextBuilder(
+                  : TabVariableContextBuilder(
+                      tabId: tab.tabId,
                       builder: (context, varContext) =>
                           KeyValueListEditor<List<QueryParamEntity>>(
                             items: tab.config.params,
@@ -272,7 +232,8 @@ class _HeadersTabViewState extends State<HeadersTabView> {
                       onChanged: (text) =>
                           emit(encode(BulkKvCodec.parse(text))),
                     )
-                  : _VariableContextBuilder(
+                  : TabVariableContextBuilder(
+                      tabId: tab.tabId,
                       builder: (context, varContext) =>
                           KeyValueListEditor<Map<String, String>>(
                             items: tab.config.headers,

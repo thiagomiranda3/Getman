@@ -8,7 +8,6 @@ void main() {
       environmentVariables: {'host': 'env.example.com', 'token': 'secret'},
       environmentSecrets: {'token'},
       collectionVariables: {'host': 'col.example.com', 'path': '/v1'},
-      collectionSecrets: {},
       environmentName: 'Staging',
     );
 

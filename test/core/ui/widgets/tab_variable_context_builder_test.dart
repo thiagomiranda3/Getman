@@ -120,17 +120,17 @@ void main() {
 
     // TabsBloc: one panel containing the linked tab.
     final tabsRepo = _MockTabsRepository();
-    when(() => tabsRepo.getPanels()).thenAnswer(
+    when(tabsRepo.getPanels).thenAnswer(
       (_) async => [
         PanelEntity(
           id: 'p1',
           name: 'Panel 1',
-          tabs: [tab],
+          tabs: const [tab],
           activeTabId: tab.tabId,
         ),
       ],
     );
-    when(() => tabsRepo.getActivePanelId()).thenAnswer((_) async => 'p1');
+    when(tabsRepo.getActivePanelId).thenAnswer((_) async => 'p1');
     when(() => tabsRepo.saveTabs(any())).thenAnswer((_) async {});
     when(() => tabsRepo.putTab(any())).thenAnswer((_) async {});
     when(() => tabsRepo.deleteTabs(any())).thenAnswer((_) async {});
@@ -148,9 +148,7 @@ void main() {
 
     // CollectionsBloc: seeded with the node carrying 'path' = '/v1'.
     final collectionsRepo = _MockCollectionsRepository();
-    when(
-      () => collectionsRepo.getCollections(),
-    ).thenAnswer((_) async => const []);
+    when(collectionsRepo.getCollections).thenAnswer((_) async => const []);
     when(
       () => collectionsRepo.saveCollections(any()),
     ).thenAnswer((_) async {});
