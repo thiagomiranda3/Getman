@@ -168,18 +168,21 @@ class GlassLozenge extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        color: color.withValues(alpha: isDark ? 0.22 : 0.16),
         border: Border.all(
           color: color.withValues(alpha: 0.55),
           width: layout.borderThin,
         ),
-        // Specular top highlight — bright near-white face fading to clear.
+        // Specular top highlight blended over the color tint so both survive.
+        // Flutter ignores `color` when `gradient` is set — encode tint here.
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Colors.white.withValues(alpha: isDark ? 0.18 : 0.45),
-            Colors.white.withValues(alpha: 0),
+            Color.alphaBlend(
+              Colors.white.withValues(alpha: isDark ? 0.18 : 0.45),
+              color.withValues(alpha: isDark ? 0.22 : 0.16),
+            ),
+            color.withValues(alpha: isDark ? 0.22 : 0.16),
           ],
           stops: const [0, 0.6],
         ),
@@ -303,36 +306,29 @@ class _LiquidSwitchState extends State<LiquidSwitch> {
     final accent = theme.primaryColor;
     final on = widget.value;
 
-    final thumb = AnimatedScale(
-      duration: widget.animate
-          ? const Duration(milliseconds: 120)
-          : Duration.zero,
-      curve: Curves.easeOut,
-      scale: 1,
-      child: Transform.scale(
-        scaleX: widget.animate ? _squish : 1.0,
-        child: Container(
-          width: 24,
-          height: 24,
-          margin: const EdgeInsets.all(2),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.white,
-                Colors.white.withValues(alpha: 0.85),
-              ],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 4,
-                offset: const Offset(0, 1),
-              ),
+    final thumb = Transform.scale(
+      scaleX: widget.animate ? _squish : 1.0,
+      child: Container(
+        width: 24,
+        height: 24,
+        margin: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.white,
+              Colors.white.withValues(alpha: 0.85),
             ],
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
         ),
       ),
     );

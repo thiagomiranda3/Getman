@@ -170,7 +170,7 @@ void main() {
       (c) => c.appComponents.statusBadge(c, statusCode: 200),
     );
     expect(tester.takeException(), isNull);
-    expect(find.byType(GlassLozenge), findsWidgets);
+    expect(find.byType(GlassLozenge), findsOneWidget);
   });
 
   testWidgets('surface (no title) fills + no overflow', (tester) async {
