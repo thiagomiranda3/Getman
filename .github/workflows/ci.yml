@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Read-only: this workflow runs PR code (including from forks), so it must not
+# hold a write token. The sticky comment is posted by the separate "CI Comment"
+# workflow (workflow_run), which runs trusted code from master.
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: '3.41.6'
+
+jobs:
+  checks:
+    name: Analyze, Lint & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash # ensures pipefail so `cmd | tee` reflects cmd's exit code
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # Each check runs to completion (continue-on-error) so the summary
+      # comment can report every gate, not just the first failure. The final
+      # step fails the job if any gate did not pass.
+
+      - name: Analyze (very_good_analysis)
+        id: analyze
+        continue-on-error: true
+        run: flutter analyze 2>&1 | tee analyze.log
+
+      - name: custom_lint (architecture rules)
+        id: custom_lint
+        continue-on-error: true
+        run: dart run custom_lint 2>&1 | tee custom_lint.log
+
+      - name: bloc_lint
+        id: bloc_lint
+        continue-on-error: true
+        run: dart run bloc_tools:bloc lint lib < /dev/null 2>&1 | tee bloc_lint.log
+
+      - name: Format check
+        id: format
+        continue-on-error: true
+        run: dart format --output=none --set-exit-if-changed lib test tools 2>&1 | tee format.log
+
+      - name: Test
+        id: test
+        continue-on-error: true
+        run: flutter test 2>&1 | tee test.log
+
+      # Build the comment body + record the PR number into an artifact. The
+      # comment itself is posted by the CI Comment workflow (it has the write
+      # token this job deliberately lacks).
+      - name: Build summary comment
+        if: github.event_name == 'pull_request'
+        env:
+          ANALYZE: ${{ steps.analyze.outcome }}
+          CUSTOM_LINT: ${{ steps.custom_lint.outcome }}
+          BLOC_LINT: ${{ steps.bloc_lint.outcome }}
+          FORMAT: ${{ steps.format.outcome }}
+          TEST: ${{ steps.test.outcome }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          icon() { [ "$1" = success ] && printf '✅ Passed' || printf '❌ Failed'; }
+          all_pass=true
+          for o in "$ANALYZE" "$CUSTOM_LINT" "$BLOC_LINT" "$FORMAT" "$TEST"; do
+            [ "$o" = success ] || all_pass=false
+          done
+
+          {
+            if $all_pass; then
+              echo "## 🟢 CI — all checks passed"
+            else
+              echo "## 🔴 CI — some checks failed"
+            fi
+            echo
+            echo "| Check | Result |"
+            echo "| :--- | :--- |"
+            echo "| \`flutter analyze\` | $(icon "$ANALYZE") |"
+            echo "| \`custom_lint\` | $(icon "$CUSTOM_LINT") |"
+            echo "| \`bloc_lint\` | $(icon "$BLOC_LINT") |"
+            echo "| \`dart format\` | $(icon "$FORMAT") |"
+            echo "| \`flutter test\` | $(icon "$TEST") |"
+            echo
+          } > comment.md
+
+          append_log() {
+            if [ "$2" != success ] && [ -f "$3" ]; then
+              {
+                echo "<details><summary>📄 <code>$1</code> output</summary>"
+                echo
+                echo '```'
+                tail -c 8000 "$3"
+                echo '```'
+                echo "</details>"
+                echo
+              } >> comment.md
+            fi
+          }
+          append_log "flutter analyze" "$ANALYZE" analyze.log
+          append_log "custom_lint" "$CUSTOM_LINT" custom_lint.log
+          append_log "bloc_lint" "$BLOC_LINT" bloc_lint.log
+          append_log "dart format" "$FORMAT" format.log
+          append_log "flutter test" "$TEST" test.log
+
+          echo "_Updated for \`${GITHUB_SHA::7}\` · [view run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})_" >> comment.md
+
+          printf '%s' "$PR_NUMBER" > number.txt
+
+      - name: Upload comment artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-comment
+          path: |
+            comment.md
+            number.txt
+          if-no-files-found: error
+
+      - name: Fail if any check failed
+        if: >-
+          steps.analyze.outcome != 'success' ||
+          steps.custom_lint.outcome != 'success' ||
+          steps.bloc_lint.outcome != 'success' ||
+          steps.format.outcome != 'success' ||
+          steps.test.outcome != 'success'
+        run: |
+          echo "One or more checks failed — see the job logs / PR comment above."
+          exit 1

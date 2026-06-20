@@ -1,0 +1,44 @@
+name: CI Comment
+
+# Runs after the CI workflow finishes. This is triggered by `workflow_run`, so
+# it executes the version of this file on the default branch (master) with the
+# repo's normal token — NOT the PR's code. That makes it safe to grant write
+# access and post a comment even for pull requests from forks (whose own CI run
+# only ever held a read-only token).
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  pull-requests: write
+  actions: read # to download the artifact from the triggering CI run
+
+jobs:
+  comment:
+    # Only PR-triggered CI runs produce the comment artifact (push-to-master
+    # runs do not).
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download comment artifact
+        id: download
+        continue-on-error: true # CI may have failed before uploading (e.g. pub get)
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-comment
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read PR number
+        if: steps.download.outcome == 'success'
+        id: pr
+        run: echo "number=$(cat number.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Post sticky comment
+        if: steps.download.outcome == 'success'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: getman-ci-summary
+          number: ${{ steps.pr.outputs.number }}
+          path: comment.md
