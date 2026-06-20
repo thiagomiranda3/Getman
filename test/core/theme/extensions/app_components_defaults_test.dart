@@ -55,7 +55,14 @@ void main() {
                       onSelected: (_) {},
                     ),
                   ),
-                  c.pendingIndicator(context),
+                  SizedBox(
+                    height: 300,
+                    child: Column(
+                      children: [
+                        Expanded(child: c.pendingIndicator(context)),
+                      ],
+                    ),
+                  ),
                   c.statusBanner(
                     context,
                     state: AppBannerState.success,

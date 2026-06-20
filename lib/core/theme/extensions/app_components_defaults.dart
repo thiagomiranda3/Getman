@@ -590,16 +590,16 @@ class _DefaultPendingIndicator extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: 15,
-              itemBuilder: (context, _) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Container(
-                  width: double.infinity,
-                  height: 20,
-                  color: shimmerFill,
+            Expanded(
+              child: ListView.builder(
+                itemCount: 15,
+                itemBuilder: (context, _) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Container(
+                    width: double.infinity,
+                    height: 20,
+                    color: shimmerFill,
+                  ),
                 ),
               ),
             ),

@@ -14,7 +14,6 @@ import 'package:getman/features/tabs/presentation/widgets/response/response_test
 import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.dart'
     show UnifiedRequestPanel;
 import 'package:re_editor/re_editor.dart';
-import 'package:shimmer/shimmer.dart';
 
 /// Shell for the response pane: the metadata row + the BODY/HEADERS/COOKIES/
 /// TESTS tabs. Each tab body is its own widget under `response/`; this widget
@@ -55,63 +54,7 @@ class ResponseSection extends StatelessWidget {
         if (tab == null) return const SizedBox.shrink();
 
         if (tab.isSending) {
-          final shimmerFill = theme.colorScheme.onSurface.withValues(
-            alpha: 0.08,
-          );
-          return Semantics(
-            label: 'Loading response',
-            liveRegion: true,
-            child: Shimmer.fromColors(
-              baseColor: theme.dividerColor.withValues(alpha: 0.1),
-              highlightColor: theme.dividerColor.withValues(alpha: 0.3),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 100,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: shimmerFill,
-                          border: Border.all(
-                            color: theme.dividerColor,
-                            width: layout.borderThin,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Container(
-                        width: 100,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: shimmerFill,
-                          border: Border.all(
-                            color: theme.dividerColor,
-                            width: layout.borderThin,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: 15,
-                      itemBuilder: (_, index) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Container(
-                          width: double.infinity,
-                          height: 20,
-                          color: shimmerFill,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
+          return context.appComponents.pendingIndicator(context);
         }
 
         final response = tab.response;
