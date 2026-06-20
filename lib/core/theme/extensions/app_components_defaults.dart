@@ -332,8 +332,6 @@ class _DefaultLogView extends StatelessWidget {
     return ListView.builder(
       controller: controller,
       padding: EdgeInsets.all(layout.isCompact ? 8 : 12),
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
       itemCount: lines.length,
       itemBuilder: (context, i) => _LogLineRow(line: lines[i]),
     );
@@ -361,15 +359,15 @@ class _LogLineRow extends StatelessWidget {
         'IN',
         theme.colorScheme.onSurface,
       ),
-      AppLogLineKind.ok => (
+      AppLogLineKind.open => (
         Icons.link,
         'OPEN',
         palette.statusSuccess,
       ),
-      AppLogLineKind.warning => (
-        Icons.warning_amber_outlined,
-        'WARN',
-        palette.statusWarning,
+      AppLogLineKind.close => (
+        Icons.link_off,
+        'CLOSE',
+        theme.colorScheme.onSurface,
       ),
       AppLogLineKind.error => (
         Icons.error_outline,

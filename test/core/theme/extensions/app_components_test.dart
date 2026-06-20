@@ -44,8 +44,8 @@ void main() {
   });
 
   test('neutral types construct', () {
-    const line = AppLogLine(text: 'hi', kind: AppLogLineKind.ok);
-    expect(line.kind, AppLogLineKind.ok);
+    const line = AppLogLine(text: 'hi', kind: AppLogLineKind.open);
+    expect(line.kind, AppLogLineKind.open);
     final spec = AppSelectSpec(
       items: const [AppSelectItem(label: 'A')],
       selectedIndex: 0,

@@ -33,11 +33,14 @@ void main() {
                   c.statusBadge(context, statusCode: 200),
                   c.metric(context, label: 'TIME', value: '142', unit: 'ms'),
                   c.toggle(context, value: true, onChanged: (_) {}, label: 'X'),
-                  c.logView(
-                    context,
-                    lines: const [
-                      AppLogLine(text: 'hi', kind: AppLogLineKind.ok),
-                    ],
+                  SizedBox(
+                    height: 120,
+                    child: c.logView(
+                      context,
+                      lines: const [
+                        AppLogLine(text: 'hi', kind: AppLogLineKind.open),
+                      ],
+                    ),
                   ),
                   c.dataRow(
                     context,

@@ -3,11 +3,20 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/network/realtime_frame.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/extensions/app_components.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_event.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_state.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
+
+AppLogLineKind _logKindFor(RealtimeDirection d) => switch (d) {
+  RealtimeDirection.incoming => AppLogLineKind.incoming,
+  RealtimeDirection.outgoing => AppLogLineKind.outgoing,
+  RealtimeDirection.open => AppLogLineKind.open,
+  RealtimeDirection.close => AppLogLineKind.close,
+  RealtimeDirection.error => AppLogLineKind.error,
+};
 
 /// Live view for a WebSocket/SSE session: connection status, the message/event
 /// log (direction shown by icon + label, not color alone), and — for
@@ -65,9 +74,14 @@ class _RealtimePanelState extends State<RealtimePanel> {
       children: [
         BlocBuilder<RealtimeBloc, RealtimeState>(
           buildWhen: _connectedChanged,
-          builder: (context, state) => _StatusBanner(
-            connected: state.sessionFor(widget.tabId).connected,
-          ),
+          builder: (context, state) {
+            final connected = state.sessionFor(widget.tabId).connected;
+            return context.appComponents.statusBanner(
+              context,
+              state: connected ? AppBannerState.success : AppBannerState.error,
+              message: connected ? 'CONNECTED' : 'DISCONNECTED',
+            );
+          },
         ),
         SizedBox(height: layout.tabSpacing),
         Expanded(
@@ -97,10 +111,15 @@ class _RealtimePanelState extends State<RealtimePanel> {
                         ),
                       );
                     }
-                    return ListView.builder(
-                      padding: EdgeInsets.all(layout.isCompact ? 8 : 12),
-                      itemCount: frames.length,
-                      itemBuilder: (context, i) => _FrameRow(frame: frames[i]),
+                    return context.appComponents.logView(
+                      context,
+                      lines: [
+                        for (final f in frames)
+                          AppLogLine(
+                            text: f.text,
+                            kind: _logKindFor(f.direction),
+                          ),
+                      ],
                     );
                   },
                 ),
@@ -149,121 +168,6 @@ class _RealtimePanelState extends State<RealtimePanel> {
           ),
         ],
       ],
-    );
-  }
-}
-
-class _StatusBanner extends StatelessWidget {
-  const _StatusBanner({required this.connected});
-  final bool connected;
-
-  @override
-  Widget build(BuildContext context) {
-    final layout = context.appLayout;
-    final palette = context.appPalette;
-    final color = connected ? palette.statusSuccess : palette.statusError;
-    final on = palette.onColor(color);
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: layout.isCompact ? 4 : 8,
-      ),
-      decoration: BoxDecoration(
-        color: color,
-        border: Border.all(
-          color: Theme.of(context).dividerColor,
-          width: layout.borderThin,
-        ),
-        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            connected ? Icons.link : Icons.link_off,
-            color: on,
-            size: layout.smallIconSize,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            connected ? 'CONNECTED' : 'DISCONNECTED',
-            style: TextStyle(
-              color: on,
-              fontWeight: context.appTypography.displayWeight,
-              fontSize: layout.fontSizeNormal,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FrameRow extends StatelessWidget {
-  const _FrameRow({required this.frame});
-  final RealtimeFrame frame;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final layout = context.appLayout;
-    final (icon, label, color) = switch (frame.direction) {
-      RealtimeDirection.incoming => (
-        Icons.arrow_downward,
-        'IN',
-        theme.colorScheme.onSurface,
-      ),
-      RealtimeDirection.outgoing => (
-        Icons.arrow_upward,
-        'OUT',
-        theme.colorScheme.secondary,
-      ),
-      RealtimeDirection.open => (
-        Icons.link,
-        'OPEN',
-        context.appPalette.statusSuccess,
-      ),
-      RealtimeDirection.close => (
-        Icons.link_off,
-        'CLOSE',
-        theme.colorScheme.onSurface,
-      ),
-      RealtimeDirection.error => (
-        Icons.error_outline,
-        'ERROR',
-        context.appPalette.statusError,
-      ),
-    };
-    return Padding(
-      padding: EdgeInsets.only(bottom: layout.tabSpacing),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: layout.smallIconSize, color: color),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 44,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: layout.fontSizeSmall,
-                fontWeight: context.appTypography.displayWeight,
-                color: color,
-              ),
-            ),
-          ),
-          Expanded(
-            child: SelectableText(
-              frame.text,
-              style: TextStyle(
-                fontFamily: context.appTypography.codeFontFamily,
-                fontSize: layout.fontSizeCode,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

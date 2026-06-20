@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-enum AppLogLineKind { outgoing, incoming, ok, warning, error }
+/// Mirrors realtime frame directions (the log view's only consumer).
+enum AppLogLineKind { outgoing, incoming, open, close, error }
 
 @immutable
 class AppLogLine {
