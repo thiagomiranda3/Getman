@@ -27,7 +27,19 @@
   `StatusReactionFlavor` classifier + `latencyWeight`/`inFlightTension`
   (`lib/core/theme/motion/`). Loud themes full, calm themes restrained; codes
   201/204/304/401/403/404/408/429/500/503. No spine change. Wiki synced
-  (`Themes-and-Appearance`). **VM-A3** below was split off from this work.
+  (`Themes-and-Appearance`).
+- **VM-A3 + VM-E4 shipped** (commits `5de9850..f9110c3`, on `dev`, unmerged):
+  transport-failure sub-personalities (client `send`/`receive`/`connection`
+  timeout → the existing `timeout` flavor; bad TLS cert → a new
+  `badCertificate` flavor; refused/unknown stay generic `networkError`) plus a
+  photosensitivity flash-safety guard. New reusable pieces in
+  `lib/core/theme/motion/`: theme-local `TransportFailureKind` on
+  `ThemeReaction`, `StatusReactionFlavor.badCertificate`, and
+  `photosensitivity.dart` (`kMaxSafeFlashesPerSecond` / `safeFlashCount`) — a
+  WCAG 2.3.1 3 Hz cap any repeating flash MUST route through (see
+  THEME_AUTHORING §5b). `NetworkFailureType.connection` was split into
+  `connectionTimeout`/`connectionError`. No wiki change (internal motion
+  polish, no new user-facing control).
 
 ---
 
@@ -37,28 +49,13 @@
 
 > **Read [`docs/THEME_AUTHORING.md`](THEME_AUTHORING.md) before touching these.**
 > The reactive spine (`lib/core/theme/motion/`, `AppMotion`) drives all of this.
-> **VM-A1 + VM-A2 shipped** (see Current state) — they added the shared
-> `StatusReactionFlavor` classifier (`flavorFor`) + `latencyWeight`/
-> `inFlightTension` helpers in `lib/core/theme/motion/`; new themes/effects
-> should reuse those rather than re-deriving status/latency semantics.
-
-### A. Express the data we already capture (highest leverage)
-
-#### VM-A3 — Client-side timeout / network-failure sub-personalities
-- **Idea**: give *transport* failures their own themed reaction, distinct from
-  the generic `networkError` — a client-side timeout
-  (`send`/`receive`/`connection` timeout) should *feel* like running out of time
-  (a clock-out / mana-drain / sag), separate from a connection refusal or a bad
-  cert. (Server-sent **HTTP 408** is already handled by VM-A2's classifier, since
-  `validateStatus: (_) => true` routes it through the success path with a real
-  status; this item is specifically the *no-HTTP-status* transport failures.)
-- **Seam**: the error path in `TabsBloc._onSendRequest` (`on NetworkFailure`)
-  currently fires a bare `ThemeReaction(kind: networkError)` with no status. Thread
-  the `NetworkFailureType` (or add a finer `ThemeReactionKind`) through
-  `ThemeReaction` → the per-theme `reactionOverlay` (which would extend the
-  `StatusReactionFlavor` classifier added in VM-A2). Small pure-Dart spine change.
-- **Effort**: S–M. **Split off from** VM-A1/VM-A2 (design
-  `docs/superpowers/specs/2026-06-19-vm-a1-a2-latency-status-reactions-design.md`).
+> **VM-A1/A2/A3 + VM-E4 shipped** (see Current state) — the shared
+> `lib/core/theme/motion/` toolkit now includes: the `StatusReactionFlavor`
+> classifier (`flavorFor`, incl. transport-failure flavors via
+> `TransportFailureKind`), `latencyWeight`/`inFlightTension`, and the
+> `photosensitivity.dart` flash guard (`safeFlashCount`). New themes/effects
+> should reuse these rather than re-deriving status/latency/flash-rate
+> semantics.
 
 ### B. Extend reactions to more app moments
 
@@ -170,13 +167,6 @@
 - **Seam**: `ThemeReactionController` + a session-scoped counter; the all-green
   case pairs with **H4** (collection runner).
 - **Effort**: M.
-
-#### VM-E4 — Photosensitivity guardrails
-- **Idea**: formalize + enforce that no effect flashes faster than a safe Hz;
-  document the policy so future effects inherit it.
-- **Seam**: a shared constraint/util referenced by the effect painters; note it
-  in THEME_AUTHORING.md.
-- **Effort**: S.
 
 #### VM-E5 — Haptics (supported platforms)
 - **Idea**: a subtle haptic tick on send/success/error (macOS trackpad / mobile).
