@@ -267,6 +267,177 @@
 
 ---
 
+## 🪶 Lightweight & Privacy
+
+> **Strategic lens** (brainstorm, 2026-06-20): Getman wins on the things people
+> *dislike* about Postman — forced accounts, cloud-captured data, telemetry,
+> bloat — not on feature-for-feature parity. These items lean into "fast,
+> offline, no-account, yours." See also **🚫 Deferred / Non-goals**.
+
+### LW1 — Encrypted-at-rest secrets (local vault)
+- **Idea**: secret env vars are masked on export today but stored **plaintext**
+  in Hive (`secretKeys` only flags them). Offer optional encryption of secret
+  *values* with a passphrase / OS keychain, so secrets at rest are never
+  readable. A strong differentiator — Postman keeps secrets in *its* cloud.
+- **Seam**: `EnvironmentModel.secretKeys` (`HiveField(3)`, typeId 4) + a crypto
+  layer at the Hive read/write boundary; a passphrase/keychain unlock on launch.
+  Send-time resolution must stay unchanged (decrypt → resolve like any var).
+- **Effort**: L. **Verify**: secrets round-trip encrypted; wrong passphrase
+  fails closed; export still masks.
+
+### LW2 — One-file workspace backup / restore
+- **Idea**: export everything (collections + environments + history + settings)
+  to a single portable file and re-import on another machine — "your data is
+  yours," no cloud. Simpler than the git mirror for casual backup.
+- **Seam**: extend `core/utils/json_file_io.dart` +
+  `collections/data/services/workspace_sync_service.dart`.
+- **Effort**: M.
+
+### LW3 — Git-native sync as a headline feature (your repo, not our cloud)
+- **Idea**: promote the existing workspace mirror into a first-class "sync
+  across machines via your own git remote," with a setup wizard + basic conflict
+  handling. The privacy-respecting answer to Postman cloud sync.
+- **Seam**: `workspace_sync_service.dart` (the git-friendly mirror already
+  exists); add remote push/pull orchestration + conflict surfacing.
+- **Effort**: M–L.
+
+### LW4 — "What Getman stores" data inspector
+- **Idea**: a settings panel listing every local Hive box with its size/count
+  and a per-category clear button. Builds trust ("nothing leaves this machine")
+  and keeps the install lean.
+- **Seam**: `core/storage/HiveBoxes` (box-name constants) + a settings section;
+  reuse `ConfirmDialog` for clears.
+- **Effort**: M.
+
+### LW5 — Cold-start & memory budget guard
+- **Idea**: make "lightweight" measurable — a perf smoke test asserting boot
+  time stays under a budget so we catch regressions as features land.
+- **Seam**: `main.dart` / `di.init()` (already opens boxes in parallel via
+  `Future.wait`); add a timing probe + a test.
+- **Effort**: S–M.
+
+---
+
+## ✨ Delight & Differentiation
+
+> Beyond themes/motion (which keep their **🎨** section) — make Getman the
+> client people *enjoy* using daily, and good at the things Postman does poorly.
+
+### DL1 — Rich response visualizers
+- **Idea**: auto-render more than JSON — HTML preview, images, CSV→table, PDF —
+  so the response panel beats Postman's weak viewer.
+- **Seam**: `tabs/presentation/widgets/response/` `ResponseBodyView` + the
+  `_BodyModeToggle` (today PRETTY/RAW/TREE); add render modes gated on
+  content-type, degrading to RAW for large/unknown bodies.
+- **Effort**: M–L.
+
+### DL2 — Inline JWT / base64 decoder
+- **Idea**: detect a JWT or base64 blob in a body/header/auth value and offer a
+  decoded view (JWT header/payload/exp; base64 → text).
+- **Seam**: response views + a small pure-Dart util in `core/utils`.
+- **Effort**: S.
+
+### DL3 — Timing waterfall + response insights
+- **Idea**: show as much of the request timeline as `dio` exposes (TTFB via an
+  interceptor, total via the existing `durationMs`) plus friendly hints ("no
+  cache headers", "slow TTFB"). Postman buries this.
+- **Seam**: `core/network/NetworkService` + the response metadata view
+  (`ResponseMetadataItem`).
+- **Effort**: M.
+
+### DL4 — Command palette → command *system*
+- **Idea**: Cmd/Ctrl+K jumps to saved requests/envs/themes today; extend it to
+  run *any* app action (new tab, send, switch env, export, …) — keyboard-first
+  everything (also a dev-native win).
+- **Seam**: `features/command_palette` (reads bloc state, dispatches existing
+  events); register an action registry instead of jump-only entries.
+- **Effort**: M.
+
+### DL5 — Delightful first-run + live sample collection
+- **Idea**: a 30-second "wow" on first launch using the existing motion, seeded
+  with a working sample collection (e.g. httpbin) so a new user sends a real
+  request immediately.
+- **Seam**: `features/home` + a first-run flag on `SettingsEntity` (new
+  `HiveField`, next free **27**).
+- **Effort**: M.
+
+### DL6 — Per-theme witty empty states & micro-copy
+- **Idea**: lean into personality — themed empty/loading/error copy per theme.
+  Cheap, high-charm.
+- **Seam**: the existing `AppCopy` theme extension (already the 6th extension);
+  add strings + wire empty states through it.
+- **Effort**: S.
+
+### DL7 — Pinned quick-access request bar
+- **Idea**: favorites exist in the tree; add a pinned launch strip for daily-
+  driver requests, one tap to open as a tab.
+- **Seam**: collections favorites (`toggleFavoriteInTree`) + a strip widget;
+  opens via `AddTab`.
+- **Effort**: S–M.
+
+---
+
+## ⚙️ Developer Workflow & Integration
+
+> "It fits how I already work." Dev-native interchange + variable ergonomics,
+> kept lean. (A headless CI runner was considered and **declined** — see
+> **🚫 Deferred / Non-goals**.)
+
+### DW1 — `.http` file import / export (VS Code / JetBrains REST Client)
+- **Idea**: import/export the `.http` REST-client format devs already keep in
+  their repos — a dev-native interchange standard alongside Postman + OpenAPI.
+- **Seam**: a new parser in `core/utils` + the picker/snackbar plumbing in
+  `json_file_io.dart`.
+- **Effort**: M.
+
+### DW2 — `.env` import + OS-environment vars at send time
+- **Idea**: import a `.env` file into an environment; optionally resolve a new
+  `{{$env:VAR}}` dynamic var from the shell at send time.
+- **Seam**: `core/utils/environment_resolver.dart` (already resolves `{{$...}}`
+  dynamic vars) + an importer; web/no-shell falls back to verbatim.
+- **Effort**: S–M.
+
+### DW3 — Generate OpenAPI / Markdown docs *from* a collection
+- **Idea**: the reverse of the existing OpenAPI import — emit an OpenAPI spec or
+  a Markdown API doc from a collection. (No docs generation exists today;
+  Postman paywalls this.)
+- **Seam**: reverse the `core/utils/openapi/` normalizers + a Markdown emitter;
+  export via `json_file_io`.
+- **Effort**: M–L.
+
+### DW4 — OpenAPI drift detection
+- **Idea**: re-sync a collection imported from a spec when that spec changes;
+  flag added/removed/changed endpoints instead of a blind re-import.
+- **Seam**: `core/utils/openapi/*` (normalized model already exists) + a diff
+  over the normalized spec.
+- **Effort**: M–L. **Pairs with**: DW3.
+
+### DW5 — Global / scoped variables
+- **Idea**: today there are environment + collection variables; add a **global**
+  scope with clear precedence (global < collection < env < dynamic `{{$…}}`).
+- **Seam**: `environment_resolver.dart` resolution order + a settings-owned
+  global map (new `HiveField` on `SettingsModel`).
+- **Effort**: M.
+
+---
+
+## 🚫 Deferred / Non-goals (for now)
+
+> Recorded so they stop resurfacing. Both cut against the chosen lightweight
+> stance (brainstorm, 2026-06-20); revisit only if a genuinely lean approach
+> appears.
+
+- **gRPC support** — heavyweight parity play (proto management, reflection,
+  streaming UI). Out of scope while we stay lightweight.
+- **Built-in mock server** — runs a local server + persisted mock rules; large
+  surface for a client whose identity is "lightweight + local." Deferred.
+- **Headless `getman` CLI / CI runner** — considered as a Newman replacement
+  (the domain layer is already Flutter-decoupled), but declined for now to avoid
+  a second entrypoint/binary and the maintenance surface. The in-app collection
+  runner (**H4**) covers the interactive case.
+
+---
+
 ## 🛠️ Build, Packaging & Release
 
 ### R1 — Bundle GStreamer into the Linux AppImage (runtime sound)
