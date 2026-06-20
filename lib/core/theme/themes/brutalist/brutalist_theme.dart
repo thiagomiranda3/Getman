@@ -3,6 +3,7 @@ import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_bounce.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_decorations.dart';
+import 'package:getman/core/theme/themes/brutalist/brutalist_motion.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_palette.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -283,6 +284,7 @@ ThemeData brutalistTheme(
       shape,
       typography,
       decoration,
+      brutalistMotion(reduceEffects: reduceEffects),
       const AppCopy(emptyResponse: 'HIT SEND TO GET A RESPONSE'),
     ],
   );

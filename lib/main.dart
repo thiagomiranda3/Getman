@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/audio/theme_sound_service.dart';
 import 'package:getman/core/di/injection_container.dart' as di;
 import 'package:getman/core/navigation/app_router.dart';
 import 'package:getman/core/navigation/intents.dart';
@@ -8,6 +9,8 @@ import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/motion/theme_reaction_controller.dart';
+import 'package:getman/core/theme/motion/theme_switch_transition.dart';
 import 'package:getman/core/theme/theme_registry.dart';
 import 'package:getman/core/utils/workspace/workspace_bookmark.dart';
 import 'package:getman/features/chaining/presentation/bloc/rules_bloc.dart';
@@ -189,6 +192,12 @@ class MyApp extends StatelessWidget {
         RepositoryProvider<WorkspaceSyncService>.value(
           value: di.sl<WorkspaceSyncService>(),
         ),
+        RepositoryProvider<ThemeSoundService>.value(
+          value: di.sl<ThemeSoundService>(),
+        ),
+        ChangeNotifierProvider<ThemeReactionController>.value(
+          value: di.sl<ThemeReactionController>(),
+        ),
         ChangeNotifierProvider<UpdateController>.value(
           value: di.sl<UpdateController>(),
         ),
@@ -268,9 +277,18 @@ class MyApp extends StatelessWidget {
                       builder: (context, child) {
                         return Focus(
                           autofocus: true,
-                          child: context.appDecoration.scaffoldBackground(
-                            context,
-                            child: child ?? const SizedBox.shrink(),
+                          child: ThemeSwitchTransition(
+                            themeId: settings.themeId,
+                            reduceEffects: settings.reduceVisualEffects,
+                            child: context.appMotion.reactionOverlay(
+                              context,
+                              controller: context
+                                  .read<ThemeReactionController>(),
+                              child: context.appDecoration.scaffoldBackground(
+                                context,
+                                child: child ?? const SizedBox.shrink(),
+                              ),
+                            ),
                           ),
                         );
                       },

@@ -184,3 +184,10 @@ class SetSkippedUpdateVersion extends SettingsEvent {
   @override
   List<Object?> get props => [version];
 }
+
+class UpdateEnableThemeSounds extends SettingsEvent {
+  const UpdateEnableThemeSounds({required this.value});
+  final bool value;
+  @override
+  List<Object?> get props => [value];
+}

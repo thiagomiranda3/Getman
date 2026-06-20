@@ -4,9 +4,9 @@ import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 
 void main() {
   group('SettingsModel themeId', () {
-    test('fromEntity default themeId is brutalist', () {
+    test('fromEntity default themeId is classic', () {
       final model = SettingsModel.fromEntity(const SettingsEntity());
-      expect(model.themeId, 'brutalist');
+      expect(model.themeId, 'classic');
     });
 
     test('json roundtrip preserves themeId', () {

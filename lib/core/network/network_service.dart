@@ -103,7 +103,7 @@ class NetworkService {
       );
     } on DioException catch (e) {
       stopwatch.stop();
-      throw _mapDioException(e);
+      throw mapDioException(e);
     } catch (e) {
       stopwatch.stop();
       throw NetworkFailure(e.toString(), type: NetworkFailureType.unknown);
@@ -121,7 +121,8 @@ class NetworkService {
     }
   }
 
-  NetworkFailure _mapDioException(DioException e) {
+  @visibleForTesting
+  NetworkFailure mapDioException(DioException e) {
     switch (e.type) {
       case DioExceptionType.cancel:
         return const NetworkFailure(
@@ -129,10 +130,14 @@ class NetworkService {
           type: NetworkFailureType.cancelled,
         );
       case DioExceptionType.connectionTimeout:
+        return NetworkFailure(
+          e.message ?? 'Connection timed out',
+          type: NetworkFailureType.connectionTimeout,
+        );
       case DioExceptionType.connectionError:
         return NetworkFailure(
           e.message ?? 'Connection failed',
-          type: NetworkFailureType.connection,
+          type: NetworkFailureType.connectionError,
         );
       case DioExceptionType.sendTimeout:
         return NetworkFailure(

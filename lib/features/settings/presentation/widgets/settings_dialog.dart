@@ -108,25 +108,28 @@ class _SettingsDialogState extends State<SettingsDialog>
       builder: (context, state) {
         final settings = state.settings;
 
+        // Grayed separators that hug the tab strip top and bottom so the tabs
+        // read as one solid bar (the buttons fill the height between the two
+        // lines) rather than floating. `height` equals `thickness` so each
+        // Divider is just its 1px line with no extra vertical box around it.
+        final tabDivider = Divider(
+          height: 1,
+          thickness: 1,
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2),
+        );
+
         final tabbed = Column(
           children: [
-            // Grayed separator under the dialog title, with breathing room so
-            // the active tab's filled indicator clears the SETTINGS text.
+            // Breathing room under the SETTINGS title before the tab bar.
             SizedBox(height: layout.tabSpacing),
-            Divider(
-              height: 1,
-              thickness: 1,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.2),
-            ),
-            SizedBox(height: layout.tabSpacing),
+            tabDivider,
             BrandedTabBar(
               controller: _tabController,
               labels: _tabLabels,
               isScrollable: true,
               tabKeyPrefix: 'settingstab',
             ),
+            tabDivider,
             SizedBox(height: layout.tabSpacing),
             Expanded(
               child: TabBarView(
@@ -282,6 +285,15 @@ class _SettingsDialogState extends State<SettingsDialog>
         subtitle: 'Disables backdrop blur & animations for performance',
         value: settings.reduceVisualEffects,
         onChanged: (v) => bloc.add(UpdateReduceVisualEffects(value: v)),
+      ),
+      _switch(
+        context,
+        switchKey: const ValueKey('theme_sounds_switch'),
+        title: 'THEME SOUNDS',
+        icon: Icons.volume_up,
+        subtitle: 'Play themed sound effects on send & response',
+        value: settings.enableThemeSounds,
+        onChanged: (v) => bloc.add(UpdateEnableThemeSounds(value: v)),
       ),
     ]);
   }

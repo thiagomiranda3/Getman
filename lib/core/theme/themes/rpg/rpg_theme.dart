@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_decorations.dart';
+import 'package:getman/core/theme/themes/rpg/rpg_motion.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_palette.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_sparkle.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -374,6 +375,7 @@ ThemeData rpgTheme(
       shape,
       typography,
       decoration,
+      rpgMotion(reduceEffects: reduceEffects),
       const AppCopy(emptyResponse: 'CAST SEND TO SUMMON A RESPONSE'),
     ],
   );

@@ -28,7 +28,7 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       isVerticalLayout: fields[4] == null ? false : fields[4] as bool,
       splitRatio: fields[5] == null ? 0.5 : (fields[5] as num).toDouble(),
       sideMenuWidth: fields[6] == null ? 300.0 : (fields[6] as num).toDouble(),
-      themeId: fields[7] == null ? 'brutalist' : fields[7] as String,
+      themeId: fields[7] == null ? 'classic' : fields[7] as String,
       activeEnvironmentId: fields[8] as String?,
       connectTimeoutMs: fields[9] == null ? 30000 : (fields[9] as num).toInt(),
       sendTimeoutMs: fields[10] == null ? 30000 : (fields[10] as num).toInt(),
@@ -52,13 +52,14 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
           : fields[24] as bool,
       checkForUpdatesOnStartup: fields[25] == null ? true : fields[25] as bool,
       skippedUpdateVersion: fields[26] as String?,
+      enableThemeSounds: fields[27] == null ? false : fields[27] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, SettingsModel obj) {
     writer
-      ..writeByte(27)
+      ..writeByte(28)
       ..writeByte(0)
       ..write(obj.historyLimit)
       ..writeByte(1)
@@ -112,7 +113,9 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       ..writeByte(25)
       ..write(obj.checkForUpdatesOnStartup)
       ..writeByte(26)
-      ..write(obj.skippedUpdateVersion);
+      ..write(obj.skippedUpdateVersion)
+      ..writeByte(27)
+      ..write(obj.enableThemeSounds);
   }
 
   @override

@@ -113,33 +113,41 @@ class _RpgSparkleState extends State<RpgSparkle> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (details) {
+    // Press feedback (sparkle + scale) rides on a raw [Listener], NOT on the
+    // tap recognizer. Listener.onPointerDown fires on every press regardless of
+    // the gesture arena, so it still fires when an inner consumer (e.g. an
+    // IconButton's InkResponse) wins the tap on a quick click. Emitting the
+    // burst from GestureDetector.onTapDown used to drop it on fast taps: the
+    // outer tap recognizer lost the arena before its deferred onTapDown
+    // deadline, so the sparkle only showed on slow/held presses. The inner
+    // GestureDetector just carries the optional onTap.
+    return Listener(
+      onPointerDown: (event) {
         unawaited(_scaleController.forward());
-        if (widget.sparkle) _emitBurst(details.localPosition);
+        if (widget.sparkle) _emitBurst(event.localPosition);
       },
-      onTapUp: (_) {
-        unawaited(_scaleController.reverse());
-        widget.onTap?.call();
-      },
-      onTapCancel: () => _scaleController.reverse(),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          ScaleTransition(scale: _scaleAnim, child: widget.child),
-          for (final b in _bursts)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: AnimatedBuilder(
-                  animation: b.controller,
-                  builder: (_, _) => CustomPaint(
-                    painter: _SparklePainter(burst: b, t: b.controller.value),
+      onPointerUp: (_) => unawaited(_scaleController.reverse()),
+      onPointerCancel: (_) => unawaited(_scaleController.reverse()),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            ScaleTransition(scale: _scaleAnim, child: widget.child),
+            for (final b in _bursts)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: b.controller,
+                    builder: (_, _) => CustomPaint(
+                      painter: _SparklePainter(burst: b, t: b.controller.value),
+                    ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

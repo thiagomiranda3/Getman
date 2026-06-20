@@ -4,6 +4,7 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_decorations.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_fade.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_palette.dart';
+import 'package:getman/core/theme/themes/shared/calm_motion.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 ThemeData editorialTheme(
@@ -274,6 +275,7 @@ ThemeData editorialTheme(
       shape,
       typography,
       decoration,
+      calmMotion(reduceEffects: reduceEffects),
       const AppCopy(emptyResponse: 'Awaiting the first response'),
     ],
   );

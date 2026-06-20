@@ -15,7 +15,7 @@ class SettingsEntity extends Equatable {
     this.isVerticalLayout = false,
     this.splitRatio = 0.5,
     this.sideMenuWidth = 300.0,
-    this.themeId = kBrutalistThemeId,
+    this.themeId = kClassicThemeId,
     this.activeEnvironmentId,
     this.connectTimeoutMs = 30000,
     this.sendTimeoutMs = 30000,
@@ -33,6 +33,7 @@ class SettingsEntity extends Equatable {
     this.saveLargeResponsesInHistory = true,
     this.checkForUpdatesOnStartup = true,
     this.skippedUpdateVersion,
+    this.enableThemeSounds = false,
   });
   final int historyLimit;
   final bool saveResponseInHistory;
@@ -101,6 +102,10 @@ class SettingsEntity extends Equatable {
   /// `null` = nothing skipped.
   final String? skippedUpdateVersion;
 
+  /// When `true`, themes play sound effects on send and response events.
+  /// Default `false` = silent (opt-in).
+  final bool enableThemeSounds;
+
   SettingsEntity copyWith({
     int? historyLimit,
     bool? saveResponseInHistory,
@@ -129,6 +134,7 @@ class SettingsEntity extends Equatable {
     bool? saveLargeResponsesInHistory,
     bool? checkForUpdatesOnStartup,
     Object? skippedUpdateVersion = _unchanged,
+    bool? enableThemeSounds,
   }) {
     return SettingsEntity(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -178,6 +184,7 @@ class SettingsEntity extends Equatable {
       skippedUpdateVersion: identical(skippedUpdateVersion, _unchanged)
           ? this.skippedUpdateVersion
           : skippedUpdateVersion as String?,
+      enableThemeSounds: enableThemeSounds ?? this.enableThemeSounds,
     );
   }
 
@@ -224,5 +231,6 @@ class SettingsEntity extends Equatable {
     saveLargeResponsesInHistory,
     checkForUpdatesOnStartup,
     skippedUpdateVersion,
+    enableThemeSounds,
   ];
 }

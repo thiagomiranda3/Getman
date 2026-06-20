@@ -123,7 +123,14 @@ void main() {
 
     test('every theme defines a switchTheme (switch colors are no longer '
         'hardcoded at call sites)', () {
-      for (final id in ['brutalist', 'editorial', 'rpg', 'dracula', 'glass']) {
+      for (final id in [
+        'brutalist',
+        'editorial',
+        'rpg',
+        'dracula',
+        'glass',
+        'classic',
+      ]) {
         for (final b in [Brightness.light, Brightness.dark]) {
           final theme = resolveTheme(id)(b, isCompact: false);
           final sw = theme.switchTheme;
@@ -147,7 +154,13 @@ void main() {
       () {
         // brutalist/editorial/rpg/dracula must NOT define brandedTabIndicator —
         // BrandedTabBar falls back to its signature solid filled look for them.
-        for (final id in ['brutalist', 'editorial', 'rpg', 'dracula']) {
+        for (final id in [
+          'brutalist',
+          'editorial',
+          'rpg',
+          'dracula',
+          'classic',
+        ]) {
           final theme = resolveTheme(id)(Brightness.dark, isCompact: false);
           final deco = theme.extension<AppDecoration>();
           expect(

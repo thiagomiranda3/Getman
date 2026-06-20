@@ -18,7 +18,7 @@ class SettingsModel extends HiveObject {
     this.isVerticalLayout = false,
     this.splitRatio = 0.5,
     this.sideMenuWidth = 300.0,
-    this.themeId = kBrutalistThemeId,
+    this.themeId = kClassicThemeId,
     this.activeEnvironmentId,
     this.connectTimeoutMs = 30000,
     this.sendTimeoutMs = 30000,
@@ -36,6 +36,7 @@ class SettingsModel extends HiveObject {
     this.saveLargeResponsesInHistory = true,
     this.checkForUpdatesOnStartup = true,
     this.skippedUpdateVersion,
+    this.enableThemeSounds = false,
   });
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) => SettingsModel(
@@ -49,7 +50,7 @@ class SettingsModel extends HiveObject {
     isVerticalLayout: json['isVerticalLayout'] as bool? ?? false,
     splitRatio: (json['splitRatio'] as num?)?.toDouble() ?? 0.5,
     sideMenuWidth: (json['sideMenuWidth'] as num?)?.toDouble() ?? 300.0,
-    themeId: json['themeId'] as String? ?? kBrutalistThemeId,
+    themeId: json['themeId'] as String? ?? kClassicThemeId,
     activeEnvironmentId: json['activeEnvironmentId'] as String?,
     connectTimeoutMs: json['connectTimeoutMs'] as int? ?? 30000,
     sendTimeoutMs: json['sendTimeoutMs'] as int? ?? 30000,
@@ -68,6 +69,7 @@ class SettingsModel extends HiveObject {
         json['saveLargeResponsesInHistory'] as bool? ?? true,
     checkForUpdatesOnStartup: json['checkForUpdatesOnStartup'] as bool? ?? true,
     skippedUpdateVersion: json['skippedUpdateVersion'] as String?,
+    enableThemeSounds: json['enableThemeSounds'] as bool? ?? false,
   );
 
   factory SettingsModel.fromEntity(SettingsEntity entity) => SettingsModel(
@@ -98,6 +100,7 @@ class SettingsModel extends HiveObject {
     saveLargeResponsesInHistory: entity.saveLargeResponsesInHistory,
     checkForUpdatesOnStartup: entity.checkForUpdatesOnStartup,
     skippedUpdateVersion: entity.skippedUpdateVersion,
+    enableThemeSounds: entity.enableThemeSounds,
   );
   @HiveField(0, defaultValue: 100)
   int historyLimit;
@@ -120,7 +123,7 @@ class SettingsModel extends HiveObject {
   @HiveField(6, defaultValue: 300.0)
   double sideMenuWidth;
 
-  @HiveField(7, defaultValue: kBrutalistThemeId)
+  @HiveField(7, defaultValue: kClassicThemeId)
   String themeId;
 
   @HiveField(8)
@@ -180,6 +183,9 @@ class SettingsModel extends HiveObject {
   @HiveField(26)
   String? skippedUpdateVersion;
 
+  @HiveField(27, defaultValue: false)
+  bool enableThemeSounds;
+
   SettingsModel copyWith({
     int? historyLimit,
     bool? saveResponseInHistory,
@@ -208,6 +214,7 @@ class SettingsModel extends HiveObject {
     bool? saveLargeResponsesInHistory,
     bool? checkForUpdatesOnStartup,
     Object? skippedUpdateVersion = _unchanged,
+    bool? enableThemeSounds,
   }) {
     return SettingsModel(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -257,6 +264,7 @@ class SettingsModel extends HiveObject {
       skippedUpdateVersion: identical(skippedUpdateVersion, _unchanged)
           ? this.skippedUpdateVersion
           : skippedUpdateVersion as String?,
+      enableThemeSounds: enableThemeSounds ?? this.enableThemeSounds,
     );
   }
 
@@ -288,6 +296,7 @@ class SettingsModel extends HiveObject {
     'saveLargeResponsesInHistory': saveLargeResponsesInHistory,
     'checkForUpdatesOnStartup': checkForUpdatesOnStartup,
     'skippedUpdateVersion': skippedUpdateVersion,
+    'enableThemeSounds': enableThemeSounds,
   };
 
   SettingsEntity toEntity() => SettingsEntity(
@@ -318,5 +327,6 @@ class SettingsModel extends HiveObject {
     saveLargeResponsesInHistory: saveLargeResponsesInHistory,
     checkForUpdatesOnStartup: checkForUpdatesOnStartup,
     skippedUpdateVersion: skippedUpdateVersion,
+    enableThemeSounds: enableThemeSounds,
   );
 }

@@ -6,6 +6,7 @@
 export 'package:getman/core/theme/extensions/app_copy.dart';
 export 'package:getman/core/theme/extensions/app_decoration.dart';
 export 'package:getman/core/theme/extensions/app_layout.dart';
+export 'package:getman/core/theme/extensions/app_motion.dart';
 export 'package:getman/core/theme/extensions/app_palette.dart';
 export 'package:getman/core/theme/extensions/app_shape.dart';
 export 'package:getman/core/theme/extensions/app_theme_access.dart';

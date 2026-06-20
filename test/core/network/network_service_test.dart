@@ -1,4 +1,6 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/error/failures.dart';
 import 'package:getman/core/network/network_config.dart';
 import 'package:getman/core/network/network_service.dart';
 
@@ -46,5 +48,32 @@ void main() {
     expect(dio.options.receiveTimeout, const Duration(milliseconds: 7000));
     expect(dio.options.followRedirects, isFalse);
     expect(dio.options.maxRedirects, 1);
+  });
+
+  group('mapDioException — connection split', () {
+    final svc = NetworkService(dio: Dio());
+    DioException ex(DioExceptionType t) => DioException(
+      requestOptions: RequestOptions(path: '/'),
+      type: t,
+    );
+
+    test('connectionTimeout → NetworkFailureType.connectionTimeout', () {
+      expect(
+        svc.mapDioException(ex(DioExceptionType.connectionTimeout)).type,
+        NetworkFailureType.connectionTimeout,
+      );
+    });
+    test('connectionError → NetworkFailureType.connectionError', () {
+      expect(
+        svc.mapDioException(ex(DioExceptionType.connectionError)).type,
+        NetworkFailureType.connectionError,
+      );
+    });
+    test('sendTimeout → NetworkFailureType.sendTimeout', () {
+      expect(
+        svc.mapDioException(ex(DioExceptionType.sendTimeout)).type,
+        NetworkFailureType.sendTimeout,
+      );
+    });
   });
 }

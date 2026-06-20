@@ -1,4 +1,5 @@
 import 'package:get_it/get_it.dart';
+import 'package:getman/core/audio/theme_sound_service.dart';
 import 'package:getman/core/navigation/app_router.dart';
 import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/cookie_interceptor.dart';
@@ -7,6 +8,7 @@ import 'package:getman/core/network/in_memory_cookie_store.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/network/realtime_service.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
+import 'package:getman/core/theme/motion/theme_reaction_controller.dart';
 import 'package:getman/features/chaining/data/datasources/request_rules_local_data_source.dart';
 import 'package:getman/features/chaining/data/models/assertion_model.dart';
 import 'package:getman/features/chaining/data/models/extraction_rule_model.dart';
@@ -250,7 +252,9 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     )
     ..registerLazySingleton(() => UpdateController(sl<UpdateRepository>()))
     // Lets the Cmd/Ctrl+L shortcut focus the active tab's URL field.
-    ..registerLazySingleton(UrlFocusRegistry.new);
+    ..registerLazySingleton(UrlFocusRegistry.new)
+    ..registerLazySingleton(ThemeReactionController.new)
+    ..registerLazySingleton<ThemeSoundService>(createThemeSoundService);
 
   // Core. The cookie box is already open (parallel wait above); hydrate the jar
   // before the network service can be used so the first send sees stored

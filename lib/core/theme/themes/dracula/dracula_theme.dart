@@ -4,6 +4,7 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/themes/dracula/dracula_decorations.dart';
 import 'package:getman/core/theme/themes/dracula/dracula_palette.dart';
 import 'package:getman/core/theme/themes/dracula/dracula_press.dart';
+import 'package:getman/core/theme/themes/shared/calm_motion.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// Dracula theme — the popular VS Code palette. Dark uses "Dracula Classic";
@@ -306,6 +307,7 @@ ThemeData draculaTheme(
       shape,
       typography,
       decoration,
+      calmMotion(reduceEffects: reduceEffects),
       const AppCopy(emptyResponse: 'SEND A REQUEST TO SEE THE RESPONSE'),
     ],
   );
