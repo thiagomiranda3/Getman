@@ -150,7 +150,7 @@ void main() {
         cancelHandle: any(named: 'cancelHandle'),
       ),
     ).thenThrow(
-      const NetworkFailure('boom', type: NetworkFailureType.connection),
+      const NetworkFailure('boom', type: NetworkFailureType.connectionError),
     );
 
     await expectLater(
@@ -177,7 +177,7 @@ void main() {
       ).thenThrow(
         const NetworkFailure(
           'boom',
-          type: NetworkFailureType.connection,
+          type: NetworkFailureType.connectionError,
           statusCode: 500,
         ),
       );

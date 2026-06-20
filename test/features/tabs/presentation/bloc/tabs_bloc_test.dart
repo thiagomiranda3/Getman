@@ -592,7 +592,7 @@ void main() {
         stubSend(
           () async => throw const NetworkFailure(
             'connection refused',
-            type: NetworkFailureType.connection,
+            type: NetworkFailureType.connectionError,
           ),
         );
 
@@ -728,7 +728,7 @@ void main() {
       stubSend(
         () async => throw const NetworkFailure(
           'refused',
-          type: NetworkFailureType.connection,
+          type: NetworkFailureType.connectionError,
         ),
       );
 
@@ -1112,7 +1112,7 @@ void main() {
         stubSend(
           () async => throw const NetworkFailure(
             'connection refused',
-            type: NetworkFailureType.connection,
+            type: NetworkFailureType.connectionError,
             // statusCode intentionally null — connection-level failure
           ),
         );

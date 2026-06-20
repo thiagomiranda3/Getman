@@ -13,7 +13,8 @@ class PersistenceFailure extends Failure {
 }
 
 enum NetworkFailureType {
-  connection,
+  connectionTimeout,
+  connectionError,
   sendTimeout,
   receiveTimeout,
   cancelled,
