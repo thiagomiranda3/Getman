@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:getman/core/theme/extensions/app_components.dart';
 import 'package:getman/core/theme/extensions/app_copy.dart';
 import 'package:getman/core/theme/extensions/app_decoration.dart';
 import 'package:getman/core/theme/extensions/app_layout.dart';
@@ -15,4 +16,5 @@ extension AppThemeAccess on BuildContext {
   AppDecoration get appDecoration => Theme.of(this).extension<AppDecoration>()!;
   AppCopy get appCopy => Theme.of(this).extension<AppCopy>()!;
   AppMotion get appMotion => Theme.of(this).extension<AppMotion>()!;
+  AppComponents get appComponents => Theme.of(this).extension<AppComponents>()!;
 }
