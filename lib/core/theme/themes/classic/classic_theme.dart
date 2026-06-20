@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/extensions/app_components_defaults.dart';
 import 'package:getman/core/theme/themes/classic/classic_decorations.dart';
 import 'package:getman/core/theme/themes/classic/classic_palette.dart';
 import 'package:getman/core/theme/themes/classic/classic_press.dart';
@@ -280,6 +281,7 @@ ThemeData classicTheme(
       decoration,
       calmMotion(reduceEffects: reduceEffects),
       const AppCopy(emptyResponse: 'No response yet.'),
+      defaultAppComponents(),
     ],
   );
 }

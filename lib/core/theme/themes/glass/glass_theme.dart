@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/extensions/app_components_defaults.dart';
 import 'package:getman/core/theme/themes/glass/glass_decorations.dart';
 import 'package:getman/core/theme/themes/glass/glass_motion.dart';
 import 'package:getman/core/theme/themes/glass/glass_palette.dart';
@@ -294,6 +295,7 @@ ThemeData glassTheme(
       effectiveDecoration,
       glassMotion(reduceEffects: reduceEffects),
       const AppCopy(emptyResponse: 'SEND A REQUEST TO SEE THE RESPONSE'),
+      defaultAppComponents(),
     ],
   );
 }

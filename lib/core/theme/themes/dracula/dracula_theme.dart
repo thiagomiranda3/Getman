@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/extensions/app_components_defaults.dart';
 import 'package:getman/core/theme/themes/dracula/dracula_decorations.dart';
 import 'package:getman/core/theme/themes/dracula/dracula_palette.dart';
 import 'package:getman/core/theme/themes/dracula/dracula_press.dart';
@@ -309,6 +310,7 @@ ThemeData draculaTheme(
       decoration,
       calmMotion(reduceEffects: reduceEffects),
       const AppCopy(emptyResponse: 'SEND A REQUEST TO SEE THE RESPONSE'),
+      defaultAppComponents(),
     ],
   );
 }

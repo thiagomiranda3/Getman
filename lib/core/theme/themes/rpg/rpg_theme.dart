@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/extensions/app_components_defaults.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_decorations.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_motion.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_palette.dart';
@@ -377,6 +378,7 @@ ThemeData rpgTheme(
       decoration,
       rpgMotion(reduceEffects: reduceEffects),
       const AppCopy(emptyResponse: 'CAST SEND TO SUMMON A RESPONSE'),
+      defaultAppComponents(),
     ],
   );
 }
