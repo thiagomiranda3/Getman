@@ -564,6 +564,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         ThemeReaction(
           kind: ThemeReaction.kindForStatus(errorResponse.statusCode),
           statusCode: errorResponse.statusCode,
+          transportFailure: _transportFailureFor(f.type),
         ),
       );
       // Assertions are meaningful on error responses too
@@ -856,3 +857,19 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     await _persistPanelMeta();
   }
 }
+
+/// Maps a transport-level [NetworkFailureType] to the theme-layer
+/// [TransportFailureKind]. Returns null for failures that carry (or imply) a
+/// real HTTP status / generic reach failure — those keep the plain
+/// networkError flavor. The motion spine never imports core/error, so this
+/// mapping lives here, at the integration point.
+TransportFailureKind? _transportFailureFor(NetworkFailureType t) => switch (t) {
+  NetworkFailureType.sendTimeout ||
+  NetworkFailureType.receiveTimeout ||
+  NetworkFailureType.connectionTimeout => TransportFailureKind.timeout,
+  NetworkFailureType.badCertificate => TransportFailureKind.badCertificate,
+  NetworkFailureType.connectionError ||
+  NetworkFailureType.badResponse ||
+  NetworkFailureType.cancelled ||
+  NetworkFailureType.unknown => null,
+};

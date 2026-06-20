@@ -1127,7 +1127,61 @@ void main() {
         expect(reaction.kind, ThemeReactionKind.networkError);
         // bloc maps null statusCode → errorResponse.statusCode = 0
         expect(reaction.statusCode, 0);
+        expect(reaction.transportFailure, isNull);
         expect(bloc.state.reactionSeq, baseSeq + 2);
+      },
+    );
+
+    test(
+      'receiveTimeout NetworkFailure → transportFailure timeout',
+      () async {
+        await loadWith([tab('a')]);
+        final baseSeq = bloc.state.reactionSeq;
+
+        stubSend(
+          () async => throw const NetworkFailure(
+            'receive timeout',
+            type: NetworkFailureType.receiveTimeout,
+          ),
+        );
+
+        bloc.add(const SendRequest(tabId: 'a'));
+        await expectLater(
+          bloc.stream,
+          emitsThrough(predicate<TabsState>((s) => !s.tabs.single.isSending)),
+        );
+
+        final reaction = bloc.state.lastReaction!;
+        expect(reaction.kind, ThemeReactionKind.networkError);
+        expect(reaction.transportFailure, TransportFailureKind.timeout);
+        expect(bloc.state.reactionSeq, baseSeq + 2);
+      },
+    );
+
+    test(
+      'badCertificate NetworkFailure → transportFailure badCertificate',
+      () async {
+        await loadWith([tab('a')]);
+
+        stubSend(
+          () async => throw const NetworkFailure(
+            'bad cert',
+            type: NetworkFailureType.badCertificate,
+          ),
+        );
+
+        bloc.add(const SendRequest(tabId: 'a'));
+        await expectLater(
+          bloc.stream,
+          emitsThrough(predicate<TabsState>((s) => !s.tabs.single.isSending)),
+        );
+
+        final reaction = bloc.state.lastReaction!;
+        expect(reaction.kind, ThemeReactionKind.networkError);
+        expect(
+          reaction.transportFailure,
+          TransportFailureKind.badCertificate,
+        );
       },
     );
 
