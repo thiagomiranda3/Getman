@@ -59,6 +59,32 @@ void main() {
     expect(controller.text, '{{host}}');
   });
 
+  testWidgets('style parameter is forwarded to the inner TextField', (
+    tester,
+  ) async {
+    const testStyle = TextStyle(fontSize: 21, fontWeight: FontWeight.w900);
+    final controller = VariableHighlightController();
+    final focus = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focus.dispose);
+
+    await tester.pumpWidget(
+      _host(
+        VariableTextField(
+          variables: ctx,
+          controller: controller,
+          focusNode: focus,
+          onChanged: (_) {},
+          style: testStyle,
+        ),
+      ),
+    );
+
+    final tf = tester.widget<TextField>(find.byType(TextField));
+    expect(tf.style?.fontSize, 21);
+    expect(tf.style?.fontWeight, FontWeight.w900);
+  });
+
   testWidgets('empty context renders a plain field with no overlay', (
     tester,
   ) async {

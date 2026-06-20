@@ -323,6 +323,7 @@ class _KeyValueRowState extends State<_KeyValueRow> {
             focusNode: _valueFocusNode,
             onChanged: widget.onValChanged,
             decoration: valueDecoration,
+            style: textStyle,
           );
 
     final secretButton = widget.showSecretToggle

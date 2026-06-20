@@ -18,6 +18,7 @@ class VariableTextField extends StatefulWidget {
     required this.focusNode,
     required this.onChanged,
     this.decoration,
+    this.style,
     this.obscureText = false,
     this.fieldKey,
     super.key,
@@ -28,6 +29,7 @@ class VariableTextField extends StatefulWidget {
   final FocusNode focusNode;
   final ValueChanged<String> onChanged;
   final InputDecoration? decoration;
+  final TextStyle? style;
   final bool obscureText;
   final Key? fieldKey;
 
@@ -69,6 +71,7 @@ class _VariableTextFieldState extends State<VariableTextField> {
       controller: widget.controller,
       focusNode: widget.focusNode,
       decoration: widget.decoration,
+      style: widget.style,
       obscureText: widget.obscureText,
       autocorrect: false,
       enableSuggestions: false,
