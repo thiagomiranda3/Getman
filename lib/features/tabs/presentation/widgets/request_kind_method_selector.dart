@@ -84,16 +84,27 @@ class RequestKindMethodSelector extends StatelessWidget {
                 ),
                 selectedItemBuilder: (context) {
                   return HttpMethods.all
-                      .map((m) => Center(child: MethodBadge(method: m)))
+                      .map(
+                        (m) => SizedBox(
+                          width: isNarrow ? 64 : (layout.isCompact ? 80 : 100),
+                          child: Center(child: MethodBadge(method: m)),
+                        ),
+                      )
                       .toList();
                 },
                 items: HttpMethods.all
                     .map(
                       (m) => DropdownMenuItem(
                         value: m,
+                        // FittedBox(scaleDown): badges like DELETE + Brutalist
+                        // padding exceed the SizedBox, causing a RenderFlex
+                        // overflow. ScaleDown fits without clipping the badge.
                         child: SizedBox(
                           width: isNarrow ? 64 : (layout.isCompact ? 80 : 100),
-                          child: Center(child: MethodBadge(method: m)),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: MethodBadge(method: m),
+                          ),
                         ),
                       ),
                     )

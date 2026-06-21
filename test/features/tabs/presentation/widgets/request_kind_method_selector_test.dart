@@ -163,12 +163,8 @@ void main() {
 
     // Select POST.
     await tester.tap(find.text('POST').last);
-    // Consume a known Flutter DropdownButton dismiss-animation overflow that
-    // occurs in the DISPOSED element after onChanged fires and the overlay
-    // closes. This is a layout timing artifact, not a real app bug.
     await tester.pump(const Duration(milliseconds: 16));
-    // Flutter DropdownButton dismiss-animation layout artifact — ignore.
-    tester.takeException();
+    expect(tester.takeException(), isNull);
     await tester.pumpAndSettle();
 
     expect(bloc.state.tabs.byId('t3')!.config.method, 'POST');
