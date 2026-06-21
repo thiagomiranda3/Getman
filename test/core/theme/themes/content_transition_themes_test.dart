@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/theme/extensions/app_motion.dart';
+import 'package:getman/core/theme/theme_ids.dart';
+import 'package:getman/core/theme/theme_registry.dart';
 import 'package:getman/core/theme/themes/auris/auris_motion.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_motion.dart';
 import 'package:getman/core/theme/themes/glass/glass_motion.dart';
@@ -15,8 +17,13 @@ const _kTransitionOverlayKey = ValueKey<String>('content_transition_overlay');
 int _overlayCount(WidgetTester tester) =>
     tester.widgetList(find.byKey(_kTransitionOverlayKey)).length;
 
-Future<void> _swap(WidgetTester tester, AppMotion motion) async {
+Future<void> _swap(
+  WidgetTester tester,
+  AppMotion motion, {
+  ThemeData? theme,
+}) async {
   Widget build(String key) => MaterialApp(
+    theme: theme,
     home: Builder(
       builder: (context) => Scaffold(
         body: motion.contentTransition(
@@ -76,19 +83,24 @@ Future<void> _swap(WidgetTester tester, AppMotion motion) async {
 }
 
 void main() {
-  for (final entry in {
-    'glass': glassMotion,
-    'rpg': rpgMotion,
-    'brutalist': brutalistMotion,
-    'auris': aurisMotion,
-  }.entries) {
-    testWidgets(
-      '${entry.key} content transition plays + keeps child',
-      (t) async {
-        await _swap(t, entry.value(reduceEffects: false));
-      },
-    );
-  }
+  testWidgets('glass content transition plays + keeps child', (t) async {
+    await _swap(t, glassMotion(reduceEffects: false));
+  });
+
+  testWidgets('rpg content transition plays + keeps child', (t) async {
+    await _swap(t, rpgMotion(reduceEffects: false));
+  });
+
+  testWidgets('brutalist content transition plays + keeps child', (t) async {
+    await _swap(t, brutalistMotion(reduceEffects: false));
+  });
+
+  testWidgets('auris content transition plays + keeps child', (t) async {
+    // Pumped under the real AURIS ThemeData so AurisScheme is present and the
+    // HUD-wipe code path is exercised — not the identity bail-out branch.
+    final aurisTheme = appThemes[kAurisThemeId]!.builder(Brightness.dark);
+    await _swap(t, aurisMotion(reduceEffects: false), theme: aurisTheme);
+  });
 
   testWidgets('reduceEffects content transition is identity', (tester) async {
     const marker = SizedBox(key: ValueKey('m'));

@@ -35,8 +35,9 @@ AppMotion aurisMotion({required bool reduceEffects}) {
 }
 
 /// HUD-wipe content transition: a vertical scan-line wipes left→right
-/// like a radar sweep updating its display (~350 ms). Falls back to identity
-/// when AurisScheme is absent.
+/// like a radar sweep updating its display (~350 ms). Bails to identity
+/// (returns child unwrapped) when [AurisScheme] is absent — exactly like
+/// [_AurisInFlightFrame], so tests and other themes see no overlay.
 class _AurisContentTransition extends StatefulWidget {
   const _AurisContentTransition({
     required this.transitionKey,
@@ -75,11 +76,11 @@ class _AurisContentTransitionState extends State<_AurisContentTransition>
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).extension<AurisScheme>();
-    // Fallback to primaryColor when AurisScheme is absent (tests / other themes)
-    // rather than bailing to identity — the transition must still play.
-    final primary = Theme.of(context).primaryColor;
-    final scanColor = scheme?.primaryActive ?? primary;
-    final trailColor = scheme?.primaryDim ?? primary;
+    // Bail to identity when the AurisScheme extension is absent — no overlay
+    // is better than non-HUD fallback pixels (Finding 1 / B2 review).
+    if (scheme == null) return widget.child;
+    final scanColor = scheme.primaryActive;
+    final trailColor = scheme.primaryDim;
 
     return AnimatedBuilder(
       animation: _c,

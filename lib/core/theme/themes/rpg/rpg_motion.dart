@@ -122,15 +122,54 @@ class _RpgContentTransitionState extends State<_RpgContentTransition>
   }
 }
 
+/// Per-mote layout data precomputed once in the painter constructor.
+class _MoteLayout {
+  const _MoteLayout({
+    required this.xFraction,
+    required this.bandOffsetFraction,
+    required this.alphaFactor,
+    required this.radius,
+  });
+
+  /// Horizontal position as a fraction of canvas width.
+  final double xFraction;
+
+  /// Vertical offset above the sweep leading edge, as a fraction of band
+  /// height.
+  final double bandOffsetFraction;
+
+  /// Per-mote alpha multiplier in [0.5, 1.0].
+  final double alphaFactor;
+
+  /// Circle radius in logical pixels.
+  final double radius;
+}
+
 /// Parchment-scroll unfurl: a golden shimmer band sweeps downward, trailing
-/// sparkle motes. Reuses Paint objects; no per-frame allocation.
+/// sparkle motes. Reuses Paint objects; mote layout is precomputed once —
+/// no [math.Random] / [Paint] / [Path] construction inside [paint].
 class _RpgScrollUnfurlPainter extends CustomPainter {
-  _RpgScrollUnfurlPainter({required this.t});
+  _RpgScrollUnfurlPainter({required this.t}) : _motes = _buildMotes();
   final double t;
 
   // Hoisted Paint objects — reused across frames.
   final Paint _bandPaint = Paint();
   final Paint _motePaint = Paint();
+
+  /// 12 motes precomputed once with a fixed seed — stable layout across frames.
+  final List<_MoteLayout> _motes;
+
+  static List<_MoteLayout> _buildMotes() {
+    final rng = math.Random(42);
+    return List.generate(12, (i) {
+      return _MoteLayout(
+        xFraction: i / 12 + rng.nextDouble() * 0.08,
+        bandOffsetFraction: rng.nextDouble() * 0.5,
+        alphaFactor: 0.5 + 0.5 * rng.nextDouble(),
+        radius: 1.5 + rng.nextDouble() * 1.5,
+      );
+    });
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -151,14 +190,13 @@ class _RpgScrollUnfurlPainter extends CustomPainter {
     ).createShader(bandRect);
     canvas.drawRect(bandRect, _bandPaint);
 
-    // Sparkle motes along the leading edge.
-    final rng = math.Random(t.hashCode); // stable per t-bucket
-    for (var i = 0; i < 12; i++) {
-      final x = (i / 12 + rng.nextDouble() * 0.08) * size.width;
-      final y = sweepY - rng.nextDouble() * bandH * 0.5;
-      final a = fade * (0.5 + 0.5 * rng.nextDouble());
+    // Sparkle motes along the leading edge — positions from precomputed list.
+    for (final m in _motes) {
+      final x = m.xFraction * size.width;
+      final y = sweepY - m.bandOffsetFraction * bandH;
+      final a = fade * m.alphaFactor;
       _motePaint.color = RpgPalette.gold.withValues(alpha: a);
-      canvas.drawCircle(Offset(x, y), 1.5 + rng.nextDouble() * 1.5, _motePaint);
+      canvas.drawCircle(Offset(x, y), m.radius, _motePaint);
     }
   }
 
