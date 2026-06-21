@@ -105,6 +105,32 @@ theme's identity:
   `assets/sounds/<themeId>/{send,success,error}.mp3`. Provide cues that match
   the theme's voice (or accept the shared/quiet default). Off by default.
   **See §11 for the per-theme sound method.**
+- [ ] **In-flight frame** — does the panel area react while sending?
+  (`AppMotion.inFlightFrame` wraps the request+response pane; receives
+  `isSending` for the displayed tab.) Loud themes render a themed border or glow
+  while in-flight; calm themes leave it at identity.
+- [ ] **Transitions** — tab/panel content swap and tab-chip entrance?
+  (`AppMotion.contentTransition` keyed on `"$activePanelId/$activeTabId"`, and
+  `AppMotion.tabChipTransition` as an `AnimatedSwitcher`-style builder). Loud
+  themes add a wipe, dissolve, or morph; calm themes identity-pass.
+- [ ] **Tree juice** — drag feedback, drop-absorb highlight, expand flourish?
+  (`AppMotion.treeDragFeedback`, `.treeDropHighlight`, `.treeExpandFlourish`).
+  These three hooks decorate the collections tree without touching TreeView
+  internals. Loud themes add visual drag handles, hover glows, and a brief icon
+  flourish on expand/collapse; calm themes identity-pass.
+- [ ] **Interactive ambient (C1)** — cursor force + click ripple behind the app?
+  Implemented in the theme's `scaffoldBackground` via `AmbientSignals`
+  (`lib/core/theme/motion/ambient_signals.dart`): `signals.pointer` is a
+  normalized `Offset` listenable; `signals.impulses` carries transient
+  `AmbientImpulse` ripple seeds. Pass `null` in the static (`reduceEffects`)
+  path so nothing subscribes or repaints. Loud themes only.
+- [ ] **Session rhythm (C2)** — idle dim + send-burst?
+  Also part of `AmbientSignals.pulse` (a `WorkspacePulseController`,
+  `lib/core/theme/motion/workspace_pulse_controller.dart`): `pulse.activityLevel`
+  (0→1, spikes on each send, decays over ~6 s) and `pulse.idleFactor` (0→1,
+  rises after ~30 s of inactivity) let the ambient background breathe with the
+  user's work pattern. Merge `signals.pulse` into the painter's `repaint:` so
+  it repaints on each bump/tick. Loud themes only.
 - [ ] **`reduceVisualEffects`** — define the degraded form of every item above
   (see §5). This is not optional.
 - [ ] **Flash safety** — any repeating flash/blink respects
@@ -161,6 +187,17 @@ Ambient backgrounds live in the theme's `scaffoldBackground`
 for full effects and a static one for `reduceEffects` (see `rpg_decorations.dart`
 `rpgScaffoldBackground` vs `rpgStaticScaffoldBackground`, and `glass`'s
 `GlassWallpaper(animate: …)`).
+
+> **All loud themes now ship an animated ambient** — as of the motion-expansion
+> work (Tasks B1–C2), Brutalist and AURIS joined Arcane Quest and Liquid Glass
+> with a live `scaffoldBackground`. If you add a new loud theme, authoring an
+> ambient is **expected, not optional**. Brutalist's ambient is a halftone-dot
+> field (`brutalist_decorations.dart`); AURIS's is the HUD-grid wallpaper
+> (`auris_decorations.dart`). Both degrade to a static variant under
+> `reduceEffects`. The `AmbientSignals` bundle (C1/C2) is passed into the
+> animated variant so the background reacts to pointer movement, click ripples,
+> and session rhythm; the static variant receives `null` and subscribes to
+> nothing.
 
 ---
 
