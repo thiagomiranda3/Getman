@@ -1,6 +1,7 @@
 // lib/core/theme/themes/rpg/rpg_motion.dart
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show PathMetric;
 
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/extensions/app_motion.dart';
@@ -130,43 +131,70 @@ class _RpgCircuitTracePainter extends CustomPainter {
   _RpgCircuitTracePainter({required this.phase});
   final double phase;
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Two concentric rectangles: outer gold trace, inner arcane dim.
+  // Hoisted Paint objects — reused across frames, color/strokeWidth mutated.
+  final Paint _outerPaint = Paint()..style = PaintingStyle.stroke;
+  final Paint _innerPaint = Paint()..style = PaintingStyle.stroke;
+
+  // Per-rect path metrics cache — rebuilt only when Size changes.
+  Size? _lastSize;
+  List<PathMetric>? _outerMetrics;
+  List<PathMetric>? _innerMetrics;
+
+  void _rebuildPaths(Size size) {
+    final outerPath = Path()
+      ..addRect(
+        Rect.fromLTWH(1.5, 1.5, size.width - 3, size.height - 3),
+      );
+    final innerPath = Path()
+      ..addRect(
+        Rect.fromLTWH(4, 4, size.width - 8, size.height - 8),
+      );
+    _outerMetrics = outerPath.computeMetrics().toList();
+    _innerMetrics = innerPath.computeMetrics().toList();
+    _lastSize = size;
+  }
+
+  void _drawDashed(
+    Canvas canvas,
+    List<PathMetric> metrics,
+    Paint paint,
+    double offset,
+  ) {
     const dashLen = 12.0;
     const gapLen = 8.0;
     const pitch = dashLen + gapLen;
-    final perimeter = 2 * (size.width + size.height);
+    for (final m in metrics) {
+      var pos = offset % pitch;
+      while (pos < m.length) {
+        final end = (pos + dashLen).clamp(0.0, m.length);
+        canvas.drawPath(m.extractPath(pos, end), paint);
+        pos += pitch;
+      }
+    }
+  }
 
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Rebuild path metrics only when size changes.
+    if (size != _lastSize) _rebuildPaths(size);
+    final outerMetrics = _outerMetrics;
+    final innerMetrics = _innerMetrics;
+    if (outerMetrics == null || innerMetrics == null) return;
+
+    // Two concentric rectangles: outer gold trace, inner arcane dim.
+    final perimeter = 2 * (size.width + size.height);
     // Advance offset so the dash pattern travels counter-clockwise.
     final offset = phase * perimeter;
 
-    void drawTracedRect(double inset, Color color, double strokeWidth) {
-      final rect = Rect.fromLTWH(
-        inset,
-        inset,
-        size.width - inset * 2,
-        size.height - inset * 2,
-      );
-      final path = Path()..addRect(rect);
-      final paint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth
-        ..color = color;
-      // Use path metrics to clip to dash pattern with animated offset.
-      final metrics = path.computeMetrics().toList();
-      for (final m in metrics) {
-        var pos = offset % pitch;
-        while (pos < m.length) {
-          final end = (pos + dashLen).clamp(0.0, m.length);
-          canvas.drawPath(m.extractPath(pos, end), paint);
-          pos += pitch;
-        }
-      }
-    }
+    _outerPaint
+      ..strokeWidth = 1.8
+      ..color = RpgPalette.gold.withValues(alpha: 0.7);
+    _drawDashed(canvas, outerMetrics, _outerPaint, offset);
 
-    drawTracedRect(1.5, RpgPalette.gold.withValues(alpha: 0.7), 1.8);
-    drawTracedRect(4, RpgPalette.arcane.withValues(alpha: 0.35), 1);
+    _innerPaint
+      ..strokeWidth = 1.0
+      ..color = RpgPalette.arcane.withValues(alpha: 0.35);
+    _drawDashed(canvas, innerMetrics, _innerPaint, offset);
   }
 
   @override

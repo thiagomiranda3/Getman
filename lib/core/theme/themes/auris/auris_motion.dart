@@ -1,6 +1,7 @@
 // lib/core/theme/themes/auris/auris_motion.dart
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show PathMetric;
 
 import 'package:auris/auris_widgets.dart';
 import 'package:flutter/material.dart';
@@ -79,8 +80,11 @@ class _AurisInFlightFrameState extends State<_AurisInFlightFrame>
   Widget build(BuildContext context) {
     if (!widget.isSending) return widget.child;
     final scheme = Theme.of(context).extension<AurisScheme>();
-    final scanColor = scheme?.primaryActive ?? Colors.amber;
-    final dimColor = scheme?.primaryDim ?? Colors.amber.withValues(alpha: 0.4);
+    // Bail to identity when the AurisScheme extension is absent — no overlay
+    // is better than amber fallback pixels (Finding 1 / B1 review).
+    if (scheme == null) return widget.child;
+    final scanColor = scheme.primaryActive;
+    final dimColor = scheme.primaryDim;
     // Child hoisted out of per-frame rebuilds.
     return AnimatedBuilder(
       animation: _c,
@@ -118,36 +122,52 @@ class _AurisFrameScanPainter extends CustomPainter {
   final Color scanColor;
   final Color dimColor;
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Always-on dim border.
-    final dimPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0
-      ..color = dimColor.withValues(alpha: 0.25);
-    canvas.drawRect(
-      Rect.fromLTWH(0.5, 0.5, size.width - 1, size.height - 1),
-      dimPaint,
-    );
+  // Hoisted Paint objects — reused across frames, color mutated as needed.
+  final Paint _dimPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.0;
+  final Paint _tailPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.5;
+  final Paint _headPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2.5;
 
-    // Scanline: a short bright segment travelling the perimeter.
-    final perimeter = 2 * (size.width + size.height);
-    const segLen = 60.0; // length of the bright scan segment
+  // Perimeter path + metrics cache — rebuilt only when Size changes.
+  Size? _lastSize;
+  PathMetric? _metric;
 
-    // Position of the leading edge along the perimeter.
-    final lead = phase * perimeter;
-
-    // Build the perimeter path (clockwise from top-left).
+  void _rebuildPath(Size size) {
     final perimPath = Path()
       ..moveTo(0, 0)
       ..lineTo(size.width, 0)
       ..lineTo(size.width, size.height)
       ..lineTo(0, size.height)
       ..close();
-
     final metrics = perimPath.computeMetrics().toList();
-    if (metrics.isEmpty) return;
-    final m = metrics.first;
+    _metric = metrics.isNotEmpty ? metrics.first : null;
+    _lastSize = size;
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Rebuild path only when size changes.
+    if (size != _lastSize) _rebuildPath(size);
+    final m = _metric;
+    if (m == null) return;
+
+    // Always-on dim border.
+    _dimPaint.color = dimColor.withValues(alpha: 0.25);
+    canvas.drawRect(
+      Rect.fromLTWH(0.5, 0.5, size.width - 1, size.height - 1),
+      _dimPaint,
+    );
+
+    // Scanline: a short bright segment travelling the perimeter.
+    const segLen = 60.0; // length of the bright scan segment
+
+    // Position of the leading edge along the perimeter.
+    final lead = phase * m.length;
 
     // Extract the segment with a tail glow (slightly longer, dimmer).
     final tailStart = (lead - segLen * 1.5).clamp(0.0, m.length);
@@ -155,19 +175,13 @@ class _AurisFrameScanPainter extends CustomPainter {
     final headStart = (lead - segLen).clamp(0.0, m.length);
 
     if (tailEnd > tailStart) {
-      final tailPaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5
-        ..color = scanColor.withValues(alpha: 0.25);
-      canvas.drawPath(m.extractPath(tailStart, tailEnd), tailPaint);
+      _tailPaint.color = scanColor.withValues(alpha: 0.25);
+      canvas.drawPath(m.extractPath(tailStart, tailEnd), _tailPaint);
     }
 
     if (tailEnd > headStart) {
-      final headPaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
-        ..color = scanColor.withValues(alpha: 0.8);
-      canvas.drawPath(m.extractPath(headStart, tailEnd), headPaint);
+      _headPaint.color = scanColor.withValues(alpha: 0.8);
+      canvas.drawPath(m.extractPath(headStart, tailEnd), _headPaint);
     }
 
     // Handle wrap-around (when lead is near the end of perimeter).
@@ -176,11 +190,8 @@ class _AurisFrameScanPainter extends CustomPainter {
       final wrapEnd = overflow.clamp(0.0, m.length);
       final wrapHeadStart = (overflow - segLen).clamp(0.0, m.length);
       if (wrapEnd > 0) {
-        final headPaint = Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.5
-          ..color = scanColor.withValues(alpha: 0.8);
-        canvas.drawPath(m.extractPath(wrapHeadStart, wrapEnd), headPaint);
+        _headPaint.color = scanColor.withValues(alpha: 0.8);
+        canvas.drawPath(m.extractPath(wrapHeadStart, wrapEnd), _headPaint);
       }
     }
   }
