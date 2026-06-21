@@ -345,6 +345,12 @@ class _AurisHudPainter extends CustomPainter {
     ..strokeWidth = 1;
   final Paint _sweepPaint = Paint();
   final Paint _tickPaint = Paint();
+  // Dedicated paint for the bright leading radar spoke — owns its own
+  // strokeWidth so the grid paint is never mutated-and-restored between frames
+  // (a future paint pass inserted between would bleed the wrong strokeWidth).
+  final Paint _spokePaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.5;
 
   // Gridline Path cache — built once, reused across frames; rebuilt only when
   // Size changes. NEVER rebuilt per frame (the drift is applied via a canvas
@@ -462,7 +468,9 @@ class _AurisHudPainter extends CustomPainter {
       ).createShader(Rect.fromCircle(center: center, radius: radius));
     canvas.drawRect(rect, _sweepPaint);
 
-    // Bright leading spoke of the sweep.
+    // Bright leading spoke of the sweep — uses its own _spokePaint so
+    // _gridPaint.strokeWidth is never mutated (a future paint pass inserted
+    // between would bleed the wrong strokeWidth).
     final spokeEnd = Offset(
       center.dx + math.cos(angle) * radius,
       center.dy + math.sin(angle) * radius,
@@ -470,12 +478,8 @@ class _AurisHudPainter extends CustomPainter {
     canvas.drawLine(
       center,
       spokeEnd,
-      _gridPaint
-        ..color = palette.sweep.withValues(alpha: spokeAlpha)
-        ..strokeWidth = 1.5,
+      _spokePaint..color = palette.sweep.withValues(alpha: spokeAlpha),
     );
-    // Restore the grid stroke width for the next frame's grid pass.
-    _gridPaint.strokeWidth = 1;
 
     // Drifting telemetry ticks: small crosshair marks that bob slowly and fade
     // in/out so the HUD feels alive without strobing.
