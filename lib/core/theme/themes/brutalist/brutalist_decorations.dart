@@ -55,8 +55,3 @@ BoxDecoration brutalistTabShape(
     ),
   );
 }
-
-Widget brutalistScaffoldBackground(
-  BuildContext context, {
-  required Widget child,
-}) => child;
