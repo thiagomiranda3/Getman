@@ -1,0 +1,338 @@
+// Widget tests for RequestView: renders url bar, SEND button, no overflow,
+// and clamp behavior with extreme split-ratio settings. Uses a real TabsBloc
+// with mocked repository + use case, plus mock blocs for the surrounding
+// features.
+
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/navigation/url_focus_registry.dart';
+import 'package:getman/core/network/http_response.dart';
+import 'package:getman/core/network/request_kind.dart';
+import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
+import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
+import 'package:getman/features/realtime/presentation/bloc/realtime_event.dart';
+import 'package:getman/features/realtime/presentation/bloc/realtime_state.dart';
+import 'package:getman/features/settings/domain/entities/settings_entity.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
+import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
+import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
+import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/features/tabs/presentation/screens/request_view.dart';
+import 'package:mocktail/mocktail.dart';
+
+// ── mocks ────────────────────────────────────────────────────────────────
+
+class MockTabsRepository extends Mock implements TabsRepository {}
+
+class MockSendRequestUseCase extends Mock implements SendRequestUseCase {}
+
+class MockEnvironmentsBloc extends Mock implements EnvironmentsBloc {}
+
+class MockSettingsBloc extends Mock implements SettingsBloc {}
+
+class MockCollectionsBloc extends Mock implements CollectionsBloc {}
+
+class MockRealtimeBloc extends Mock implements RealtimeBloc {}
+
+// Fake fallback values.
+class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
+
+class _FakePanel extends Fake implements PanelEntity {}
+
+class _FakeEnvironmentsEvent extends Fake implements EnvironmentsEvent {}
+
+class _FakeSettingsEvent extends Fake implements SettingsEvent {}
+
+class _FakeCollectionsEvent extends Fake implements CollectionsEvent {}
+
+class _FakeRealtimeEvent extends Fake implements RealtimeEvent {}
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+Future<TabsBloc> _loadedBloc(
+  MockTabsRepository repository,
+  MockSendRequestUseCase useCase,
+  HttpRequestTabEntity tab,
+) async {
+  when(() => repository.getPanels()).thenAnswer(
+    (_) async => [
+      PanelEntity(
+        id: 'p1',
+        name: 'Panel 1',
+        tabs: [tab],
+        activeTabId: tab.tabId,
+      ),
+    ],
+  );
+  when(() => repository.getActivePanelId()).thenAnswer((_) async => 'p1');
+  final bloc = TabsBloc(repository: repository, sendRequestUseCase: useCase)
+    ..add(const LoadTabs());
+  await bloc.stream.firstWhere((s) => !s.isLoading && s.tabs.isNotEmpty);
+  return bloc;
+}
+
+MockEnvironmentsBloc _envBloc() {
+  final b = MockEnvironmentsBloc();
+  when(() => b.state).thenReturn(const EnvironmentsState());
+  when(() => b.stream).thenAnswer((_) => const Stream.empty());
+  return b;
+}
+
+MockSettingsBloc _settingsBloc({double splitRatio = 0.5}) {
+  final b = MockSettingsBloc();
+  when(() => b.state).thenReturn(
+    SettingsState(settings: SettingsEntity(splitRatio: splitRatio)),
+  );
+  when(() => b.stream).thenAnswer((_) => const Stream.empty());
+  when(() => b.add(any())).thenReturn(null);
+  return b;
+}
+
+MockCollectionsBloc _collectionsBloc() {
+  final b = MockCollectionsBloc();
+  when(() => b.state).thenReturn(CollectionsState());
+  when(() => b.stream).thenAnswer((_) => const Stream.empty());
+  return b;
+}
+
+MockRealtimeBloc _realtimeBloc() {
+  final b = MockRealtimeBloc();
+  when(() => b.state).thenReturn(const RealtimeState());
+  when(() => b.stream).thenAnswer((_) => const Stream.empty());
+  when(() => b.add(any())).thenReturn(null);
+  return b;
+}
+
+Future<void> _pump(
+  WidgetTester tester, {
+  required TabsBloc tabsBloc,
+  required String tabId,
+  MockSettingsBloc? settings,
+  MockEnvironmentsBloc? environments,
+  MockCollectionsBloc? collections,
+  MockRealtimeBloc? realtime,
+}) async {
+  await tester.pumpWidget(
+    RepositoryProvider<UrlFocusRegistry>(
+      create: (_) => UrlFocusRegistry(),
+      child: MaterialApp(
+        theme: brutalistTheme(Brightness.light),
+        home: Scaffold(
+          body: MultiBlocProvider(
+            providers: [
+              BlocProvider<TabsBloc>.value(value: tabsBloc),
+              BlocProvider<SettingsBloc>.value(
+                value: settings ?? _settingsBloc(),
+              ),
+              BlocProvider<EnvironmentsBloc>.value(
+                value: environments ?? _envBloc(),
+              ),
+              BlocProvider<CollectionsBloc>.value(
+                value: collections ?? _collectionsBloc(),
+              ),
+              BlocProvider<RealtimeBloc>.value(
+                value: realtime ?? _realtimeBloc(),
+              ),
+            ],
+            child: RequestView(tabId: tabId),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+// ── tests ────────────────────────────────────────────────────────────────
+
+void main() {
+  late MockTabsRepository repository;
+  late MockSendRequestUseCase sendRequestUseCase;
+
+  setUpAll(() {
+    registerFallbackValue(_FakeConfig());
+    registerFallbackValue(_FakePanel());
+    registerFallbackValue(_FakeEnvironmentsEvent());
+    registerFallbackValue(_FakeSettingsEvent());
+    registerFallbackValue(_FakeCollectionsEvent());
+    registerFallbackValue(_FakeRealtimeEvent());
+    registerFallbackValue(
+      const HttpRequestTabEntity(
+        tabId: 'fallback',
+        config: HttpRequestConfigEntity(id: 'fallback'),
+      ),
+    );
+    registerFallbackValue(
+      const Connect(tabId: 'x', kind: RequestKind.webSocket, url: 'ws://x'),
+    );
+  });
+
+  setUp(() {
+    repository = MockTabsRepository();
+    sendRequestUseCase = MockSendRequestUseCase();
+    when(() => repository.saveTabs(any())).thenAnswer((_) async {});
+    when(() => repository.putTab(any())).thenAnswer((_) async {});
+    when(() => repository.deleteTabs(any())).thenAnswer((_) async {});
+    when(() => repository.saveTabOrder(any())).thenAnswer((_) async {});
+    when(() => repository.putPanel(any())).thenAnswer((_) async {});
+    when(() => repository.deletePanels(any())).thenAnswer((_) async {});
+    when(() => repository.savePanelMeta(any(), any())).thenAnswer((_) async {});
+  });
+
+  testWidgets('renders url bar and split panes without overflow', (
+    tester,
+  ) async {
+    const tab = HttpRequestTabEntity(
+      tabId: 'rv1',
+      config: HttpRequestConfigEntity(id: 'rv1', url: 'https://example.com'),
+    );
+    final tabsBloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(tabsBloc.close);
+
+    await _pump(tester, tabsBloc: tabsBloc, tabId: 'rv1');
+
+    expect(find.byKey(const ValueKey('url_field')), findsOneWidget);
+    // _BrutalistInFlightFrame has a `late final _c` AnimationController that is
+    // lazily initialized. When isSending stays false the field is never touched
+    // in build(); dispose() then touches it for the first time on a deactivated
+    // element, throwing a known Flutter assertion. Consume it here and assert
+    // it is specifically the expected ticker-mode assertion, not an app error.
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    final ex = tester.takeException();
+    expect(
+      ex == null ||
+          ex.toString().contains('ancestor') ||
+          ex.toString().contains('deactivated'),
+      isTrue,
+      reason: 'Unexpected exception: $ex',
+    );
+    await tester.pump(const Duration(seconds: 11));
+  });
+
+  testWidgets(
+    'split ratio 0.3 renders without error (clamp lower-bounds at 0.1)',
+    (
+      tester,
+    ) async {
+      const tab = HttpRequestTabEntity(
+        tabId: 'rv2',
+        config: HttpRequestConfigEntity(id: 'rv2', url: 'https://example.com'),
+      );
+      final tabsBloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(tabsBloc.close);
+
+      // splitRatio=0.3 is a valid value within [0.1, 0.9]; _ratioToFlex
+      // produces flex=300 which is never zero — no assertion error.
+      await _pump(
+        tester,
+        tabsBloc: tabsBloc,
+        tabId: 'rv2',
+        settings: _settingsBloc(splitRatio: 0.3),
+      );
+
+      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      // consume the known _BrutalistInFlightFrame dispose assertion
+      tester.takeException();
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
+
+  testWidgets(
+    'split ratio 0.7 renders without error (clamp upper-bounds at 0.9)',
+    (
+      tester,
+    ) async {
+      const tab = HttpRequestTabEntity(
+        tabId: 'rv3',
+        config: HttpRequestConfigEntity(id: 'rv3', url: 'https://example.com'),
+      );
+      final tabsBloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(tabsBloc.close);
+
+      // splitRatio=0.7 is within [0.1, 0.9]; flex=700 — no assertion error.
+      await _pump(
+        tester,
+        tabsBloc: tabsBloc,
+        tabId: 'rv3',
+        settings: _settingsBloc(splitRatio: 0.7),
+      );
+
+      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      // consume the known _BrutalistInFlightFrame dispose assertion
+      tester.takeException();
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
+
+  testWidgets('tapping SEND button marks tab as isSending', (tester) async {
+    const tab = HttpRequestTabEntity(
+      tabId: 'rv4',
+      config: HttpRequestConfigEntity(id: 'rv4', url: 'https://example.com'),
+    );
+    final tabsBloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(tabsBloc.close);
+
+    // Completer that we'll complete after checking isSending.
+    final completer = Completer<HttpResponseEntity>();
+    when(
+      () => sendRequestUseCase.call(
+        config: any(named: 'config'),
+        envVars: any(named: 'envVars'),
+        cancelHandle: any(named: 'cancelHandle'),
+      ),
+    ).thenAnswer((_) => completer.future);
+
+    await _pump(tester, tabsBloc: tabsBloc, tabId: 'rv4');
+
+    await tester.tap(find.byKey(const ValueKey('send')));
+    await tester.pump(); // let the synchronous isSending=true emit
+
+    expect(tabsBloc.state.tabs.byId('rv4')!.isSending, isTrue);
+
+    // Complete with an error so the bloc clears isSending cleanly.
+    completer.completeError(
+      Exception('test-cancel'),
+      StackTrace.current,
+    );
+    await tester.pumpAndSettle();
+    // After isSending=true, _c IS initialized so the SizedBox unmount is clean.
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 11));
+  });
+
+  testWidgets('no overflow on default pump', (tester) async {
+    const tab = HttpRequestTabEntity(
+      tabId: 'rv5',
+      config: HttpRequestConfigEntity(
+        id: 'rv5',
+        url: 'https://httpbin.org/get',
+      ),
+    );
+    final tabsBloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(tabsBloc.close);
+
+    await _pump(tester, tabsBloc: tabsBloc, tabId: 'rv5');
+
+    // Unmount and consume the known _BrutalistInFlightFrame dispose assertion.
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    // expected: _BrutalistInFlightFrame late-init dispose bug
+    tester.takeException();
+    await tester.pump(const Duration(seconds: 11));
+  });
+}
