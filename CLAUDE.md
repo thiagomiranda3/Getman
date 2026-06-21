@@ -249,6 +249,7 @@ fvm dart format lib test tools                                # formatter — th
 fvm flutter test                                              # all tests must be green
 dart run build_runner build --delete-conflicting-outputs      # after any @HiveType change (hive_ce_generator)
 fvm flutter run -d macos                                      # desktop run; supported targets in pubspec
+bash tool/coverage.sh                                         # unit/widget coverage report (coverage/html/index.html)
 ```
 
 Verification bar (the `.githooks/pre-commit` hook runs the first four automatically — enable once per clone with `git config core.hooksPath .githooks`): **all of `fvm flutter analyze`, `fvm dart run custom_lint`, and `fvm dart run bloc_tools:bloc lint lib` report no issues, the tree is `dart format`-clean, AND `fvm flutter test` is 100% green** before reporting work done. The three analysis passes are independent — a clean `flutter analyze` does NOT imply custom_lint/bloc_lint are clean (they run as separate processes).
