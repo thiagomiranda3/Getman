@@ -15,12 +15,26 @@ class BrandedTabBar extends StatelessWidget implements PreferredSizeWidget {
     this.padding,
     this.labelPadding,
     this.tabKeyPrefix,
+    this.topIndicatorBorder = true,
+    this.tabAlignment,
   });
   final List<String> labels;
   final TabController? controller;
   final bool isScrollable;
   final EdgeInsetsGeometry? padding;
   final EdgeInsetsGeometry? labelPadding;
+
+  /// When false, the selected-tab indicator drops its top border. Used by the
+  /// Settings tab strip, which already frames the tabs with a divider above and
+  /// below, so a tab top border would double up against the upper divider.
+  final bool topIndicatorBorder;
+
+  /// Overrides the scrollable tab strip's alignment. Null keeps Material's
+  /// default (`TabAlignment.startOffset` when scrollable — a ~52px leading
+  /// offset that pushes the tabs right). The Settings strip passes
+  /// [TabAlignment.center] so its tabs sit centered with equal space on both
+  /// sides. Only meaningful with [isScrollable] true.
+  final TabAlignment? tabAlignment;
 
   /// When set, each [Tab] gets a stable `ValueKey('<prefix>_tab_<label>')` so
   /// E2E tests can target a specific tab even when labels collide across panels
@@ -40,14 +54,19 @@ class BrandedTabBar extends StatelessWidget implements PreferredSizeWidget {
     // translucent gradient lozenge); everyone else keeps the signature solid
     // filled look with a thick top/left/right border.
     final indicator =
-        context.appDecoration.brandedTabIndicator?.call(context) ??
+        context.appDecoration.brandedTabIndicator?.call(
+          context,
+          topBorder: topIndicatorBorder,
+        ) ??
         BoxDecoration(
           color: theme.primaryColor,
           border: Border(
-            top: BorderSide(
-              color: theme.dividerColor,
-              width: layout.borderThick,
-            ),
+            top: topIndicatorBorder
+                ? BorderSide(
+                    color: theme.dividerColor,
+                    width: layout.borderThick,
+                  )
+                : BorderSide.none,
             left: BorderSide(
               color: theme.dividerColor,
               width: layout.borderThick,
@@ -63,6 +82,7 @@ class BrandedTabBar extends StatelessWidget implements PreferredSizeWidget {
       controller: controller,
       dividerColor: Colors.transparent,
       isScrollable: isScrollable,
+      tabAlignment: tabAlignment,
       padding: padding,
       labelPadding: labelPadding,
       indicator: indicator,

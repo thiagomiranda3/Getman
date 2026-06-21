@@ -1,6 +1,7 @@
 // lib/core/theme/themes/rpg/rpg_motion.dart
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show PathMetric;
 
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/extensions/app_motion.dart';
@@ -53,7 +54,334 @@ AppMotion rpgMotion({required bool reduceEffects}) {
         _RpgReactionOverlay(controller: controller, child: child),
     sendAffordance: (context, {required child, required isSending}) =>
         _RpgSendAffordance(isSending: isSending, child: child),
+    inFlightFrame: (context, {required child, required isSending}) =>
+        _RpgInFlightFrame(isSending: isSending, child: child),
+    contentTransition: (context, {required child, required transitionKey}) =>
+        _RpgContentTransition(transitionKey: transitionKey, child: child),
+    tabChipTransition: (context, {required child, required animation}) =>
+        _rpgChipEntrance(animation, child),
+    treeDragFeedback: (context, {required child}) =>
+        _RpgTreeDragFeedback(child: child),
+    treeDropHighlight: (context, {required child, required active}) =>
+        _RpgTreeDropHighlight(active: active, child: child),
+    treeExpandFlourish: (context, {required child, required expanded}) =>
+        _RpgTreeExpandFlourish(expanded: expanded, child: child),
   );
+}
+
+/// Arcane chip entrance: unfurl (scaleX 0→1, left-aligned) + fade — like a
+/// scroll unrolling from the left edge.
+///
+/// Uses [Transform] (not [SizeTransition]) so the chip claims its full layout
+/// width immediately and the strip never reflows during the entrance.  Only
+/// the *painting* is horizontally scaled, anchored to the left edge.
+Widget _rpgChipEntrance(Animation<double> animation, Widget child) {
+  final curved = CurvedAnimation(
+    parent: animation,
+    curve: Curves.easeOutCubic,
+  );
+  return AnimatedBuilder(
+    animation: curved,
+    child: child, // hoisted — child is not rebuilt per frame
+    builder: (context, child) {
+      final scale = curved.value.clamp(0.0, 1.0);
+      return FadeTransition(
+        opacity: curved,
+        child: Transform(
+          transform: Matrix4.diagonal3Values(scale, 1, 1),
+          alignment: Alignment.centerLeft,
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+/// Scroll-unfurl content transition: a golden shimmer band sweeps top-to-bottom
+/// as if unfurling a parchment scroll (~400 ms).
+class _RpgContentTransition extends StatefulWidget {
+  const _RpgContentTransition({
+    required this.transitionKey,
+    required this.child,
+  });
+
+  final String transitionKey;
+  final Widget child;
+
+  @override
+  State<_RpgContentTransition> createState() => _RpgContentTransitionState();
+}
+
+class _RpgContentTransitionState extends State<_RpgContentTransition>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 400),
+  );
+
+  @override
+  void didUpdateWidget(_RpgContentTransition old) {
+    super.didUpdateWidget(old);
+    if (old.transitionKey != widget.transitionKey) {
+      unawaited(_c.forward(from: 0));
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child, // hoisted — entire tab content NOT rebuilt per frame
+      builder: (ctx, child) {
+        if (_c.value == 0 || _c.value == 1) return child!;
+        return Stack(
+          children: [
+            child!,
+            Positioned.fill(
+              key: const ValueKey<String>('content_transition_overlay'),
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _RpgScrollUnfurlPainter(t: _c.value),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Per-mote layout data precomputed once in the painter constructor.
+class _MoteLayout {
+  const _MoteLayout({
+    required this.xFraction,
+    required this.bandOffsetFraction,
+    required this.alphaFactor,
+    required this.radius,
+  });
+
+  /// Horizontal position as a fraction of canvas width.
+  final double xFraction;
+
+  /// Vertical offset above the sweep leading edge, as a fraction of band
+  /// height.
+  final double bandOffsetFraction;
+
+  /// Per-mote alpha multiplier in [0.5, 1.0].
+  final double alphaFactor;
+
+  /// Circle radius in logical pixels.
+  final double radius;
+}
+
+/// Parchment-scroll unfurl: a golden shimmer band sweeps downward, trailing
+/// sparkle motes. Reuses Paint objects; mote layout is precomputed once —
+/// no [math.Random] / [Paint] / [Path] construction inside [paint].
+class _RpgScrollUnfurlPainter extends CustomPainter {
+  _RpgScrollUnfurlPainter({required this.t}) : _motes = _buildMotes();
+  final double t;
+
+  // Hoisted Paint objects — reused across frames.
+  final Paint _bandPaint = Paint();
+  final Paint _motePaint = Paint();
+
+  /// 12 motes precomputed once with a fixed seed — stable layout across frames.
+  final List<_MoteLayout> _motes;
+
+  static List<_MoteLayout> _buildMotes() {
+    final rng = math.Random(42);
+    return List.generate(12, (i) {
+      return _MoteLayout(
+        xFraction: i / 12 + rng.nextDouble() * 0.08,
+        bandOffsetFraction: rng.nextDouble() * 0.5,
+        alphaFactor: 0.5 + 0.5 * rng.nextDouble(),
+        radius: 1.5 + rng.nextDouble() * 1.5,
+      );
+    });
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Sweep band: travels top→bottom over full duration.
+    final sweepY = Curves.easeInOut.transform(t) * size.height;
+    final bandH = size.height * 0.35;
+    final fade = (t < 0.6 ? 1.0 : (1.0 - (t - 0.6) / 0.4)).clamp(0.0, 1.0);
+
+    final bandRect = Rect.fromLTWH(0, sweepY - bandH, size.width, bandH);
+    _bandPaint.shader = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        const Color(0x00000000),
+        RpgPalette.gold.withValues(alpha: 0.18 * fade),
+        RpgPalette.gold.withValues(alpha: 0.08 * fade),
+      ],
+    ).createShader(bandRect);
+    canvas.drawRect(bandRect, _bandPaint);
+
+    // Sparkle motes along the leading edge — positions from precomputed list.
+    for (final m in _motes) {
+      final x = m.xFraction * size.width;
+      final y = sweepY - m.bandOffsetFraction * bandH;
+      final a = fade * m.alphaFactor;
+      _motePaint.color = RpgPalette.gold.withValues(alpha: a);
+      canvas.drawCircle(Offset(x, y), m.radius, _motePaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RpgScrollUnfurlPainter old) => old.t != t;
+}
+
+/// Runic circuit-trace frame: an animated dash-offset stroke that travels the
+/// border while [isSending].  Period ~2.4 s — continuous motion, not a strobe.
+class _RpgInFlightFrame extends StatefulWidget {
+  const _RpgInFlightFrame({required this.isSending, required this.child});
+  final bool isSending;
+  final Widget child;
+
+  @override
+  State<_RpgInFlightFrame> createState() => _RpgInFlightFrameState();
+}
+
+class _RpgInFlightFrameState extends State<_RpgInFlightFrame>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400), // circuit trace period
+    );
+    if (widget.isSending) unawaited(_c.repeat());
+  }
+
+  @override
+  void didUpdateWidget(_RpgInFlightFrame old) {
+    super.didUpdateWidget(old);
+    // Edge-detect on old.isSending (THEME_AUTHORING §3 restart guard).
+    if (widget.isSending && !old.isSending) {
+      unawaited(_c.repeat());
+    } else if (!widget.isSending && old.isSending) {
+      _c
+        ..stop()
+        ..value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.isSending) return widget.child;
+    // Child hoisted out of per-frame rebuilds.
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child,
+      builder: (context, child) => Stack(
+        children: [
+          child!,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _RpgCircuitTracePainter(phase: _c.value),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Draws a dashed border whose dash-offset advances with [phase] (0→1 loop),
+/// producing the "circuit trace travelling the frame" effect.
+class _RpgCircuitTracePainter extends CustomPainter {
+  _RpgCircuitTracePainter({required this.phase});
+  final double phase;
+
+  // Hoisted Paint objects — reused across frames, color/strokeWidth mutated.
+  final Paint _outerPaint = Paint()..style = PaintingStyle.stroke;
+  final Paint _innerPaint = Paint()..style = PaintingStyle.stroke;
+
+  // Per-rect path metrics cache — rebuilt only when Size changes.
+  Size? _lastSize;
+  List<PathMetric>? _outerMetrics;
+  List<PathMetric>? _innerMetrics;
+
+  void _rebuildPaths(Size size) {
+    final outerPath = Path()
+      ..addRect(
+        Rect.fromLTWH(1.5, 1.5, size.width - 3, size.height - 3),
+      );
+    final innerPath = Path()
+      ..addRect(
+        Rect.fromLTWH(4, 4, size.width - 8, size.height - 8),
+      );
+    _outerMetrics = outerPath.computeMetrics().toList();
+    _innerMetrics = innerPath.computeMetrics().toList();
+    _lastSize = size;
+  }
+
+  void _drawDashed(
+    Canvas canvas,
+    List<PathMetric> metrics,
+    Paint paint,
+    double offset,
+  ) {
+    const dashLen = 12.0;
+    const gapLen = 8.0;
+    const pitch = dashLen + gapLen;
+    for (final m in metrics) {
+      var pos = offset % pitch;
+      while (pos < m.length) {
+        final end = (pos + dashLen).clamp(0.0, m.length);
+        canvas.drawPath(m.extractPath(pos, end), paint);
+        pos += pitch;
+      }
+    }
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Rebuild path metrics only when size changes.
+    if (size != _lastSize) _rebuildPaths(size);
+    final outerMetrics = _outerMetrics;
+    final innerMetrics = _innerMetrics;
+    if (outerMetrics == null || innerMetrics == null) return;
+
+    // Two concentric rectangles: outer gold trace, inner arcane dim.
+    final perimeter = 2 * (size.width + size.height);
+    // Advance offset so the dash pattern travels counter-clockwise.
+    final offset = phase * perimeter;
+
+    _outerPaint
+      ..strokeWidth = 1.8
+      ..color = RpgPalette.gold.withValues(alpha: 0.7);
+    _drawDashed(canvas, outerMetrics, _outerPaint, offset);
+
+    _innerPaint
+      ..strokeWidth = 1.0
+      ..color = RpgPalette.arcane.withValues(alpha: 0.35);
+    _drawDashed(canvas, innerMetrics, _innerPaint, offset);
+  }
+
+  @override
+  bool shouldRepaint(covariant _RpgCircuitTracePainter old) =>
+      old.phase != phase;
 }
 
 class _RpgReactionOverlay extends StatefulWidget {
@@ -377,19 +705,25 @@ class _RpgSendAffordance extends StatefulWidget {
 
 class _RpgSendAffordanceState extends State<_RpgSendAffordance>
     with TickerProviderStateMixin {
-  late final AnimationController _spin = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1600),
-  );
-
-  late final AnimationController _build = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: kTensionFullMs),
-  );
+  // Eagerly initialized in initState — NOT a lazy `late final = …` field.
+  // build() returns the child early when not sending, so a lazy controller
+  // would stay uninitialized and dispose()'s `.dispose()` would force the
+  // initializer to run inside dispose (illegal TickerMode ancestor lookup on a
+  // deactivated element). See send_affordance_dispose_test.
+  late final AnimationController _spin;
+  late final AnimationController _build;
 
   @override
   void initState() {
     super.initState();
+    _spin = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    );
+    _build = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: kTensionFullMs),
+    );
     if (widget.isSending) {
       unawaited(_spin.repeat());
       unawaited(_build.forward(from: 0));
@@ -490,4 +824,166 @@ class _RuneRingPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _RuneRingPainter old) =>
       old.t != t || old.fill != fill;
+}
+
+// ---------------------------------------------------------------------------
+// VM-B3: Tree drag/drop/expand juice — Arcane Quest (RPG)
+// ---------------------------------------------------------------------------
+
+/// Rune-glow chip shown under the cursor while dragging a tree node.
+class _RpgTreeDragFeedback extends StatelessWidget {
+  const _RpgTreeDragFeedback({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: RpgPalette.gold.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: RpgPalette.gold.withValues(alpha: 0.7),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: RpgPalette.gold.withValues(alpha: 0.25),
+              blurRadius: 8,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// Gold glow-pull border around drop targets while [active].
+class _RpgTreeDropHighlight extends StatefulWidget {
+  const _RpgTreeDropHighlight({
+    required this.active,
+    required this.child,
+  });
+  final bool active;
+  final Widget child;
+
+  @override
+  State<_RpgTreeDropHighlight> createState() => _RpgTreeDropHighlightState();
+}
+
+class _RpgTreeDropHighlightState extends State<_RpgTreeDropHighlight>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 350),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.active) _c.value = 1.0;
+  }
+
+  @override
+  void didUpdateWidget(_RpgTreeDropHighlight old) {
+    super.didUpdateWidget(old);
+    if (widget.active && !old.active) {
+      unawaited(_c.forward(from: 0));
+    } else if (!widget.active && old.active) {
+      unawaited(_c.reverse());
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.active && _c.value == 0) return widget.child;
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child, // hoisted — not rebuilt per frame
+      builder: (ctx, child) {
+        if (_c.value == 0) return child!;
+        return Stack(
+          children: [
+            child!, // child first — receives taps/drops
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: RpgPalette.gold.withValues(alpha: 0.8 * _c.value),
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: RpgPalette.gold.withValues(
+                          alpha: 0.3 * _c.value,
+                        ),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Gold glow flourish around the expand icon on expand/collapse.
+class _RpgTreeExpandFlourish extends StatelessWidget {
+  const _RpgTreeExpandFlourish({
+    required this.expanded,
+    required this.child,
+  });
+  final bool expanded;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(expanded),
+      tween: Tween(begin: 0, end: expanded ? 1.0 : 0.0),
+      duration: const Duration(milliseconds: 200),
+      builder: (ctx, v, ch) {
+        if (v <= 0) return ch!;
+        return Stack(
+          children: [
+            ch!, // child first — receives taps
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: RpgPalette.gold.withValues(alpha: 0.6 * v),
+                        blurRadius: 8 * v,
+                        spreadRadius: 2 * v,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+      child: child,
+    );
+  }
 }

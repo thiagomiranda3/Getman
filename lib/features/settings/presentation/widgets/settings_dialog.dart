@@ -128,6 +128,12 @@ class _SettingsDialogState extends State<SettingsDialog>
               labels: _tabLabels,
               isScrollable: true,
               tabKeyPrefix: 'settingstab',
+              // The tab strip is already framed by a divider above and below; a
+              // tab top border would double up against the upper divider.
+              topIndicatorBorder: false,
+              // Center the tabs with equal space on both sides instead of the
+              // scrollable default's leading offset (which pushes them right).
+              tabAlignment: TabAlignment.center,
             ),
             tabDivider,
             SizedBox(height: layout.tabSpacing),
@@ -593,10 +599,9 @@ class _SettingsDialogState extends State<SettingsDialog>
     Key? switchKey,
   }) {
     final layout = context.appLayout;
-    return SwitchListTile(
-      key: switchKey,
+    return ListTile(
       contentPadding: EdgeInsets.symmetric(horizontal: layout.inputPadding),
-      secondary: icon == null ? null : Icon(icon, size: layout.iconSize),
+      leading: icon == null ? null : Icon(icon, size: layout.iconSize),
       title: Text(
         title,
         style: TextStyle(
@@ -607,8 +612,15 @@ class _SettingsDialogState extends State<SettingsDialog>
       subtitle: subtitle == null
           ? null
           : Text(subtitle, style: TextStyle(fontSize: layout.fontSizeSmall)),
-      value: value,
-      onChanged: onChanged,
+      trailing: KeyedSubtree(
+        key: switchKey,
+        child: context.appComponents.toggle(
+          context,
+          value: value,
+          onChanged: onChanged,
+        ),
+      ),
+      onTap: () => onChanged(!value),
     );
   }
 }

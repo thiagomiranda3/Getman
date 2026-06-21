@@ -732,6 +732,7 @@ void main() {
 
       // ---- First launch: build a rich panel state -------------------------
       var settings = await di.init(storageDirectoryOverride: dir.path);
+      await disableStartupUpdateCheck();
       await $.pumpWidgetAndSettle(MyApp(initialSettings: settings));
       await resizeWindow($, kE2eWindowSize);
 
@@ -791,6 +792,7 @@ void main() {
 
       // ---- Second launch: same Hive dir → state restored ------------------
       settings = await di.init(storageDirectoryOverride: dir.path);
+      await disableStartupUpdateCheck();
       await $.pumpWidgetAndSettle(MyApp(initialSettings: settings));
       await resizeWindow($, kE2eWindowSize);
 

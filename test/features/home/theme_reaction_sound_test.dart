@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/audio/theme_sound_service.dart';
 import 'package:getman/core/theme/motion/theme_reaction.dart';
 import 'package:getman/core/theme/motion/theme_reaction_controller.dart';
+import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
 import 'package:getman/features/home/presentation/widgets/theme_reaction_listener.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
@@ -38,6 +39,7 @@ void main() {
   testWidgets('plays sound only when enabled', (tester) async {
     final tabs = _FakeTabsBloc();
     final controller = ThemeReactionController();
+    final pulse = WorkspacePulseController();
     final sound = _RecordingSound();
 
     Future<void> pumpWith({required bool enabled}) async {
@@ -54,6 +56,9 @@ void main() {
             providers: [
               ChangeNotifierProvider<ThemeReactionController>.value(
                 value: controller,
+              ),
+              ChangeNotifierProvider<WorkspacePulseController>.value(
+                value: pulse,
               ),
               RepositoryProvider<ThemeSoundService>.value(value: sound),
             ],
@@ -93,5 +98,6 @@ void main() {
 
     await tabs.close();
     controller.dispose();
+    pulse.dispose();
   });
 }

@@ -65,10 +65,14 @@ class AppDecoration extends ThemeExtension<AppDecoration> {
   final FrostWrapper frost;
 
   /// Optional override for `BrandedTabBar`'s selected-tab indicator. When null
-  /// (every theme except Liquid Glass) BrandedTabBar keeps its signature solid
-  /// filled look. Glass supplies a translucent gradient-frosted lozenge so the
-  /// active tab reads as glass rather than a flat accent billboard.
-  final Decoration Function(BuildContext context)? brandedTabIndicator;
+  /// (e.g. Classic / Brutalist) BrandedTabBar keeps its signature solid filled
+  /// look. Glass supplies a translucent gradient-frosted lozenge, and AURIS a
+  /// light-filled tab (its `primaryColor` defaults dark, which would leave the
+  /// label unreadable). The `topBorder` argument is honored by the override so
+  /// the Settings tab strip — which frames the tabs with its own dividers — can
+  /// drop the top edge (see `BrandedTabBar.topIndicatorBorder`).
+  final Decoration Function(BuildContext context, {bool topBorder})?
+  brandedTabIndicator;
 
   @override
   AppDecoration copyWith({
@@ -77,7 +81,8 @@ class AppDecoration extends ThemeExtension<AppDecoration> {
     InteractiveWrapper? wrapInteractive,
     ScaffoldBackgroundWrapper? scaffoldBackground,
     FrostWrapper? frost,
-    Decoration Function(BuildContext context)? brandedTabIndicator,
+    Decoration Function(BuildContext context, {bool topBorder})?
+    brandedTabIndicator,
   }) {
     return AppDecoration(
       panelBox: panelBox ?? this.panelBox,

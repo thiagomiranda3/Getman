@@ -558,16 +558,18 @@ class _MainScreenState extends State<MainScreen> {
                         ),
                         itemBuilder: (context, index) {
                           final tab = tabs[index];
-                          return TabWidget(
+                          return _ChipEntrance(
                             key: ValueKey('tab_${tab.tabId}'),
-                            tabId: tab.tabId,
-                            index: index,
-                            isActive: activeIndex == index,
-                            onTap: () => context.read<TabsBloc>().add(
-                              SetActiveIndex(index),
+                            child: TabWidget(
+                              tabId: tab.tabId,
+                              index: index,
+                              isActive: activeIndex == index,
+                              onTap: () => context.read<TabsBloc>().add(
+                                SetActiveIndex(index),
+                              ),
+                              onClose: () =>
+                                  _requestCloseConfirmation(context, tab.tabId),
                             ),
-                            onClose: () =>
-                                _requestCloseConfirmation(context, tab.tabId),
                           );
                         },
                       ),
@@ -587,4 +589,43 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
   }
+}
+
+/// Plays the theme's [AppMotion.tabChipTransition] entrance animation the
+/// first time a tab chip is inserted into the strip. A 0→1 controller fires
+/// on first mount; the theme's closure drives fade/scale/size widgets.
+/// Calm themes and reduceEffects receive the identity closure (no animation).
+///
+/// The [key] MUST be the chip's [ValueKey] so [ReorderableListView] preserves
+/// per-tab identity; moving the key here (rather than on the inner TabWidget)
+/// is required — [ReorderableListView] requires every direct child to have a
+/// key.
+class _ChipEntrance extends StatefulWidget {
+  const _ChipEntrance({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  State<_ChipEntrance> createState() => _ChipEntranceState();
+}
+
+class _ChipEntranceState extends State<_ChipEntrance>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 220),
+  )..forward();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => context.appMotion.tabChipTransition(
+    context,
+    animation: _c,
+    child: widget.child,
+  );
 }

@@ -182,6 +182,72 @@
   alongside sound; web/unsupported no-op. Niche.
 - **Effort**: S–M.
 
+### F. Per-theme custom component widgets (`AppComponents` slots)
+
+> The **AURIS** theme introduced an 8th theme extension, `AppComponents`
+> (`lib/core/theme/extensions/app_components.dart`): per-theme widget builders
+> for `surface / methodBadge / statusBadge / metric / toggle / logView /
+> dataRow / select / pendingIndicator / statusBanner`. A shared
+> `defaultAppComponents()` reproduces the classic look, and AURIS overrides the
+> slots with the `auris` package's HUD widgets. The seam now exists for every
+> theme to express personality through *different widgets*, not just colors.
+
+#### VM-F1 — Original components per theme (give every theme its own widget set, like AURIS) — ✅ DONE (2026-06-20)
+- **Shipped**: every theme except Classic now has a bespoke `<name>Components()`
+  = `defaultAppComponents().copyWith(...)` in its own dir, wired through the
+  `AppComponents` slots (no app-widget edits). `select` inherited everywhere
+  (still VM-F2). Per-theme `<name>_components_test.dart` (per-slot smoke +
+  ResponseSection/RealtimePanel overflow guards). What landed:
+  - **BRUTALIST** (`brutalist_components.dart`) — ink-press: slab panels +
+    stuck-on header label, ink-stamp method/status badges, mono ticker-chip
+    metric, chunky snap switch, fanfold line-printer log, printed data rows,
+    block-press pending, stamped banner.
+  - **ARCANE QUEST** (`rpg_components.dart`) — spellbook: runic-framed parchment
+    panel (rune-corner CustomPaint), faceted gem status badge, rune-plate method
+    badge, runestone metric, enchanted lever, grimoire log, quest-ledger rows,
+    rotating summoning-ring pending, heraldic ribbon banner.
+  - **LIQUID GLASS** (`glass_components.dart`) — frosted HUD: frosted tiles (real
+    blur via `context.appDecoration.frost`), translucent lozenge badges, frosted
+    lozenge metric, liquid-glass switch, blurred terminal log, glass rows,
+    frosted ripple pending, frosted capsule banner.
+  - **EDITORIAL** (`editorial_components.dart`) — print magazine, fully static
+    (no animation): hairline article panels, small-caps typographic tags,
+    footnote metric, outlined switch, dispatch log, reference rows, galley-proof
+    pending, ruled note banner.
+  - **DRACULA** (`dracula_components.dart`) — neon dev-console: console panels
+    (static purple glow + `// comment` header), neon capsule badges, terminal
+    metric, console toggle, REPL log (→/←/⊕/⊗/✗), console kv rows, ≤1.5 Hz
+    blinking-cursor pending, `[OK]`/`[ERR]` status line.
+  - **CLASSIC** — unchanged, stays on `defaultAppComponents()` by design.
+- **Patterns enforced** (carried from AURIS): `surface` fills (in an `Expanded`),
+  `logView` sizes to bounded height, `metric` is a compact inline chip; animated
+  slots build the painter once + `CustomPainter(repaint:)` (no per-frame alloc),
+  degrade to static under `reduceEffects`; any repeating flash ≤ 3 Hz.
+- **Remaining**: `select` slot still inherited everywhere (VM-F2); a few accepted
+  Minors (see plan/ledger) — none blocking.
+
+#### VM-F2 — Wire the `select` slot (currently built but unused)
+- **Idea**: `AppDropdown<T>` + the `select` slot exist but no app surface routes
+  through them — the HTTP method selector (`RequestKindMethodSelector`, renders a
+  colored `MethodBadge` in its trigger) and `PanelSelector` (custom drag-target
+  overlay) were too bespoke to route faithfully. Build a select-slot-friendly
+  selector (or enrich the slot) so AURIS shows `AurisSelect` there.
+- **Effort**: M.
+
+#### VM-F3 — Source real AURIS audio + signature theme-switch entrance
+- **Idea**: `assets/sounds/auris/` currently holds placeholder cues (seeded from
+  Glass). Source real sci-fi-HUD `send/success/error` mp3s. Optionally give AURIS
+  a bespoke CRT-power-on `ThemeSwitchTransition` entrance.
+- **Effort**: S (audio) / S–M (entrance).
+
+#### VM-F4 — AURIS metric stat cards (currently a compact chip fallback)
+- **Idea**: the `metric` slot under AURIS falls back to a compact `AurisContainer`
+  chip because `AurisStatCard`'s large value overflows the inline metadata
+  `Wrap`. A dedicated, larger response-metadata layout could use the full
+  `AurisStatCard` (flag `kAurisMetricUsesStatCard` already left in
+  `auris_components.dart`).
+- **Effort**: S–M.
+
 ---
 
 ## 🔐 Auth & Security

@@ -82,7 +82,8 @@ void main() {
 
     expect(find.text('CONNECTED'), findsOneWidget);
     expect(find.text('hello world'), findsOneWidget);
-    expect(find.text('IN'), findsOneWidget);
+    // Brutalist logView uses ▼ glyph for incoming (not 'IN').
+    expect(find.text('▼'), findsOneWidget);
     // WebSocket gets a message composer.
     expect(find.widgetWithText(ElevatedButton, 'SEND'), findsOneWidget);
   });

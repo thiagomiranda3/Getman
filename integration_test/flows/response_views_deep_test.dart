@@ -18,8 +18,8 @@ void main() {
     $,
   ) async {
     await bootGetman($);
-    // Brutalist (default) empty-response copy.
-    expect($('HIT SEND TO GET A RESPONSE'), findsWidgets);
+    // Classic (default) empty-response copy.
+    expect($('No response yet.'), findsWidgets);
   });
 
   patrolWidgetTest('copy response reports via snackbar', ($) async {

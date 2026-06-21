@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/extensions/app_theme_access.dart';
 
 class MethodBadge extends StatelessWidget {
   const MethodBadge({required this.method, super.key, this.small = false});
@@ -8,29 +8,10 @@ class MethodBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final layout = context.appLayout;
-    final color = context.appPalette.methodColor(method);
-
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: layout.badgePaddingHorizontal,
-        vertical: layout.badgePaddingVertical,
-      ),
-      decoration: BoxDecoration(
-        color: color,
-        border: Border.all(color: theme.dividerColor, width: layout.borderThin),
-      ),
-      child: Text(
-        method,
-        style: TextStyle(
-          // Contrast against the per-method color, not a fixed onPrimary
-          // (a11y).
-          color: context.appPalette.methodOn(method),
-          fontWeight: context.appTypography.displayWeight,
-          fontSize: small ? layout.fontSizeSmall : layout.fontSizeNormal,
-        ),
-      ),
+    return context.appComponents.methodBadge(
+      context,
+      method: method,
+      small: small,
     );
   }
 }

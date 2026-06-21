@@ -26,12 +26,11 @@ class UpdateSettingsSection extends StatelessWidget {
           buildWhen: (p, n) =>
               p.settings.checkForUpdatesOnStartup !=
               n.settings.checkForUpdatesOnStartup,
-          builder: (context, state) => SwitchListTile(
-            key: const ValueKey('check_updates_switch'),
+          builder: (context, state) => ListTile(
             contentPadding: EdgeInsets.symmetric(
               horizontal: layout.inputPadding,
             ),
-            secondary: Icon(Icons.system_update, size: layout.iconSize),
+            leading: Icon(Icons.system_update, size: layout.iconSize),
             title: Text(
               'CHECK FOR UPDATES ON STARTUP',
               style: TextStyle(
@@ -39,9 +38,20 @@ class UpdateSettingsSection extends StatelessWidget {
                 fontWeight: context.appTypography.titleWeight,
               ),
             ),
-            value: state.settings.checkForUpdatesOnStartup,
-            onChanged: (v) =>
-                bloc.add(UpdateCheckForUpdatesOnStartup(enabled: v)),
+            trailing: KeyedSubtree(
+              key: const ValueKey('check_updates_switch'),
+              child: context.appComponents.toggle(
+                context,
+                value: state.settings.checkForUpdatesOnStartup,
+                onChanged: (v) =>
+                    bloc.add(UpdateCheckForUpdatesOnStartup(enabled: v)),
+              ),
+            ),
+            onTap: () => bloc.add(
+              UpdateCheckForUpdatesOnStartup(
+                enabled: !state.settings.checkForUpdatesOnStartup,
+              ),
+            ),
           ),
         ),
         Padding(

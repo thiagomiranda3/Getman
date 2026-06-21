@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/themes/editorial/editorial_components.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_decorations.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_fade.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_palette.dart';
@@ -277,6 +278,7 @@ ThemeData editorialTheme(
       decoration,
       calmMotion(reduceEffects: reduceEffects),
       const AppCopy(emptyResponse: 'Awaiting the first response'),
+      editorialComponents(),
     ],
   );
 }

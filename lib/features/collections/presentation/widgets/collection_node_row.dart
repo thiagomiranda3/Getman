@@ -84,13 +84,17 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
                   padding: EdgeInsets.only(left: indent),
                   child: Row(
                     children: [
-                      Icon(
-                        isExpanded
-                            ? Icons.keyboard_arrow_down
-                            : Icons.keyboard_arrow_right,
-                        size: layout.smallIconSize,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.5,
+                      context.appMotion.treeExpandFlourish(
+                        context,
+                        expanded: isExpanded,
+                        child: Icon(
+                          isExpanded
+                              ? Icons.keyboard_arrow_down
+                              : Icons.keyboard_arrow_right,
+                          size: layout.smallIconSize,
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.5,
+                          ),
                         ),
                       ),
                       Icon(
@@ -135,7 +139,12 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
                   MoveNode(details.data, node.id),
                 );
               },
-              builder: (context, candidateData, rejectedData) => folderInner,
+              builder: (context, candidateData, rejectedData) =>
+                  context.appMotion.treeDropHighlight(
+                    context,
+                    active: _isDragOver,
+                    child: folderInner,
+                  ),
             );
     } else {
       content = SizedBox(
@@ -174,13 +183,17 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
                       if (node.examples.isNotEmpty)
                         InkWell(
                           onTap: widget.onToggle,
-                          child: Icon(
-                            isExpanded
-                                ? Icons.keyboard_arrow_down
-                                : Icons.keyboard_arrow_right,
-                            size: layout.smallIconSize,
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.5,
+                          child: context.appMotion.treeExpandFlourish(
+                            context,
+                            expanded: isExpanded,
+                            child: Icon(
+                              isExpanded
+                                  ? Icons.keyboard_arrow_down
+                                  : Icons.keyboard_arrow_right,
+                              size: layout.smallIconSize,
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.5,
+                              ),
                             ),
                           ),
                         )
@@ -226,23 +239,26 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
 
     return Draggable<String>(
       data: node.id,
-      feedback: Material(
-        color: Colors.transparent,
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: layout.inputPadding,
-            vertical: layout.inputPaddingVertical,
-          ),
-          decoration: context.appDecoration.panelBox(
-            context,
-            color: theme.primaryColor,
-          ),
-          child: Text(
-            node.name,
-            style: TextStyle(
-              fontSize: layout.fontSizeNormal,
-              fontWeight: context.appTypography.displayWeight,
-              color: theme.colorScheme.onSurface,
+      feedback: context.appMotion.treeDragFeedback(
+        context,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: layout.inputPadding,
+              vertical: layout.inputPaddingVertical,
+            ),
+            decoration: context.appDecoration.panelBox(
+              context,
+              color: theme.primaryColor,
+            ),
+            child: Text(
+              node.name,
+              style: TextStyle(
+                fontSize: layout.fontSizeNormal,
+                fontWeight: context.appTypography.displayWeight,
+                color: theme.colorScheme.onSurface,
+              ),
             ),
           ),
         ),

@@ -48,3 +48,6 @@ build/
 
 # Superpowers (visual brainstorming, scratch)
 .superpowers/
+
+# Coverage reports
+coverage/

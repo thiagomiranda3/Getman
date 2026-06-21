@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/themes/brutalist/brutalist_ambient.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_bounce.dart';
+import 'package:getman/core/theme/themes/brutalist/brutalist_components.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_decorations.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_motion.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_palette.dart';
@@ -100,7 +102,9 @@ ThemeData brutalistTheme(
     tabShape: brutalistTabShape,
     wrapInteractive: ({required child, onTap, scaleDown}) =>
         BrutalBounce(onTap: onTap, scaleDown: scaleDown ?? 0.95, child: child),
-    scaffoldBackground: brutalistScaffoldBackground,
+    scaffoldBackground: reduceEffects
+        ? brutalistStaticScaffoldBackground
+        : brutalistScaffoldBackgroundAnimated,
   );
 
   final base = ThemeData(
@@ -286,6 +290,7 @@ ThemeData brutalistTheme(
       decoration,
       brutalistMotion(reduceEffects: reduceEffects),
       const AppCopy(emptyResponse: 'HIT SEND TO GET A RESPONSE'),
+      brutalistComponents(reduceEffects: reduceEffects),
     ],
   );
 }

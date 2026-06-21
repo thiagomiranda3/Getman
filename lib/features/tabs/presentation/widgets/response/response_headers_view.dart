@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/extensions/app_theme_access.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
@@ -46,23 +47,12 @@ class ResponseHeadersView extends StatelessWidget {
           itemCount: entries.length,
           itemBuilder: (context, index) {
             final e = entries[index];
-            return ListTile(
-              dense: true,
-              title: Text(
-                e.key.toUpperCase(),
-                style: TextStyle(
-                  fontWeight: context.appTypography.titleWeight,
-                  fontSize: layout.fontSizeNormal,
-                  color: theme.primaryColor,
-                ),
-              ),
-              subtitle: Text(
-                e.value,
-                style: TextStyle(
-                  fontSize: layout.fontSizeNormal,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
+            // Uppercase at the call site — preserves the existing rendering
+            // (integration tests assert find.textContaining('CONTENT-TYPE')).
+            return context.appComponents.dataRow(
+              context,
+              label: e.key.toUpperCase(),
+              value: e.value,
             );
           },
         );

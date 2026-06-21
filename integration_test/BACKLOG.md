@@ -36,6 +36,12 @@ dirty/edge-path coverage (~95 cases). What remains is genuinely blocked
   GENERAL/APPEARANCE/NETWORK/WORKSPACE on desktop + switch tabs at phone width).
 - **Themes** — `theme_stress_test` (every theme in light + dark, compact, rapid
   glass↔flat switching, the LIQUID GLASS reduce-effects toggle-twice guard).
+- **Theme motion during a send** — `theme_motion_send_test` (each "loud" theme —
+  ARCANE QUEST / LIQUID GLASS / AURIS / DRACULA — drives a real send so the
+  in-flight panel-frame motion mounts/disposes while a request is in flight,
+  asserting the app survives + the 200 renders; plus a reduce-effects send that
+  must still complete with motion degraded to static). E2E guard for the
+  in-flight-frame dispose fix.
 - **Chaining (deep)** — `chaining_deep_test` (JSONPath / header / contains
   assertions, mixed pass-count, extraction write-back into the active env).
 - **Realtime (deep)** — `realtime_deep_test` (server-initiated WS broadcast,

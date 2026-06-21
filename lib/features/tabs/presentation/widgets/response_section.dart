@@ -10,12 +10,10 @@ import 'package:getman/features/tabs/presentation/widgets/response/response_body
 import 'package:getman/features/tabs/presentation/widgets/response/response_cookies_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_headers_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_history_timeline.dart';
-import 'package:getman/features/tabs/presentation/widgets/response/response_metadata_item.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_tests_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.dart'
     show UnifiedRequestPanel;
 import 'package:re_editor/re_editor.dart';
-import 'package:shimmer/shimmer.dart';
 
 /// Shell for the response pane: the metadata row + the BODY/HEADERS/COOKIES/
 /// TESTS tabs. Each tab body is its own widget under `response/`; this widget
@@ -56,63 +54,7 @@ class ResponseSection extends StatelessWidget {
         if (tab == null) return const SizedBox.shrink();
 
         if (tab.isSending) {
-          final shimmerFill = theme.colorScheme.onSurface.withValues(
-            alpha: 0.08,
-          );
-          return Semantics(
-            label: 'Loading response',
-            liveRegion: true,
-            child: Shimmer.fromColors(
-              baseColor: theme.dividerColor.withValues(alpha: 0.1),
-              highlightColor: theme.dividerColor.withValues(alpha: 0.3),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 100,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: shimmerFill,
-                          border: Border.all(
-                            color: theme.dividerColor,
-                            width: layout.borderThin,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Container(
-                        width: 100,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: shimmerFill,
-                          border: Border.all(
-                            color: theme.dividerColor,
-                            width: layout.borderThin,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: 15,
-                      itemBuilder: (_, index) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Container(
-                          width: double.infinity,
-                          height: 20,
-                          color: shimmerFill,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
+          return context.appComponents.pendingIndicator(context);
         }
 
         final response = tab.response;
@@ -153,25 +95,19 @@ class ResponseSection extends StatelessWidget {
                   spacing: 12,
                   runSpacing: 8,
                   children: [
-                    ResponseMetadataItem(
-                      label: 'STATUS',
-                      value: response.statusCode.toString(),
-                      color: context.appPalette.statusAccent(
-                        response.statusCode,
-                      ),
-                      layout: layout,
+                    context.appComponents.statusBadge(
+                      context,
+                      statusCode: response.statusCode,
                     ),
-                    ResponseMetadataItem(
+                    context.appComponents.metric(
+                      context,
                       label: 'TIME',
                       value: '${response.durationMs} ms',
-                      color: theme.colorScheme.secondary,
-                      layout: layout,
                     ),
-                    ResponseMetadataItem(
+                    context.appComponents.metric(
+                      context,
                       label: 'SIZE',
                       value: formatBytes(responseSizeBytes(response)),
-                      color: theme.colorScheme.secondary,
-                      layout: layout,
                     ),
                     ResponseHistoryTimeline(
                       tabId: tabId,
@@ -196,11 +132,8 @@ class ResponseSection extends StatelessWidget {
                         borderRadius: BorderRadius.circular(
                           context.appShape.panelRadius,
                         ),
-                        child: Container(
-                          decoration: context.appDecoration.panelBox(
-                            context,
-                            offset: 0,
-                          ),
+                        child: context.appComponents.surface(
+                          context,
                           child: TabBarView(
                             children: [
                               ResponseBodyView(

@@ -1,5 +1,4 @@
-import 'package:getman/core/audio/theme_sound_service_stub.dart'
-    if (dart.library.io) 'package:getman/core/audio/theme_sound_service_io.dart';
+import 'package:getman/core/audio/theme_sound_service_audioplayers.dart';
 import 'package:getman/core/theme/motion/theme_reaction.dart';
 
 /// Plays short, themed one-shot sound effects keyed by (themeId, reaction).
@@ -10,5 +9,7 @@ abstract class ThemeSoundService {
   void dispose();
 }
 
-/// Native => audioplayers-backed; web/unsupported => no-op stub.
+/// audioplayers-backed on every platform — `audioplayers` ships a web backend
+/// (`audioplayers_web`), so there is no web no-op stub. Failures (missing
+/// asset, no backend, blocked autoplay) degrade to silence inside the service.
 ThemeSoundService createThemeSoundService() => createThemeSoundServiceImpl();

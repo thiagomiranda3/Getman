@@ -17,8 +17,8 @@ void main() {
 
     await openSettings($);
     await openSettingsTab($, 'APPEARANCE');
-    // Default theme is BRUTALIST.
-    expect($('BRUTALIST'), findsWidgets);
+    // Default theme is CLASSIC (the calm native default for fresh installs).
+    expect($('CLASSIC'), findsWidgets);
 
     await $(const ValueKey('theme_dropdown')).tap();
     await $('EDITORIAL').tap();

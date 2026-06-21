@@ -37,6 +37,7 @@ import 'flows/smoke_test.dart' as smoke;
 import 'flows/tab_management_test.dart' as tab_management;
 import 'flows/tab_shortcuts_test.dart' as tab_shortcuts;
 import 'flows/tabs_test.dart' as tabs;
+import 'flows/theme_motion_send_test.dart' as theme_motion_send;
 import 'flows/theme_stress_test.dart' as theme_stress;
 import 'flows/variable_substitution_test.dart' as variable_substitution;
 
@@ -92,6 +93,7 @@ void main() {
   response_views_deep.main();
   responsive.main();
   theme_stress.main();
+  theme_motion_send.main();
   command_palette.main();
   command_palette_deep.main();
   extras.main();

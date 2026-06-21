@@ -94,8 +94,8 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel>
             child: context.appDecoration.frost(
               context,
               borderRadius: BorderRadius.circular(context.appShape.panelRadius),
-              child: Container(
-                decoration: context.appDecoration.panelBox(context, offset: 0),
+              child: context.appComponents.surface(
+                context,
                 child: TabBarView(
                   controller: _tabController,
                   children: [

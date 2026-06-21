@@ -2,9 +2,13 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/motion/ambient_signals.dart';
+import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_palette.dart';
+import 'package:provider/provider.dart';
 
 BoxDecoration rpgPanelBox(
   BuildContext context, {
@@ -90,6 +94,23 @@ BoxDecoration rpgTabShape(
   );
 }
 
+/// How long a click impulse stays alive before the widget prunes it.
+const Duration _kImpulseLifetime = Duration(milliseconds: 1400);
+
+/// @visibleForTesting impulse counter — updated by the
+/// `_RpgAnimatedBackgroundState` on each `_addImpulse` call; read by tests
+/// to assert click registration without accessing the private State class.
+/// Reset to 0 between tests.
+@visibleForTesting
+int debugRpgImpulseCount = 0;
+
+/// @visibleForTesting C2 sentinels — last activity/idle values read by the
+/// painter's paint() on the most recent frame. 0.0 when no pulse is plumbed.
+@visibleForTesting
+double debugRpgLastActivityLevel = 0;
+@visibleForTesting
+double debugRpgLastIdleFactor = 0;
+
 Widget rpgScaffoldBackground(BuildContext context, {required Widget child}) {
   return _RpgAnimatedBackground(child: child);
 }
@@ -142,12 +163,32 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
   late final AnimationController _controller;
   late final List<_Mote> _motes;
   late final ValueNotifier<double> _frameNotifier;
+
+  // Parallax pointer: convention is -1..1 from centre (existing starfield).
   final ValueNotifier<Offset> _pointer = ValueNotifier<Offset>(Offset.zero);
+
+  // Active click impulse seeds (VM-C1). Appended on pointer-down, pruned by
+  // age. Impulse positions are stored as 0..1 (separate from the -1..1
+  // parallax pointer).
+  final ValueNotifier<List<AmbientImpulse>> _impulses =
+      ValueNotifier<List<AmbientImpulse>>(const []);
+
+  // Widget-owned monotonic clock for impulse ageing.
+  final Stopwatch _clock = Stopwatch();
+
+  // Resolved from the provider once dependencies are available; null when no
+  // provider is registered (e.g. standalone tests).
+  WorkspacePulseController? _pulse;
+
+  // Inert stand-in when no provider is registered. Built lazily, disposed
+  // here (never by the provider layer).
+  WorkspacePulseController? _ownedIdlePulse;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _clock.start();
     _frameNotifier = ValueNotifier<double>(0);
     _controller = AnimationController(
       vsync: this,
@@ -173,6 +214,19 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Resolve pulse unconditionally (the Task 11 pulse-resolution lesson):
+    // didChangeDependencies does NOT re-fire on prop changes, so gating on an
+    // animate flag would miss a re-enable round-trip.
+    try {
+      _pulse = Provider.of<WorkspacePulseController>(context, listen: false);
+    } on ProviderNotFoundException {
+      _pulse = null;
+    }
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Don't burn CPU/battery animating the starfield while the app is hidden.
     if (state == AppLifecycleState.resumed) {
@@ -188,58 +242,109 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
     _controller.dispose();
     _frameNotifier.dispose();
     _pointer.dispose();
+    _impulses.dispose();
+    _ownedIdlePulse?.dispose();
     super.dispose();
+  }
+
+  /// The pulse to bundle into [AmbientSignals]: the real provider controller
+  /// when present, otherwise an inert idle stand-in we own. Built once.
+  WorkspacePulseController get _effectivePulse =>
+      _pulse ?? (_ownedIdlePulse ??= WorkspacePulseController());
+
+  void _addImpulse(Offset normalized) {
+    final nowMs = _clock.elapsedMilliseconds;
+    final cutoff = nowMs - _kImpulseLifetime.inMilliseconds;
+    // Prune aged entries while appending the fresh one (bounded list).
+    final next = <AmbientImpulse>[
+      for (final imp in _impulses.value)
+        if (imp.bornAtMs >= cutoff) imp,
+      AmbientImpulse(position: normalized, bornAtMs: nowMs),
+    ];
+    _impulses.value = next;
+    debugRpgImpulseCount = next.length;
+    // Clicking is activity — keep the session pulse awake (no-op if null).
+    _pulse?.touch();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    return MouseRegion(
-      onHover: (e) {
+
+    final signals = AmbientSignals(
+      pointer: _pointer,
+      impulses: _impulses,
+      pulse: _effectivePulse,
+      isDark: isDark,
+    );
+
+    final stack = Stack(
+      children: [
+        // Radial vignette under everything.
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                radius: 1.2,
+                colors: [
+                  theme.scaffoldBackgroundColor,
+                  if (isDark)
+                    Colors.black.withValues(alpha: 0.6)
+                  else
+                    RpgPalette.goldDeep.withValues(alpha: 0.08),
+                ],
+              ),
+            ),
+          ),
+        ),
+        RepaintBoundary(child: widget.child),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: _StarfieldPainter(
+                  tListenable: _frameNotifier,
+                  motes: _motes,
+                  isDark: isDark,
+                  signals: signals,
+                  hasPulse: _pulse != null,
+                  clock: _clock,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    return Listener(
+      onPointerDown: (e) {
+        // Desktop/web only — touch events don't produce ambient ripples.
+        if (e.kind != PointerDeviceKind.mouse &&
+            e.kind != PointerDeviceKind.stylus) {
+          return;
+        }
         final size = context.size;
-        if (size == null) return;
-        // Normalized -1..1 from center; parallax keeps each mote shift small.
-        _pointer.value = Offset(
-          (e.localPosition.dx / size.width) * 2 - 1,
-          (e.localPosition.dy / size.height) * 2 - 1,
+        if (size == null || size.isEmpty) return;
+        _addImpulse(
+          Offset(
+            (e.localPosition.dx / size.width).clamp(0.0, 1.0),
+            (e.localPosition.dy / size.height).clamp(0.0, 1.0),
+          ),
         );
       },
-      child: Stack(
-        children: [
-          // Radial vignette under everything.
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  radius: 1.2,
-                  colors: [
-                    theme.scaffoldBackgroundColor,
-                    if (isDark)
-                      Colors.black.withValues(alpha: 0.6)
-                    else
-                      RpgPalette.goldDeep.withValues(alpha: 0.08),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          RepaintBoundary(child: widget.child),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: RepaintBoundary(
-                child: CustomPaint(
-                  painter: _StarfieldPainter(
-                    tListenable: _frameNotifier,
-                    pointer: _pointer,
-                    motes: _motes,
-                    isDark: isDark,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+      child: MouseRegion(
+        onHover: (e) {
+          final size = context.size;
+          if (size == null) return;
+          // Normalized -1..1 from center; parallax keeps each mote shift small.
+          _pointer.value = Offset(
+            (e.localPosition.dx / size.width) * 2 - 1,
+            (e.localPosition.dy / size.height) * 2 - 1,
+          );
+        },
+        child: stack,
       ),
     );
   }
@@ -289,15 +394,23 @@ class _Mote {
 class _StarfieldPainter extends CustomPainter {
   _StarfieldPainter({
     required this.tListenable,
-    required this.pointer,
     required this.motes,
     required this.isDark,
-  }) : super(repaint: Listenable.merge([tListenable, pointer]));
+    required this.signals,
+    required this.hasPulse,
+    this.clock,
+  }) : super(repaint: _repaintFor(tListenable, signals, hasPulse));
 
   final ValueListenable<double> tListenable;
-  final ValueListenable<Offset> pointer;
   final List<_Mote> motes;
   final bool isDark;
+
+  /// Non-null (always passed from animated state).
+  final AmbientSignals? signals;
+  final bool hasPulse;
+
+  /// Monotonic clock for impulse age computation.
+  final Stopwatch? clock;
 
   // Reused across motes/frames — only `.color` changes per draw (the immutable
   // blur MaskFilter is set once). Allocating per mote per frame was the hot
@@ -307,13 +420,44 @@ class _StarfieldPainter extends CustomPainter {
   final Paint _corePaint = Paint();
   final Paint _constellationPaint = Paint()..strokeWidth = 0.5;
   final Paint _shootPaint = Paint()..strokeCap = StrokeCap.round;
+  // Reused stroke paint for shockwave ripples (C1).
+  final Paint _ripplePaint = Paint()..style = PaintingStyle.stroke;
+
+  static Listenable _repaintFor(
+    ValueListenable<double> t,
+    AmbientSignals? signals,
+    bool hasPulse,
+  ) {
+    if (signals == null) return t;
+    return Listenable.merge([
+      t,
+      signals.pointer,
+      signals.impulses,
+      if (hasPulse) signals.pulse,
+    ]);
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
     final t = tListenable.value;
-    final par = pointer.value;
 
-    // --- Build mote screen positions (parallax applied) ---
+    // C2 session rhythm: read pulse values defensively (null-safe).
+    // activityLevel (0..1) → more star brightness + drift speed when busy.
+    // idleFactor (0..1) → dimmer, slower starfield when idle.
+    final activityLevel = signals?.pulse.activityLevel ?? 0.0;
+    final idleFactor = signals?.pulse.idleFactor ?? 0.0;
+    // Write sentinels for tests.
+    debugRpgLastActivityLevel = activityLevel;
+    debugRpgLastIdleFactor = idleFactor;
+
+    // Pointer is -1..1 from centre (parallax convention).
+    final par = signals?.pointer.value ?? Offset.zero;
+    // Cursor force: convert pointer to pixel coords for distance check.
+    // Pointer is -1..1 from centre → pixel centre + (par * halfSize).
+    final ptrPxX = size.width * 0.5 + par.dx * size.width * 0.5;
+    final ptrPxY = size.height * 0.5 + par.dy * size.height * 0.5;
+
+    // --- Build mote screen positions (parallax + cursor force applied) ---
     final positions = List<Offset>.unmodifiable(
       motes.map((m) {
         final dy = ((m.seedY + t * m.speed) % 1.0) * size.height;
@@ -326,11 +470,27 @@ class _StarfieldPainter extends CustomPainter {
                 1.0) *
             size.width;
         // Bigger motes shift more → depth illusion.
-        final px = dx + par.dx * (m.size * 4);
-        final py = dy + par.dy * (m.size * 4);
+        var px = dx + par.dx * (m.size * 4);
+        var py = dy + par.dy * (m.size * 4);
+
+        // C1 cursor force: motes repel from pointer position.
+        final ddx = px - ptrPxX;
+        final ddy = py - ptrPxY;
+        final dist = math.sqrt(ddx * ddx + ddy * ddy);
+        const forceRadius = 90.0;
+        if (dist < forceRadius && dist > 0) {
+          final push = (1 - dist / forceRadius) * 24.0;
+          px += ddx / dist * push;
+          py += ddy / dist * push;
+        }
+
         return Offset(px, py);
       }),
     );
+
+    // C2: compute a single alpha multiplier for all motes (cheap arithmetic).
+    // Activity brightens the starfield (+45%); idle dims it (-40%).
+    final alphaMult = (1.0 + 0.45 * activityLevel) * (1.0 - 0.4 * idleFactor);
 
     // --- Draw motes ---
     for (var i = 0; i < motes.length; i++) {
@@ -346,8 +506,11 @@ class _StarfieldPainter extends CustomPainter {
                       math.sin(
                         (t * math.pi * 2 + m.twinkleOffset * math.pi * 2) * 1.4,
                       ));
-      final alphaBase = isDark ? 0.55 : 0.18;
-      final color = _colorFor(m.hue).withValues(alpha: alphaBase * twinkle);
+      // C2: apply activity/idle multiplier to the base alpha.
+      final alphaBase = (isDark ? 0.55 : 0.18) * alphaMult;
+      final color = _colorFor(
+        m.hue,
+      ).withValues(alpha: (alphaBase * twinkle).clamp(0.0, 1.0));
 
       _glowPaint.color = color.withValues(alpha: color.a * 0.6);
       canvas.drawCircle(pos, m.size * 2, _glowPaint);
@@ -439,6 +602,28 @@ class _StarfieldPainter extends CustomPainter {
         canvas.drawCircle(seg.head, 1.8, _corePaint);
       }
     }
+
+    // C1 click shockwave: expanding gold ring per impulse.
+    final nowMs = clock?.elapsedMilliseconds ?? 0;
+    const kRippleLifetimeMs = 1400;
+    for (final imp in signals?.impulses.value ?? const <AmbientImpulse>[]) {
+      final ageMs = nowMs - imp.bornAtMs;
+      if (ageMs < 0 || ageMs > kRippleLifetimeMs) continue;
+      final age01 = ageMs / kRippleLifetimeMs;
+      final rippleRadius = size.shortestSide * 0.22 * age01;
+      final alpha = 0.35 * math.sin(age01 * math.pi);
+      if (alpha <= 0 || rippleRadius <= 0) continue;
+      final center = Offset(
+        imp.position.dx * size.width,
+        imp.position.dy * size.height,
+      );
+      _ripplePaint
+        ..shader = null
+        ..blendMode = BlendMode.srcOver
+        ..color = RpgPalette.gold.withValues(alpha: alpha)
+        ..strokeWidth = 1.5;
+      canvas.drawCircle(center, rippleRadius, _ripplePaint);
+    }
   }
 
   Color _colorFor(double h) {
@@ -450,5 +635,9 @@ class _StarfieldPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _StarfieldPainter old) =>
-      old.motes != motes || old.isDark != isDark;
+      old.motes != motes ||
+      old.isDark != isDark ||
+      old.signals != signals ||
+      old.hasPulse != hasPulse ||
+      old.clock != clock;
 }

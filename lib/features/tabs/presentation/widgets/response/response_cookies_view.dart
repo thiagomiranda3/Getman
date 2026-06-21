@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/extensions/app_theme_access.dart';
 import 'package:getman/core/utils/cookie_parser.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
@@ -55,23 +56,13 @@ class ResponseCookiesView extends StatelessWidget {
           itemCount: cookies.length,
           itemBuilder: (context, index) {
             final c = cookies[index];
-            return ListTile(
-              dense: true,
-              title: Text(
-                c.name,
-                style: TextStyle(
-                  fontWeight: context.appTypography.titleWeight,
-                  fontSize: layout.fontSizeNormal,
-                  color: theme.primaryColor,
-                ),
-              ),
-              subtitle: Text(
-                c.attributes.isEmpty ? c.value : '${c.value}\n${c.attributes}',
-                style: TextStyle(
-                  fontSize: layout.fontSizeNormal,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
+            // Cookie name is NOT uppercased — preserved as-is from the header.
+            return context.appComponents.dataRow(
+              context,
+              label: c.name,
+              value: c.attributes.isEmpty
+                  ? c.value
+                  : '${c.value}\n${c.attributes}',
             );
           },
         );

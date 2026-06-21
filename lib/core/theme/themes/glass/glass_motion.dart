@@ -3,7 +3,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:getman/core/theme/extensions/app_motion.dart';
+import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/motion/latency_weight.dart';
 import 'package:getman/core/theme/motion/reaction_stage.dart';
 import 'package:getman/core/theme/motion/status_reaction_flavor.dart';
@@ -58,7 +58,221 @@ AppMotion glassMotion({required bool reduceEffects}) {
         _GlassReactionOverlay(controller: controller, child: child),
     sendAffordance: (context, {required child, required isSending}) =>
         _GlassSendAffordance(isSending: isSending, child: child),
+    inFlightFrame: (context, {required child, required isSending}) =>
+        _GlassInFlightFrame(isSending: isSending, child: child),
+    contentTransition: (context, {required child, required transitionKey}) =>
+        _GlassContentTransition(transitionKey: transitionKey, child: child),
+    tabChipTransition: (context, {required child, required animation}) =>
+        _glassChipEntrance(animation, child),
+    treeDragFeedback: (context, {required child}) =>
+        _GlassTreeDragFeedback(child: child),
+    treeDropHighlight: (context, {required child, required active}) =>
+        _GlassTreeDropHighlight(active: active, child: child),
+    treeExpandFlourish: (context, {required child, required expanded}) =>
+        _GlassTreeExpandFlourish(expanded: expanded, child: child),
   );
+}
+
+/// Glass chip entrance: scale from 0.85→1.0 + fade 0→1 (frost-in).
+Widget _glassChipEntrance(Animation<double> animation, Widget child) {
+  final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+  final scale = Tween<double>(begin: 0.85, end: 1).animate(curved);
+  return FadeTransition(
+    opacity: curved,
+    child: ScaleTransition(scale: scale, child: child),
+  );
+}
+
+/// Frost-dissolve content transition: a frosted white veil blooms in then
+/// dissolves away (~350 ms), giving the impression of glass condensation
+/// clearing as new content materialises.
+class _GlassContentTransition extends StatefulWidget {
+  const _GlassContentTransition({
+    required this.transitionKey,
+    required this.child,
+  });
+
+  final String transitionKey;
+  final Widget child;
+
+  @override
+  State<_GlassContentTransition> createState() =>
+      _GlassContentTransitionState();
+}
+
+class _GlassContentTransitionState extends State<_GlassContentTransition>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 350),
+  );
+
+  @override
+  void didUpdateWidget(_GlassContentTransition old) {
+    super.didUpdateWidget(old);
+    if (old.transitionKey != widget.transitionKey) {
+      unawaited(_c.forward(from: 0));
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).primaryColor;
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child, // hoisted — entire tab content NOT rebuilt per frame
+      builder: (ctx, child) {
+        if (_c.value == 0 || _c.value == 1) return child!;
+        // Frost dissolve: peak opacity mid-transition.
+        // 0→1 ramp-in, 1→0 ramp-out.
+        final alpha =
+            (_c.value < 0.5 ? _c.value * 2 : (1.0 - _c.value) * 2).clamp(
+              0.0,
+              1.0,
+            ) *
+            0.55;
+        return Stack(
+          children: [
+            child!,
+            Positioned.fill(
+              key: const ValueKey<String>('content_transition_overlay'),
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _GlassFrostDissolvePainter(
+                    t: _c.value,
+                    color: accent,
+                    alpha: alpha,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Frosted veil: a soft radial bloom from centre that peaks mid-transition.
+/// Reuses [Paint] objects; no per-frame allocation.
+class _GlassFrostDissolvePainter extends CustomPainter {
+  _GlassFrostDissolvePainter({
+    required this.t,
+    required this.color,
+    required this.alpha,
+  });
+  final double t;
+  final Color color;
+  final double alpha;
+
+  // Hoisted Paint — reused across frames, shader field mutated.
+  final Paint _paint = Paint();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final maxR = size.longestSide * 0.75;
+    _paint.shader = RadialGradient(
+      colors: [
+        color.withValues(alpha: alpha),
+        color.withValues(alpha: alpha * 0.3),
+        const Color(0x00000000),
+      ],
+      stops: const [0.0, 0.6, 1.0],
+    ).createShader(Rect.fromCircle(center: center, radius: maxR));
+    canvas.drawRect(Offset.zero & size, _paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _GlassFrostDissolvePainter old) =>
+      old.t != t || old.alpha != alpha || old.color != color;
+}
+
+/// Frost-breathe frame: a soft animated border glow that pulses in opacity
+/// while [isSending].  The glow period is ~1.6 s — well under 3 Hz; not a
+/// strobe.
+class _GlassInFlightFrame extends StatefulWidget {
+  const _GlassInFlightFrame({required this.isSending, required this.child});
+  final bool isSending;
+  final Widget child;
+
+  @override
+  State<_GlassInFlightFrame> createState() => _GlassInFlightFrameState();
+}
+
+class _GlassInFlightFrameState extends State<_GlassInFlightFrame>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      // 1.6 s breathe — well under 3 Hz
+      duration: const Duration(milliseconds: 1600),
+    );
+    if (widget.isSending) unawaited(_c.repeat(reverse: true));
+  }
+
+  @override
+  void didUpdateWidget(_GlassInFlightFrame old) {
+    super.didUpdateWidget(old);
+    // Edge-detect on old.isSending (THEME_AUTHORING §3 restart guard).
+    if (widget.isSending && !old.isSending) {
+      unawaited(_c.repeat(reverse: true));
+    } else if (!widget.isSending && old.isSending) {
+      _c
+        ..stop()
+        ..value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.isSending) return widget.child;
+    final accent = Theme.of(context).primaryColor;
+    // Child hoisted out of per-frame rebuilds.
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child,
+      builder: (context, child) {
+        final glow = 0.15 + 0.35 * _c.value;
+        return Stack(
+          children: [
+            child!,
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(
+                      context.appShape.panelRadius,
+                    ),
+                    border: Border.all(
+                      color: accent.withValues(alpha: glow),
+                      width: context.appLayout.borderThin * 2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class _GlassReactionOverlay extends StatefulWidget {
@@ -449,6 +663,155 @@ class _GlassSendAffordanceState extends State<_GlassSendAffordance>
           ),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// VM-B3: Tree drag/drop/expand juice — Glass
+// ---------------------------------------------------------------------------
+
+/// Frosted chip shown under the cursor while dragging a tree node.
+class _GlassTreeDragFeedback extends StatelessWidget {
+  const _GlassTreeDragFeedback({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).primaryColor;
+    return Material(
+      type: MaterialType.transparency,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: accent.withValues(alpha: 0.5)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// Animated glow border around drop targets while [active].
+class _GlassTreeDropHighlight extends StatefulWidget {
+  const _GlassTreeDropHighlight({
+    required this.active,
+    required this.child,
+  });
+  final bool active;
+  final Widget child;
+
+  @override
+  State<_GlassTreeDropHighlight> createState() =>
+      _GlassTreeDropHighlightState();
+}
+
+class _GlassTreeDropHighlightState extends State<_GlassTreeDropHighlight>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 300),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.active) _c.value = 1.0;
+  }
+
+  @override
+  void didUpdateWidget(_GlassTreeDropHighlight old) {
+    super.didUpdateWidget(old);
+    if (widget.active && !old.active) {
+      unawaited(_c.forward(from: 0));
+    } else if (!widget.active && old.active) {
+      unawaited(_c.reverse());
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.active && _c.value == 0) return widget.child;
+    final accent = Theme.of(context).primaryColor;
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child, // hoisted — not rebuilt per frame
+      builder: (ctx, child) {
+        if (_c.value == 0) return child!;
+        return Stack(
+          children: [
+            child!, // child first — receives taps/drops
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: accent.withValues(alpha: 0.7 * _c.value),
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// A brief circular glow around the expand icon on expand/collapse.
+class _GlassTreeExpandFlourish extends StatelessWidget {
+  const _GlassTreeExpandFlourish({
+    required this.expanded,
+    required this.child,
+  });
+  final bool expanded;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).primaryColor;
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(expanded),
+      tween: Tween(begin: 0, end: expanded ? 1.0 : 0.0),
+      duration: const Duration(milliseconds: 200),
+      builder: (ctx, v, ch) {
+        if (v <= 0) return ch!;
+        return Stack(
+          children: [
+            ch!, // child first — receives taps
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: accent.withValues(alpha: 0.6 * v),
+                        blurRadius: 8 * v,
+                        spreadRadius: 2 * v,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+      child: child,
     );
   }
 }

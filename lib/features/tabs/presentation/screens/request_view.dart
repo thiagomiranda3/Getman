@@ -175,7 +175,17 @@ class _RequestViewState extends State<RequestView> {
               child: Focus(
                 autofocus: true,
                 child: Padding(
-                  padding: EdgeInsets.all(layout.pagePadding),
+                  // On the desktop split-pane layout, align the content's left
+                  // edge with the open-request tab strip above it (which sits
+                  // flush against the side-menu divider) by dropping the left
+                  // page padding. The drawer layout (tablet/phone) keeps full
+                  // padding so content isn't flush against the screen edge.
+                  padding: EdgeInsets.fromLTRB(
+                    context.useDrawerNav ? layout.pagePadding : 0,
+                    layout.pagePadding,
+                    layout.pagePadding,
+                    layout.pagePadding,
+                  ),
                   child: Column(
                     children: [
                       UrlBar(
@@ -230,32 +240,56 @@ class _RequestViewState extends State<RequestView> {
                                     },
                                   );
 
-                                  return ValueListenableBuilder<double?>(
-                                    valueListenable: _localSplitRatio,
-                                    builder: (context, local, _) {
-                                      final currentRatio =
-                                          local ?? settings.splitRatio;
-                                      return Flex(
-                                        direction: settings.isVerticalLayout
-                                            ? Axis.vertical
-                                            : Axis.horizontal,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Flexible(
-                                            flex: _ratioToFlex(currentRatio),
-                                            child: requestPane,
-                                          ),
-                                          splitter,
-                                          Flexible(
-                                            flex: _ratioToFlex(
-                                              1 - currentRatio,
-                                            ),
-                                            child: responsePane,
-                                          ),
-                                        ],
-                                      );
-                                    },
+                                  return BlocSelector<
+                                    TabsBloc,
+                                    TabsState,
+                                    bool
+                                  >(
+                                    selector: (state) =>
+                                        state.tabs
+                                            .byId(widget.tabId)
+                                            ?.isSending ??
+                                        false,
+                                    builder: (context, isSending) =>
+                                        context.appMotion.inFlightFrame(
+                                          context,
+                                          isSending: isSending,
+                                          child:
+                                              ValueListenableBuilder<double?>(
+                                                valueListenable:
+                                                    _localSplitRatio,
+                                                builder: (context, local, _) {
+                                                  final currentRatio =
+                                                      local ??
+                                                      settings.splitRatio;
+                                                  return Flex(
+                                                    direction:
+                                                        settings
+                                                            .isVerticalLayout
+                                                        ? Axis.vertical
+                                                        : Axis.horizontal,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Flexible(
+                                                        flex: _ratioToFlex(
+                                                          currentRatio,
+                                                        ),
+                                                        child: requestPane,
+                                                      ),
+                                                      splitter,
+                                                      Flexible(
+                                                        flex: _ratioToFlex(
+                                                          1 - currentRatio,
+                                                        ),
+                                                        child: responsePane,
+                                                      ),
+                                                    ],
+                                                  );
+                                                },
+                                              ),
+                                        ),
                                   );
                                 },
                               ),

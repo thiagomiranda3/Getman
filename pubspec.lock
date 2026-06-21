@@ -105,6 +105,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.3.1"
+  auris:
+    dependency: "direct main"
+    description:
+      name: auris
+      sha256: "8983007add960f06aa910f8c4323d2eb1bdf8c02b4182710c1972dd58937c535"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.0"
   bloc:
     dependency: transitive
     description:

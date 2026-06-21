@@ -5,10 +5,34 @@
 // covered by integration/smoke tests elsewhere).
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/theme/theme_registry.dart';
 import 'package:getman/features/home/presentation/widgets/tab_content_stack.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
+
+// A minimal ThemeData that includes all required ThemeExtensions (AppMotion,
+// AppPalette, etc.) so that context.appMotion is resolvable in tests.
+final ThemeData _testTheme = resolveThemeData(
+  'classic',
+  Brightness.light,
+  isCompact: false,
+);
+
+// ---------------------------------------------------------------------------
+// Fake TabsBloc — satisfies context.select<TabsBloc, ...> without needing the
+// full dependency tree. Uses the default TabsState (activePanelId == '').
+// ---------------------------------------------------------------------------
+
+class _FakeTabsBloc extends Cubit<TabsState> implements TabsBloc {
+  _FakeTabsBloc() : super(const TabsState());
+
+  @override
+  dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
+}
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -115,13 +139,17 @@ Future<_HarnessState> _pumpHarness(
   required Widget Function(String) builder,
 }) async {
   await tester.pumpWidget(
-    MaterialApp(
-      home: Scaffold(
-        body: _Harness(
-          key: const ValueKey('harness'),
-          initialTabs: tabs,
-          initialIndex: activeIndex,
-          builder: builder,
+    BlocProvider<TabsBloc>(
+      create: (_) => _FakeTabsBloc(),
+      child: MaterialApp(
+        theme: _testTheme,
+        home: Scaffold(
+          body: _Harness(
+            key: const ValueKey('harness'),
+            initialTabs: tabs,
+            initialIndex: activeIndex,
+            builder: builder,
+          ),
         ),
       ),
     ),
@@ -282,13 +310,19 @@ void main() {
   testWidgets('empty tab list renders SizedBox.shrink without error', (
     tester,
   ) async {
+    // Empty-tabs path hits the early-return before any context.select, so no
+    // TabsBloc provider is strictly needed; we wrap anyway for consistency.
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: TabContentStack(
-            tabs: const [],
-            activeIndex: 0,
-            childBuilder: (id) => Text('child-$id'),
+      BlocProvider<TabsBloc>(
+        create: (_) => _FakeTabsBloc(),
+        child: MaterialApp(
+          theme: _testTheme,
+          home: Scaffold(
+            body: TabContentStack(
+              tabs: const [],
+              activeIndex: 0,
+              childBuilder: (id) => Text('child-$id'),
+            ),
           ),
         ),
       ),

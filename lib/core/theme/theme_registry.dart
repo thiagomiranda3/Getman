@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/theme_ids.dart';
+import 'package:getman/core/theme/themes/auris/auris_theme.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/core/theme/themes/classic/classic_theme.dart';
 import 'package:getman/core/theme/themes/dracula/dracula_theme.dart';
@@ -59,6 +60,11 @@ const Map<String, ThemeDescriptor> appThemes = {
     id: kGlassThemeId,
     displayName: 'LIQUID GLASS',
     builder: glassTheme,
+  ),
+  kAurisThemeId: ThemeDescriptor(
+    id: kAurisThemeId,
+    displayName: 'AURIS',
+    builder: aurisTheme,
   ),
 };
 

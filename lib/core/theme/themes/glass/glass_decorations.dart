@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/motion/ambient_signals.dart';
+import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
 import 'package:getman/core/theme/themes/glass/glass_palette.dart';
+import 'package:provider/provider.dart';
 
 /// Gaussian blur radius for frosted panels. Single tunable so the whole theme's
 /// blur intensity moves together.
@@ -138,13 +142,35 @@ BoxDecoration glassTabShape(
 /// BrandedTabBar selected-tab indicator for glass — the same glass lozenge,
 /// top-rounded only so the active PARAMS/HEADERS/BODY segment lifts off the
 /// translucent panel as a tab (flush bottom) instead of a floating blue bar.
-Decoration glassBrandedTabIndicator(BuildContext context) =>
-    glassSelectedTabBox(
-      context,
-      borderRadius: BorderRadius.vertical(
-        top: Radius.circular(context.appShape.buttonRadius),
-      ),
-    );
+// topBorder is accepted for API parity with the indicator hook but not used:
+// the glass lozenge is a rounded, top-cornered pill (no flat top edge to drop),
+// so it reads cleanly inside the Settings tab strip's dividers either way.
+Decoration glassBrandedTabIndicator(
+  BuildContext context, {
+  bool topBorder = true,
+}) => glassSelectedTabBox(
+  context,
+  borderRadius: BorderRadius.vertical(
+    top: Radius.circular(context.appShape.buttonRadius),
+  ),
+);
+
+/// How long a click impulse stays alive before the widget prunes it.
+const Duration _kImpulseLifetime = Duration(milliseconds: 1400);
+
+/// @visibleForTesting impulse counter — updated by the `_GlassWallpaperState`
+/// on each `_addImpulse` call; read by tests to assert click registration
+/// without accessing the private State class. Reset to 0 between tests.
+@visibleForTesting
+int debugGlassImpulseCount = 0;
+
+/// @visibleForTesting C2 sentinels — last activity/idle values read by the
+/// painter's paint() on the most recent frame. 0.0 when no pulse is plumbed
+/// (static / no-provider path). Read by rhythm tests to confirm C2 wiring.
+@visibleForTesting
+double debugGlassLastActivityLevel = 0;
+@visibleForTesting
+double debugGlassLastIdleFactor = 0;
 
 /// Full-effects wallpaper: animated drifting mesh gradient.
 Widget glassScaffoldBackground(BuildContext context, {required Widget child}) =>
@@ -186,6 +212,22 @@ class _GlassWallpaperState extends State<GlassWallpaper>
     const Offset(0.5, 0.35),
   );
 
+  // Active click impulse seeds (VM-C1). Appended on pointer-down, pruned by
+  // age. Only populated in animated mode.
+  final ValueNotifier<List<AmbientImpulse>> _impulses =
+      ValueNotifier<List<AmbientImpulse>>(const []);
+
+  // Widget-owned monotonic clock for impulse ageing.
+  final Stopwatch _clock = Stopwatch();
+
+  // Resolved from the provider once dependencies are available; null when no
+  // provider is registered (e.g. standalone tests).
+  WorkspacePulseController? _pulse;
+
+  // Inert stand-in when no provider is registered. Built lazily, disposed
+  // here (never by the provider layer).
+  WorkspacePulseController? _ownedIdlePulse;
+
   @override
   void initState() {
     super.initState();
@@ -194,8 +236,20 @@ class _GlassWallpaperState extends State<GlassWallpaper>
       duration: const Duration(seconds: 40),
     );
     if (widget.animate) {
+      _clock.start();
       WidgetsBinding.instance.addObserver(this);
       unawaited(_controller.repeat());
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Resolve pulse unconditionally (the Task 11 pulse-resolution lesson).
+    try {
+      _pulse = Provider.of<WorkspacePulseController>(context, listen: false);
+    } on ProviderNotFoundException {
+      _pulse = null;
     }
   }
 
@@ -204,9 +258,13 @@ class _GlassWallpaperState extends State<GlassWallpaper>
     super.didUpdateWidget(old);
     if (old.animate == widget.animate) return;
     if (widget.animate) {
+      _clock.start();
       WidgetsBinding.instance.addObserver(this);
       unawaited(_controller.repeat());
     } else {
+      _clock
+        ..stop()
+        ..reset();
       WidgetsBinding.instance.removeObserver(this);
       _controller.stop();
     }
@@ -227,7 +285,29 @@ class _GlassWallpaperState extends State<GlassWallpaper>
     if (widget.animate) WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     _pointer.dispose();
+    _impulses.dispose();
+    _ownedIdlePulse?.dispose();
     super.dispose();
+  }
+
+  /// The pulse to bundle into [AmbientSignals]: the real provider controller
+  /// when present, otherwise an inert idle stand-in we own. Built once.
+  WorkspacePulseController get _effectivePulse =>
+      _pulse ?? (_ownedIdlePulse ??= WorkspacePulseController());
+
+  void _addImpulse(Offset normalized) {
+    final nowMs = _clock.elapsedMilliseconds;
+    final cutoff = nowMs - _kImpulseLifetime.inMilliseconds;
+    // Prune aged entries while appending the fresh one (bounded list).
+    final next = <AmbientImpulse>[
+      for (final imp in _impulses.value)
+        if (imp.bornAtMs >= cutoff) imp,
+      AmbientImpulse(position: normalized, bornAtMs: nowMs),
+    ];
+    _impulses.value = next;
+    debugGlassImpulseCount = next.length;
+    // Clicking is activity — keep the session pulse awake (no-op if null).
+    _pulse?.touch();
   }
 
   @override
@@ -242,6 +322,17 @@ class _GlassWallpaperState extends State<GlassWallpaper>
     // Stopped (reduced mode) the controller never notifies -> one static frame;
     // running it drives the drift. Either way it's a valid repaint listenable.
     final t = _controller;
+
+    // Built only in animated mode; static passes null so nothing subscribes.
+    final signals = widget.animate
+        ? AmbientSignals(
+            pointer: _pointer,
+            impulses: _impulses,
+            pulse: _effectivePulse,
+            isDark: isDark,
+          )
+        : null;
+
     final stack = Stack(
       children: [
         Positioned.fill(
@@ -251,9 +342,9 @@ class _GlassWallpaperState extends State<GlassWallpaper>
                 t: t,
                 base: base,
                 blobs: blobs,
-                // Pass pointer only in animated mode: reduced-effects gets null
-                // so the painter doesn't subscribe and stays zero-cost.
-                pointer: widget.animate ? _pointer : null,
+                signals: signals,
+                hasPulse: _pulse != null,
+                clock: widget.animate ? _clock : null,
               ),
             ),
           ),
@@ -261,20 +352,37 @@ class _GlassWallpaperState extends State<GlassWallpaper>
         widget.child,
       ],
     );
-    // MouseRegion is only attached in animated mode.  The static (reduced-
-    // effects) path returns the Stack unwrapped so pointer moves never trigger
-    // a repaint there.
+    // Listener + MouseRegion are only attached in animated mode.  The static
+    // (reduced-effects) path returns the Stack unwrapped so pointer moves and
+    // clicks never trigger a repaint there.
     if (!widget.animate) return stack;
-    return MouseRegion(
-      onHover: (e) {
+    return Listener(
+      onPointerDown: (e) {
+        // Desktop/web only — touch events don't produce ambient ripples.
+        if (e.kind != PointerDeviceKind.mouse &&
+            e.kind != PointerDeviceKind.stylus) {
+          return;
+        }
         final size = context.size;
-        if (size == null) return;
-        _pointer.value = Offset(
-          e.localPosition.dx / size.width,
-          e.localPosition.dy / size.height,
+        if (size == null || size.isEmpty) return;
+        _addImpulse(
+          Offset(
+            (e.localPosition.dx / size.width).clamp(0.0, 1.0),
+            (e.localPosition.dy / size.height).clamp(0.0, 1.0),
+          ),
         );
       },
-      child: stack,
+      child: MouseRegion(
+        onHover: (e) {
+          final size = context.size;
+          if (size == null) return;
+          _pointer.value = Offset(
+            e.localPosition.dx / size.width,
+            e.localPosition.dy / size.height,
+          );
+        },
+        child: stack,
+      ),
     );
   }
 }
@@ -282,36 +390,76 @@ class _GlassWallpaperState extends State<GlassWallpaper>
 /// Paints the glass mesh wallpaper: a base fill plus three drifting
 /// radial-gradient blobs, and (in animated mode only) a soft specular sheen
 /// that follows the cursor. Mirrors `rpg_decorations.dart`'s
-/// `_StarfieldPainter` — a reused `Paint`, repaint driven by the animation,
-/// and zero per-frame widget allocation (the previous widget-tree approach
-/// rebuilt three `DecoratedBox`es every frame).
+/// `_StarfieldPainter` — reused [Paint] objects, repaint driven by the
+/// animation, and zero per-frame allocation (the previous widget-tree approach
+/// rebuilt three `DecoratedBox`es every frame; the earlier per-frame `sheen`
+/// Paint allocation has been moved to a field).
 ///
-/// [pointer] is null in reduced-effects mode: the repaint listenable only
-/// includes `t` then, so pointer moves never cause a repaint in static mode.
+/// [signals] is null in reduced-effects mode: the repaint listenable only
+/// includes `t` then, so pointer moves and clicks never cause a repaint in
+/// static mode.
 class _GlassMeshPainter extends CustomPainter {
   _GlassMeshPainter({
     required this.t,
     required this.base,
     required this.blobs,
-    this.pointer,
-  }) : super(
-         repaint: pointer == null ? t : Listenable.merge([t, pointer]),
-       );
+    this.signals,
+    this.hasPulse = false,
+    this.clock,
+  }) : super(repaint: _repaintFor(t, signals, hasPulse));
 
   final Animation<double> t;
   final Color base;
   final List<Color> blobs;
 
-  /// Non-null only in animated mode; drives the specular sheen position.
-  final ValueListenable<Offset>? pointer;
+  /// Non-null only in animated mode; drives sheen + ripples.
+  final AmbientSignals? signals;
+  final bool hasPulse;
 
-  // Reused across blobs/frames — only `.shader` changes per blob.
+  /// Monotonic clock for impulse age computation; null in static mode.
+  final Stopwatch? clock;
+
+  // Reused across blobs/frames — only `.shader`/`.color` changes per draw.
   final Paint _paint = Paint();
+
+  // Specular sheen paint — reused across frames (was incorrectly allocated
+  // inside paint() before C1 work; moved to a field to eliminate per-frame
+  // Paint construction).
+  // Colors.white is allowed in lib/core/theme (exempt from
+  // avoid_hardcoded_brand_colors).
+  final Paint _sheenPaint = Paint()..blendMode = BlendMode.plus;
+
+  // Reused stroke paint for glass ripples (C1).
+  final Paint _ripplePaint = Paint()..style = PaintingStyle.stroke;
+
+  static Listenable _repaintFor(
+    Animation<double> t,
+    AmbientSignals? signals,
+    bool hasPulse,
+  ) {
+    if (signals == null) return t;
+    return Listenable.merge([
+      t,
+      signals.pointer,
+      signals.impulses,
+      if (hasPulse) signals.pulse,
+    ]);
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
     final v = t.value;
     final rect = Offset.zero & size;
+
+    // C2 session rhythm: read pulse values defensively (null-safe).
+    // activityLevel (0..1) → intensify blob opacity when busy.
+    // idleFactor (0..1) → dim and calm the mesh when idle.
+    final activityLevel = signals?.pulse.activityLevel ?? 0.0;
+    final idleFactor = signals?.pulse.idleFactor ?? 0.0;
+    // Write sentinels for tests.
+    debugGlassLastActivityLevel = activityLevel;
+    debugGlassLastIdleFactor = idleFactor;
+
     // Base fill (clear any shader left from the previous frame's last blob).
     canvas.drawRect(
       rect,
@@ -319,51 +467,110 @@ class _GlassMeshPainter extends CustomPainter {
         ..shader = null
         ..color = base,
     );
+
+    // C1 cursor force: blobs lean slightly toward the pointer. Each blob centre
+    // is offset a fraction of the way toward the pointer, giving the mesh a
+    // subtle magnetic "pull toward cursor" feel.
+    final ptr = signals?.pointer.value;
+    final ptrAlign = ptr != null
+        ? Alignment((ptr.dx * 2 - 1) * 0.12, (ptr.dy * 2 - 1) * 0.12)
+        : Alignment.center;
+
     final centers = <Alignment>[
-      Alignment(-0.8 + 0.2 * _wave(v), -0.9 + 0.15 * _wave(v + 0.33)),
-      Alignment(0.9 - 0.2 * _wave(v + 0.5), -0.8 + 0.15 * _wave(v)),
-      Alignment(0.4 * _wave(v + 0.66), 0.95 - 0.1 * _wave(v + 0.2)),
+      Alignment(
+        -0.8 + 0.2 * _wave(v) + ptrAlign.x,
+        -0.9 + 0.15 * _wave(v + 0.33) + ptrAlign.y,
+      ),
+      Alignment(
+        0.9 - 0.2 * _wave(v + 0.5) + ptrAlign.x,
+        -0.8 + 0.15 * _wave(v) + ptrAlign.y,
+      ),
+      Alignment(
+        0.4 * _wave(v + 0.66) + ptrAlign.x,
+        0.95 - 0.1 * _wave(v + 0.2) + ptrAlign.y,
+      ),
     ];
+    // C2: activity intensifies blob opacity; idle dims it.
+    // Base blob alpha 0.55; boost up to 0.72 on full activity, down to 0.33 on
+    // full idle. Multipliers are cheap arithmetic — no per-frame alloc.
+    final blobAlpha =
+        (0.55 * (1 + 0.31 * activityLevel) * (1 - 0.4 * idleFactor)).clamp(
+          0.0,
+          1.0,
+        );
     for (var i = 0; i < blobs.length; i++) {
       final blobRect = Rect.fromCircle(
         center: centers[i].alongSize(size),
         radius: size.shortestSide * 1.1,
       );
       _paint.shader = RadialGradient(
-        colors: [blobs[i].withValues(alpha: 0.55), Colors.transparent],
+        colors: [
+          blobs[i].withValues(alpha: blobAlpha),
+          Colors.transparent,
+        ],
       ).createShader(blobRect);
       canvas.drawRect(rect, _paint);
     }
 
-    // Specular sheen: only in animated mode (pointer != null).
+    // Specular sheen: only in animated mode (signals != null).
     // A soft radial near-white highlight that follows the cursor, blended with
     // BlendMode.plus so it brightens the mesh rather than covering it.
-    // Colors.white is allowed here — lib/core/theme is exempt from the
-    // avoid_hardcoded_brand_colors lint.
-    final ptr = pointer;
+    // C2: dim the sheen when idle; intensify slightly when active.
     if (ptr != null) {
-      final p = ptr.value;
-      final center = Offset(p.dx * size.width, p.dy * size.height);
-      final sheen = Paint()
+      final center = Offset(ptr.dx * size.width, ptr.dy * size.height);
+      // C2: sheen alpha dims on idle (0.06 → 0.03), brightens on activity
+      // (0.06 → 0.10). Cheap multiplier — no per-frame alloc.
+      final sheenAlpha =
+          (0.06 * (1 + 0.67 * activityLevel) * (1 - 0.5 * idleFactor)).clamp(
+            0.0,
+            1.0,
+          );
+      _sheenPaint.shader =
+          RadialGradient(
+            colors: [
+              // theme-internal near-white; Colors.white is allowed in
+              // lib/core/theme (exempt from avoid_hardcoded_brand_colors).
+              Colors.white.withValues(alpha: sheenAlpha),
+              const Color(0x00000000),
+            ],
+          ).createShader(
+            Rect.fromCircle(center: center, radius: size.shortestSide * 0.6),
+          );
+      canvas.drawRect(rect, _sheenPaint);
+    }
+
+    // C1 click ripple: an expanding translucent ring per impulse. Glass variant
+    // uses BlendMode.plus so it brightens the mesh — the "liquid" look.
+    final nowMs = clock?.elapsedMilliseconds ?? 0;
+    const kRippleLifetimeMs = 1400;
+    for (final imp in signals?.impulses.value ?? const <AmbientImpulse>[]) {
+      final ageMs = nowMs - imp.bornAtMs;
+      if (ageMs < 0 || ageMs > kRippleLifetimeMs) continue;
+      final age01 = ageMs / kRippleLifetimeMs;
+      final rippleRadius = size.shortestSide * 0.25 * age01;
+      final alpha = 0.22 * math.sin(age01 * math.pi);
+      if (alpha <= 0 || rippleRadius <= 0) continue;
+      final center = Offset(
+        imp.position.dx * size.width,
+        imp.position.dy * size.height,
+      );
+      // Colors.white is allowed in lib/core/theme (exempt from lint).
+      _ripplePaint
+        ..shader = null
         ..blendMode = BlendMode.plus
-        ..shader =
-            RadialGradient(
-              colors: [
-                // theme-internal near-white highlight; Colors.white is allowed
-                // under lib/core/theme (exempt from avoid_hardcoded_brand_colors).
-                Colors.white.withValues(alpha: 0.06),
-                const Color(0x00000000),
-              ],
-            ).createShader(
-              Rect.fromCircle(center: center, radius: size.shortestSide * 0.6),
-            );
-      canvas.drawRect(rect, sheen);
+        ..color = Colors.white.withValues(alpha: alpha)
+        ..strokeWidth = 2.0;
+      canvas.drawCircle(center, rippleRadius, _ripplePaint);
     }
   }
 
   @override
   bool shouldRepaint(covariant _GlassMeshPainter old) =>
-      old.base != base || old.blobs != blobs || old.pointer != pointer;
+      old.base != base ||
+      old.blobs != blobs ||
+      old.signals != signals ||
+      old.hasPulse != hasPulse ||
+      old.clock != clock;
 }
 
 // C0-continuous oscillation in -1..1 (no dart:math import in the hot path).

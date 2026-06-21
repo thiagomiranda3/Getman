@@ -52,7 +52,297 @@ AppMotion brutalistMotion({required bool reduceEffects}) {
         _BrutalReactionOverlay(controller: controller, child: child),
     sendAffordance: (context, {required child, required isSending}) =>
         _BrutalStampSend(isSending: isSending, child: child),
+    inFlightFrame: (context, {required child, required isSending}) =>
+        _BrutalistInFlightFrame(isSending: isSending, child: child),
+    contentTransition: (context, {required child, required transitionKey}) =>
+        _BrutalistContentTransition(transitionKey: transitionKey, child: child),
+    tabChipTransition: (context, {required child, required animation}) =>
+        _brutalistChipEntrance(animation, child),
+    treeDragFeedback: (context, {required child}) =>
+        _BrutalistTreeDragFeedback(child: child),
+    treeDropHighlight: (context, {required child, required active}) =>
+        _BrutalistTreeDropHighlight(active: active, child: child),
+    treeExpandFlourish: (context, {required child, required expanded}) =>
+        _BrutalistTreeExpandFlourish(expanded: expanded, child: child),
   );
+}
+
+/// Brutalist chip entrance: hard slam-in — overshoot scale (1.18→1.0) + fade.
+/// The overshoot gives the characteristic brutalist "thud" feel.
+Widget _brutalistChipEntrance(Animation<double> animation, Widget child) {
+  final curved = CurvedAnimation(
+    parent: animation,
+    curve: Curves.easeOutBack, // natural overshoot
+  );
+  // Scale overshoots slightly above 1.0 then snaps back — brutalist "slam".
+  final scale = Tween<double>(begin: 0, end: 1).animate(curved);
+  return FadeTransition(
+    opacity: CurvedAnimation(parent: animation, curve: Curves.easeIn),
+    child: ScaleTransition(scale: scale, child: child),
+  );
+}
+
+/// Slam-in content transition: a thick ink bar slams in from the left edge and
+/// retracts (printing-press platen), revealing the new content (~380 ms).
+class _BrutalistContentTransition extends StatefulWidget {
+  const _BrutalistContentTransition({
+    required this.transitionKey,
+    required this.child,
+  });
+
+  final String transitionKey;
+  final Widget child;
+
+  @override
+  State<_BrutalistContentTransition> createState() =>
+      _BrutalistContentTransitionState();
+}
+
+class _BrutalistContentTransitionState
+    extends State<_BrutalistContentTransition>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 380),
+  );
+
+  @override
+  void didUpdateWidget(_BrutalistContentTransition old) {
+    super.didUpdateWidget(old);
+    if (old.transitionKey != widget.transitionKey) {
+      unawaited(_c.forward(from: 0));
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Use AppPalette when available (normal runtime); fall back to colorScheme
+    // for test environments that don't supply the full brutalist ThemeData.
+    final palette = Theme.of(context).extension<AppPalette>();
+    final accent =
+        palette?.statusSuccess ?? Theme.of(context).colorScheme.primary;
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child, // hoisted — entire tab content NOT rebuilt per frame
+      builder: (ctx, child) {
+        if (_c.value == 0 || _c.value == 1) return child!;
+        return Stack(
+          children: [
+            child!,
+            Positioned.fill(
+              key: const ValueKey<String>('content_transition_overlay'),
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _BrutalistSlamPainter(t: _c.value, color: accent),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Ink-bar slam: sweeps in from the left (0→0.45), holds a beat, then snaps
+/// out to the right (0.45→1). The bar is solid, thick, and hard-edged —
+/// quintessentially brutalist. Reuses Paint; no per-frame allocation.
+class _BrutalistSlamPainter extends CustomPainter {
+  _BrutalistSlamPainter({required this.t, required this.color});
+  final double t;
+  final Color color;
+
+  // Hoisted Paint — reused across frames.
+  final Paint _fillPaint = Paint();
+  final Paint _edgePaint = Paint()..style = PaintingStyle.stroke;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Phase 0→0.45: bar slams in from left, covering full width at 0.45.
+    // Phase 0.45→1: bar snaps out to the right.
+    double coverFrac;
+    double alpha;
+
+    if (t < 0.45) {
+      coverFrac = Curves.easeOut.transform(t / 0.45);
+      alpha = 0.82;
+    } else {
+      coverFrac = 1.0 - Curves.easeIn.transform((t - 0.45) / 0.55);
+      alpha = 0.82 * (1.0 - Curves.easeIn.transform((t - 0.45) / 0.55));
+    }
+
+    if (coverFrac <= 0) return;
+
+    final barW = size.width * coverFrac;
+
+    _fillPaint.color = color.withValues(alpha: alpha * 0.9);
+    canvas.drawRect(Rect.fromLTWH(0, 0, barW, size.height), _fillPaint);
+
+    // Hard right edge line.
+    _edgePaint
+      ..strokeWidth = 4
+      ..color = color.withValues(alpha: alpha);
+    canvas.drawLine(Offset(barW, 0), Offset(barW, size.height), _edgePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _BrutalistSlamPainter old) =>
+      old.t != t || old.color != color;
+}
+
+/// Marching ink loading-bar along the top edge while [isSending].
+/// Translating stripes — continuous motion, NOT a strobe (well under 3 Hz).
+class _BrutalistInFlightFrame extends StatefulWidget {
+  const _BrutalistInFlightFrame({required this.isSending, required this.child});
+  final bool isSending;
+  final Widget child;
+
+  @override
+  State<_BrutalistInFlightFrame> createState() =>
+      _BrutalistInFlightFrameState();
+}
+
+class _BrutalistInFlightFrameState extends State<_BrutalistInFlightFrame>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800), // march period ~1.8 s
+    );
+    if (widget.isSending) unawaited(_c.repeat());
+  }
+
+  @override
+  void didUpdateWidget(_BrutalistInFlightFrame old) {
+    super.didUpdateWidget(old);
+    // Edge-detect on old.isSending (THEME_AUTHORING §3 restart guard).
+    if (widget.isSending && !old.isSending) {
+      unawaited(_c.repeat());
+    } else if (!widget.isSending && old.isSending) {
+      _c
+        ..stop()
+        ..value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.isSending) return widget.child;
+    final accent = context.appPalette.statusSuccess;
+    // Child hoisted out of per-frame rebuilds.
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child,
+      builder: (context, child) => Stack(
+        children: [
+          child!,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _BrutalistMarchingFramePainter(
+                  phase: _c.value,
+                  color: accent,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A thick bar along the top and left edges carrying marching diagonal stripes.
+/// All motion is continuous translation — no opacity strobe.
+///
+/// Paint objects are hoisted as instance fields; color is mutated in paint().
+/// Stripe geometry is drawn with canvas.drawPath on a single reused Path field
+/// (reset each frame) — no Paint()/Path() construction inside paint().
+class _BrutalistMarchingFramePainter extends CustomPainter {
+  _BrutalistMarchingFramePainter({
+    required this.phase,
+    required this.color,
+  });
+  final double phase;
+  final Color color;
+
+  // Hoisted Paints — allocated once, color mutated per frame in paint().
+  final Paint _solidPaint = Paint();
+  final Paint _stripePaint = Paint();
+
+  // Reused Path — reset each frame via reset(); no per-stripe allocation.
+  final Path _path = Path();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const barH = 5.0; // top bar height
+    const dash = 14.0;
+    const gap = 10.0;
+    const pitch = dash + gap;
+
+    _solidPaint.color = color.withValues(alpha: 0.8);
+    _stripePaint.color = color.withValues(alpha: 0.35);
+
+    // Draw top edge bar.
+    final offset = (phase * pitch) % pitch;
+    canvas
+      ..save()
+      ..clipRect(Rect.fromLTWH(0, 0, size.width, barH))
+      // Solid base.
+      ..drawRect(Rect.fromLTWH(0, 0, size.width, barH), _solidPaint);
+
+    // Marching diagonal stripes (offset advances with phase).
+    for (var x = -pitch + offset; x < size.width + barH; x += pitch) {
+      // Diagonal stripe: a parallelogram tilted 45°.
+      _path
+        ..reset()
+        ..moveTo(x, 0)
+        ..lineTo(x + dash, 0)
+        ..lineTo(x + dash + barH, barH)
+        ..lineTo(x + barH, barH)
+        ..close();
+      canvas.drawPath(_path, _stripePaint);
+    }
+    canvas.restore();
+
+    // Draw left edge bar (same height as barH but rotated).
+    final leftBarRect = Rect.fromLTWH(0, barH, barH, size.height - barH);
+    canvas
+      ..save()
+      ..clipRect(leftBarRect)
+      ..drawRect(leftBarRect, _solidPaint);
+    for (var y = barH - pitch + offset; y < size.height + barH; y += pitch) {
+      _path
+        ..reset()
+        ..moveTo(0, y)
+        ..lineTo(barH, y + barH)
+        ..lineTo(barH, y + barH + dash)
+        ..lineTo(0, y + dash)
+        ..close();
+      canvas.drawPath(_path, _stripePaint);
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _BrutalistMarchingFramePainter old) =>
+      old.phase != phase || old.color != color;
 }
 
 class _BrutalReactionOverlay extends StatefulWidget {
@@ -347,6 +637,10 @@ class _MarchingBarPainter extends CustomPainter {
   /// Drives the march: 0→1 as the build controller advances.
   final double phase;
 
+  // Reused across frames — only `.color` is mutated in paint() (no per-frame
+  // Paint allocation on the hot in-flight path).
+  final Paint _paint = Paint();
+
   @override
   void paint(Canvas canvas, Size size) {
     const h = 4.0;
@@ -354,7 +648,7 @@ class _MarchingBarPainter extends CustomPainter {
     const dashPitch = dash * 2; // gap == dash width
     final y = size.height - h;
     final w = size.width * (0.15 + 0.85 * tension);
-    final paint = Paint()..color = color;
+    _paint.color = color;
 
     // Clip so dashes never paint outside the bar bounds.
     canvas
@@ -365,7 +659,7 @@ class _MarchingBarPainter extends CustomPainter {
     final offset = (phase * dashPitch) % dashPitch;
     // Start one pitch before 0 so a partial dash can march in from the left.
     for (var x = -dashPitch + offset; x < w; x += dashPitch) {
-      canvas.drawRect(Rect.fromLTWH(x, y, dash, h), paint);
+      canvas.drawRect(Rect.fromLTWH(x, y, dash, h), _paint);
     }
 
     canvas.restore();
@@ -374,4 +668,140 @@ class _MarchingBarPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _MarchingBarPainter old) =>
       old.tension != tension || old.color != color || old.phase != phase;
+}
+
+// ---------------------------------------------------------------------------
+// VM-B3: Tree drag/drop/expand juice — Brutalist
+// ---------------------------------------------------------------------------
+
+/// Ink-stamp slab chip shown under cursor while dragging a tree node.
+/// Hard edges, thick border — quintessentially brutalist.
+class _BrutalistTreeDragFeedback extends StatelessWidget {
+  const _BrutalistTreeDragFeedback({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    // Use AppPalette when available; fall back to colorScheme.primary.
+    final palette = Theme.of(context).extension<AppPalette>();
+    final color =
+        palette?.statusSuccess ?? Theme.of(context).colorScheme.primary;
+    return Material(
+      type: MaterialType.transparency,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          border: Border.all(color: color, width: 3),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// Slam outline: hard thick border flashes around a drop target while [active].
+class _BrutalistTreeDropHighlight extends StatefulWidget {
+  const _BrutalistTreeDropHighlight({
+    required this.active,
+    required this.child,
+  });
+  final bool active;
+  final Widget child;
+
+  @override
+  State<_BrutalistTreeDropHighlight> createState() =>
+      _BrutalistTreeDropHighlightState();
+}
+
+class _BrutalistTreeDropHighlightState
+    extends State<_BrutalistTreeDropHighlight>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 200), // brutalist = fast snap
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.active) _c.value = 1.0;
+  }
+
+  @override
+  void didUpdateWidget(_BrutalistTreeDropHighlight old) {
+    super.didUpdateWidget(old);
+    if (widget.active && !old.active) {
+      unawaited(_c.forward(from: 0));
+    } else if (!widget.active && old.active) {
+      unawaited(_c.reverse());
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.active && _c.value == 0) return widget.child;
+    final palette = Theme.of(context).extension<AppPalette>();
+    final color =
+        palette?.statusSuccess ?? Theme.of(context).colorScheme.primary;
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child, // hoisted — not rebuilt per frame
+      builder: (ctx, child) {
+        if (_c.value == 0) return child!;
+        return Stack(
+          children: [
+            child!, // child first — receives taps/drops
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    // No border-radius — brutalist is sharp
+                    border: Border.all(
+                      color: color.withValues(alpha: _c.value),
+                      width: 4,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Overshoot-bounce scale flourish on the expand icon.
+///
+/// Uses a [ValueKey] on [expanded] to restart the tween each toggle.
+/// [Transform.scale] does not affect layout — row height stays fixed.
+class _BrutalistTreeExpandFlourish extends StatelessWidget {
+  const _BrutalistTreeExpandFlourish({
+    required this.expanded,
+    required this.child,
+  });
+  final bool expanded;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    // Animate: slam in at 1.2, then ease back to 1.0 with overshoot.
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(expanded),
+      tween: Tween(begin: 1.2, end: 1),
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutBack,
+      builder: (ctx, v, ch) => Transform.scale(scale: v, child: ch),
+      child: child,
+    );
+  }
 }
