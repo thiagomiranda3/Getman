@@ -5,14 +5,19 @@ import 'package:flutter/foundation.dart';
 import 'package:getman/core/audio/theme_sound_service.dart';
 import 'package:getman/core/theme/motion/theme_reaction.dart';
 
-/// audioplayers-backed sound service for native platforms.
+/// audioplayers-backed sound service used on every platform.
+///
+/// `audioplayers` is cross-platform — the federated `audioplayers_web` backend
+/// ships the web implementation — so there is no web no-op stub: web plays the
+/// same cues as native (gated by the user's opt-in `enableThemeSounds` and the
+/// browser's user-activation policy, which a SEND click satisfies).
 ///
 /// Defensive: the [AudioPlayer] is constructed lazily on the first [play] call
 /// so no platform channel is touched at construction time (safe in headless
 /// tests, CI, and platforms without an audio backend). Any failure — missing
-/// asset, no GStreamer on Linux, headless environment — is caught and logged so
-/// audio never crashes the app.
-class IoThemeSoundService implements ThemeSoundService {
+/// asset, no GStreamer on Linux, headless environment, a browser blocking
+/// autoplay — is caught and logged so audio never crashes the app.
+class AudioPlayersThemeSoundService implements ThemeSoundService {
   AudioPlayer? _player;
 
   /// True while a play() is mid stop/start. Overlapping stop()/play() calls on
@@ -77,4 +82,5 @@ class IoThemeSoundService implements ThemeSoundService {
   }
 }
 
-ThemeSoundService createThemeSoundServiceImpl() => IoThemeSoundService();
+ThemeSoundService createThemeSoundServiceImpl() =>
+    AudioPlayersThemeSoundService();
