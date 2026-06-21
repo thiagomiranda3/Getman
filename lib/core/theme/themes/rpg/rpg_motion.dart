@@ -65,23 +65,29 @@ AppMotion rpgMotion({required bool reduceEffects}) {
 
 /// Arcane chip entrance: unfurl (scaleX 0→1, left-aligned) + fade — like a
 /// scroll unrolling from the left edge.
+///
+/// Uses [Transform] (not [SizeTransition]) so the chip claims its full layout
+/// width immediately and the strip never reflows during the entrance.  Only
+/// the *painting* is horizontally scaled, anchored to the left edge.
 Widget _rpgChipEntrance(Animation<double> animation, Widget child) {
   final curved = CurvedAnimation(
     parent: animation,
     curve: Curves.easeOutCubic,
   );
-  // SizeTransition on the horizontal axis gives the "unrolling scroll" unfurl.
-  return FadeTransition(
-    opacity: curved,
-    child: Align(
-      alignment: Alignment.centerLeft,
-      child: SizeTransition(
-        sizeFactor: curved,
-        axis: Axis.horizontal,
-        axisAlignment: -1, // anchors to left edge
-        child: child,
-      ),
-    ),
+  return AnimatedBuilder(
+    animation: curved,
+    child: child, // hoisted — child is not rebuilt per frame
+    builder: (context, child) {
+      final scale = curved.value.clamp(0.0, 1.0);
+      return FadeTransition(
+        opacity: curved,
+        child: Transform(
+          transform: Matrix4.diagonal3Values(scale, 1, 1),
+          alignment: Alignment.centerLeft,
+          child: child,
+        ),
+      );
+    },
   );
 }
 

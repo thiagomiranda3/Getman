@@ -105,16 +105,29 @@ void main() {
     },
   );
 
-  testWidgets('rpg tabChipTransition has FadeTransition at 0.5', (t) async {
-    final motion = rpgMotion(reduceEffects: false);
-    await t.pumpWidget(_buildChip(motion));
-    expect(
-      _fadeFinder,
-      findsWidgets,
-      reason: 'rpg entrance should use FadeTransition',
-    );
-    expect(find.text('chip'), findsOneWidget);
-  });
+  testWidgets(
+    'rpg tabChipTransition has FadeTransition + Transform (scaleX) at 0.5',
+    (t) async {
+      final motion = rpgMotion(reduceEffects: false);
+      await t.pumpWidget(_buildChip(motion));
+      expect(
+        _fadeFinder,
+        findsWidgets,
+        reason: 'rpg entrance should use FadeTransition',
+      );
+      // Layout-neutral horizontal scale: Transform (not SizeTransition) so the
+      // strip does not reflow during the entrance animation.
+      expect(
+        find.descendant(
+          of: find.byType(_IdentityWrapper),
+          matching: find.byType(Transform),
+        ),
+        findsWidgets,
+        reason: 'rpg entrance should use Transform for layout-neutral scaleX',
+      );
+      expect(find.text('chip'), findsOneWidget);
+    },
+  );
 
   testWidgets('brutalist tabChipTransition has FadeTransition at 0.5', (
     t,
