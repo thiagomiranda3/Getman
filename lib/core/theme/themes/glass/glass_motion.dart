@@ -208,15 +208,16 @@ class _GlassInFlightFrame extends StatefulWidget {
 
 class _GlassInFlightFrameState extends State<_GlassInFlightFrame>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    // 1.6 s breathe — well under 3 Hz
-    duration: const Duration(milliseconds: 1600),
-  );
+  late final AnimationController _c;
 
   @override
   void initState() {
     super.initState();
+    _c = AnimationController(
+      vsync: this,
+      // 1.6 s breathe — well under 3 Hz
+      duration: const Duration(milliseconds: 1600),
+    );
     if (widget.isSending) unawaited(_c.repeat(reverse: true));
   }
 

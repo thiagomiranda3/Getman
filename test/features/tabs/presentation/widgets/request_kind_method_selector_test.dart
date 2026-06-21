@@ -167,7 +167,8 @@ void main() {
     // occurs in the DISPOSED element after onChanged fires and the overlay
     // closes. This is a layout timing artifact, not a real app bug.
     await tester.pump(const Duration(milliseconds: 16));
-    tester.takeException(); // consume any dispose-time overflow artifact
+    // Flutter DropdownButton dismiss-animation layout artifact — ignore.
+    tester.takeException();
     await tester.pumpAndSettle();
 
     expect(bloc.state.tabs.byId('t3')!.config.method, 'POST');

@@ -210,14 +210,15 @@ class _BrutalistInFlightFrame extends StatefulWidget {
 
 class _BrutalistInFlightFrameState extends State<_BrutalistInFlightFrame>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1800), // march period ~1.8 s
-  );
+  late final AnimationController _c;
 
   @override
   void initState() {
     super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800), // march period ~1.8 s
+    );
     if (widget.isSending) unawaited(_c.repeat());
   }
 

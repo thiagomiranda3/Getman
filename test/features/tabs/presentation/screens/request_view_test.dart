@@ -207,20 +207,8 @@ void main() {
     await _pump(tester, tabsBloc: tabsBloc, tabId: 'rv1');
 
     expect(find.byKey(const ValueKey('url_field')), findsOneWidget);
-    // _BrutalistInFlightFrame has a `late final _c` AnimationController that is
-    // lazily initialized. When isSending stays false the field is never touched
-    // in build(); dispose() then touches it for the first time on a deactivated
-    // element, throwing a known Flutter assertion. Consume it here and assert
-    // it is specifically the expected ticker-mode assertion, not an app error.
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
-    final ex = tester.takeException();
-    expect(
-      ex == null ||
-          ex.toString().contains('ancestor') ||
-          ex.toString().contains('deactivated'),
-      isTrue,
-      reason: 'Unexpected exception: $ex',
-    );
+    expect(tester.takeException(), isNull);
     await tester.pump(const Duration(seconds: 11));
   });
 
@@ -246,8 +234,7 @@ void main() {
       );
 
       await tester.pumpWidget(const MaterialApp(home: SizedBox()));
-      // consume the known _BrutalistInFlightFrame dispose assertion
-      tester.takeException();
+      expect(tester.takeException(), isNull);
       await tester.pump(const Duration(seconds: 11));
     },
   );
@@ -273,8 +260,7 @@ void main() {
       );
 
       await tester.pumpWidget(const MaterialApp(home: SizedBox()));
-      // consume the known _BrutalistInFlightFrame dispose assertion
-      tester.takeException();
+      expect(tester.takeException(), isNull);
       await tester.pump(const Duration(seconds: 11));
     },
   );
@@ -329,10 +315,8 @@ void main() {
 
     await _pump(tester, tabsBloc: tabsBloc, tabId: 'rv5');
 
-    // Unmount and consume the known _BrutalistInFlightFrame dispose assertion.
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
-    // expected: _BrutalistInFlightFrame late-init dispose bug
-    tester.takeException();
+    expect(tester.takeException(), isNull);
     await tester.pump(const Duration(seconds: 11));
   });
 }

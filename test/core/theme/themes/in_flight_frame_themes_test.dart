@@ -241,6 +241,121 @@ void main() {
   );
 
   // ---------------------------------------------------------------------------
+  // dispose-safety: mount with isSending:false for entire lifetime, then
+  // unmount — must NOT crash (lazy-init controller dispose-time vsync crash).
+  // ---------------------------------------------------------------------------
+
+  group('dispose with isSending:false never touched', () {
+    testWidgets('brutalist dispose is clean', (tester) async {
+      final theme = brutalistTheme(Brightness.light);
+      final motion = brutalistMotion(reduceEffects: false);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: motion.inFlightFrame(
+                context,
+                isSending: false,
+                child: const Text('x'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      await tester.pumpAndSettle();
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'brutalist crashed on dispose',
+      );
+    });
+
+    testWidgets('rpg dispose is clean', (tester) async {
+      final theme = rpgTheme(Brightness.light);
+      final motion = rpgMotion(reduceEffects: false);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: motion.inFlightFrame(
+                context,
+                isSending: false,
+                child: const Text('x'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      await tester.pumpAndSettle();
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'rpg crashed on dispose',
+      );
+    });
+
+    testWidgets('glass dispose is clean', (tester) async {
+      final theme = glassTheme(Brightness.light);
+      final motion = glassMotion(reduceEffects: false);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: motion.inFlightFrame(
+                context,
+                isSending: false,
+                child: const Text('x'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      await tester.pumpAndSettle();
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'glass crashed on dispose',
+      );
+    });
+
+    testWidgets('auris dispose is clean', (tester) async {
+      final theme = aurisTheme(Brightness.dark);
+      final motion = aurisMotion(reduceEffects: false);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: motion.inFlightFrame(
+                context,
+                isSending: false,
+                child: const Text('x'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      await tester.pumpAndSettle();
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'auris crashed on dispose',
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // reduceEffects → identity (all four return child unchanged)
   // ---------------------------------------------------------------------------
 

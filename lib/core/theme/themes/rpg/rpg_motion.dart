@@ -253,14 +253,15 @@ class _RpgInFlightFrame extends StatefulWidget {
 
 class _RpgInFlightFrameState extends State<_RpgInFlightFrame>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2400), // circuit trace period
-  );
+  late final AnimationController _c;
 
   @override
   void initState() {
     super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400), // circuit trace period
+    );
     if (widget.isSending) unawaited(_c.repeat());
   }
 
