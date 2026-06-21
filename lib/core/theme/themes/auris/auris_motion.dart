@@ -31,6 +31,22 @@ AppMotion aurisMotion({required bool reduceEffects}) {
         _AurisInFlightFrame(isSending: isSending, child: child),
     contentTransition: (context, {required child, required transitionKey}) =>
         _AurisContentTransition(transitionKey: transitionKey, child: child),
+    tabChipTransition: (context, {required child, required animation}) =>
+        _aurisChipEntrance(animation, child),
+  );
+}
+
+/// AURIS chip entrance: HUD fade-in — fade + small upward scale (0.92→1.0),
+/// scheme-independent so it works regardless of whether AurisScheme is present.
+Widget _aurisChipEntrance(Animation<double> animation, Widget child) {
+  final curved = CurvedAnimation(
+    parent: animation,
+    curve: Curves.easeOutCubic,
+  );
+  final scale = Tween<double>(begin: 0.92, end: 1).animate(curved);
+  return FadeTransition(
+    opacity: curved,
+    child: ScaleTransition(scale: scale, child: child),
   );
 }
 

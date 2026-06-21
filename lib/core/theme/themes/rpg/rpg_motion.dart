@@ -58,6 +58,30 @@ AppMotion rpgMotion({required bool reduceEffects}) {
         _RpgInFlightFrame(isSending: isSending, child: child),
     contentTransition: (context, {required child, required transitionKey}) =>
         _RpgContentTransition(transitionKey: transitionKey, child: child),
+    tabChipTransition: (context, {required child, required animation}) =>
+        _rpgChipEntrance(animation, child),
+  );
+}
+
+/// Arcane chip entrance: unfurl (scaleX 0→1, left-aligned) + fade — like a
+/// scroll unrolling from the left edge.
+Widget _rpgChipEntrance(Animation<double> animation, Widget child) {
+  final curved = CurvedAnimation(
+    parent: animation,
+    curve: Curves.easeOutCubic,
+  );
+  // SizeTransition on the horizontal axis gives the "unrolling scroll" unfurl.
+  return FadeTransition(
+    opacity: curved,
+    child: Align(
+      alignment: Alignment.centerLeft,
+      child: SizeTransition(
+        sizeFactor: curved,
+        axis: Axis.horizontal,
+        axisAlignment: -1, // anchors to left edge
+        child: child,
+      ),
+    ),
   );
 }
 

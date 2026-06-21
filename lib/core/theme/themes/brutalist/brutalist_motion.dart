@@ -56,6 +56,23 @@ AppMotion brutalistMotion({required bool reduceEffects}) {
         _BrutalistInFlightFrame(isSending: isSending, child: child),
     contentTransition: (context, {required child, required transitionKey}) =>
         _BrutalistContentTransition(transitionKey: transitionKey, child: child),
+    tabChipTransition: (context, {required child, required animation}) =>
+        _brutalistChipEntrance(animation, child),
+  );
+}
+
+/// Brutalist chip entrance: hard slam-in — overshoot scale (1.18→1.0) + fade.
+/// The overshoot gives the characteristic brutalist "thud" feel.
+Widget _brutalistChipEntrance(Animation<double> animation, Widget child) {
+  final curved = CurvedAnimation(
+    parent: animation,
+    curve: Curves.easeOutBack, // natural overshoot
+  );
+  // Scale overshoots slightly above 1.0 then snaps back — brutalist "slam".
+  final scale = Tween<double>(begin: 0, end: 1).animate(curved);
+  return FadeTransition(
+    opacity: CurvedAnimation(parent: animation, curve: Curves.easeIn),
+    child: ScaleTransition(scale: scale, child: child),
   );
 }
 

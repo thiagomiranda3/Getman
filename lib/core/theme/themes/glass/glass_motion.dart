@@ -62,6 +62,18 @@ AppMotion glassMotion({required bool reduceEffects}) {
         _GlassInFlightFrame(isSending: isSending, child: child),
     contentTransition: (context, {required child, required transitionKey}) =>
         _GlassContentTransition(transitionKey: transitionKey, child: child),
+    tabChipTransition: (context, {required child, required animation}) =>
+        _glassChipEntrance(animation, child),
+  );
+}
+
+/// Glass chip entrance: scale from 0.85→1.0 + fade 0→1 (frost-in).
+Widget _glassChipEntrance(Animation<double> animation, Widget child) {
+  final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+  final scale = Tween<double>(begin: 0.85, end: 1).animate(curved);
+  return FadeTransition(
+    opacity: curved,
+    child: ScaleTransition(scale: scale, child: child),
   );
 }
 
