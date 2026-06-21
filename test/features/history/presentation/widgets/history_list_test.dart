@@ -81,6 +81,33 @@ void main() {
     expect(find.text('https://example.com/2'), findsOneWidget);
   });
 
+  testWidgets('renders entries in newest-first order (state index 0 at top)', (
+    tester,
+  ) async {
+    // The repository reverses insertion order, so the state list is
+    // newest-first: index 0 = newest. The widget must preserve this order.
+    final newest = _config('newest');
+    final older = _config('older');
+    when(() => historyBloc.state).thenReturn(
+      HistoryState(history: [newest, older]), // newest first, as the repo gives
+    );
+
+    await tester.pumpWidget(
+      _host(historyBloc: historyBloc, tabsBloc: tabsBloc),
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+
+    final newestFinder = find.text('https://example.com/newest');
+    final olderFinder = find.text('https://example.com/older');
+    expect(newestFinder, findsOneWidget);
+    expect(olderFinder, findsOneWidget);
+
+    // The newest entry's top edge must be above the older entry's top edge.
+    final newestTop = tester.getTopLeft(newestFinder).dy;
+    final olderTop = tester.getTopLeft(olderFinder).dy;
+    expect(newestTop, lessThan(olderTop));
+  });
+
   testWidgets('tapping an entry dispatches AddTab with the config', (
     tester,
   ) async {

@@ -140,9 +140,31 @@ void main() {
     final settingsBloc = buildSettingsBloc(const SettingsEntity());
     addTearDown(settingsBloc.close);
 
-    await tester.pumpWidget(host(collectionsBloc, settingsBloc));
+    const childKey = ValueKey('sync_listener_child');
+
+    // Use a host variant with a distinctly-keyed child so the assertion is
+    // falsifiable (fails if WorkspaceSyncListener drops its child).
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: brutalistTheme(Brightness.light),
+        home: Scaffold(
+          body: RepositoryProvider<WorkspaceSyncService>.value(
+            value: syncService,
+            child: MultiBlocProvider(
+              providers: [
+                BlocProvider.value(value: collectionsBloc),
+                BlocProvider.value(value: settingsBloc),
+              ],
+              child: const WorkspaceSyncListener(
+                child: SizedBox.expand(key: childKey),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
     await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.byType(SizedBox), findsWidgets);
+    expect(find.byKey(childKey), findsOneWidget);
   });
 }

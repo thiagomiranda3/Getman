@@ -140,4 +140,48 @@ void main() {
     // NamePromptDialog appears with a NEW FOLDER title
     expect(find.text('NEW FOLDER'), findsWidgets);
   });
+
+  testWidgets('tapping HISTORY tab switches to the history section', (
+    tester,
+  ) async {
+    await tester.pumpWidget(buildHost());
+    await tester.pump(const Duration(milliseconds: 50));
+
+    // Initially, COLLECTIONS tab is selected (index 0).
+    final controller = DefaultTabController.of(
+      tester.element(find.byType(TabBarView)),
+    );
+    expect(controller.index, 0);
+
+    // Tap the HISTORY tab label.
+    await tester.tap(find.text('HISTORY'));
+    await tester.pump(const Duration(milliseconds: 50));
+
+    // The DefaultTabController should now be at index 1 (HISTORY).
+    expect(controller.index, 1);
+  });
+
+  testWidgets(
+    'tapping COLLECTIONS tab after HISTORY switches back to index 0',
+    (
+      tester,
+    ) async {
+      await tester.pumpWidget(buildHost());
+      await tester.pump(const Duration(milliseconds: 50));
+
+      final controller = DefaultTabController.of(
+        tester.element(find.byType(TabBarView)),
+      );
+
+      // Switch to HISTORY first.
+      await tester.tap(find.text('HISTORY'));
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(controller.index, 1);
+
+      // Switch back to COLLECTIONS.
+      await tester.tap(find.text('COLLECTIONS'));
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(controller.index, 0);
+    },
+  );
 }

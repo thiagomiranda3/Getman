@@ -12,6 +12,7 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/node_action_sheet.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -126,19 +127,34 @@ void main() {
         final bloc = await openSheet(tester, _folderNode, repo: repo);
         addTearDown(bloc.close);
 
+        // Seed the bloc with the folder node via ReplaceCollections so the
+        // ToggleFavorite event can mutate it and we can observe the flip.
+        bloc.add(const ReplaceCollections([_folderNode]));
+        await tester.pump(const Duration(milliseconds: 50));
+
+        // The node should be non-favorite before the tap.
+        final before = bloc.state.collections.firstWhere(
+          (n) => n.id == _folderNode.id,
+        );
+        expect(before.isFavorite, isFalse);
+
         await tester.tap(find.text('FAVORITE'));
-        // Pump multiple frames to complete the sheet dismiss animation.
+        // Pump multiple frames to complete the sheet dismiss animation and
+        // allow the bloc to process the ToggleFavorite event.
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 100));
         await tester.pump(const Duration(milliseconds: 100));
         await tester.pump(const Duration(milliseconds: 100));
         await tester.pump(const Duration(milliseconds: 100));
 
-        // Sheet should be dismissed
+        // Sheet should be dismissed.
         expect(find.text('FAVORITE'), findsNothing);
 
-        // The bloc received the ToggleFavorite event and is still alive.
-        expect(bloc.state.isLoading, isFalse);
+        // The ToggleFavorite event must have flipped isFavorite on the node.
+        final after = bloc.state.collections.firstWhere(
+          (n) => n.id == _folderNode.id,
+        );
+        expect(after.isFavorite, isTrue);
       },
     );
 
@@ -208,6 +224,40 @@ void main() {
       },
     );
 
+    testWidgets('tapping VARIABLES closes sheet and opens variables dialog', (
+      tester,
+    ) async {
+      final bloc = await openSheet(tester, _folderNode, repo: repo);
+      addTearDown(bloc.close);
+
+      await tester.tap(find.text('VARIABLES'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // The CollectionVariablesDialog title shows "VARIABLES — My Folder".
+      expect(find.textContaining('VARIABLES — My Folder'), findsOneWidget);
+    });
+
+    testWidgets('tapping MOVE TO... closes sheet and opens move sheet', (
+      tester,
+    ) async {
+      final bloc = await openSheet(tester, _folderNode, repo: repo);
+      addTearDown(bloc.close);
+
+      await tester.tap(find.text('MOVE TO...'));
+      // Wait for the action sheet to dismiss and the move sheet to open.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // The _MoveToSheet header contains the node name in its label.
+      expect(find.textContaining('My Folder'), findsWidgets);
+      // ROOT (TOP LEVEL) is always the first option in the move sheet.
+      expect(find.text('ROOT (TOP LEVEL)'), findsOneWidget);
+    });
+
     testWidgets('does not overflow at desktop width', (tester) async {
       final bloc = await openSheet(tester, _folderNode, repo: repo);
       addTearDown(bloc.close);
@@ -270,6 +320,27 @@ void main() {
 
         // NamePromptDialog with DESCRIPTION title opens after sheet dismissal.
         expect(find.text('DESCRIPTION'), findsOneWidget);
+      },
+    );
+
+    // Note: DUPLICATE and SAVE-AS-EXAMPLE are NOT actions in NodeActionSheet.
+    // They exist only in the desktop three-dot popup menu
+    // (collections_list.dart), not in this phone bottom-sheet. No tests here.
+
+    testWidgets(
+      'tapping MOVE TO... closes sheet and opens move sheet for leaf',
+      (
+        tester,
+      ) async {
+        final bloc = await openSheet(tester, _leafNode, repo: repo);
+        addTearDown(bloc.close);
+
+        await tester.tap(find.text('MOVE TO...'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        // ROOT (TOP LEVEL) is always the first option in the move sheet.
+        expect(find.text('ROOT (TOP LEVEL)'), findsOneWidget);
       },
     );
   });
