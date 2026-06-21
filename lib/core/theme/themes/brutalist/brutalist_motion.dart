@@ -269,6 +269,10 @@ class _BrutalistInFlightFrameState extends State<_BrutalistInFlightFrame>
 
 /// A thick bar along the top and left edges carrying marching diagonal stripes.
 /// All motion is continuous translation — no opacity strobe.
+///
+/// Paint objects are hoisted as instance fields; color is mutated in paint().
+/// Stripe geometry is drawn with canvas.drawPath on a single reused Path field
+/// (reset each frame) — no Paint()/Path() construction inside paint().
 class _BrutalistMarchingFramePainter extends CustomPainter {
   _BrutalistMarchingFramePainter({
     required this.phase,
@@ -277,6 +281,13 @@ class _BrutalistMarchingFramePainter extends CustomPainter {
   final double phase;
   final Color color;
 
+  // Hoisted Paints — allocated once, color mutated per frame in paint().
+  final Paint _solidPaint = Paint();
+  final Paint _stripePaint = Paint();
+
+  // Reused Path — reset each frame via reset(); no per-stripe allocation.
+  final Path _path = Path();
+
   @override
   void paint(Canvas canvas, Size size) {
     const barH = 5.0; // top bar height
@@ -284,8 +295,8 @@ class _BrutalistMarchingFramePainter extends CustomPainter {
     const gap = 10.0;
     const pitch = dash + gap;
 
-    final solidPaint = Paint()..color = color.withValues(alpha: 0.8);
-    final stripePaint = Paint()..color = color.withValues(alpha: 0.35);
+    _solidPaint.color = color.withValues(alpha: 0.8);
+    _stripePaint.color = color.withValues(alpha: 0.35);
 
     // Draw top edge bar.
     final offset = (phase * pitch) % pitch;
@@ -293,18 +304,19 @@ class _BrutalistMarchingFramePainter extends CustomPainter {
       ..save()
       ..clipRect(Rect.fromLTWH(0, 0, size.width, barH))
       // Solid base.
-      ..drawRect(Rect.fromLTWH(0, 0, size.width, barH), solidPaint);
+      ..drawRect(Rect.fromLTWH(0, 0, size.width, barH), _solidPaint);
 
     // Marching diagonal stripes (offset advances with phase).
     for (var x = -pitch + offset; x < size.width + barH; x += pitch) {
       // Diagonal stripe: a parallelogram tilted 45°.
-      final path = Path()
+      _path
+        ..reset()
         ..moveTo(x, 0)
         ..lineTo(x + dash, 0)
         ..lineTo(x + dash + barH, barH)
         ..lineTo(x + barH, barH)
         ..close();
-      canvas.drawPath(path, stripePaint);
+      canvas.drawPath(_path, _stripePaint);
     }
     canvas.restore();
 
@@ -313,15 +325,16 @@ class _BrutalistMarchingFramePainter extends CustomPainter {
     canvas
       ..save()
       ..clipRect(leftBarRect)
-      ..drawRect(leftBarRect, solidPaint);
+      ..drawRect(leftBarRect, _solidPaint);
     for (var y = barH - pitch + offset; y < size.height + barH; y += pitch) {
-      final path = Path()
+      _path
+        ..reset()
         ..moveTo(0, y)
         ..lineTo(barH, y + barH)
         ..lineTo(barH, y + barH + dash)
         ..lineTo(0, y + dash)
         ..close();
-      canvas.drawPath(path, stripePaint);
+      canvas.drawPath(_path, _stripePaint);
     }
     canvas.restore();
   }
