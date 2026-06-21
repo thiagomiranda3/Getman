@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/di/injection_container.dart' as di;
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/main.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:patrol_finders/patrol_finders.dart';
@@ -100,6 +102,21 @@ Future<void> bootGetman(
   });
 
   final settings = await di.init(storageDirectoryOverride: tempDir.path);
+
+  // Disable the startup auto-update check for E2E. Otherwise the real GitHub
+  // `releases/latest` check finds a newer published version than the test
+  // bundle's and opens the UpdateDialog on boot — its modal barrier absorbs
+  // every hit-test, so `url_field` (and everything else) is in the tree but
+  // not hit-testable and all interaction flows time out. A fresh E2E profile
+  // seeds from an empty box, so the setting defaults to `true`; flip it on the
+  // SettingsBloc (the gate reads it from there) before the gate mounts. This
+  // also keeps the suite hermetic (no network call to GitHub).
+  final settingsBloc = di.sl<SettingsBloc>()
+    ..add(const UpdateCheckForUpdatesOnStartup(enabled: false));
+  await settingsBloc.stream.firstWhere(
+    (s) => !s.settings.checkForUpdatesOnStartup,
+  );
+
   await $.pumpWidgetAndSettle(MyApp(initialSettings: settings));
   await resizeWindow($, windowSize);
 }
