@@ -164,6 +164,14 @@ const Duration _kImpulseLifetime = Duration(milliseconds: 1400);
 @visibleForTesting
 int debugGlassImpulseCount = 0;
 
+/// @visibleForTesting C2 sentinels — last activity/idle values read by the
+/// painter's paint() on the most recent frame. 0.0 when no pulse is plumbed
+/// (static / no-provider path). Read by rhythm tests to confirm C2 wiring.
+@visibleForTesting
+double debugGlassLastActivityLevel = 0;
+@visibleForTesting
+double debugGlassLastIdleFactor = 0;
+
 /// Full-effects wallpaper: animated drifting mesh gradient.
 Widget glassScaffoldBackground(BuildContext context, {required Widget child}) =>
     GlassWallpaper(animate: true, child: child);
@@ -442,6 +450,16 @@ class _GlassMeshPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final v = t.value;
     final rect = Offset.zero & size;
+
+    // C2 session rhythm: read pulse values defensively (null-safe).
+    // activityLevel (0..1) → intensify blob opacity when busy.
+    // idleFactor (0..1) → dim and calm the mesh when idle.
+    final activityLevel = signals?.pulse.activityLevel ?? 0.0;
+    final idleFactor = signals?.pulse.idleFactor ?? 0.0;
+    // Write sentinels for tests.
+    debugGlassLastActivityLevel = activityLevel;
+    debugGlassLastIdleFactor = idleFactor;
+
     // Base fill (clear any shader left from the previous frame's last blob).
     canvas.drawRect(
       rect,
@@ -472,13 +490,24 @@ class _GlassMeshPainter extends CustomPainter {
         0.95 - 0.1 * _wave(v + 0.2) + ptrAlign.y,
       ),
     ];
+    // C2: activity intensifies blob opacity; idle dims it.
+    // Base blob alpha 0.55; boost up to 0.72 on full activity, down to 0.33 on
+    // full idle. Multipliers are cheap arithmetic — no per-frame alloc.
+    final blobAlpha =
+        (0.55 * (1 + 0.31 * activityLevel) * (1 - 0.4 * idleFactor)).clamp(
+          0.0,
+          1.0,
+        );
     for (var i = 0; i < blobs.length; i++) {
       final blobRect = Rect.fromCircle(
         center: centers[i].alongSize(size),
         radius: size.shortestSide * 1.1,
       );
       _paint.shader = RadialGradient(
-        colors: [blobs[i].withValues(alpha: 0.55), Colors.transparent],
+        colors: [
+          blobs[i].withValues(alpha: blobAlpha),
+          Colors.transparent,
+        ],
       ).createShader(blobRect);
       canvas.drawRect(rect, _paint);
     }
@@ -486,14 +515,22 @@ class _GlassMeshPainter extends CustomPainter {
     // Specular sheen: only in animated mode (signals != null).
     // A soft radial near-white highlight that follows the cursor, blended with
     // BlendMode.plus so it brightens the mesh rather than covering it.
+    // C2: dim the sheen when idle; intensify slightly when active.
     if (ptr != null) {
       final center = Offset(ptr.dx * size.width, ptr.dy * size.height);
+      // C2: sheen alpha dims on idle (0.06 → 0.03), brightens on activity
+      // (0.06 → 0.10). Cheap multiplier — no per-frame alloc.
+      final sheenAlpha =
+          (0.06 * (1 + 0.67 * activityLevel) * (1 - 0.5 * idleFactor)).clamp(
+            0.0,
+            1.0,
+          );
       _sheenPaint.shader =
           RadialGradient(
             colors: [
               // theme-internal near-white; Colors.white is allowed in
               // lib/core/theme (exempt from avoid_hardcoded_brand_colors).
-              Colors.white.withValues(alpha: 0.06),
+              Colors.white.withValues(alpha: sheenAlpha),
               const Color(0x00000000),
             ],
           ).createShader(

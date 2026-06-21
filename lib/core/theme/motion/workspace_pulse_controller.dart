@@ -31,6 +31,11 @@ class WorkspacePulseController extends ChangeNotifier {
   double get activityLevel => _activity;
   double get idleFactor => _idle;
 
+  /// Whether any listener is currently subscribed. Exposed for tests that need
+  /// to verify ambient painters subscribe (and unsubscribe) to the controller.
+  @visibleForTesting
+  bool get debugHasListeners => hasListeners;
+
   /// A request reaction happened — intensify and clear idle.
   void bump() {
     _activity = (_activity + _bumpAmount).clamp(0.0, 1.0);

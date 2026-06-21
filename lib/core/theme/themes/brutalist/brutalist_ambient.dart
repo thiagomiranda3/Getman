@@ -17,6 +17,13 @@ const Duration _kImpulseLifetime = Duration(milliseconds: 1400);
 @visibleForTesting
 int debugBrutalistImpulseCount = 0;
 
+/// @visibleForTesting C2 sentinels — last activity/idle values read by the
+/// painter's paint() on the most recent frame. 0.0 when no pulse is plumbed.
+@visibleForTesting
+double debugBrutalistLastActivityLevel = 0;
+@visibleForTesting
+double debugBrutalistLastIdleFactor = 0;
+
 /// Full-effects Brutalist wallpaper: a slowly drifting risograph/halftone dot
 /// grid with a faint accent registration "ghost" offset. This is the C1/C2
 /// foundation — [AmbientSignals] (pointer + click impulses + session pulse) is
@@ -313,6 +320,15 @@ class _HalftonePainter extends CustomPainter {
     final v = t.value; // 0..1 over the loop
     final rect = Offset.zero & size;
 
+    // C2 session rhythm: read pulse values defensively (null-safe).
+    // activityLevel (0..1) → more ink density / darker dots when busy.
+    // idleFactor (0..1) → lighter, calmer halftone grid when idle.
+    final activityLevel = signals?.pulse.activityLevel ?? 0.0;
+    final idleFactor = signals?.pulse.idleFactor ?? 0.0;
+    // Write sentinels for tests.
+    debugBrutalistLastActivityLevel = activityLevel;
+    debugBrutalistLastIdleFactor = idleFactor;
+
     // Base paper fill.
     final base = isDark
         ? BrutalistPalette.backgroundDark
@@ -387,6 +403,10 @@ class _HalftonePainter extends CustomPainter {
       }
     }
 
+    // C2: compute alpha multiplier (cheap arithmetic, no alloc).
+    // Activity densifies the ink (up to +50%); idle thins it (down to -35%).
+    final alphaMult = (1.0 + 0.5 * activityLevel) * (1.0 - 0.35 * idleFactor);
+
     // Accent registration ghost first (under the ink), faint.
     canvas.drawPath(
       _ghostPath,
@@ -394,7 +414,7 @@ class _HalftonePainter extends CustomPainter {
         ..shader = null
         ..blendMode = BlendMode.srcOver
         ..color = BrutalistPalette.primary.withValues(
-          alpha: isDark ? 0.10 : 0.14,
+          alpha: ((isDark ? 0.10 : 0.14) * alphaMult).clamp(0.0, 1.0),
         ),
     );
 
@@ -402,7 +422,10 @@ class _HalftonePainter extends CustomPainter {
     final ink = isDark ? BrutalistPalette.textDark : BrutalistPalette.textLight;
     canvas.drawPath(
       _inkPath,
-      _paint..color = ink.withValues(alpha: isDark ? 0.06 : 0.05),
+      _paint
+        ..color = ink.withValues(
+          alpha: ((isDark ? 0.06 : 0.05) * alphaMult).clamp(0.0, 1.0),
+        ),
     );
 
     // C1 click ripple: an expanding ink-splat ring per impulse. Age drives both

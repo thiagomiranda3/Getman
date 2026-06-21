@@ -17,6 +17,13 @@ const Duration _kImpulseLifetime = Duration(milliseconds: 1400);
 @visibleForTesting
 int debugAurisImpulseCount = 0;
 
+/// @visibleForTesting C2 sentinels — last activity/idle values read by the
+/// painter's paint() on the most recent frame. 0.0 when no pulse is plumbed.
+@visibleForTesting
+double debugAurisLastActivityLevel = 0;
+@visibleForTesting
+double debugAurisLastIdleFactor = 0;
+
 /// Full-effects AURIS wallpaper: a scanning sci-fi HUD grid (faint gridlines)
 /// with a slow radar sweep arc and drifting telemetry ticks. This is the C1/C2
 /// foundation — [AmbientSignals] (pointer + click impulses + session pulse) is
@@ -432,13 +439,28 @@ class _AurisHudPainter extends CustomPainter {
     if (size.isEmpty) return;
     final v = t.value; // 0..1 over the 30 s loop
     final rect = Offset.zero & size;
+
+    // C2 session rhythm: read pulse values defensively (null-safe).
+    // activityLevel (0..1) → brighter HUD (sweep/ticks) when busy.
+    // idleFactor (0..1) → dimmer, calmer HUD when idle.
+    final activityLevel = signals?.pulse.activityLevel ?? 0.0;
+    final idleFactor = signals?.pulse.idleFactor ?? 0.0;
+    // Write sentinels for tests.
+    debugAurisLastActivityLevel = activityLevel;
+    debugAurisLastIdleFactor = idleFactor;
+
+    // C2 multiplier: activity brightens HUD elements (up to +40%);
+    // idle dims them (down to -30%). Grid gets a subtler effect (always faint).
+    final hudMult = (1.0 + 0.4 * activityLevel) * (1.0 - 0.3 * idleFactor);
+    final gridMult = (1.0 + 0.2 * activityLevel) * (1.0 - 0.2 * idleFactor);
+
     // Slightly stronger when the AurisScheme is present (the scheme-coloured
     // HUD); fainter for the neutral fallback so it never shouts.
     final has = palette.hasScheme;
-    final gridAlpha = has ? 0.07 : 0.05;
-    final sweepAlpha = has ? 0.10 : 0.06;
-    final spokeAlpha = has ? 0.16 : 0.10;
-    final tickBaseAlpha = has ? 0.22 : 0.14;
+    final gridAlpha = ((has ? 0.07 : 0.05) * gridMult).clamp(0.0, 1.0);
+    final sweepAlpha = ((has ? 0.10 : 0.06) * hudMult).clamp(0.0, 1.0);
+    final spokeAlpha = ((has ? 0.16 : 0.10) * hudMult).clamp(0.0, 1.0);
+    final tickBaseAlpha = ((has ? 0.22 : 0.14) * hudMult).clamp(0.0, 1.0);
 
     // Base fill (clear any shader left from a previous frame).
     if (palette.base.a > 0) {
