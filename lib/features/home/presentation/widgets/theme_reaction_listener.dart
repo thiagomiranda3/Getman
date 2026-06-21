@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/audio/theme_sound_service.dart';
 import 'package:getman/core/theme/motion/theme_reaction_controller.dart';
+import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
@@ -26,6 +27,7 @@ class ThemeReactionListener extends StatelessWidget {
       listener: (context, state) {
         final reaction = state.lastReaction!;
         context.read<ThemeReactionController>().fire(reaction);
+        context.read<WorkspacePulseController>().bump();
         final settings = context.read<SettingsBloc>().state.settings;
         if (settings.enableThemeSounds) {
           // play() never throws (service contract); fire-and-forget.
