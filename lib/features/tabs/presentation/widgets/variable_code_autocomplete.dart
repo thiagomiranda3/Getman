@@ -217,13 +217,15 @@ class _VariableCodeAutocompleteList extends StatelessWidget
   }
 }
 
-/// Wraps a body [child] (a `CodeEditor`) with variable autocomplete. Returns
-/// [child] unchanged when there are no variables (no empty overlay).
+/// Wraps a body [child] (a `CodeEditor`) with variable autocomplete. Always
+/// wraps: dynamic built-ins ({{$guid}}, {{$timestamp}}…) are suggestable even
+/// with no active environment, matching the URL bar. The `promptsBuilder`
+/// returns null (no overlay) when the caret isn't inside a `{{` token, so an
+/// empty context simply yields the dynamics for a matching query.
 Widget wrapBodyWithVariableAutocomplete({
   required LayeredVariableContext Function() contextProvider,
   required Widget child,
 }) {
-  if (contextProvider().isEmpty) return child;
   return CodeAutocomplete(
     viewBuilder: variableAutocompleteViewBuilder,
     promptsBuilder: VariablePromptsBuilder(contextProvider),

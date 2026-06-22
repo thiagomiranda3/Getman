@@ -146,15 +146,18 @@ void main() {
   });
 
   group('wrapBodyWithVariableAutocomplete', () {
-    testWidgets('returns the child unchanged when the context is empty', (
+    testWidgets('wraps even when the context is empty (dynamics apply)', (
       tester,
     ) async {
+      // Regression: dynamic built-ins ({{$guid}}, {{$timestamp}}…) are
+      // suggestable with no active environment, so the body editor must still
+      // wrap — matching the URL bar — rather than return the bare child.
       const child = SizedBox(key: Key('body-child'));
       final wrapped = wrapBodyWithVariableAutocomplete(
         contextProvider: () => LayeredVariableContext.empty,
         child: child,
       );
-      expect(identical(wrapped, child), isTrue);
+      expect(wrapped, isA<CodeAutocomplete>());
     });
 
     testWidgets('wraps with CodeAutocomplete when variables exist', (

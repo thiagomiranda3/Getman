@@ -63,8 +63,8 @@ class _VariableTextFieldState extends State<VariableTextField> {
         unresolved: palette.variableUnresolved,
       )
       ..updateVariables(ctx.allVariables)
-      ..onVariableEnter = ctx.isEmpty ? null : _showPopover
-      ..onVariableExit = ctx.isEmpty ? null : _hover.scheduleHide;
+      ..onVariableEnter = _showPopover
+      ..onVariableExit = _hover.scheduleHide;
 
     final field = TextField(
       key: widget.fieldKey,
@@ -78,8 +78,9 @@ class _VariableTextFieldState extends State<VariableTextField> {
       onChanged: widget.onChanged,
     );
 
-    if (ctx.isEmpty) return field;
-
+    // Always offer autocomplete: dynamic built-ins ({{$guid}}, {{$timestamp}}…)
+    // are suggestable even with no active environment, matching the URL bar.
+    // The overlay self-closes when a query matches nothing.
     return VariableAutocomplete(
       controller: widget.controller,
       focusNode: widget.focusNode,

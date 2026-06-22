@@ -85,25 +85,34 @@ void main() {
     expect(tf.style?.fontWeight, FontWeight.w900);
   });
 
-  testWidgets('empty context renders a plain field with no overlay', (
-    tester,
-  ) async {
-    final controller = VariableHighlightController();
-    final focus = FocusNode();
-    await tester.pumpWidget(
-      _host(
-        VariableTextField(
-          variables: LayeredVariableContext.empty,
-          controller: controller,
-          focusNode: focus,
-          onChanged: (_) {},
+  testWidgets(
+    'with no env/collection vars, {{ still offers dynamic variables',
+    (tester) async {
+      // Regression: when no environment is active (allVariables empty), the
+      // field must still offer dynamic built-ins ({{$guid}}, {{$timestamp}}…),
+      // exactly like the URL bar — not degrade to a plain field. Dynamics are
+      // always suggestable, so the overlay must appear.
+      final controller = VariableHighlightController();
+      final focus = FocusNode();
+      addTearDown(() {
+        controller.dispose();
+        focus.dispose();
+      });
+      await tester.pumpWidget(
+        _host(
+          VariableTextField(
+            variables: LayeredVariableContext.empty,
+            controller: controller,
+            focusNode: focus,
+            onChanged: (_) {},
+          ),
         ),
-      ),
-    );
-    await tester.tap(find.byType(TextField));
-    await tester.enterText(find.byType(TextField), '{{');
-    await tester.pumpAndSettle();
-    // No suggestions to show.
-    expect(find.byType(ListView), findsNothing);
-  });
+      );
+      await tester.tap(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), '{{time');
+      await tester.pumpAndSettle();
+
+      expect(find.text(r'$timestamp'), findsOneWidget);
+    },
+  );
 }
