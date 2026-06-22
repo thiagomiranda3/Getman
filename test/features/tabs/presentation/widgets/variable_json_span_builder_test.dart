@@ -75,6 +75,37 @@ void main() {
     },
   );
 
+  testWidgets(
+    'span plain-text fidelity: variable line preserves every character',
+    (tester) async {
+      const line = '{"url": "{{host}}/v1"}';
+      late String spanText;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              final span = variableAwareJsonSpan(
+                context: context,
+                index: 0,
+                codeLine: const CodeLine(line),
+                textSpan: const TextSpan(text: line),
+                style: const TextStyle(color: Colors.black),
+                variables: const {'host': 'example.com'},
+                resolvedColor: const Color(0xFF00FF00),
+                unresolvedColor: const Color(0xFFFF0000),
+              );
+              spanText = span.toPlainText();
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+
+      // The flat-run merge must not drop or duplicate any characters.
+      expect(spanText, line);
+    },
+  );
+
   testWidgets('unknown variable uses the unresolved color', (tester) async {
     late TextSpan span;
     await tester.pumpWidget(

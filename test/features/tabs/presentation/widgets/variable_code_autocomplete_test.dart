@@ -215,5 +215,68 @@ void main() {
 
       expect(controller.text, '{{host}}');
     });
+
+    testWidgets(
+      'accepts host without doubling braces when closing braces present',
+      (tester) async {
+        final controller = CodeLineEditingController();
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: resolveTheme('brutalist')(Brightness.light),
+            home: Scaffold(
+              body: SizedBox(
+                width: 600,
+                height: 400,
+                child: wrapBodyWithVariableAutocomplete(
+                  contextProvider: () => ctx,
+                  child: CodeEditor(controller: controller),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Focus the editor so it attaches a text-input connection.
+        await tester.tap(find.byType(CodeEditor));
+        await tester.pumpAndSettle();
+
+        // Establish `{{}}` in the editor with the caret at offset 2 (between
+        // the braces) — simulates the user already having `{{}}` and moving
+        // the caret inside it.
+        await sendInsertionDelta(
+          tester,
+          oldText: '',
+          deltaText: '{{}}',
+          insertAt: 0,
+          caret: 2,
+        );
+        // Brief pump — do NOT wait the 60 ms autocomplete timer yet.
+        await tester.pump(const Duration(milliseconds: 5));
+
+        // Now type `ho` at position 2 (between `{{` and `}}`).
+        await sendInsertionDelta(
+          tester,
+          oldText: '{{}}',
+          deltaText: 'ho',
+          insertAt: 2,
+          caret: 4,
+        );
+        // Wait for the 50 ms autocomplete debounce.
+        await tester.pump(const Duration(milliseconds: 60));
+        await tester.pumpAndSettle();
+
+        expect(controller.text, '{{ho}}');
+        expect(find.text('host'), findsOneWidget);
+
+        // Accepting must yield `{{host}}`, NOT the doubled `{{host}}}}`.
+        await tester.tap(find.text('host'));
+        await tester.pumpAndSettle();
+
+        expect(controller.text, '{{host}}');
+      },
+    );
   });
 }
