@@ -8,16 +8,11 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/bulk_kv_editor.dart';
 import 'package:getman/core/ui/widgets/key_value_list_editor.dart';
-import 'package:getman/core/ui/widgets/variable_hover_popover.dart';
+import 'package:getman/core/ui/widgets/tab_variable_context_builder.dart';
 import 'package:getman/core/utils/bulk_kv_codec.dart';
 import 'package:getman/core/utils/equality.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/core/utils/path_utils.dart';
-import 'package:getman/features/environments/domain/logic/active_environment_helper.dart';
-import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
-import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
-import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
-import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
@@ -28,47 +23,12 @@ import 'package:getman/features/tabs/presentation/widgets/request_config_section
     show RequestConfigSection;
 import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.dart'
     show UnifiedRequestPanel;
+import 'package:getman/features/tabs/presentation/widgets/variable_code_autocomplete.dart';
 import 'package:re_editor/re_editor.dart';
 
 /// The three request-editor tab bodies (PARAMS / HEADERS / BODY), shared by
 /// the split-pane [RequestConfigSection] and the phone [UnifiedRequestPanel]
 /// so both layouts stay behaviorally identical.
-
-/// Recomputes the active-environment [VariableHoverContext] and rebuilds when
-/// the environment set or the active-environment id changes, so value-field
-/// hover popovers always reflect the current environment.
-class _VariableContextBuilder extends StatelessWidget {
-  const _VariableContextBuilder({required this.builder});
-
-  final Widget Function(BuildContext, VariableHoverContext) builder;
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<SettingsBloc, SettingsState>(
-      buildWhen: (p, n) =>
-          p.settings.activeEnvironmentId != n.settings.activeEnvironmentId,
-      builder: (context, settingsState) {
-        return BlocBuilder<EnvironmentsBloc, EnvironmentsState>(
-          buildWhen: (p, n) => p.environments != n.environments,
-          builder: (context, envState) {
-            final env = ActiveEnvironmentHelper.activeEnvironment(
-              envState.environments,
-              settingsState.settings.activeEnvironmentId,
-            );
-            return builder(
-              context,
-              VariableHoverContext(
-                variables: env?.variables ?? const {},
-                secretKeys: env?.secretKeys ?? const {},
-                environmentName: env?.name,
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-}
 
 /// Small header above the params/headers editor body offering the row⇄bulk
 /// toggle. [bulk] is the current mode; [onToggle] flips it. The icon/label
@@ -191,7 +151,8 @@ class _ParamsTabViewState extends State<ParamsTabView> {
                       onChanged: (text) =>
                           emit(encode(BulkKvCodec.parse(text))),
                     )
-                  : _VariableContextBuilder(
+                  : TabVariableContextBuilder(
+                      tabId: tab.tabId,
                       builder: (context, varContext) =>
                           KeyValueListEditor<List<QueryParamEntity>>(
                             items: tab.config.params,
@@ -272,7 +233,8 @@ class _HeadersTabViewState extends State<HeadersTabView> {
                       onChanged: (text) =>
                           emit(encode(BulkKvCodec.parse(text))),
                     )
-                  : _VariableContextBuilder(
+                  : TabVariableContextBuilder(
+                      tabId: tab.tabId,
                       builder: (context, varContext) =>
                           KeyValueListEditor<Map<String, String>>(
                             items: tab.config.headers,
@@ -333,7 +295,7 @@ class BodyTabView extends StatelessWidget {
       case BodyType.none:
         return const _EmptyBodyHint();
       case BodyType.raw:
-        return _RawBodyEditor(controller: controller);
+        return _RawBodyEditor(tabId: tabId, controller: controller);
       case BodyType.urlencoded:
         return FormDataEditor(tabId: tabId, allowFiles: false);
       case BodyType.multipart:
@@ -342,6 +304,7 @@ class BodyTabView extends StatelessWidget {
         return _BinaryBodyPicker(tabId: tabId);
       case BodyType.graphql:
         return _GraphqlBodyEditor(
+          tabId: tabId,
           queryController: controller,
           variablesController: variablesController,
         );
@@ -450,7 +413,8 @@ class _BodyTypeChip extends StatelessWidget {
 }
 
 class _RawBodyEditor extends StatelessWidget {
-  const _RawBodyEditor({required this.controller});
+  const _RawBodyEditor({required this.tabId, required this.controller});
+  final String tabId;
   final CodeLineEditingController controller;
 
   @override
@@ -459,7 +423,16 @@ class _RawBodyEditor extends StatelessWidget {
     final layout = context.appLayout;
     return Stack(
       children: [
-        JsonCodeEditor(controller: controller),
+        // The variable context rebuilds on env/collection change, recreating
+        // the prompts builder with the fresh context so env switches apply.
+        // The Beautify overlay stays outside the autocomplete wrap.
+        TabVariableContextBuilder(
+          tabId: tabId,
+          builder: (context, varContext) => wrapBodyWithVariableAutocomplete(
+            contextProvider: () => varContext,
+            child: JsonCodeEditor(controller: controller),
+          ),
+        ),
         Positioned(
           top: 8,
           right: 8,
@@ -498,9 +471,11 @@ class _RawBodyEditor extends StatelessWidget {
 /// variables are JSON).
 class _GraphqlBodyEditor extends StatelessWidget {
   const _GraphqlBodyEditor({
+    required this.tabId,
     required this.queryController,
     required this.variablesController,
   });
+  final String tabId;
   final CodeLineEditingController queryController;
   final CodeLineEditingController variablesController;
 
@@ -520,7 +495,10 @@ class _GraphqlBodyEditor extends StatelessWidget {
           flex: 2,
           child: _GraphqlPane(
             label: 'VARIABLES (JSON)',
-            child: _RawBodyEditor(controller: variablesController),
+            child: _RawBodyEditor(
+              tabId: tabId,
+              controller: variablesController,
+            ),
           ),
         ),
       ],

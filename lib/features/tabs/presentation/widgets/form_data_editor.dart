@@ -7,6 +7,10 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/key_value_list_editor.dart'
     show KeyValueListEditor;
+import 'package:getman/core/ui/widgets/tab_variable_context_builder.dart';
+import 'package:getman/core/ui/widgets/variable_highlight_controller.dart';
+import 'package:getman/core/ui/widgets/variable_text_field.dart';
+import 'package:getman/core/utils/layered_variable_context.dart';
 import 'package:getman/core/utils/path_utils.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
@@ -112,33 +116,41 @@ class _FormDataEditorState extends State<FormDataEditor> {
   Widget build(BuildContext context) {
     final layout = context.appLayout;
 
-    return BlocListener<TabsBloc, TabsState>(
-      listenWhen: (prev, next) => !_fieldListEquality.equals(
-        prev.tabs.byId(widget.tabId)?.config.formFields,
-        next.tabs.byId(widget.tabId)?.config.formFields,
-      ),
-      listener: (context, state) {
-        final fields =
-            state.tabs.byId(widget.tabId)?.config.formFields ?? const [];
-        if (_lastEmitted != null &&
-            _fieldListEquality.equals(fields, _lastEmitted)) {
-          return;
-        }
-        setState(() {
-          _disposeRows();
-          _initRows(fields);
-          _lastEmitted = null;
-        });
-      },
-      child: ListView.builder(
-        padding: EdgeInsets.all(layout.pagePadding),
-        itemCount: _rows.length,
-        itemBuilder: _buildRow,
+    return TabVariableContextBuilder(
+      tabId: widget.tabId,
+      builder: (context, varContext) => BlocListener<TabsBloc, TabsState>(
+        listenWhen: (prev, next) => !_fieldListEquality.equals(
+          prev.tabs.byId(widget.tabId)?.config.formFields,
+          next.tabs.byId(widget.tabId)?.config.formFields,
+        ),
+        listener: (context, state) {
+          final fields =
+              state.tabs.byId(widget.tabId)?.config.formFields ?? const [];
+          if (_lastEmitted != null &&
+              _fieldListEquality.equals(fields, _lastEmitted)) {
+            return;
+          }
+          setState(() {
+            _disposeRows();
+            _initRows(fields);
+            _lastEmitted = null;
+          });
+        },
+        child: ListView.builder(
+          padding: EdgeInsets.all(layout.pagePadding),
+          itemCount: _rows.length,
+          itemBuilder: (context, index) =>
+              _buildRow(context, index, varContext),
+        ),
       ),
     );
   }
 
-  Widget _buildRow(BuildContext context, int index) {
+  Widget _buildRow(
+    BuildContext context,
+    int index,
+    LayeredVariableContext varContext,
+  ) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
     final row = _rows[index];
@@ -172,18 +184,18 @@ class _FormDataEditorState extends State<FormDataEditor> {
             label: row.fileLabel,
             onTap: () => _pickFile(row),
           )
-        : TextField(
-            key: ValueKey('val_${row.id}'),
+        : VariableTextField(
+            fieldKey: ValueKey('val_${row.id}'),
+            variables: varContext,
             controller: row.valueController,
+            focusNode: row.valueFocus,
+            onChanged: (_) => _emit(),
             style: textStyle,
-            autocorrect: false,
-            enableSuggestions: false,
             decoration: InputDecoration(
               hintText: 'VALUE',
               isDense: true,
               contentPadding: fieldPadding,
             ),
-            onChanged: (_) => _emit(),
           );
 
     final children = <Widget>[
@@ -293,6 +305,7 @@ class _RowState {
   _RowState({
     required this.nameController,
     required this.valueController,
+    required this.valueFocus,
     this.isFile = false,
     this.filePath,
     this.fileName,
@@ -301,7 +314,8 @@ class _RowState {
 
   factory _RowState.from(MultipartFieldEntity f) => _RowState(
     nameController: TextEditingController(text: f.name),
-    valueController: TextEditingController(text: f.value),
+    valueController: VariableHighlightController(text: f.value),
+    valueFocus: FocusNode(),
     isFile: f.isFile,
     filePath: f.filePath,
     fileName: f.filePath == null ? null : PathUtils.basename(f.filePath!),
@@ -310,12 +324,14 @@ class _RowState {
 
   factory _RowState.empty() => _RowState(
     nameController: TextEditingController(),
-    valueController: TextEditingController(),
+    valueController: VariableHighlightController(),
+    valueFocus: FocusNode(),
   );
   static int _counter = 0;
   final int id;
   final TextEditingController nameController;
-  final TextEditingController valueController;
+  final VariableHighlightController valueController;
+  final FocusNode valueFocus;
   bool isFile;
   String? filePath;
   String? fileName;
@@ -336,5 +352,6 @@ class _RowState {
   void dispose() {
     nameController.dispose();
     valueController.dispose();
+    valueFocus.dispose();
   }
 }

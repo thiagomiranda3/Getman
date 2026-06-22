@@ -8,7 +8,9 @@ import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
+import 'package:getman/core/ui/widgets/tab_variable_context_builder.dart';
 import 'package:getman/core/utils/json_utils.dart';
+import 'package:getman/core/utils/layered_variable_context.dart';
 import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
@@ -46,6 +48,13 @@ class _RequestViewState extends State<RequestView> {
   late final CodeLineEditingController _bodyController;
   late final CodeLineEditingController _graphqlVarsController;
   late final CodeLineEditingController _responseController;
+
+  // Live variable highlighting state for the body editor. The span builder
+  // reads these via closures at paint time, so an env or theme change recolors
+  // `{{var}}` tokens on the next [CodeLineEditingController.forceRepaint].
+  LayeredVariableContext _bodyVarContext = LayeredVariableContext.empty;
+  Color _resolvedColor = Colors.transparent;
+  Color _unresolvedColor = Colors.transparent;
   // Live drag ratio. A ValueNotifier (not setState) so dragging the splitter
   // only re-runs the Flex layout — the captured request/response panes (and
   // their code editors) are not rebuilt frame-by-frame. Committed to the
@@ -56,8 +65,18 @@ class _RequestViewState extends State<RequestView> {
   @override
   void initState() {
     super.initState();
-    _bodyController = createJsonCodeController();
-    _graphqlVarsController = createJsonCodeController();
+    _bodyController = createJsonCodeController(
+      variablesProvider: () => _bodyVarContext.allVariables,
+      resolvedColor: () => _resolvedColor,
+      unresolvedColor: () => _unresolvedColor,
+    );
+    // The GraphQL VARIABLES pane is JSON where `{{var}}` applies too — give it
+    // the same live highlighting providers as the body editor.
+    _graphqlVarsController = createJsonCodeController(
+      variablesProvider: () => _bodyVarContext.allVariables,
+      resolvedColor: () => _resolvedColor,
+      unresolvedColor: () => _unresolvedColor,
+    );
     _responseController = createJsonCodeController();
     _bodyController.addListener(_onBodyChanged);
     _graphqlVarsController.addListener(_onGraphqlVarsChanged);
@@ -74,6 +93,15 @@ class _RequestViewState extends State<RequestView> {
         _graphqlVarsController.text != tab.config.graphqlVariables) {
       _graphqlVarsController.text = tab.config.graphqlVariables;
     }
+    // Theme is available here (not in initState). Recolor `{{var}}` tokens when
+    // the variable palette changes (e.g. dark/light or theme switch).
+    final palette = context.appPalette;
+    if (_resolvedColor != palette.variableResolved ||
+        _unresolvedColor != palette.variableUnresolved) {
+      _resolvedColor = palette.variableResolved;
+      _unresolvedColor = palette.variableUnresolved;
+      _bodyController.forceRepaint();
+    }
   }
 
   void _onGraphqlVarsChanged() {
@@ -88,6 +116,18 @@ class _RequestViewState extends State<RequestView> {
         tab.copyWith(config: tab.config.copyWith(graphqlVariables: newText)),
       ),
     );
+  }
+
+  /// Stores the latest layered variable context for the body editor's span
+  /// builder and repaints visible lines so an env/collection switch recolors
+  /// tokens without waiting for a keystroke. Called from the body pane's
+  /// [TabVariableContextBuilder], which rebuilds only on env/collection change.
+  void _syncBodyVarContext(LayeredVariableContext varContext) {
+    if (_bodyVarContext == varContext) return;
+    _bodyVarContext = varContext;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _bodyController.forceRepaint();
+    });
   }
 
   void _onBodyChanged() {
@@ -194,105 +234,71 @@ class _RequestViewState extends State<RequestView> {
                       ),
                       SizedBox(height: layout.sectionSpacing),
                       Expanded(
-                        child: context.useUnifiedRequestTabs
-                            ? UnifiedRequestPanel(
-                                tabId: widget.tabId,
-                                bodyController: _bodyController,
-                                variablesController: _graphqlVarsController,
-                                responseController: _responseController,
-                              )
-                            : LayoutBuilder(
-                                builder: (context, constraints) {
-                                  final totalSize = settings.isVerticalLayout
-                                      ? constraints.maxHeight
-                                      : constraints.maxWidth;
-                                  // Build the panes once; only the Flex (below)
-                                  // rebuilds on drag, so the editors relayout
-                                  // rather than rebuild.
-                                  final requestPane = RequestConfigSection(
+                        child: TabVariableContextBuilder(
+                          tabId: widget.tabId,
+                          builder: (context, varContext) {
+                            _syncBodyVarContext(varContext);
+                            return context.useUnifiedRequestTabs
+                                ? UnifiedRequestPanel(
                                     tabId: widget.tabId,
                                     bodyController: _bodyController,
                                     variablesController: _graphqlVarsController,
-                                  );
-                                  final responsePane = ResponseArea(
-                                    tabId: widget.tabId,
                                     responseController: _responseController,
-                                  );
-                                  final splitter = Splitter(
-                                    isVertical: settings.isVerticalLayout,
-                                    onUpdate: (delta) {
-                                      final base =
-                                          _localSplitRatio.value ??
-                                          settings.splitRatio;
-                                      _localSplitRatio.value =
-                                          (base + delta / totalSize).clamp(
-                                            _splitMin,
-                                            _splitMax,
-                                          );
-                                    },
-                                    onEnd: () {
-                                      final committed = _localSplitRatio.value;
-                                      if (committed == null) return;
-                                      context.read<SettingsBloc>().add(
-                                        UpdateSplitRatio(committed),
+                                  )
+                                : LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      final totalSize =
+                                          settings.isVerticalLayout
+                                          ? constraints.maxHeight
+                                          : constraints.maxWidth;
+                                      // Build the panes once; only the Flex
+                                      // (below) rebuilds on drag, so the
+                                      // editors relayout rather than rebuild.
+                                      final requestPane = RequestConfigSection(
+                                        tabId: widget.tabId,
+                                        bodyController: _bodyController,
+                                        variablesController:
+                                            _graphqlVarsController,
                                       );
-                                      _localSplitRatio.value = null;
+                                      final responsePane = ResponseArea(
+                                        tabId: widget.tabId,
+                                        responseController: _responseController,
+                                      );
+                                      final splitter = Splitter(
+                                        isVertical: settings.isVerticalLayout,
+                                        onUpdate: (delta) {
+                                          final base =
+                                              _localSplitRatio.value ??
+                                              settings.splitRatio;
+                                          _localSplitRatio.value =
+                                              (base + delta / totalSize).clamp(
+                                                _splitMin,
+                                                _splitMax,
+                                              );
+                                        },
+                                        onEnd: () {
+                                          final committed =
+                                              _localSplitRatio.value;
+                                          if (committed == null) return;
+                                          context.read<SettingsBloc>().add(
+                                            UpdateSplitRatio(committed),
+                                          );
+                                          _localSplitRatio.value = null;
+                                        },
+                                      );
+
+                                      return _splitPanes(
+                                        context,
+                                        splitRatio: settings.splitRatio,
+                                        isVertical: settings.isVerticalLayout,
+                                        requestPane: requestPane,
+                                        responsePane: responsePane,
+                                        splitter: splitter,
+                                      );
                                     },
                                   );
-
-                                  return BlocSelector<
-                                    TabsBloc,
-                                    TabsState,
-                                    bool
-                                  >(
-                                    selector: (state) =>
-                                        state.tabs
-                                            .byId(widget.tabId)
-                                            ?.isSending ??
-                                        false,
-                                    builder: (context, isSending) =>
-                                        context.appMotion.inFlightFrame(
-                                          context,
-                                          isSending: isSending,
-                                          child:
-                                              ValueListenableBuilder<double?>(
-                                                valueListenable:
-                                                    _localSplitRatio,
-                                                builder: (context, local, _) {
-                                                  final currentRatio =
-                                                      local ??
-                                                      settings.splitRatio;
-                                                  return Flex(
-                                                    direction:
-                                                        settings
-                                                            .isVerticalLayout
-                                                        ? Axis.vertical
-                                                        : Axis.horizontal,
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Flexible(
-                                                        flex: _ratioToFlex(
-                                                          currentRatio,
-                                                        ),
-                                                        child: requestPane,
-                                                      ),
-                                                      splitter,
-                                                      Flexible(
-                                                        flex: _ratioToFlex(
-                                                          1 - currentRatio,
-                                                        ),
-                                                        child: responsePane,
-                                                      ),
-                                                    ],
-                                                  );
-                                                },
-                                              ),
-                                        ),
-                                  );
-                                },
-                              ),
+                          },
+                        ),
                       ),
                     ],
                   ),
@@ -302,6 +308,44 @@ class _RequestViewState extends State<RequestView> {
           },
         );
       },
+    );
+  }
+
+  /// The request/response split, wrapped in the loud-theme in-flight motion
+  /// frame. Extracted to a method so the body pane's variable-context nesting
+  /// doesn't push this block past the line-length limit.
+  Widget _splitPanes(
+    BuildContext context, {
+    required double splitRatio,
+    required bool isVertical,
+    required Widget requestPane,
+    required Widget responsePane,
+    required Widget splitter,
+  }) {
+    return BlocSelector<TabsBloc, TabsState, bool>(
+      selector: (state) => state.tabs.byId(widget.tabId)?.isSending ?? false,
+      builder: (context, isSending) => context.appMotion.inFlightFrame(
+        context,
+        isSending: isSending,
+        child: ValueListenableBuilder<double?>(
+          valueListenable: _localSplitRatio,
+          builder: (context, local, _) {
+            final currentRatio = local ?? splitRatio;
+            return Flex(
+              direction: isVertical ? Axis.vertical : Axis.horizontal,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Flexible(flex: _ratioToFlex(currentRatio), child: requestPane),
+                splitter,
+                Flexible(
+                  flex: _ratioToFlex(1 - currentRatio),
+                  child: responsePane,
+                ),
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 

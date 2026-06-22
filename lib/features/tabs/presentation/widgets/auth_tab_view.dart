@@ -4,17 +4,19 @@ import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart'
     show HttpRequestConfigEntity;
 import 'package:getman/core/theme/app_theme.dart';
-import 'package:getman/core/ui/widgets/key_value_list_editor.dart'
-    show KeyValueListEditor;
+import 'package:getman/core/ui/widgets/tab_variable_context_builder.dart';
+import 'package:getman/core/ui/widgets/variable_highlight_controller.dart';
+import 'package:getman/core/ui/widgets/variable_text_field.dart';
 import 'package:getman/core/utils/equality.dart';
+import 'package:getman/core/utils/layered_variable_context.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 
 /// AUTH tab — a fixed-field form over [HttpRequestConfigEntity.auth]. Holds its
-/// own controllers and suppresses echoes of its own emissions (mirrors
-/// [KeyValueListEditor]) so typing never loses focus across the bloc
+/// own controllers and suppresses echoes of its own emissions (same pattern as
+/// `KeyValueListEditor`) so typing never loses focus across the bloc
 /// round-trip. Field values may contain `{{env vars}}`; they resolve at send
 /// time.
 class AuthTabView extends StatefulWidget {
@@ -36,11 +38,16 @@ class _AuthTabViewState extends State<AuthTabView> {
 
   late AuthType _type;
   late ApiKeyLocation _apiKeyLocation;
-  late final TextEditingController _token;
-  late final TextEditingController _username;
-  late final TextEditingController _password;
-  late final TextEditingController _apiKeyName;
-  late final TextEditingController _apiKeyValue;
+  late final VariableHighlightController _token;
+  late final VariableHighlightController _username;
+  late final VariableHighlightController _password;
+  late final VariableHighlightController _apiKeyName;
+  late final VariableHighlightController _apiKeyValue;
+  late final FocusNode _tokenFocus;
+  late final FocusNode _usernameFocus;
+  late final FocusNode _passwordFocus;
+  late final FocusNode _apiKeyNameFocus;
+  late final FocusNode _apiKeyValueFocus;
 
   Map<String, String>? _lastEmitted;
 
@@ -50,11 +57,16 @@ class _AuthTabViewState extends State<AuthTabView> {
     final auth = _currentAuth();
     _type = auth.type;
     _apiKeyLocation = auth.apiKeyLocation;
-    _token = TextEditingController(text: auth.token);
-    _username = TextEditingController(text: auth.username);
-    _password = TextEditingController(text: auth.password);
-    _apiKeyName = TextEditingController(text: auth.apiKeyName);
-    _apiKeyValue = TextEditingController(text: auth.apiKeyValue);
+    _token = VariableHighlightController(text: auth.token);
+    _username = VariableHighlightController(text: auth.username);
+    _password = VariableHighlightController(text: auth.password);
+    _apiKeyName = VariableHighlightController(text: auth.apiKeyName);
+    _apiKeyValue = VariableHighlightController(text: auth.apiKeyValue);
+    _tokenFocus = FocusNode();
+    _usernameFocus = FocusNode();
+    _passwordFocus = FocusNode();
+    _apiKeyNameFocus = FocusNode();
+    _apiKeyValueFocus = FocusNode();
   }
 
   AuthConfig _currentAuth() =>
@@ -74,6 +86,11 @@ class _AuthTabViewState extends State<AuthTabView> {
     _password.dispose();
     _apiKeyName.dispose();
     _apiKeyValue.dispose();
+    _tokenFocus.dispose();
+    _usernameFocus.dispose();
+    _passwordFocus.dispose();
+    _apiKeyNameFocus.dispose();
+    _apiKeyValueFocus.dispose();
     super.dispose();
   }
 
@@ -131,49 +148,62 @@ class _AuthTabViewState extends State<AuthTabView> {
         }
         setState(() => _syncFrom(AuthConfig.fromMap(auth)));
       },
-      child: ListView(
-        padding: EdgeInsets.all(layout.pagePadding),
-        children: [
-          _label(context, 'AUTH TYPE'),
-          SizedBox(height: layout.tabSpacing),
-          DropdownButton<AuthType>(
-            key: const ValueKey('auth_type_dropdown'),
-            value: _type,
-            isExpanded: true,
-            items: [
-              for (final t in AuthType.values)
-                DropdownMenuItem(value: t, child: Text(_labels[t]!)),
-            ],
-            onChanged: (next) {
-              if (next == null) return;
-              setState(() => _type = next);
-              _emit();
-            },
-          ),
-          SizedBox(height: layout.sectionSpacing),
-          ..._fieldsFor(context),
-        ],
+      child: TabVariableContextBuilder(
+        tabId: widget.tabId,
+        builder: (context, varContext) => ListView(
+          padding: EdgeInsets.all(layout.pagePadding),
+          children: [
+            _label(context, 'AUTH TYPE'),
+            SizedBox(height: layout.tabSpacing),
+            DropdownButton<AuthType>(
+              key: const ValueKey('auth_type_dropdown'),
+              value: _type,
+              isExpanded: true,
+              items: [
+                for (final t in AuthType.values)
+                  DropdownMenuItem(value: t, child: Text(_labels[t]!)),
+              ],
+              onChanged: (next) {
+                if (next == null) return;
+                setState(() => _type = next);
+                _emit();
+              },
+            ),
+            SizedBox(height: layout.sectionSpacing),
+            ..._fieldsFor(context, varContext),
+          ],
+        ),
       ),
     );
   }
 
-  List<Widget> _fieldsFor(BuildContext context) {
+  List<Widget> _fieldsFor(
+    BuildContext context,
+    LayeredVariableContext varContext,
+  ) {
     switch (_type) {
       case AuthType.none:
         return [_hint(context, 'This request is sent without authentication.')];
       case AuthType.inherit:
         return [_hint(context, 'Inherits auth from the parent collection.')];
       case AuthType.bearer:
-        return [_field(context, 'TOKEN', _token)];
+        return [_field(context, 'TOKEN', _token, _tokenFocus, varContext)];
       case AuthType.basic:
         return [
-          _field(context, 'USERNAME', _username),
-          _field(context, 'PASSWORD', _password, obscure: true),
+          _field(context, 'USERNAME', _username, _usernameFocus, varContext),
+          _field(
+            context,
+            'PASSWORD',
+            _password,
+            _passwordFocus,
+            varContext,
+            obscure: true,
+          ),
         ];
       case AuthType.apiKey:
         return [
-          _field(context, 'KEY', _apiKeyName),
-          _field(context, 'VALUE', _apiKeyValue),
+          _field(context, 'KEY', _apiKeyName, _apiKeyNameFocus, varContext),
+          _field(context, 'VALUE', _apiKeyValue, _apiKeyValueFocus, varContext),
           _label(context, 'ADD TO'),
           SizedBox(height: context.appLayout.tabSpacing),
           DropdownButton<ApiKeyLocation>(
@@ -220,7 +250,9 @@ class _AuthTabViewState extends State<AuthTabView> {
   Widget _field(
     BuildContext context,
     String label,
-    TextEditingController controller, {
+    VariableHighlightController controller,
+    FocusNode focusNode,
+    LayeredVariableContext variables, {
     bool obscure = false,
   }) {
     final layout = context.appLayout;
@@ -231,12 +263,13 @@ class _AuthTabViewState extends State<AuthTabView> {
         children: [
           _label(context, label),
           SizedBox(height: layout.tabSpacing),
-          TextField(
-            key: ValueKey('auth_field_$label'),
+          VariableTextField(
+            fieldKey: ValueKey('auth_field_$label'),
+            variables: variables,
             controller: controller,
+            focusNode: focusNode,
             obscureText: obscure,
-            autocorrect: false,
-            enableSuggestions: false,
+            onChanged: (_) => _emit(),
             style: TextStyle(
               fontSize: layout.fontSizeNormal,
               fontWeight: context.appTypography.titleWeight,
@@ -246,7 +279,6 @@ class _AuthTabViewState extends State<AuthTabView> {
               isDense: true,
               contentPadding: EdgeInsets.all(layout.isCompact ? 8 : 12),
             ),
-            onChanged: (_) => _emit(),
           ),
         ],
       ),

@@ -1,12 +1,22 @@
 // Widget tests for AuthTabView: scheme selection reveals the right fields and
 // edits round-trip into the tab's config.auth map. Uses a real TabsBloc fed by
-// a mocked repository + use case (same pattern as response_section_test.dart).
+// a mocked repository + use case alongside SettingsBloc, EnvironmentsBloc, and
+// CollectionsBloc (required by TabVariableContextBuilder).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/environments/domain/entities/environment_entity.dart';
+import 'package:getman/features/environments/domain/usecases/environments_usecases.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
+import 'package:getman/features/settings/domain/entities/settings_entity.dart';
+import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
@@ -20,9 +30,56 @@ class MockTabsRepository extends Mock implements TabsRepository {}
 
 class MockSendRequestUseCase extends Mock implements SendRequestUseCase {}
 
+class MockSaveSettingsUseCase extends Mock implements SaveSettingsUseCase {}
+
+class MockGetEnvironmentsUseCase extends Mock
+    implements GetEnvironmentsUseCase {}
+
+class MockSaveEnvironmentsUseCase extends Mock
+    implements SaveEnvironmentsUseCase {}
+
+class MockPutEnvironmentUseCase extends Mock implements PutEnvironmentUseCase {}
+
+class MockDeleteEnvironmentUseCase extends Mock
+    implements DeleteEnvironmentUseCase {}
+
+class MockGetCollectionsUseCase extends Mock implements GetCollectionsUseCase {}
+
+class MockSaveCollectionsUseCase extends Mock
+    implements SaveCollectionsUseCase {}
+
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 
 class _FakePanel extends Fake implements PanelEntity {}
+
+SettingsBloc _settingsBloc(SettingsEntity settings) {
+  final save = MockSaveSettingsUseCase();
+  when(() => save(any())).thenAnswer((_) async {});
+  return SettingsBloc(saveSettingsUseCase: save, initialSettings: settings);
+}
+
+EnvironmentsBloc _environmentsBloc([
+  List<EnvironmentEntity> environments = const [],
+]) {
+  final get = MockGetEnvironmentsUseCase();
+  when(get.call).thenAnswer((_) async => environments);
+  return EnvironmentsBloc(
+    getEnvironmentsUseCase: get,
+    saveEnvironmentsUseCase: MockSaveEnvironmentsUseCase(),
+    putEnvironmentUseCase: MockPutEnvironmentUseCase(),
+    deleteEnvironmentUseCase: MockDeleteEnvironmentUseCase(),
+    initialEnvironments: environments,
+  );
+}
+
+CollectionsBloc _collectionsBloc() {
+  final get = MockGetCollectionsUseCase();
+  when(get.call).thenAnswer((_) async => const <CollectionNodeEntity>[]);
+  return CollectionsBloc(
+    getCollectionsUseCase: get,
+    saveCollectionsUseCase: MockSaveCollectionsUseCase(),
+  );
+}
 
 Future<TabsBloc> _loadedBloc(
   MockTabsRepository repository,
@@ -46,13 +103,33 @@ Future<TabsBloc> _loadedBloc(
   return bloc;
 }
 
-Future<void> _pump(WidgetTester tester, TabsBloc bloc, String tabId) async {
+Future<void> _pump(
+  WidgetTester tester,
+  TabsBloc bloc,
+  String tabId, {
+  List<EnvironmentEntity> environments = const [],
+  String? activeEnvironmentId,
+}) async {
+  final settingsBloc = _settingsBloc(
+    SettingsEntity(activeEnvironmentId: activeEnvironmentId),
+  );
+  addTearDown(settingsBloc.close);
+  final environmentsBloc = _environmentsBloc(environments);
+  addTearDown(environmentsBloc.close);
+  final collectionsBloc = _collectionsBloc();
+  addTearDown(collectionsBloc.close);
+
   await tester.pumpWidget(
     MaterialApp(
       theme: brutalistTheme(Brightness.light),
       home: Scaffold(
-        body: BlocProvider.value(
-          value: bloc,
+        body: MultiBlocProvider(
+          providers: [
+            BlocProvider.value(value: bloc),
+            BlocProvider<SettingsBloc>.value(value: settingsBloc),
+            BlocProvider<EnvironmentsBloc>.value(value: environmentsBloc),
+            BlocProvider<CollectionsBloc>.value(value: collectionsBloc),
+          ],
           child: AuthTabView(tabId: tabId),
         ),
       ),
@@ -74,6 +151,7 @@ void main() {
         config: HttpRequestConfigEntity(id: 'fallback'),
       ),
     );
+    registerFallbackValue(const SettingsEntity());
   });
 
   setUp(() {
@@ -193,4 +271,52 @@ void main() {
 
     await tester.pump(const Duration(seconds: 11));
   });
+
+  testWidgets(
+    'TOKEN field shows {{var}} autocomplete overlay and accepts suggestion',
+    (tester) async {
+      final env = EnvironmentEntity(
+        id: 'env1',
+        name: 'Test',
+        variables: const {'host': 'example.com'},
+      );
+      final bloc = await _loadedBloc(
+        repository,
+        sendRequestUseCase,
+        tabWithAuth('t', const {'type': 'bearer', 'token': ''}),
+      );
+      addTearDown(bloc.close);
+
+      await _pump(
+        tester,
+        bloc,
+        't',
+        environments: [env],
+        activeEnvironmentId: 'env1',
+      );
+
+      // Enter text that triggers autocomplete for the 'host' variable.
+      await tester.enterText(
+        find.byKey(const ValueKey('auth_field_TOKEN')),
+        '{{ho',
+      );
+      await tester.pumpAndSettle();
+
+      // The 'host' suggestion must appear in the overlay.
+      expect(find.text('host'), findsOneWidget);
+
+      // Tap the suggestion to accept it.
+      await tester.tap(find.text('host'));
+      await tester.pumpAndSettle();
+
+      // The token in the bloc state should be fully completed.
+      expect(
+        bloc.state.tabs.byId('t')!.config.auth['token'],
+        '{{host}}',
+      );
+
+      // Flush the debounced-save timer.
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
 }

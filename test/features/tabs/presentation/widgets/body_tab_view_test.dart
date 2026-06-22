@@ -8,6 +8,14 @@ import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/environments/domain/usecases/environments_usecases.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
+import 'package:getman/features/settings/domain/entities/settings_entity.dart';
+import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
@@ -23,9 +31,62 @@ class MockTabsRepository extends Mock implements TabsRepository {}
 
 class MockSendRequestUseCase extends Mock implements SendRequestUseCase {}
 
+class _MockSaveSettingsUseCase extends Mock implements SaveSettingsUseCase {}
+
+class _MockGetEnvironmentsUseCase extends Mock
+    implements GetEnvironmentsUseCase {}
+
+class _MockSaveEnvironmentsUseCase extends Mock
+    implements SaveEnvironmentsUseCase {}
+
+class _MockPutEnvironmentUseCase extends Mock
+    implements PutEnvironmentUseCase {}
+
+class _MockDeleteEnvironmentUseCase extends Mock
+    implements DeleteEnvironmentUseCase {}
+
+class _MockGetCollectionsUseCase extends Mock
+    implements GetCollectionsUseCase {}
+
+class _MockSaveCollectionsUseCase extends Mock
+    implements SaveCollectionsUseCase {}
+
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 
 class _FakePanel extends Fake implements PanelEntity {}
+
+// Minimal SettingsBloc with no active environment (no env/collection vars;
+// dynamic built-ins remain suggestable, so fields still wire autocomplete).
+SettingsBloc _settingsBloc() {
+  final save = _MockSaveSettingsUseCase();
+  when(() => save(any())).thenAnswer((_) async {});
+  return SettingsBloc(
+    saveSettingsUseCase: save,
+    initialSettings: const SettingsEntity(),
+  );
+}
+
+// Minimal EnvironmentsBloc with no environments.
+EnvironmentsBloc _environmentsBloc() {
+  final get = _MockGetEnvironmentsUseCase();
+  when(get.call).thenAnswer((_) async => const []);
+  return EnvironmentsBloc(
+    getEnvironmentsUseCase: get,
+    saveEnvironmentsUseCase: _MockSaveEnvironmentsUseCase(),
+    putEnvironmentUseCase: _MockPutEnvironmentUseCase(),
+    deleteEnvironmentUseCase: _MockDeleteEnvironmentUseCase(),
+  );
+}
+
+// Minimal CollectionsBloc with no collections.
+CollectionsBloc _collectionsBloc() {
+  final get = _MockGetCollectionsUseCase();
+  when(get.call).thenAnswer((_) async => const <CollectionNodeEntity>[]);
+  return CollectionsBloc(
+    getCollectionsUseCase: get,
+    saveCollectionsUseCase: _MockSaveCollectionsUseCase(),
+  );
+}
 
 Future<TabsBloc> _loadedBloc(
   MockTabsRepository repository,
@@ -57,12 +118,26 @@ Future<CodeLineEditingController> _pump(
   final controller = CodeLineEditingController();
   final variablesController = CodeLineEditingController();
   addTearDown(variablesController.dispose);
+  // TabVariableContextBuilder (used by FormDataEditor + the body editor)
+  // requires all four blocs. Build eagerly — when() stubs must not run inside
+  // pumpWidget callbacks. Close via addTearDown so handlers don't outlive it.
+  final settingsBloc = _settingsBloc();
+  addTearDown(settingsBloc.close);
+  final environmentsBloc = _environmentsBloc();
+  addTearDown(environmentsBloc.close);
+  final collectionsBloc = _collectionsBloc();
+  addTearDown(collectionsBloc.close);
   await tester.pumpWidget(
     MaterialApp(
       theme: brutalistTheme(Brightness.light),
       home: Scaffold(
-        body: BlocProvider.value(
-          value: bloc,
+        body: MultiBlocProvider(
+          providers: [
+            BlocProvider.value(value: bloc),
+            BlocProvider<SettingsBloc>.value(value: settingsBloc),
+            BlocProvider<EnvironmentsBloc>.value(value: environmentsBloc),
+            BlocProvider<CollectionsBloc>.value(value: collectionsBloc),
+          ],
           child: BodyTabView(
             tabId: tabId,
             controller: controller,
@@ -89,6 +164,9 @@ void main() {
         config: HttpRequestConfigEntity(id: 'fallback'),
       ),
     );
+    // Required by _settingsBloc() → when(() => save(any())) where save takes
+    // a SettingsEntity; mocktail needs a fallback for sound null safety.
+    registerFallbackValue(const SettingsEntity());
   });
 
   setUp(() {

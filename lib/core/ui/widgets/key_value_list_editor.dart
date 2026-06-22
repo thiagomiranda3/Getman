@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
-import 'package:getman/core/ui/widgets/variable_autocomplete.dart';
 import 'package:getman/core/ui/widgets/variable_highlight_controller.dart';
-import 'package:getman/core/ui/widgets/variable_hover_popover.dart';
-import 'package:getman/core/utils/variable_resolution_helper.dart';
-import 'package:getman/core/utils/variable_suggestions.dart';
+import 'package:getman/core/ui/widgets/variable_text_field.dart';
+import 'package:getman/core/utils/layered_variable_context.dart';
 
 /// Generic editable key/value row list backing the params, headers, and
 /// environment-variable editors. The canonical value type [T] (ordered list,
@@ -46,12 +44,13 @@ class KeyValueListEditor<T extends Object> extends StatefulWidget {
   /// Called with the new secret-key set when a row's lock is toggled.
   final ValueChanged<Set<String>>? onSecretKeysChanged;
 
-  /// When non-null, value fields highlight `{{var}}` tokens and show a hover
-  /// popover resolving them against the active environment. Params and headers
+  /// When non-null, value fields highlight `{{var}}` tokens, show a hover
+  /// popover resolving them, and offer autocomplete suggestions from the
+  /// layered (env + collection + dynamic) variable context. Params and headers
   /// pass a context (highlighting enabled); the env editor and other consumers
   /// pass null, leaving value fields as plain text. Note: this is unrelated to
   /// [secretKeys], which toggles per-row secret obscuring in the env editor.
-  final VariableHoverContext? variableContext;
+  final LayeredVariableContext? variableContext;
 
   /// When set, each row's key/value [TextField] gets a stable
   /// `ValueKey('<prefix>_key_<index>')` / `ValueKey('<prefix>_val_<index>')` so
@@ -68,8 +67,6 @@ class _KeyValueListEditorState<T extends Object>
   late List<TextEditingController> _keyControllers;
   late List<TextEditingController> _valControllers;
   T? _lastEmitted;
-
-  final VariableHoverController _hoverController = VariableHoverController();
 
   @override
   void initState() {
@@ -98,19 +95,6 @@ class _KeyValueListEditorState<T extends Object>
     _valControllers.add(_newValueController(''));
   }
 
-  void _showVariablePopover(BuildContext context, String name, Offset pos) {
-    if (!mounted) return;
-    final varContext = widget.variableContext;
-    if (varContext == null) return;
-    final data = VariableResolutionHelper.classify(
-      name: name,
-      variables: varContext.variables,
-      secretKeys: varContext.secretKeys,
-      environmentName: varContext.environmentName,
-    );
-    _hoverController.showFor(context, data, pos);
-  }
-
   @override
   void didUpdateWidget(KeyValueListEditor<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -137,7 +121,6 @@ class _KeyValueListEditorState<T extends Object>
 
   @override
   void dispose() {
-    _hoverController.dispose();
     _disposeControllers();
     super.dispose();
   }
@@ -175,37 +158,6 @@ class _KeyValueListEditorState<T extends Object>
         // mis-flag a key with surrounding whitespace.
         final keyText = _keyControllers[index].text.trim();
 
-        final varContext = widget.variableContext;
-        final valController = _valControllers[index];
-        VariableSuggestionsProvider? valueSuggestionsFor;
-        if (varContext != null &&
-            valController is VariableHighlightController) {
-          final palette = context.appPalette;
-          // Block syntax for onVariableEnter prevents the arrow-function body
-          // from greedily capturing the following cascade item as part of its
-          // return expression, which would trigger use_of_void_result.
-          valController
-            ..onVariableEnter = (name, pos) {
-              _showVariablePopover(context, name, pos);
-            }
-            ..onVariableExit = _hoverController.scheduleHide
-            ..updateColors(
-              resolved: palette.variableResolved,
-              unresolved: palette.variableUnresolved,
-            )
-            ..updateVariables(varContext.variables);
-          valueSuggestionsFor = (query) => buildVariableSuggestions(
-            query: query,
-            userVariableNames: varContext.variables.keys,
-            classify: (name) => VariableResolutionHelper.classify(
-              name: name,
-              variables: varContext.variables,
-              secretKeys: varContext.secretKeys,
-              environmentName: varContext.environmentName,
-            ),
-          );
-        }
-
         return _KeyValueRow(
           key: ValueKey(_keyControllers[index]),
           rowIndex: index,
@@ -219,7 +171,7 @@ class _KeyValueListEditorState<T extends Object>
               keyText.isNotEmpty &&
               secrets.contains(keyText),
           onToggleSecret: secrets == null ? null : () => _toggleSecret(index),
-          valueSuggestionsFor: valueSuggestionsFor,
+          variableContext: widget.variableContext,
           onKeyChanged: (val) {
             if (index == _keyControllers.length - 1 && val.isNotEmpty) {
               setState(_addEmptyRow);
@@ -257,7 +209,7 @@ class _KeyValueRow extends StatefulWidget {
     this.showSecretToggle = false,
     this.isSecret = false,
     this.onToggleSecret,
-    this.valueSuggestionsFor,
+    this.variableContext,
   });
   final int rowIndex;
   final String? fieldPrefix;
@@ -270,7 +222,7 @@ class _KeyValueRow extends StatefulWidget {
   final bool showSecretToggle;
   final bool isSecret;
   final VoidCallback? onToggleSecret;
-  final VariableSuggestionsProvider? valueSuggestionsFor;
+  final LayeredVariableContext? variableContext;
 
   @override
   State<_KeyValueRow> createState() => _KeyValueRowState();
@@ -320,44 +272,60 @@ class _KeyValueRowState extends State<_KeyValueRow> {
       enableSuggestions: false,
       onChanged: widget.onKeyChanged,
     );
-    final valueField = TextField(
-      key: widget.fieldPrefix == null
-          ? null
-          : ValueKey('${widget.fieldPrefix}_val_${widget.rowIndex}'),
-      style: textStyle,
-      focusNode: _valueFocusNode,
-      obscureText: widget.isSecret && !_revealed,
-      decoration: InputDecoration(
-        hintText: 'VALUE',
-        isDense: true,
-        contentPadding: fieldPadding,
-        // Reveal toggle lives in the field so the row layout is unchanged.
-        suffixIcon: widget.isSecret
-            ? IconButton(
-                visualDensity: VisualDensity.compact,
-                icon: Icon(
-                  _revealed ? Icons.visibility_off : Icons.visibility,
-                  size: widget.layout.isCompact ? 18 : 20,
-                ),
-                tooltip: _revealed ? 'Hide value' : 'Reveal value',
-                onPressed: () => setState(() => _revealed = !_revealed),
-              )
-            : null,
-      ),
-      controller: widget.valController,
-      autocorrect: false,
-      enableSuggestions: false,
-      onChanged: widget.onValChanged,
+
+    // Build the value field decoration once so both the plain path and the
+    // VariableTextField path share the exact same decoration.
+    final valueDecoration = InputDecoration(
+      hintText: 'VALUE',
+      isDense: true,
+      contentPadding: fieldPadding,
+      // Reveal toggle lives in the field so the row layout is unchanged.
+      suffixIcon: widget.isSecret
+          ? IconButton(
+              visualDensity: VisualDensity.compact,
+              icon: Icon(
+                _revealed ? Icons.visibility_off : Icons.visibility,
+                size: widget.layout.isCompact ? 18 : 20,
+              ),
+              tooltip: _revealed ? 'Hide value' : 'Reveal value',
+              onPressed: () => setState(() => _revealed = !_revealed),
+            )
+          : null,
     );
-    final valueFieldWithAutocomplete = widget.valueSuggestionsFor == null
-        ? valueField
-        : VariableAutocomplete(
-            controller: widget.valController,
+
+    final ctx = widget.variableContext;
+    final valController = widget.valController;
+
+    // Use VariableTextField when the context is non-null and the controller
+    // is a VariableHighlightController. Secret rows pass a null context (the
+    // env editor), so the two paths never combine.
+    final Widget valueFieldWithAutocomplete =
+        (ctx == null || valController is! VariableHighlightController)
+        ? TextField(
+            key: widget.fieldPrefix == null
+                ? null
+                : ValueKey('${widget.fieldPrefix}_val_${widget.rowIndex}'),
+            style: textStyle,
             focusNode: _valueFocusNode,
-            suggestionsFor: widget.valueSuggestionsFor!,
-            onAccepted: widget.onValChanged,
-            child: valueField,
+            obscureText: widget.isSecret && !_revealed,
+            decoration: valueDecoration,
+            controller: valController,
+            autocorrect: false,
+            enableSuggestions: false,
+            onChanged: widget.onValChanged,
+          )
+        : VariableTextField(
+            fieldKey: widget.fieldPrefix == null
+                ? null
+                : ValueKey('${widget.fieldPrefix}_val_${widget.rowIndex}'),
+            variables: ctx,
+            controller: valController,
+            focusNode: _valueFocusNode,
+            onChanged: widget.onValChanged,
+            decoration: valueDecoration,
+            style: textStyle,
           );
+
     final secretButton = widget.showSecretToggle
         ? context.appDecoration.wrapInteractive(
             child: IconButton(
