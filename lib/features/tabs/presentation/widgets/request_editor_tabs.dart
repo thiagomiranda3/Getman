@@ -304,6 +304,7 @@ class BodyTabView extends StatelessWidget {
         return _BinaryBodyPicker(tabId: tabId);
       case BodyType.graphql:
         return _GraphqlBodyEditor(
+          tabId: tabId,
           queryController: controller,
           variablesController: variablesController,
         );
@@ -470,9 +471,11 @@ class _RawBodyEditor extends StatelessWidget {
 /// variables are JSON).
 class _GraphqlBodyEditor extends StatelessWidget {
   const _GraphqlBodyEditor({
+    required this.tabId,
     required this.queryController,
     required this.variablesController,
   });
+  final String tabId;
   final CodeLineEditingController queryController;
   final CodeLineEditingController variablesController;
 
@@ -492,7 +495,10 @@ class _GraphqlBodyEditor extends StatelessWidget {
           flex: 2,
           child: _GraphqlPane(
             label: 'VARIABLES (JSON)',
-            child: _RawBodyEditor(controller: variablesController),
+            child: _RawBodyEditor(
+              tabId: tabId,
+              controller: variablesController,
+            ),
           ),
         ),
       ],
