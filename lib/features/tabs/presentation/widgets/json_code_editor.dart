@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/features/tabs/presentation/widgets/code_find_panel.dart';
+import 'package:getman/features/tabs/presentation/widgets/variable_json_span_builder.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:re_highlight/languages/json.dart';
 import 'package:re_highlight/re_highlight.dart';
@@ -51,8 +52,43 @@ TextSpan jsonHighlightSpanBuilder({
 /// Creates a [CodeLineEditingController] pre-wired with JSON syntax
 /// highlighting. Use this (not the bare constructor) for any controller fed to
 /// a [JsonCodeEditor] so highlighting works without an extra setup step.
-CodeLineEditingController createJsonCodeController() =>
-    CodeLineEditingController(spanBuilder: jsonHighlightSpanBuilder);
+///
+/// When [variablesProvider], [resolvedColor], and [unresolvedColor] are all
+/// supplied, the span builder additionally recolors `{{var}}` tokens on top of
+/// the JSON highlighting (resolved vs. unresolved). The providers are read at
+/// span-build time — call [CodeLineEditingController.forceRepaint] after an
+/// env/theme change to recolor without a text edit. When any provider is
+/// omitted (e.g. the response viewer), the behavior is plain JSON highlighting.
+CodeLineEditingController createJsonCodeController({
+  Map<String, String> Function()? variablesProvider,
+  Color Function()? resolvedColor,
+  Color Function()? unresolvedColor,
+}) {
+  if (variablesProvider == null ||
+      resolvedColor == null ||
+      unresolvedColor == null) {
+    return CodeLineEditingController(spanBuilder: jsonHighlightSpanBuilder);
+  }
+  return CodeLineEditingController(
+    spanBuilder:
+        ({
+          required context,
+          required index,
+          required codeLine,
+          required textSpan,
+          required style,
+        }) => variableAwareJsonSpan(
+          context: context,
+          index: index,
+          codeLine: codeLine,
+          textSpan: textSpan,
+          style: style,
+          variables: variablesProvider(),
+          resolvedColor: resolvedColor(),
+          unresolvedColor: unresolvedColor(),
+        ),
+  );
+}
 
 class JsonCodeEditor extends StatelessWidget {
   const JsonCodeEditor({
