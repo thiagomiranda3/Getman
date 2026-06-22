@@ -172,7 +172,20 @@ highlighting:
 body widget updates on context change). **Do not reinstate `codeTheme`** — the
 gotcha in CLAUDE.md still holds; coloring stays in the span builder.
 
-### Component 7 — Body hover ⚠️ (highest risk)
+### Component 7 — Body hover ⚠️ (highest risk) — DEFERRED (spike result, 2026-06-20)
+
+> **RESOLUTION:** The Task 9 spike confirmed body hover is **not feasible in
+> `re_editor 0.9.0` without forking the package**, so it is **deferred** per the
+> fallback below. Evidence: the editor's render object is `_CodeFieldRender`
+> (private), reached via a private `editorKey`; the position-from-offset method
+> (`CodeLineRenderParagraph.getPosition(Offset)`) lives on private
+> line/paragraph internals; the public `CodeLineEditingController` exposes no
+> position↔offset API and `CodeEditor` exposes no hover/position callback. The
+> `TextSpan.onEnter/onExit` route also fails because re_editor paints with a
+> custom render object (not `RenderParagraph`), so span hover callbacks never
+> fire. **Delivered:** body autocomplete + highlighting. **Not delivered:**
+> body hover (URL, params, headers, auth, form-data retain full hover). Revisit
+> if/when re_editor exposes a public position API or a fork is justified.
 
 `re_editor` paints lines through a custom render object, so Flutter's
 `TextSpan.onEnter/onExit` hover callbacks are not expected to fire (unlike the
