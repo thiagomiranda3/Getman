@@ -276,8 +276,7 @@ void main() {
       StackTrace.current,
     );
     await tester.pumpAndSettle();
-    // Unmount so _BrutalistInFlightFrame disposes cleanly when isSending was
-    // true (the AnimationController must be disposed while ticker is active).
+    // Unmount before the debounced save timer fires so the bloc closes cleanly.
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
     await tester.pump(const Duration(seconds: 11));
   });

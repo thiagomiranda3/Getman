@@ -94,10 +94,8 @@ BoxDecoration rpgTabShape(
   );
 }
 
-/// @visibleForTesting C2 sentinels — last activity/idle values read by the
-/// painter's paint() on the most recent frame. 0.0 when no pulse is plumbed.
-@visibleForTesting
-double debugRpgLastActivityLevel = 0;
+/// @visibleForTesting C2 sentinel — last idle value read by the painter's
+/// paint() on the most recent frame. 0.0 when no pulse is plumbed.
 @visibleForTesting
 double debugRpgLastIdleFactor = 0;
 
@@ -389,13 +387,10 @@ class _StarfieldPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final t = tListenable.value;
 
-    // C2 session rhythm: read pulse values defensively (null-safe).
-    // activityLevel (0..1) → more star brightness + drift speed when busy.
+    // C2 session rhythm: read idle factor defensively (null-safe).
     // idleFactor (0..1) → dimmer, slower starfield when idle.
-    final activityLevel = signals?.pulse.activityLevel ?? 0.0;
     final idleFactor = signals?.pulse.idleFactor ?? 0.0;
-    // Write sentinels for tests.
-    debugRpgLastActivityLevel = activityLevel;
+    // Write sentinel for tests.
     debugRpgLastIdleFactor = idleFactor;
 
     // Pointer is -1..1 from centre (parallax convention).
@@ -437,8 +432,8 @@ class _StarfieldPainter extends CustomPainter {
     );
 
     // C2: compute a single alpha multiplier for all motes (cheap arithmetic).
-    // Activity brightens the starfield (+45%); idle dims it (-40%).
-    final alphaMult = (1.0 + 0.45 * activityLevel) * (1.0 - 0.4 * idleFactor);
+    // Idle dims the starfield (-40%).
+    final alphaMult = 1.0 - 0.4 * idleFactor;
 
     // --- Draw motes ---
     for (var i = 0; i < motes.length; i++) {
@@ -454,7 +449,7 @@ class _StarfieldPainter extends CustomPainter {
                       math.sin(
                         (t * math.pi * 2 + m.twinkleOffset * math.pi * 2) * 1.4,
                       ));
-      // C2: apply activity/idle multiplier to the base alpha.
+      // C2: apply idle multiplier to the base alpha.
       final alphaBase = (isDark ? 0.55 : 0.18) * alphaMult;
       final color = _colorFor(
         m.hue,

@@ -8,10 +8,8 @@ import 'package:getman/core/theme/motion/ambient_signals.dart';
 import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
 import 'package:provider/provider.dart';
 
-/// @visibleForTesting C2 sentinels — last activity/idle values read by the
-/// painter's paint() on the most recent frame. 0.0 when no pulse is plumbed.
-@visibleForTesting
-double debugAurisLastActivityLevel = 0;
+/// @visibleForTesting C2 sentinel — last idle value read by the painter's
+/// paint() on the most recent frame. 0.0 when no pulse is plumbed.
 @visibleForTesting
 double debugAurisLastIdleFactor = 0;
 
@@ -380,19 +378,16 @@ class _AurisHudPainter extends CustomPainter {
     final v = t.value; // 0..1 over the 30 s loop
     final rect = Offset.zero & size;
 
-    // C2 session rhythm: read pulse values defensively (null-safe).
-    // activityLevel (0..1) → brighter HUD (sweep/ticks) when busy.
+    // C2 session rhythm: read idle factor defensively (null-safe).
     // idleFactor (0..1) → dimmer, calmer HUD when idle.
-    final activityLevel = signals?.pulse.activityLevel ?? 0.0;
     final idleFactor = signals?.pulse.idleFactor ?? 0.0;
-    // Write sentinels for tests.
-    debugAurisLastActivityLevel = activityLevel;
+    // Write sentinel for tests.
     debugAurisLastIdleFactor = idleFactor;
 
-    // C2 multiplier: activity brightens HUD elements (up to +40%);
-    // idle dims them (down to -30%). Grid gets a subtler effect (always faint).
-    final hudMult = (1.0 + 0.4 * activityLevel) * (1.0 - 0.3 * idleFactor);
-    final gridMult = (1.0 + 0.2 * activityLevel) * (1.0 - 0.2 * idleFactor);
+    // C2 multiplier: idle dims HUD elements (down to -30%).
+    // Grid gets a subtler effect (always faint).
+    final hudMult = 1.0 - 0.3 * idleFactor;
+    final gridMult = 1.0 - 0.2 * idleFactor;
 
     // Slightly stronger when the AurisScheme is present (the scheme-coloured
     // HUD); fainter for the neutral fallback so it never shouts.

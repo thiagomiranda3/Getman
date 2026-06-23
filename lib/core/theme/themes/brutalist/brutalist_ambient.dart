@@ -8,10 +8,8 @@ import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_palette.dart';
 import 'package:provider/provider.dart';
 
-/// @visibleForTesting C2 sentinels — last activity/idle values read by the
-/// painter's paint() on the most recent frame. 0.0 when no pulse is plumbed.
-@visibleForTesting
-double debugBrutalistLastActivityLevel = 0;
+/// @visibleForTesting C2 sentinel — last idle value read by the painter's
+/// paint() on the most recent frame. 0.0 when no pulse is plumbed.
 @visibleForTesting
 double debugBrutalistLastIdleFactor = 0;
 
@@ -259,13 +257,10 @@ class _HalftonePainter extends CustomPainter {
     final v = t.value; // 0..1 over the loop
     final rect = Offset.zero & size;
 
-    // C2 session rhythm: read pulse values defensively (null-safe).
-    // activityLevel (0..1) → more ink density / darker dots when busy.
+    // C2 session rhythm: read idle factor defensively (null-safe).
     // idleFactor (0..1) → lighter, calmer halftone grid when idle.
-    final activityLevel = signals?.pulse.activityLevel ?? 0.0;
     final idleFactor = signals?.pulse.idleFactor ?? 0.0;
-    // Write sentinels for tests.
-    debugBrutalistLastActivityLevel = activityLevel;
+    // Write sentinel for tests.
     debugBrutalistLastIdleFactor = idleFactor;
 
     // Base paper fill.
@@ -343,8 +338,8 @@ class _HalftonePainter extends CustomPainter {
     }
 
     // C2: compute alpha multiplier (cheap arithmetic, no alloc).
-    // Activity densifies the ink (up to +50%); idle thins it (down to -35%).
-    final alphaMult = (1.0 + 0.5 * activityLevel) * (1.0 - 0.35 * idleFactor);
+    // Idle thins the ink (down to -35%).
+    final alphaMult = 1.0 - 0.35 * idleFactor;
 
     // Accent registration ghost first (under the ink), faint.
     canvas.drawPath(

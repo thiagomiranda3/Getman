@@ -18,8 +18,8 @@ class AmbientSignals {
   /// from centre, glass uses 0..1). Widget keeps its convention.
   final ValueListenable<Offset> pointer;
 
-  /// Session rhythm (activityLevel / idleFactor). Also a `Listenable`, so merge
-  /// it into the painter's `repaint:`.
+  /// Session idle/presence rhythm. Also a `Listenable`, so merge it into the
+  /// painter's `repaint:`.
   final WorkspacePulseController pulse;
 
   final bool isDark;

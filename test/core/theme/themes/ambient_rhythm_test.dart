@@ -1,8 +1,7 @@
 // test/core/theme/themes/ambient_rhythm_test.dart
 //
-// Task 14 — C2 (idle dim + send-burst intensify): verifies that each animated
-// ambient painter subscribes to the provided [WorkspacePulseController], that
-// a bump() does not throw, and that teardown unsubscribes.
+// Verifies that each animated ambient painter subscribes to the provided
+// [WorkspacePulseController], reads idleFactor, and unsubscribes on teardown.
 //
 // The [hasListeners] check is a TDD seam: the painters include [pulse] in their
 // `repaint:` listenable only when [hasPulse] is true (i.e. a real provider is
@@ -21,15 +20,11 @@ import 'package:getman/core/theme/themes/rpg/rpg_decorations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
-// Reset all C2 debug sentinels before each test.
+// Reset C2 debug sentinels before each test.
 void _resetSentinels() {
-  debugGlassLastActivityLevel = 0;
   debugGlassLastIdleFactor = 0;
-  debugBrutalistLastActivityLevel = 0;
   debugBrutalistLastIdleFactor = 0;
-  debugAurisLastActivityLevel = 0;
   debugAurisLastIdleFactor = 0;
-  debugRpgLastActivityLevel = 0;
   debugRpgLastIdleFactor = 0;
 }
 
@@ -45,7 +40,7 @@ void main() {
   // ---------------------------------------------------------------------------
 
   testWidgets(
-    'glass animated: subscribes to pulse, C2 sentinels active, unsubscribes',
+    'glass animated: subscribes to pulse, idle sentinel active, unsubscribes',
     (tester) async {
       final pulse = WorkspacePulseController();
       await tester.pumpWidget(
@@ -68,16 +63,6 @@ void main() {
         pulse.debugHasListeners,
         isTrue,
         reason: 'animated glass ambient must subscribe to the pulse for C2',
-      );
-      // Bumping the pulse must not throw (exercises activityLevel in paint()).
-      pulse.bump();
-      await tester.pump(const Duration(milliseconds: 50));
-      expect(tester.takeException(), isNull);
-      // After a bump, the painter must have read a non-zero activityLevel.
-      expect(
-        debugGlassLastActivityLevel,
-        greaterThan(0.0),
-        reason: 'paint() must read activityLevel from pulse after bump',
       );
       // Idle ticks must not throw (exercises idleFactor path in paint()).
       pulse
@@ -109,7 +94,7 @@ void main() {
   // ---------------------------------------------------------------------------
 
   testWidgets(
-    'brutalist animated: subscribes to pulse, C2 sentinels, unsubscribes',
+    'brutalist animated: subscribes to pulse, idle sentinel, unsubscribes',
     (tester) async {
       final pulse = WorkspacePulseController();
       await tester.pumpWidget(
@@ -130,14 +115,6 @@ void main() {
         pulse.debugHasListeners,
         isTrue,
         reason: 'animated brutalist ambient must subscribe to the pulse for C2',
-      );
-      pulse.bump();
-      await tester.pump(const Duration(milliseconds: 50));
-      expect(tester.takeException(), isNull);
-      expect(
-        debugBrutalistLastActivityLevel,
-        greaterThan(0.0),
-        reason: 'paint() must read activityLevel from pulse after bump',
       );
       pulse
         ..tick()
@@ -166,7 +143,7 @@ void main() {
   // ---------------------------------------------------------------------------
 
   testWidgets(
-    'auris animated: subscribes to pulse, C2 sentinels active, unsubscribes',
+    'auris animated: subscribes to pulse, idle sentinel active, unsubscribes',
     (tester) async {
       final pulse = WorkspacePulseController();
       await tester.pumpWidget(
@@ -188,14 +165,6 @@ void main() {
         pulse.debugHasListeners,
         isTrue,
         reason: 'animated auris ambient must subscribe to the pulse for C2',
-      );
-      pulse.bump();
-      await tester.pump(const Duration(milliseconds: 50));
-      expect(tester.takeException(), isNull);
-      expect(
-        debugAurisLastActivityLevel,
-        greaterThan(0.0),
-        reason: 'paint() must read activityLevel from pulse after bump',
       );
       pulse
         ..tick()
@@ -224,7 +193,7 @@ void main() {
   // ---------------------------------------------------------------------------
 
   testWidgets(
-    'rpg animated: subscribes to pulse, C2 sentinels active, unsubscribes',
+    'rpg animated: subscribes to pulse, idle sentinel active, unsubscribes',
     (tester) async {
       final pulse = WorkspacePulseController();
       await tester.pumpWidget(
@@ -246,14 +215,6 @@ void main() {
         pulse.debugHasListeners,
         isTrue,
         reason: 'animated rpg ambient must subscribe to the pulse for C2',
-      );
-      pulse.bump();
-      await tester.pump(const Duration(milliseconds: 50));
-      expect(tester.takeException(), isNull);
-      expect(
-        debugRpgLastActivityLevel,
-        greaterThan(0.0),
-        reason: 'paint() must read activityLevel from pulse after bump',
       );
       pulse
         ..tick()
