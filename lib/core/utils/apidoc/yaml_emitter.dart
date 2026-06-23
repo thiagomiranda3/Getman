@@ -30,6 +30,16 @@ class YamlEmitter {
             ..write(key)
             ..writeln(':');
           _emitList(v, indent + 2, buf);
+        } else if (v is Map && v.isEmpty) {
+          buf
+            ..write(pad)
+            ..write(key)
+            ..writeln(': {}');
+        } else if (v is List && v.isEmpty) {
+          buf
+            ..write(pad)
+            ..write(key)
+            ..writeln(': []');
         } else {
           buf
             ..write(pad)
@@ -72,6 +82,14 @@ class YamlEmitter {
             ..write(firstEntry.key)
             ..writeln(':');
           _emitList(fv, indent + 4, buf);
+        } else if (fv is Map && fv.isEmpty) {
+          buf
+            ..write(firstEntry.key)
+            ..writeln(': {}');
+        } else if (fv is List && fv.isEmpty) {
+          buf
+            ..write(firstEntry.key)
+            ..writeln(': []');
         } else {
           buf
             ..write(firstEntry.key)
@@ -93,6 +111,16 @@ class YamlEmitter {
               ..write(entry.key)
               ..writeln(':');
             _emitList(v, indent + 4, buf);
+          } else if (v is Map && v.isEmpty) {
+            buf
+              ..write(subPad)
+              ..write(entry.key)
+              ..writeln(': {}');
+          } else if (v is List && v.isEmpty) {
+            buf
+              ..write(subPad)
+              ..write(entry.key)
+              ..writeln(': []');
           } else {
             buf
               ..write(subPad)

@@ -54,4 +54,18 @@ void main() {
     expect(YamlEmitter.emit(42), '42\n');
     expect(YamlEmitter.emit(null), 'null\n');
   });
+
+  test('nested empty map/list emit inline containers, not quoted strings', () {
+    expect(YamlEmitter.emit({'a': <String, dynamic>{}}), 'a: {}\n');
+    expect(YamlEmitter.emit({'a': <dynamic>[]}), 'a: []\n');
+  });
+
+  test('empty containers inside a list item stay inline', () {
+    final yaml = YamlEmitter.emit({
+      'items': [
+        {'props': <String, dynamic>{}},
+      ],
+    });
+    expect(yaml, 'items:\n  - props: {}\n');
+  });
 }
