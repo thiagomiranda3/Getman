@@ -4,8 +4,8 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/extensions/app_components_defaults.dart';
 import 'package:getman/core/theme/themes/classic/classic_decorations.dart';
 import 'package:getman/core/theme/themes/classic/classic_palette.dart';
-import 'package:getman/core/theme/themes/classic/classic_press.dart';
 import 'package:getman/core/theme/themes/shared/calm_motion.dart';
+import 'package:getman/core/theme/themes/shared/subtle_press.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 ThemeData classicTheme(
@@ -99,7 +99,7 @@ ThemeData classicTheme(
   final decoration = AppDecoration(
     panelBox: classicPanelBox,
     tabShape: classicTabShape,
-    wrapInteractive: ({required child, onTap, scaleDown}) => ClassicPress(
+    wrapInteractive: ({required child, onTap, scaleDown}) => SubtlePress(
       onTap: onTap,
       scaleDown: scaleDown,
       animate: !reduceEffects,

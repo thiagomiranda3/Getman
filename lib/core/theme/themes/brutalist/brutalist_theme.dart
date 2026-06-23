@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_ambient.dart';
-import 'package:getman/core/theme/themes/brutalist/brutalist_bounce.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_components.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_decorations.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_motion.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_palette.dart';
+import 'package:getman/core/theme/themes/shared/subtle_press.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 ThemeData brutalistTheme(
@@ -100,8 +100,12 @@ ThemeData brutalistTheme(
   final decoration = AppDecoration(
     panelBox: brutalistPanelBox,
     tabShape: brutalistTabShape,
-    wrapInteractive: ({required child, onTap, scaleDown}) =>
-        BrutalBounce(onTap: onTap, scaleDown: scaleDown ?? 0.95, child: child),
+    wrapInteractive: ({required child, onTap, scaleDown}) => SubtlePress(
+      onTap: onTap,
+      scaleDown: scaleDown,
+      animate: !reduceEffects,
+      child: child,
+    ),
     scaffoldBackground: reduceEffects
         ? brutalistStaticScaffoldBackground
         : brutalistScaffoldBackgroundAnimated,

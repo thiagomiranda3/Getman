@@ -4,8 +4,8 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/themes/dracula/dracula_components.dart';
 import 'package:getman/core/theme/themes/dracula/dracula_decorations.dart';
 import 'package:getman/core/theme/themes/dracula/dracula_palette.dart';
-import 'package:getman/core/theme/themes/dracula/dracula_press.dart';
 import 'package:getman/core/theme/themes/shared/calm_motion.dart';
+import 'package:getman/core/theme/themes/shared/subtle_press.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// Dracula theme — the popular VS Code palette. Dark uses "Dracula Classic";
@@ -143,8 +143,12 @@ ThemeData draculaTheme(
   final decoration = AppDecoration(
     panelBox: draculaPanelBox,
     tabShape: draculaTabShape,
-    wrapInteractive: ({required child, onTap, scaleDown}) =>
-        DraculaPress(onTap: onTap, scaleDown: scaleDown ?? 0.98, child: child),
+    wrapInteractive: ({required child, onTap, scaleDown}) => SubtlePress(
+      onTap: onTap,
+      scaleDown: scaleDown,
+      animate: !reduceEffects,
+      child: child,
+    ),
     scaffoldBackground: draculaScaffoldBackground,
   );
 

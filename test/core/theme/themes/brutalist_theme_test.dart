@@ -59,7 +59,7 @@ void main() {
       },
     );
 
-    testWidgets('wrapInteractive returns a widget that scales on tap-down', (
+    testWidgets('wrapInteractive returns a SubtlePress that scales on press', (
       tester,
     ) async {
       final theme = brutalistTheme(Brightness.light);
@@ -87,33 +87,22 @@ void main() {
 
       expect(find.byKey(const ValueKey('target')), findsOneWidget);
 
-      // Scope the ScaleTransition search to the Align subtree to avoid
-      // matching the MaterialApp page-route ScaleTransition as well.
-      final scaleInAlign = find.descendant(
-        of: find.byType(Align),
-        matching: find.byType(ScaleTransition),
-      );
-      expect(scaleInAlign, findsOneWidget);
-
-      // Press on the BrutalBounce GestureDetector (HitTestBehavior.opaque),
-      // which is the actual hit-test recipient. Pressing the inner SizedBox
-      // would trigger a warnIfMissed warning because opaque behavior absorbs
-      // the hit at the GestureDetector level before the test framework walks
-      // to the SizedBox leaf.
+      // SubtlePress uses AnimatedScale (setState-based, not ScaleTransition).
+      // Press on the GestureDetector (HitTestBehavior.opaque) — the actual
+      // hit-test recipient. Pressing the inner SizedBox would trigger a
+      // warnIfMissed because opaque behavior absorbs the hit first.
       final gesture = await tester.press(find.byType(GestureDetector));
       await tester.pump(); // let gesture recognizer fire onTapDown
-      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 120));
       final scaleBefore = tester
-          .widget<ScaleTransition>(scaleInAlign)
-          .scale
-          .value;
-      expect(scaleBefore, lessThan(1.0));
+          .widget<AnimatedScale>(find.byType(AnimatedScale))
+          .scale;
+      expect(scaleBefore, lessThan(1.0)); // subtle press engaged
       await gesture.up();
       await tester.pumpAndSettle();
       final scaleAfter = tester
-          .widget<ScaleTransition>(scaleInAlign)
-          .scale
-          .value;
+          .widget<AnimatedScale>(find.byType(AnimatedScale))
+          .scale;
       expect(scaleAfter, 1.0);
     });
   });
