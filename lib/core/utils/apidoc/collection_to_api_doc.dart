@@ -183,7 +183,9 @@ class CollectionToApiDoc {
         Object variables = <String, dynamic>{};
         if (config.graphqlVariables.isNotEmpty) {
           try {
-            variables = jsonDecode(config.graphqlVariables) as Object;
+            variables =
+                (jsonDecode(config.graphqlVariables) as Object?) ??
+                <String, dynamic>{};
           } on FormatException {
             variables = <String, dynamic>{};
           }

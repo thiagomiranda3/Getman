@@ -116,6 +116,25 @@ void main() {
     expect((body.example! as Map)['variables'], {'x': 1});
   });
 
+  test('graphql null variables fall back to empty object', () {
+    final doc = CollectionToApiDoc.build(
+      _rootWith(
+        const HttpRequestConfigEntity(
+          id: 'c',
+          method: 'POST',
+          url: 'https://api.test.com/graphql',
+          bodyType: BodyType.graphql,
+          body: 'query { me }',
+          graphqlVariables: 'null', // valid JSON null
+        ),
+      ),
+    );
+    expect(
+      (doc.operations.single.requestBody!.example! as Map)['variables'],
+      <String, dynamic>{},
+    );
+  });
+
   test('Content-Type and Accept are excluded from header params', () {
     final doc = CollectionToApiDoc.build(
       _rootWith(
