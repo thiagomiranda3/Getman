@@ -1,8 +1,6 @@
 // lib/core/theme/themes/auris/auris_motion.dart
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' show PathMetric;
-
 import 'package:auris/auris_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/extensions/app_motion.dart';
@@ -25,10 +23,6 @@ AppMotion aurisMotion({required bool reduceEffects}) {
   return AppMotion(
     reactionOverlay: (context, {required child, required controller}) =>
         _AurisReactionOverlay(controller: controller, child: child),
-    sendAffordance: (context, {required child, required isSending}) =>
-        _AurisSendAffordance(isSending: isSending, child: child),
-    inFlightFrame: (context, {required child, required isSending}) =>
-        _AurisInFlightFrame(isSending: isSending, child: child),
     contentTransition: (context, {required child, required transitionKey}) =>
         _AurisContentTransition(transitionKey: transitionKey, child: child),
     tabChipTransition: (context, {required child, required animation}) =>
@@ -58,8 +52,8 @@ Widget _aurisChipEntrance(Animation<double> animation, Widget child) {
 
 /// HUD-wipe content transition: a vertical scan-line wipes left→right
 /// like a radar sweep updating its display (~350 ms). Bails to identity
-/// (returns child unwrapped) when [AurisScheme] is absent — exactly like
-/// [_AurisInFlightFrame], so tests and other themes see no overlay.
+/// (returns child unwrapped) when [AurisScheme] is absent — no overlay
+/// is better than non-HUD fallback pixels.
 class _AurisContentTransition extends StatefulWidget {
   const _AurisContentTransition({
     required this.transitionKey,
@@ -185,178 +179,6 @@ class _AurisHudWipePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _AurisHudWipePainter old) =>
       old.t != t || old.scanColor != scanColor || old.trailColor != trailColor;
-}
-
-/// HUD scanline sweep around the frame while [isSending].
-/// A bright line travels the four edges continuously. Period ~2.0 s — not a
-/// strobe. Colors sourced from [AurisScheme].
-class _AurisInFlightFrame extends StatefulWidget {
-  const _AurisInFlightFrame({required this.isSending, required this.child});
-  final bool isSending;
-  final Widget child;
-
-  @override
-  State<_AurisInFlightFrame> createState() => _AurisInFlightFrameState();
-}
-
-class _AurisInFlightFrameState extends State<_AurisInFlightFrame>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c;
-
-  @override
-  void initState() {
-    super.initState();
-    _c = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000), // orbit period
-    );
-    if (widget.isSending) unawaited(_c.repeat());
-  }
-
-  @override
-  void didUpdateWidget(_AurisInFlightFrame old) {
-    super.didUpdateWidget(old);
-    // Edge-detect on old.isSending (THEME_AUTHORING §3 restart guard).
-    if (widget.isSending && !old.isSending) {
-      unawaited(_c.repeat());
-    } else if (!widget.isSending && old.isSending) {
-      _c
-        ..stop()
-        ..value = 0;
-    }
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!widget.isSending) return widget.child;
-    final scheme = Theme.of(context).extension<AurisScheme>();
-    // Bail to identity when the AurisScheme extension is absent — no overlay
-    // is better than amber fallback pixels (Finding 1 / B1 review).
-    if (scheme == null) return widget.child;
-    final scanColor = scheme.primaryActive;
-    final dimColor = scheme.primaryDim;
-    // Child hoisted out of per-frame rebuilds.
-    return AnimatedBuilder(
-      animation: _c,
-      child: widget.child,
-      builder: (context, child) => Stack(
-        children: [
-          child!,
-          Positioned.fill(
-            child: IgnorePointer(
-              child: CustomPaint(
-                painter: _AurisFrameScanPainter(
-                  phase: _c.value,
-                  scanColor: scanColor,
-                  dimColor: dimColor,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Draws a bright scanline that travels the four edges of the frame.
-/// The line advances via [phase] (0→1 = one full orbit).  A dim ghost border
-/// is always present to reinforce the HUD "targeting" feel.
-class _AurisFrameScanPainter extends CustomPainter {
-  _AurisFrameScanPainter({
-    required this.phase,
-    required this.scanColor,
-    required this.dimColor,
-  });
-  final double phase;
-  final Color scanColor;
-  final Color dimColor;
-
-  // Hoisted Paint objects — reused across frames, color mutated as needed.
-  final Paint _dimPaint = Paint()
-    ..style = PaintingStyle.stroke
-    ..strokeWidth = 1.0;
-  final Paint _tailPaint = Paint()
-    ..style = PaintingStyle.stroke
-    ..strokeWidth = 1.5;
-  final Paint _headPaint = Paint()
-    ..style = PaintingStyle.stroke
-    ..strokeWidth = 2.5;
-
-  // Perimeter path + metrics cache — rebuilt only when Size changes.
-  Size? _lastSize;
-  PathMetric? _metric;
-
-  void _rebuildPath(Size size) {
-    final perimPath = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width, 0)
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
-    final metrics = perimPath.computeMetrics().toList();
-    _metric = metrics.isNotEmpty ? metrics.first : null;
-    _lastSize = size;
-  }
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Rebuild path only when size changes.
-    if (size != _lastSize) _rebuildPath(size);
-    final m = _metric;
-    if (m == null) return;
-
-    // Always-on dim border.
-    _dimPaint.color = dimColor.withValues(alpha: 0.25);
-    canvas.drawRect(
-      Rect.fromLTWH(0.5, 0.5, size.width - 1, size.height - 1),
-      _dimPaint,
-    );
-
-    // Scanline: a short bright segment travelling the perimeter.
-    const segLen = 60.0; // length of the bright scan segment
-
-    // Position of the leading edge along the perimeter.
-    final lead = phase * m.length;
-
-    // Extract the segment with a tail glow (slightly longer, dimmer).
-    final tailStart = (lead - segLen * 1.5).clamp(0.0, m.length);
-    final tailEnd = lead.clamp(0.0, m.length);
-    final headStart = (lead - segLen).clamp(0.0, m.length);
-
-    if (tailEnd > tailStart) {
-      _tailPaint.color = scanColor.withValues(alpha: 0.25);
-      canvas.drawPath(m.extractPath(tailStart, tailEnd), _tailPaint);
-    }
-
-    if (tailEnd > headStart) {
-      _headPaint.color = scanColor.withValues(alpha: 0.8);
-      canvas.drawPath(m.extractPath(headStart, tailEnd), _headPaint);
-    }
-
-    // Handle wrap-around (when lead is near the end of perimeter).
-    final overflow = lead - m.length;
-    if (overflow > 0) {
-      final wrapEnd = overflow.clamp(0.0, m.length);
-      final wrapHeadStart = (overflow - segLen).clamp(0.0, m.length);
-      if (wrapEnd > 0) {
-        _headPaint.color = scanColor.withValues(alpha: 0.8);
-        canvas.drawPath(m.extractPath(wrapHeadStart, wrapEnd), _headPaint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _AurisFrameScanPainter old) =>
-      old.phase != phase ||
-      old.scanColor != scanColor ||
-      old.dimColor != dimColor;
 }
 
 // ---------------------------------------------------------------------------
@@ -885,131 +707,6 @@ class _AurisFizzlePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _AurisFizzlePainter old) =>
       old.t != t || old.color != color;
-}
-
-// ---------------------------------------------------------------------------
-// _AurisSendAffordance — targeting reticle while sending
-// ---------------------------------------------------------------------------
-
-class _AurisSendAffordance extends StatefulWidget {
-  const _AurisSendAffordance({
-    required this.isSending,
-    required this.child,
-  });
-  final bool isSending;
-  final Widget child;
-
-  @override
-  State<_AurisSendAffordance> createState() => _AurisSendAffordanceState();
-}
-
-class _AurisSendAffordanceState extends State<_AurisSendAffordance>
-    with TickerProviderStateMixin {
-  /// Drives the in-flight tension build-up (0 → 1 over kTensionFullMs).
-  /// Eagerly initialized in initState — NOT a lazy `late final = …` field.
-  /// build() returns the child early when not sending, so a lazy controller
-  /// would stay uninitialized and dispose()'s `.dispose()` would force the
-  /// initializer to run inside dispose (illegal TickerMode ancestor lookup on a
-  /// deactivated element). See send_affordance_dispose_test.
-  late final AnimationController _build;
-
-  @override
-  void initState() {
-    super.initState();
-    _build = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: kTensionFullMs),
-    );
-    if (widget.isSending) unawaited(_build.forward(from: 0));
-  }
-
-  @override
-  void didUpdateWidget(_AurisSendAffordance old) {
-    super.didUpdateWidget(old);
-    // Edge-detect on old.isSending — NOT !_build.isAnimating (MANDATORY guard)
-    if (widget.isSending && !old.isSending) {
-      unawaited(_build.forward(from: 0));
-    } else if (!widget.isSending && old.isSending) {
-      _build
-        ..stop()
-        ..value = 0;
-    }
-  }
-
-  @override
-  void dispose() {
-    _build.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!widget.isSending) return widget.child;
-
-    // Use AurisScanBracket with pulse to show the reticle, and overlay a glow
-    // that builds with inFlightTension.
-    return AnimatedBuilder(
-      animation: _build,
-      child: widget.child,
-      builder: (context, child) {
-        final tension = inFlightTension(
-          (_build.value * kTensionFullMs).round(),
-        );
-        final scheme = Theme.of(context).extension<AurisScheme>();
-        final reticleColor = scheme?.primaryActive ?? Colors.amber;
-
-        return Stack(
-          alignment: Alignment.center,
-          children: [
-            // AurisScanBracket renders corner brackets + optional pulse
-            AurisScanBracket(
-              color: reticleColor,
-              pulse: true,
-              child: child!,
-            ),
-            // Glow overlay that intensifies as tension builds
-            if (tension > 0)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: RepaintBoundary(
-                    child: CustomPaint(
-                      painter: _AurisTensionGlowPainter(
-                        tension: tension,
-                        color: reticleColor,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-/// Corner-edge glow that intensifies with the in-flight tension level.
-class _AurisTensionGlowPainter extends CustomPainter {
-  _AurisTensionGlowPainter({required this.tension, required this.color});
-  final double tension;
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (tension <= 0) return;
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5 + tension * 1.5
-      ..color = color.withValues(alpha: tension * 0.35);
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _AurisTensionGlowPainter old) =>
-      old.tension != tension || old.color != color;
 }
 
 // ---------------------------------------------------------------------------

@@ -22,15 +22,21 @@ void main() {
         ),
       );
       final motion = ctx.appMotion;
-      // Identity sendAffordance returns the child unchanged.
+      // Identity reactionOverlay returns the child unchanged.
       const marker = SizedBox(key: ValueKey('marker'));
       expect(
+        motion.reactionOverlay,
+        isNotNull,
+        reason: 'theme "$id" must attach a reactionOverlay hook',
+      );
+      // contentTransition identity check — default returns child unchanged.
+      expect(
         identical(
-          motion.sendAffordance(ctx, child: marker, isSending: false),
+          motion.contentTransition(ctx, child: marker, transitionKey: 'x'),
           marker,
         ),
         isTrue,
-        reason: 'theme "$id" sendAffordance must default to identity',
+        reason: 'theme "$id" contentTransition must default to identity',
       );
     }
   });

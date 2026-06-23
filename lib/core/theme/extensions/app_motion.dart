@@ -10,24 +10,6 @@ typedef ReactionOverlayBuilder =
       required ThemeReactionController controller,
     });
 
-/// Wraps the SEND control: plays the theme's send ritual and renders its
-/// "charging" state while [isSending].
-typedef SendAffordanceBuilder =
-    Widget Function(
-      BuildContext context, {
-      required Widget child,
-      required bool isSending,
-    });
-
-/// VM-B1: wraps the request+response panel area; renders a themed frame while
-/// [isSending] (the displayed tab's send is in flight).
-typedef InFlightFrameBuilder =
-    Widget Function(
-      BuildContext context, {
-      required Widget child,
-      required bool isSending,
-    });
-
 /// VM-B2: wraps the active tab/panel content; plays a themed transition when
 /// [transitionKey] changes (keyed on "$activePanelId/$activeTabId").
 typedef ContentTransitionBuilder =
@@ -75,18 +57,6 @@ Widget _identityReactionOverlay(
   required ThemeReactionController controller,
 }) => child;
 
-Widget _identitySendAffordance(
-  BuildContext context, {
-  required Widget child,
-  required bool isSending,
-}) => child;
-
-Widget _identityInFlightFrame(
-  BuildContext context, {
-  required Widget child,
-  required bool isSending,
-}) => child;
-
 Widget _identityContentTransition(
   BuildContext context, {
   required Widget child,
@@ -123,8 +93,6 @@ Widget _identityTreeExpandFlourish(
 class AppMotion extends ThemeExtension<AppMotion> {
   const AppMotion({
     this.reactionOverlay = _identityReactionOverlay,
-    this.sendAffordance = _identitySendAffordance,
-    this.inFlightFrame = _identityInFlightFrame,
     this.contentTransition = _identityContentTransition,
     this.tabChipTransition = _identityTabChipTransition,
     this.treeDragFeedback = _identityTreeDragFeedback,
@@ -133,8 +101,6 @@ class AppMotion extends ThemeExtension<AppMotion> {
   });
 
   final ReactionOverlayBuilder reactionOverlay;
-  final SendAffordanceBuilder sendAffordance;
-  final InFlightFrameBuilder inFlightFrame;
   final ContentTransitionBuilder contentTransition;
   final TabChipTransitionBuilder tabChipTransition;
   final TreeDragFeedbackBuilder treeDragFeedback;
@@ -144,8 +110,6 @@ class AppMotion extends ThemeExtension<AppMotion> {
   @override
   AppMotion copyWith({
     ReactionOverlayBuilder? reactionOverlay,
-    SendAffordanceBuilder? sendAffordance,
-    InFlightFrameBuilder? inFlightFrame,
     ContentTransitionBuilder? contentTransition,
     TabChipTransitionBuilder? tabChipTransition,
     TreeDragFeedbackBuilder? treeDragFeedback,
@@ -153,8 +117,6 @@ class AppMotion extends ThemeExtension<AppMotion> {
     TreeExpandFlourishBuilder? treeExpandFlourish,
   }) => AppMotion(
     reactionOverlay: reactionOverlay ?? this.reactionOverlay,
-    sendAffordance: sendAffordance ?? this.sendAffordance,
-    inFlightFrame: inFlightFrame ?? this.inFlightFrame,
     contentTransition: contentTransition ?? this.contentTransition,
     tabChipTransition: tabChipTransition ?? this.tabChipTransition,
     treeDragFeedback: treeDragFeedback ?? this.treeDragFeedback,

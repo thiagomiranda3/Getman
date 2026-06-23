@@ -3,7 +3,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/theme/extensions/app_motion.dart';
 import 'package:getman/core/theme/motion/latency_weight.dart';
 import 'package:getman/core/theme/motion/reaction_stage.dart';
 import 'package:getman/core/theme/motion/status_reaction_flavor.dart';
@@ -56,10 +56,6 @@ AppMotion glassMotion({required bool reduceEffects}) {
   return AppMotion(
     reactionOverlay: (context, {required child, required controller}) =>
         _GlassReactionOverlay(controller: controller, child: child),
-    sendAffordance: (context, {required child, required isSending}) =>
-        _GlassSendAffordance(isSending: isSending, child: child),
-    inFlightFrame: (context, {required child, required isSending}) =>
-        _GlassInFlightFrame(isSending: isSending, child: child),
     contentTransition: (context, {required child, required transitionKey}) =>
         _GlassContentTransition(transitionKey: transitionKey, child: child),
     tabChipTransition: (context, {required child, required animation}) =>
@@ -192,87 +188,6 @@ class _GlassFrostDissolvePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _GlassFrostDissolvePainter old) =>
       old.t != t || old.alpha != alpha || old.color != color;
-}
-
-/// Frost-breathe frame: a soft animated border glow that pulses in opacity
-/// while [isSending].  The glow period is ~1.6 s — well under 3 Hz; not a
-/// strobe.
-class _GlassInFlightFrame extends StatefulWidget {
-  const _GlassInFlightFrame({required this.isSending, required this.child});
-  final bool isSending;
-  final Widget child;
-
-  @override
-  State<_GlassInFlightFrame> createState() => _GlassInFlightFrameState();
-}
-
-class _GlassInFlightFrameState extends State<_GlassInFlightFrame>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c;
-
-  @override
-  void initState() {
-    super.initState();
-    _c = AnimationController(
-      vsync: this,
-      // 1.6 s breathe — well under 3 Hz
-      duration: const Duration(milliseconds: 1600),
-    );
-    if (widget.isSending) unawaited(_c.repeat(reverse: true));
-  }
-
-  @override
-  void didUpdateWidget(_GlassInFlightFrame old) {
-    super.didUpdateWidget(old);
-    // Edge-detect on old.isSending (THEME_AUTHORING §3 restart guard).
-    if (widget.isSending && !old.isSending) {
-      unawaited(_c.repeat(reverse: true));
-    } else if (!widget.isSending && old.isSending) {
-      _c
-        ..stop()
-        ..value = 0;
-    }
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!widget.isSending) return widget.child;
-    final accent = Theme.of(context).primaryColor;
-    // Child hoisted out of per-frame rebuilds.
-    return AnimatedBuilder(
-      animation: _c,
-      child: widget.child,
-      builder: (context, child) {
-        final glow = 0.15 + 0.35 * _c.value;
-        return Stack(
-          children: [
-            child!,
-            Positioned.fill(
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(
-                      context.appShape.panelRadius,
-                    ),
-                    border: Border.all(
-                      color: accent.withValues(alpha: glow),
-                      width: context.appLayout.borderThin * 2,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
 }
 
 class _GlassReactionOverlay extends StatefulWidget {
@@ -583,90 +498,6 @@ class _GlassShardPainter extends CustomPainter {
       old.t != t || old.color != color;
 }
 
-/// Press ripple + a translucent liquid that rises from the bottom
-/// while sending.
-class _GlassSendAffordance extends StatefulWidget {
-  const _GlassSendAffordance({required this.isSending, required this.child});
-  final bool isSending;
-  final Widget child;
-
-  @override
-  State<_GlassSendAffordance> createState() => _GlassSendAffordanceState();
-}
-
-class _GlassSendAffordanceState extends State<_GlassSendAffordance>
-    with TickerProviderStateMixin {
-  late final AnimationController _ripple = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 600),
-  );
-  late final AnimationController _build = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: kTensionFullMs),
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.isSending) unawaited(_build.forward(from: 0));
-  }
-
-  @override
-  void didUpdateWidget(_GlassSendAffordance old) {
-    super.didUpdateWidget(old);
-    if (widget.isSending && !old.isSending) {
-      unawaited(_build.forward(from: 0));
-    } else if (!widget.isSending && old.isSending) {
-      _build
-        ..stop()
-        ..value = 0;
-    }
-  }
-
-  @override
-  void dispose() {
-    _ripple.dispose();
-    _build.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = Theme.of(context).primaryColor;
-    return Listener(
-      onPointerDown: (_) {
-        _ripple.reset();
-        unawaited(_ripple.forward());
-      },
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.center,
-        children: [
-          widget.child,
-          Positioned.fill(
-            child: IgnorePointer(
-              child: AnimatedBuilder(
-                animation: Listenable.merge([_ripple, _build]),
-                builder: (_, child) => CustomPaint(
-                  painter: _GlassSendPainter(
-                    ripple: _ripple.value,
-                    level: widget.isSending
-                        ? inFlightTension(
-                            (_build.value * kTensionFullMs).round(),
-                          )
-                        : 0,
-                    color: accent,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ---------------------------------------------------------------------------
 // VM-B3: Tree drag/drop/expand juice — Glass
 // ---------------------------------------------------------------------------
@@ -814,55 +645,4 @@ class _GlassTreeExpandFlourish extends StatelessWidget {
       child: child,
     );
   }
-}
-
-/// Press ripple + a translucent liquid that rises from the bottom with the
-/// in-flight [level] (0..1).
-class _GlassSendPainter extends CustomPainter {
-  _GlassSendPainter({
-    required this.ripple,
-    required this.level,
-    required this.color,
-  });
-  final double ripple;
-  final double level;
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (level > 0) {
-      final h = size.height * level;
-      final fill = Paint()..color = color.withValues(alpha: 0.22);
-      canvas.drawRect(
-        Rect.fromLTWH(0, size.height - h, size.width, h),
-        fill,
-      );
-      // Meniscus line.
-      final line = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5
-        ..color = color.withValues(alpha: 0.5);
-      canvas.drawLine(
-        Offset(0, size.height - h),
-        Offset(size.width, size.height - h),
-        line,
-      );
-    }
-    if (ripple > 0) {
-      final center = size.center(Offset.zero);
-      final r = Curves.easeOut.transform(ripple) * size.longestSide;
-      canvas.drawCircle(
-        center,
-        r,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2
-          ..color = color.withValues(alpha: 0.5 * (1 - ripple)),
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _GlassSendPainter old) =>
-      old.ripple != ripple || old.level != level || old.color != color;
 }

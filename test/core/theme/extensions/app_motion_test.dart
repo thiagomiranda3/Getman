@@ -20,10 +20,6 @@ void main() {
       ),
     );
     expect(
-      identical(m.inFlightFrame(ctx, child: marker, isSending: true), marker),
-      isTrue,
-    );
-    expect(
       identical(
         m.contentTransition(ctx, child: marker, transitionKey: 'a'),
         marker,
@@ -62,12 +58,12 @@ void main() {
     Widget custom(
       BuildContext c, {
       required Widget child,
-      required bool isSending,
+      required String transitionKey,
     }) => const SizedBox(key: ValueKey('custom'));
     const base = AppMotion();
-    final copy = base.copyWith(inFlightFrame: custom);
-    expect(identical(copy.inFlightFrame, custom), isTrue);
+    final copy = base.copyWith(contentTransition: custom);
+    expect(identical(copy.contentTransition, custom), isTrue);
     expect(identical(copy.reactionOverlay, base.reactionOverlay), isTrue);
-    expect(identical(copy.contentTransition, base.contentTransition), isTrue);
+    expect(identical(copy.tabChipTransition, base.tabChipTransition), isTrue);
   });
 }

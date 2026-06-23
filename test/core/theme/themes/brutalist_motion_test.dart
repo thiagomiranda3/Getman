@@ -46,39 +46,6 @@ void main() {
     expect(motion.runtimeType.toString(), 'AppMotion');
   });
 
-  testWidgets('A1: send build-up starts and stops via didUpdateWidget', (
-    tester,
-  ) async {
-    final motion = brutalistMotion(reduceEffects: false);
-    late StateSetter setOuter;
-    var sending = true;
-    await tester.pumpWidget(
-      StatefulBuilder(
-        builder: (context, ss) {
-          setOuter = ss;
-          return MaterialApp(
-            theme: brutalistTheme(Brightness.light),
-            home: Scaffold(
-              body: Center(
-                child: motion.sendAffordance(
-                  context,
-                  isSending: sending,
-                  child: const Text('SEND'),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(find.text('SEND'), findsOneWidget);
-    // Flip isSending in place — triggers didUpdateWidget stop/reset path.
-    setOuter(() => sending = false);
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets('A1: slow success resolves without throwing', (tester) async {
     final motion = brutalistMotion(reduceEffects: false);
     final controller = ThemeReactionController();

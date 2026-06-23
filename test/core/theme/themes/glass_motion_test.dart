@@ -7,7 +7,7 @@ import 'package:getman/core/theme/motion/theme_reaction_controller.dart';
 import 'package:getman/core/theme/themes/glass/glass_motion.dart';
 
 void main() {
-  testWidgets('reduced effects => identity overlay + identity send', (
+  testWidgets('reduced effects => identity overlay', (
     tester,
   ) async {
     final motion = glassMotion(reduceEffects: true);
@@ -26,7 +26,7 @@ void main() {
     );
     expect(
       identical(
-        motion.sendAffordance(ctx, child: marker, isSending: false),
+        motion.contentTransition(ctx, child: marker, transitionKey: 'x'),
         marker,
       ),
       isTrue,
@@ -71,55 +71,6 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pump(const Duration(seconds: 1)); // let controllers finish
     controller.dispose();
-  });
-
-  testWidgets('A1: glass send shows a rising liquid level while sending', (
-    tester,
-  ) async {
-    final motion = glassMotion(reduceEffects: false);
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Builder(
-          builder: (context) => Scaffold(
-            body: Center(
-              child: motion.sendAffordance(
-                context,
-                isSending: true,
-                child: const SizedBox(
-                  width: 100,
-                  height: 40,
-                  key: ValueKey('s'),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(find.byKey(const ValueKey('s')), findsOneWidget);
-    expect(tester.takeException(), isNull);
-
-    // Assert that a _GlassSendPainter with level > 0 is in the tree.
-    // Dynamic cast is used because _GlassSendPainter is library-private.
-    final sendPainterFinder = find.byWidgetPredicate((widget) {
-      if (widget is! CustomPaint) return false;
-      final p = widget.painter;
-      if (p == null) return false;
-      if (!p.runtimeType.toString().contains('_GlassSendPainter')) return false;
-      // Dynamic cast needed: _GlassSendPainter is library-private; there is no
-      // other way to read its `level` field from an external test library.
-      return ((p as dynamic).level as double) > 0;
-    });
-    expect(
-      sendPainterFinder,
-      findsAtLeastNWidgets(1),
-      reason: '_GlassSendPainter.level must be > 0 after 600ms of sending',
-    );
-
-    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
   });
 
   testWidgets('A1: slow vs fast success both resolve cleanly', (tester) async {
