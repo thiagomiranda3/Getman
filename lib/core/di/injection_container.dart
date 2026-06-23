@@ -1,5 +1,4 @@
 import 'package:get_it/get_it.dart';
-import 'package:getman/core/audio/theme_sound_service.dart';
 import 'package:getman/core/navigation/app_router.dart';
 import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/cookie_interceptor.dart';
@@ -255,8 +254,7 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     ..registerLazySingleton(UrlFocusRegistry.new)
     ..registerLazySingleton<WorkspacePulseController>(
       WorkspacePulseController.new,
-    )
-    ..registerLazySingleton<ThemeSoundService>(createThemeSoundService);
+    );
 
   // Core. The cookie box is already open (parallel wait above); hydrate the jar
   // before the network service can be used so the first send sees stored

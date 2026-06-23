@@ -2,7 +2,7 @@
 //
 // Pumping the real MainScreen is not feasible in widget tests: its transitive
 // tree requires GetIt-registered singletons (WorkspacePulseController,
-// ThemeSoundService, TabDirtyChecker) plus
+// TabDirtyChecker) plus
 // SideMenu / TabContentStack / ChainingWriteBackListener
 // that cannot be provided without running the full DI container, and the
 // theme's ambient ticker never settles so pumpAndSettle would hang.
