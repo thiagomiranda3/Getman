@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
-import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/screens/request_view.dart';
 import 'package:re_editor/re_editor.dart'
     as re_editor
@@ -200,14 +197,6 @@ class _TabContentStackState extends State<TabContentStack> {
         widget.childBuilder ??
         (String id) => RequestView(key: ValueKey('view_$id'), tabId: id);
 
-    // Narrow selector: only activePanelId — avoids rebuilding the stack on
-    // every tab mutation (the stack already rebuilds on widget.tabs changes
-    // from the parent BlocBuilder).
-    final panelId = context.select<TabsBloc, String>(
-      (b) => b.state.activePanelId,
-    );
-    final transitionKey = '$panelId/$activeId';
-
     // Use Stack + Offstage rather than IndexedStack. IndexedStack wraps
     // children in anonymous Offstage nodes internally, so Flutter cannot match
     // keyed children across rebuilds when the children list changes — the
@@ -219,7 +208,7 @@ class _TabContentStackState extends State<TabContentStack> {
     // ancestor relayout — every resize or splitter drag lays out all live views
     // (up to kMaxLiveTabViews). This is an intentional trade-off; the cap keeps
     // the cost bounded.
-    final stack = Stack(
+    return Stack(
       fit: StackFit.expand,
       children: [
         for (final id in _liveIds)
@@ -238,11 +227,6 @@ class _TabContentStackState extends State<TabContentStack> {
             ),
           ),
       ],
-    );
-    return context.appMotion.contentTransition(
-      context,
-      transitionKey: transitionKey,
-      child: stack,
     );
   }
 }

@@ -25,10 +25,7 @@ void main() {
       ),
     );
     expect(
-      identical(
-        motion.contentTransition(ctx, child: marker, transitionKey: 'x'),
-        marker,
-      ),
+      identical(motion.treeDragFeedback(ctx, child: marker), marker),
       isTrue,
     );
     controller.dispose();

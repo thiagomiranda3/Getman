@@ -29,14 +29,11 @@ void main() {
         isNotNull,
         reason: 'theme "$id" must attach a reactionOverlay hook',
       );
-      // contentTransition identity check — default returns child unchanged.
+      // treeDragFeedback identity check — default returns child unchanged.
       expect(
-        identical(
-          motion.contentTransition(ctx, child: marker, transitionKey: 'x'),
-          marker,
-        ),
+        identical(motion.treeDragFeedback(ctx, child: marker), marker),
         isTrue,
-        reason: 'theme "$id" contentTransition must default to identity',
+        reason: 'theme "$id" treeDragFeedback must default to identity',
       );
     }
   });

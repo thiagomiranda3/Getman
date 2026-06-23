@@ -10,24 +10,6 @@ typedef ReactionOverlayBuilder =
       required ThemeReactionController controller,
     });
 
-/// VM-B2: wraps the active tab/panel content; plays a themed transition when
-/// [transitionKey] changes (keyed on "$activePanelId/$activeTabId").
-typedef ContentTransitionBuilder =
-    Widget Function(
-      BuildContext context, {
-      required Widget child,
-      required String transitionKey,
-    });
-
-/// VM-B2: transition builder for tab-strip chips entering/leaving (used as an
-/// AnimatedSwitcher/AnimatedList transitionBuilder; [animation] is 0→1 enter).
-typedef TabChipTransitionBuilder =
-    Widget Function(
-      BuildContext context, {
-      required Widget child,
-      required Animation<double> animation,
-    });
-
 /// VM-B3: themed widget shown under the cursor while dragging a tree node.
 typedef TreeDragFeedbackBuilder =
     Widget Function(BuildContext context, {required Widget child});
@@ -57,18 +39,6 @@ Widget _identityReactionOverlay(
   required ThemeReactionController controller,
 }) => child;
 
-Widget _identityContentTransition(
-  BuildContext context, {
-  required Widget child,
-  required String transitionKey,
-}) => child;
-
-Widget _identityTabChipTransition(
-  BuildContext context, {
-  required Widget child,
-  required Animation<double> animation,
-}) => child;
-
 Widget _identityTreeDragFeedback(
   BuildContext context, {
   required Widget child,
@@ -93,16 +63,12 @@ Widget _identityTreeExpandFlourish(
 class AppMotion extends ThemeExtension<AppMotion> {
   const AppMotion({
     this.reactionOverlay = _identityReactionOverlay,
-    this.contentTransition = _identityContentTransition,
-    this.tabChipTransition = _identityTabChipTransition,
     this.treeDragFeedback = _identityTreeDragFeedback,
     this.treeDropHighlight = _identityTreeDropHighlight,
     this.treeExpandFlourish = _identityTreeExpandFlourish,
   });
 
   final ReactionOverlayBuilder reactionOverlay;
-  final ContentTransitionBuilder contentTransition;
-  final TabChipTransitionBuilder tabChipTransition;
   final TreeDragFeedbackBuilder treeDragFeedback;
   final TreeDropHighlightBuilder treeDropHighlight;
   final TreeExpandFlourishBuilder treeExpandFlourish;
@@ -110,15 +76,11 @@ class AppMotion extends ThemeExtension<AppMotion> {
   @override
   AppMotion copyWith({
     ReactionOverlayBuilder? reactionOverlay,
-    ContentTransitionBuilder? contentTransition,
-    TabChipTransitionBuilder? tabChipTransition,
     TreeDragFeedbackBuilder? treeDragFeedback,
     TreeDropHighlightBuilder? treeDropHighlight,
     TreeExpandFlourishBuilder? treeExpandFlourish,
   }) => AppMotion(
     reactionOverlay: reactionOverlay ?? this.reactionOverlay,
-    contentTransition: contentTransition ?? this.contentTransition,
-    tabChipTransition: tabChipTransition ?? this.tabChipTransition,
     treeDragFeedback: treeDragFeedback ?? this.treeDragFeedback,
     treeDropHighlight: treeDropHighlight ?? this.treeDropHighlight,
     treeExpandFlourish: treeExpandFlourish ?? this.treeExpandFlourish,

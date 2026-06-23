@@ -56,10 +56,6 @@ AppMotion glassMotion({required bool reduceEffects}) {
   return AppMotion(
     reactionOverlay: (context, {required child, required controller}) =>
         _GlassReactionOverlay(controller: controller, child: child),
-    contentTransition: (context, {required child, required transitionKey}) =>
-        _GlassContentTransition(transitionKey: transitionKey, child: child),
-    tabChipTransition: (context, {required child, required animation}) =>
-        _glassChipEntrance(animation, child),
     treeDragFeedback: (context, {required child}) =>
         _GlassTreeDragFeedback(child: child),
     treeDropHighlight: (context, {required child, required active}) =>
@@ -67,127 +63,6 @@ AppMotion glassMotion({required bool reduceEffects}) {
     treeExpandFlourish: (context, {required child, required expanded}) =>
         _GlassTreeExpandFlourish(expanded: expanded, child: child),
   );
-}
-
-/// Glass chip entrance: scale from 0.85→1.0 + fade 0→1 (frost-in).
-Widget _glassChipEntrance(Animation<double> animation, Widget child) {
-  final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-  final scale = Tween<double>(begin: 0.85, end: 1).animate(curved);
-  return FadeTransition(
-    opacity: curved,
-    child: ScaleTransition(scale: scale, child: child),
-  );
-}
-
-/// Frost-dissolve content transition: a frosted white veil blooms in then
-/// dissolves away (~350 ms), giving the impression of glass condensation
-/// clearing as new content materialises.
-class _GlassContentTransition extends StatefulWidget {
-  const _GlassContentTransition({
-    required this.transitionKey,
-    required this.child,
-  });
-
-  final String transitionKey;
-  final Widget child;
-
-  @override
-  State<_GlassContentTransition> createState() =>
-      _GlassContentTransitionState();
-}
-
-class _GlassContentTransitionState extends State<_GlassContentTransition>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 350),
-  );
-
-  @override
-  void didUpdateWidget(_GlassContentTransition old) {
-    super.didUpdateWidget(old);
-    if (old.transitionKey != widget.transitionKey) {
-      unawaited(_c.forward(from: 0));
-    }
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = Theme.of(context).primaryColor;
-    return AnimatedBuilder(
-      animation: _c,
-      child: widget.child, // hoisted — entire tab content NOT rebuilt per frame
-      builder: (ctx, child) {
-        if (_c.value == 0 || _c.value == 1) return child!;
-        // Frost dissolve: peak opacity mid-transition.
-        // 0→1 ramp-in, 1→0 ramp-out.
-        final alpha =
-            (_c.value < 0.5 ? _c.value * 2 : (1.0 - _c.value) * 2).clamp(
-              0.0,
-              1.0,
-            ) *
-            0.55;
-        return Stack(
-          children: [
-            child!,
-            Positioned.fill(
-              key: const ValueKey<String>('content_transition_overlay'),
-              child: IgnorePointer(
-                child: CustomPaint(
-                  painter: _GlassFrostDissolvePainter(
-                    t: _c.value,
-                    color: accent,
-                    alpha: alpha,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-/// Frosted veil: a soft radial bloom from centre that peaks mid-transition.
-/// Reuses [Paint] objects; no per-frame allocation.
-class _GlassFrostDissolvePainter extends CustomPainter {
-  _GlassFrostDissolvePainter({
-    required this.t,
-    required this.color,
-    required this.alpha,
-  });
-  final double t;
-  final Color color;
-  final double alpha;
-
-  // Hoisted Paint — reused across frames, shader field mutated.
-  final Paint _paint = Paint();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = size.center(Offset.zero);
-    final maxR = size.longestSide * 0.75;
-    _paint.shader = RadialGradient(
-      colors: [
-        color.withValues(alpha: alpha),
-        color.withValues(alpha: alpha * 0.3),
-        const Color(0x00000000),
-      ],
-      stops: const [0.0, 0.6, 1.0],
-    ).createShader(Rect.fromCircle(center: center, radius: maxR));
-    canvas.drawRect(Offset.zero & size, _paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _GlassFrostDissolvePainter old) =>
-      old.t != t || old.alpha != alpha || old.color != color;
 }
 
 class _GlassReactionOverlay extends StatefulWidget {
