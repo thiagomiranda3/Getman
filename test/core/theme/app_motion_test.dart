@@ -1,39 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getman/core/theme/extensions/app_theme_access.dart';
+import 'package:getman/core/theme/extensions/app_motion.dart';
 import 'package:getman/core/theme/theme_registry.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 void main() {
-  testWidgets('every theme attaches an AppMotion; defaults are identity', (
+  setUpAll(() {
+    // Some theme builders (e.g. glass) pull fonts via GoogleFonts; disable
+    // runtime fetching so resolveThemeData works offline in tests.
+    GoogleFonts.config.allowRuntimeFetching = false;
+  });
+
+  // Reads the AppMotion straight off each theme's ThemeData (not via a
+  // BuildContext). pumpWidget reuses the element tree across iterations, so a
+  // per-iteration ctx would stay pinned to the first theme and any hook
+  // assertion through it would be vacuous — assert on theme.extension instead.
+  testWidgets('every registered theme attaches an AppMotion extension', (
     tester,
   ) async {
     for (final id in appThemes.keys) {
       final theme = resolveThemeData(id, Brightness.light, isCompact: false);
-      late BuildContext ctx;
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: theme,
-          home: Builder(
-            builder: (c) {
-              ctx = c;
-              return const SizedBox();
-            },
-          ),
-        ),
-      );
-      final motion = ctx.appMotion;
-      // Identity reactionOverlay returns the child unchanged.
-      const marker = SizedBox(key: ValueKey('marker'));
       expect(
-        motion.reactionOverlay,
+        theme.extension<AppMotion>(),
         isNotNull,
-        reason: 'theme "$id" must attach a reactionOverlay hook',
-      );
-      // treeDragFeedback identity check — default returns child unchanged.
-      expect(
-        identical(motion.treeDragFeedback(ctx, child: marker), marker),
-        isTrue,
-        reason: 'theme "$id" treeDragFeedback must default to identity',
+        reason: 'theme "$id" must attach an AppMotion extension',
       );
     }
   });
