@@ -93,7 +93,10 @@ class CollectionToApiDoc {
       pathParams: pathParams,
       headerParams: _headerParams(config),
       requestBody: _requestBody(leaf, config, warnings),
-      // responses / security: Task 5.
+      responses: _responses(leaf, config),
+      security: config.authConfig.type == AuthType.inherit
+          ? AuthConfig.none
+          : config.authConfig,
     );
   }
 
@@ -220,6 +223,55 @@ class CollectionToApiDoc {
       schema: JsonSchema(type: 'object', properties: props),
       example: example,
     );
+  }
+
+  static List<ApiResponse> _responses(
+    CollectionNodeEntity leaf,
+    HttpRequestConfigEntity config,
+  ) {
+    final byStatus = <int, ApiResponse>{};
+
+    for (final ex in leaf.examples) {
+      final code = ex.config.statusCode ?? 200;
+      byStatus.putIfAbsent(
+        code,
+        () => ApiResponse(
+          statusCode: code,
+          description: 'Example: ${ex.name}',
+          body: _responseBody(ex.config.responseBody),
+        ),
+      );
+    }
+
+    final liveCode = config.statusCode;
+    if (liveCode != null && !byStatus.containsKey(liveCode)) {
+      byStatus[liveCode] = ApiResponse(
+        statusCode: liveCode,
+        description: 'Response',
+        body: _responseBody(config.responseBody),
+      );
+    }
+
+    if (byStatus.isEmpty) {
+      return const [
+        ApiResponse(statusCode: 200, description: 'Successful response'),
+      ];
+    }
+    return byStatus.values.toList();
+  }
+
+  static ApiBody? _responseBody(String? body) {
+    if (body == null || body.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(body);
+      return ApiBody(
+        contentType: 'application/json',
+        schema: JsonSchemaInferrer.infer(decoded),
+        example: decoded,
+      );
+    } on FormatException {
+      return ApiBody(contentType: 'text/plain', example: body);
+    }
   }
 
   /// Env value for [name], or null when there's no env, the var is missing, or
