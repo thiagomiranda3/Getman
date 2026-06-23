@@ -9,7 +9,6 @@ import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/theme/app_theme.dart';
-import 'package:getman/core/theme/motion/theme_reaction_controller.dart';
 import 'package:getman/core/theme/motion/theme_switch_transition.dart';
 import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
 import 'package:getman/core/theme/theme_registry.dart';
@@ -196,9 +195,6 @@ class MyApp extends StatelessWidget {
         RepositoryProvider<ThemeSoundService>.value(
           value: di.sl<ThemeSoundService>(),
         ),
-        ChangeNotifierProvider<ThemeReactionController>.value(
-          value: di.sl<ThemeReactionController>(),
-        ),
         ChangeNotifierProvider<WorkspacePulseController>.value(
           value: di.sl<WorkspacePulseController>(),
         ),
@@ -284,14 +280,9 @@ class MyApp extends StatelessWidget {
                           child: ThemeSwitchTransition(
                             themeId: settings.themeId,
                             reduceEffects: settings.reduceVisualEffects,
-                            child: context.appMotion.reactionOverlay(
+                            child: context.appDecoration.scaffoldBackground(
                               context,
-                              controller: context
-                                  .read<ThemeReactionController>(),
-                              child: context.appDecoration.scaffoldBackground(
-                                context,
-                                child: child ?? const SizedBox.shrink(),
-                              ),
+                              child: child ?? const SizedBox.shrink(),
                             ),
                           ),
                         );

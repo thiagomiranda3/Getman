@@ -1,14 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:getman/core/theme/motion/theme_reaction_controller.dart';
-
-/// Wraps the whole app: may Transform the child (e.g. screen shake) and Stack
-/// transient effects above it. Subscribes to [controller] for reactions.
-typedef ReactionOverlayBuilder =
-    Widget Function(
-      BuildContext context, {
-      required Widget child,
-      required ThemeReactionController controller,
-    });
 
 /// VM-B3: themed widget shown under the cursor while dragging a tree node.
 typedef TreeDragFeedbackBuilder =
@@ -33,12 +23,6 @@ typedef TreeExpandFlourishBuilder =
       required bool expanded,
     });
 
-Widget _identityReactionOverlay(
-  BuildContext context, {
-  required Widget child,
-  required ThemeReactionController controller,
-}) => child;
-
 Widget _identityTreeDragFeedback(
   BuildContext context, {
   required Widget child,
@@ -62,25 +46,21 @@ Widget _identityTreeExpandFlourish(
 /// AppDecoration pattern.
 class AppMotion extends ThemeExtension<AppMotion> {
   const AppMotion({
-    this.reactionOverlay = _identityReactionOverlay,
     this.treeDragFeedback = _identityTreeDragFeedback,
     this.treeDropHighlight = _identityTreeDropHighlight,
     this.treeExpandFlourish = _identityTreeExpandFlourish,
   });
 
-  final ReactionOverlayBuilder reactionOverlay;
   final TreeDragFeedbackBuilder treeDragFeedback;
   final TreeDropHighlightBuilder treeDropHighlight;
   final TreeExpandFlourishBuilder treeExpandFlourish;
 
   @override
   AppMotion copyWith({
-    ReactionOverlayBuilder? reactionOverlay,
     TreeDragFeedbackBuilder? treeDragFeedback,
     TreeDropHighlightBuilder? treeDropHighlight,
     TreeExpandFlourishBuilder? treeExpandFlourish,
   }) => AppMotion(
-    reactionOverlay: reactionOverlay ?? this.reactionOverlay,
     treeDragFeedback: treeDragFeedback ?? this.treeDragFeedback,
     treeDropHighlight: treeDropHighlight ?? this.treeDropHighlight,
     treeExpandFlourish: treeExpandFlourish ?? this.treeExpandFlourish,

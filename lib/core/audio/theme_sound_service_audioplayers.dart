@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:getman/core/audio/theme_sound_service.dart';
-import 'package:getman/core/theme/motion/theme_reaction.dart';
 
 /// audioplayers-backed sound service used on every platform.
 ///

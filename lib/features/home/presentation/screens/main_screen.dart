@@ -23,7 +23,6 @@ import 'package:getman/features/home/presentation/widgets/side_menu.dart';
 import 'package:getman/features/home/presentation/widgets/tab_chip.dart';
 import 'package:getman/features/home/presentation/widgets/tab_content_stack.dart';
 import 'package:getman/features/home/presentation/widgets/tab_widget.dart';
-import 'package:getman/features/home/presentation/widgets/theme_reaction_listener.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
@@ -350,34 +349,32 @@ class _MainScreenState extends State<MainScreen> {
               },
               child: Focus(
                 focusNode: _mainFocusNode,
-                child: ThemeReactionListener(
-                  child: ChainingWriteBackListener(
-                    child: Scaffold(
-                      drawer: context.useDrawerNav
-                          ? const Drawer(child: SideMenu())
-                          : null,
-                      body: Stack(
-                        children: [
-                          if (context.useDrawerNav)
-                            _buildDrawerShell(
-                              context,
-                              theme,
-                              tabsState,
-                              activeIndex,
-                              tabs,
-                            )
-                          else
-                            _buildSplitShell(
-                              context,
-                              theme,
-                              tabsState,
-                              activeIndex,
-                              tabs,
-                              currentSideMenuWidth,
-                            ),
-                          const UpdateGate(),
-                        ],
-                      ),
+                child: ChainingWriteBackListener(
+                  child: Scaffold(
+                    drawer: context.useDrawerNav
+                        ? const Drawer(child: SideMenu())
+                        : null,
+                    body: Stack(
+                      children: [
+                        if (context.useDrawerNav)
+                          _buildDrawerShell(
+                            context,
+                            theme,
+                            tabsState,
+                            activeIndex,
+                            tabs,
+                          )
+                        else
+                          _buildSplitShell(
+                            context,
+                            theme,
+                            tabsState,
+                            activeIndex,
+                            tabs,
+                            currentSideMenuWidth,
+                          ),
+                        const UpdateGate(),
+                      ],
                     ),
                   ),
                 ),

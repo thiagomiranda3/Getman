@@ -44,7 +44,10 @@ void main() {
     const base = AppMotion();
     final copy = base.copyWith(treeDragFeedback: custom);
     expect(identical(copy.treeDragFeedback, custom), isTrue);
-    expect(identical(copy.reactionOverlay, base.reactionOverlay), isTrue);
+    expect(
+      identical(copy.treeExpandFlourish, base.treeExpandFlourish),
+      isTrue,
+    );
     expect(identical(copy.treeDropHighlight, base.treeDropHighlight), isTrue);
   });
 }

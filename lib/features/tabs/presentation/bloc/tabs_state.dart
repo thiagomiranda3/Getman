@@ -1,5 +1,4 @@
 import 'package:equatable/equatable.dart';
-import 'package:getman/core/theme/motion/theme_reaction.dart';
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 
@@ -10,8 +9,6 @@ class TabsState extends Equatable {
     this.tabs = const [],
     this.activeIndex = 0,
     this.isLoading = false,
-    this.lastReaction,
-    this.reactionSeq = 0,
   });
 
   /// All panels, in display order. Invariant: non-empty once loaded.
@@ -29,13 +26,6 @@ class TabsState extends Equatable {
 
   final bool isLoading;
 
-  /// The most recent request-driven motion reaction (transient, never
-  /// persisted). [reactionSeq] is monotonic across the bloc's lifetime and is
-  /// carried forward by `_derive` so it never moves backwards; the
-  /// ThemeReactionListener fires on each increase.
-  final ThemeReaction? lastReaction;
-  final int reactionSeq;
-
   PanelEntity? get activePanel => panels.byId(activePanelId);
 
   @override
@@ -45,22 +35,14 @@ class TabsState extends Equatable {
     tabs,
     activeIndex,
     isLoading,
-    lastReaction,
-    reactionSeq,
   ];
 
-  /// Note: [lastReaction] cannot be cleared back to null via copyWith by design
-  /// — the ThemeReactionListener keys on [reactionSeq] increasing, never on
-  /// [lastReaction] becoming null, so `lastReaction ?? this.lastReaction` is
-  /// intentional.
   TabsState copyWith({
     List<PanelEntity>? panels,
     String? activePanelId,
     List<HttpRequestTabEntity>? tabs,
     int? activeIndex,
     bool? isLoading,
-    ThemeReaction? lastReaction,
-    int? reactionSeq,
   }) {
     return TabsState(
       panels: panels ?? this.panels,
@@ -68,8 +50,6 @@ class TabsState extends Equatable {
       tabs: tabs ?? this.tabs,
       activeIndex: activeIndex ?? this.activeIndex,
       isLoading: isLoading ?? this.isLoading,
-      lastReaction: lastReaction ?? this.lastReaction,
-      reactionSeq: reactionSeq ?? this.reactionSeq,
     );
   }
 }

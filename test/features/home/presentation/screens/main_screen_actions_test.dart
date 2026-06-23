@@ -1,9 +1,9 @@
 // Tests for the Action callback LOGIC registered by MainScreen.
 //
 // Pumping the real MainScreen is not feasible in widget tests: its transitive
-// tree requires GetIt-registered singletons (ThemeReactionController,
-// WorkspacePulseController, ThemeSoundService, TabDirtyChecker) plus
-// SideMenu / TabContentStack / ChainingWriteBackListener / ThemeReactionListener
+// tree requires GetIt-registered singletons (WorkspacePulseController,
+// ThemeSoundService, TabDirtyChecker) plus
+// SideMenu / TabContentStack / ChainingWriteBackListener
 // that cannot be provided without running the full DI container, and the
 // theme's ambient ticker never settles so pumpAndSettle would hang.
 //

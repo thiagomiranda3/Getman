@@ -8,7 +8,6 @@ import 'package:getman/core/network/in_memory_cookie_store.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/network/realtime_service.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
-import 'package:getman/core/theme/motion/theme_reaction_controller.dart';
 import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
 import 'package:getman/features/chaining/data/datasources/request_rules_local_data_source.dart';
 import 'package:getman/features/chaining/data/models/assertion_model.dart';
@@ -254,7 +253,6 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     ..registerLazySingleton(() => UpdateController(sl<UpdateRepository>()))
     // Lets the Cmd/Ctrl+L shortcut focus the active tab's URL field.
     ..registerLazySingleton(UrlFocusRegistry.new)
-    ..registerLazySingleton(ThemeReactionController.new)
     ..registerLazySingleton<WorkspacePulseController>(
       WorkspacePulseController.new,
     )
