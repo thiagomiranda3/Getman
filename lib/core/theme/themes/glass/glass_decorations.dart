@@ -154,12 +154,6 @@ Decoration glassBrandedTabIndicator(
   ),
 );
 
-/// @visibleForTesting impulse counter — kept at 0 permanently (click ripple
-/// removed in Task 3). Used by tests to assert that no ripple is seeded.
-/// Reset to 0 between tests if needed (no-op: never mutated).
-@visibleForTesting
-int debugGlassImpulseCount = 0;
-
 /// @visibleForTesting C2 sentinels — last activity/idle values read by the
 /// painter's paint() on the most recent frame. 0.0 when no pulse is plumbed
 /// (static / no-provider path). Read by rhythm tests to confirm C2 wiring.

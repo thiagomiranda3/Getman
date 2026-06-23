@@ -8,12 +8,6 @@ import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_palette.dart';
 import 'package:provider/provider.dart';
 
-/// @visibleForTesting impulse counter — kept at 0 permanently (click ripple
-/// removed in Task 3). Used by tests to assert that no ripple is seeded.
-/// Reset to 0 between tests if needed (no-op: never mutated).
-@visibleForTesting
-int debugBrutalistImpulseCount = 0;
-
 /// @visibleForTesting C2 sentinels — last activity/idle values read by the
 /// painter's paint() on the most recent frame. 0.0 when no pulse is plumbed.
 @visibleForTesting
