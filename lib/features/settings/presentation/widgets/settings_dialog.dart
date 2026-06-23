@@ -283,24 +283,6 @@ class _SettingsDialogState extends State<SettingsDialog>
         value: settings.isCompactMode,
         onChanged: (v) => bloc.add(UpdateCompactMode(isCompactMode: v)),
       ),
-      _switch(
-        context,
-        switchKey: const ValueKey('reduce_effects_switch'),
-        title: 'REDUCE VISUAL EFFECTS',
-        icon: Icons.auto_awesome,
-        subtitle: 'Disables backdrop blur & animations for performance',
-        value: settings.reduceVisualEffects,
-        onChanged: (v) => bloc.add(UpdateReduceVisualEffects(value: v)),
-      ),
-      _switch(
-        context,
-        switchKey: const ValueKey('theme_sounds_switch'),
-        title: 'THEME SOUNDS',
-        icon: Icons.volume_up,
-        subtitle: 'Play themed sound effects on send & response',
-        value: settings.enableThemeSounds,
-        onChanged: (v) => bloc.add(UpdateEnableThemeSounds(value: v)),
-      ),
     ]);
   }
 

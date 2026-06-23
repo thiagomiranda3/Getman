@@ -56,7 +56,7 @@ Future<void> _openAppearanceTab(WidgetTester tester, SettingsBloc bloc) async {
   );
   await tester.tap(find.text('open'));
   await tester.pumpAndSettle();
-  // Navigate to APPEARANCE to reach reduce_effects_switch / theme_sounds_switch.
+  // Navigate to APPEARANCE.
   await tester.tap(find.byKey(const ValueKey('settingstab_tab_APPEARANCE')));
   await tester.pumpAndSettle();
 }
@@ -94,77 +94,23 @@ void main() {
   });
 
   group('B6 toggle-slot wiring — APPEARANCE tab', () {
-    testWidgets('reduce_effects_switch is reachable by key', (tester) async {
-      final bloc = _bloc();
-      addTearDown(bloc.close);
-      await _openAppearanceTab(tester, bloc);
-
-      expect(
-        find.byKey(const ValueKey('reduce_effects_switch')),
-        findsOneWidget,
-      );
-    });
-
     testWidgets(
-      'tapping reduce_effects_switch toggles reduceVisualEffects',
-      (tester) async {
-        // reduceVisualEffects defaults to false — no need to supply initial.
-        final bloc = _bloc();
-        addTearDown(bloc.close);
-        await _openAppearanceTab(tester, bloc);
-
-        expect(bloc.state.settings.reduceVisualEffects, isFalse);
-
-        // Tap the keyed subtree (wraps the Switch produced by the slot).
-        await tester.tap(find.byKey(const ValueKey('reduce_effects_switch')));
-        await tester.pump();
-
-        expect(bloc.state.settings.reduceVisualEffects, isTrue);
-      },
-    );
-
-    testWidgets(
-      'tapping ListTile row (onTap) also toggles reduce_effects_switch',
+      'REDUCE VISUAL EFFECTS and THEME SOUNDS toggles are removed',
       (tester) async {
         final bloc = _bloc();
         addTearDown(bloc.close);
         await _openAppearanceTab(tester, bloc);
 
-        // Tap the title text — exercises the ListTile.onTap path.
-        await tester.tap(find.text('REDUCE VISUAL EFFECTS'));
-        await tester.pump();
-
-        expect(bloc.state.settings.reduceVisualEffects, isTrue);
-      },
-    );
-
-    testWidgets('theme_sounds_switch is reachable by key', (tester) async {
-      final bloc = _bloc();
-      addTearDown(bloc.close);
-      await _openAppearanceTab(tester, bloc);
-
-      expect(
-        find.byKey(const ValueKey('theme_sounds_switch')),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets(
-      'tapping theme_sounds_switch dispatches UpdateEnableThemeSounds',
-      (tester) async {
-        // enableThemeSounds defaults to false; supply true to test the flip.
-        final bloc = _bloc(
-          initial: const SettingsEntity(enableThemeSounds: true),
+        expect(find.text('REDUCE VISUAL EFFECTS'), findsNothing);
+        expect(find.text('THEME SOUNDS'), findsNothing);
+        expect(
+          find.byKey(const ValueKey('reduce_effects_switch')),
+          findsNothing,
         );
-        addTearDown(bloc.close);
-        await _openAppearanceTab(tester, bloc);
-
-        expect(bloc.state.settings.enableThemeSounds, isTrue);
-
-        await tester.tap(find.byKey(const ValueKey('theme_sounds_switch')));
-        await tester.pump();
-
-        expect(bloc.state.settings.enableThemeSounds, isFalse);
+        expect(
+          find.byKey(const ValueKey('theme_sounds_switch')),
+          findsNothing,
+        );
       },
     );
   });

@@ -224,9 +224,7 @@ class MyApp extends StatelessWidget {
               buildWhen: (prev, next) =>
                   prev.settings.themeId != next.settings.themeId ||
                   prev.settings.isDarkMode != next.settings.isDarkMode ||
-                  prev.settings.isCompactMode != next.settings.isCompactMode ||
-                  prev.settings.reduceVisualEffects !=
-                      next.settings.reduceVisualEffects,
+                  prev.settings.isCompactMode != next.settings.isCompactMode,
               builder: (context, state) {
                 final settings = state.settings;
                 return Shortcuts(
@@ -258,13 +256,11 @@ class MyApp extends StatelessWidget {
                         settings.themeId,
                         Brightness.light,
                         isCompact: settings.isCompactMode,
-                        reduceEffects: settings.reduceVisualEffects,
                       ),
                       darkTheme: resolveThemeData(
                         settings.themeId,
                         Brightness.dark,
                         isCompact: settings.isCompactMode,
-                        reduceEffects: settings.reduceVisualEffects,
                       ),
                       themeMode: settings.isDarkMode
                           ? ThemeMode.dark
@@ -275,7 +271,7 @@ class MyApp extends StatelessWidget {
                           autofocus: true,
                           child: ThemeSwitchTransition(
                             themeId: settings.themeId,
-                            reduceEffects: settings.reduceVisualEffects,
+                            reduceEffects: false,
                             child: context.appDecoration.scaffoldBackground(
                               context,
                               child: child ?? const SizedBox.shrink(),

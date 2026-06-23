@@ -14,7 +14,6 @@ class SettingsModel extends HiveObject {
     this.alwaysPrettifyLargeResponses = false,
     this.isDarkMode = false,
     this.isCompactMode = false,
-    this.reduceVisualEffects = false,
     this.isVerticalLayout = false,
     this.splitRatio = 0.5,
     this.sideMenuWidth = 300.0,
@@ -36,7 +35,6 @@ class SettingsModel extends HiveObject {
     this.saveLargeResponsesInHistory = true,
     this.checkForUpdatesOnStartup = true,
     this.skippedUpdateVersion,
-    this.enableThemeSounds = false,
   });
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) => SettingsModel(
@@ -46,7 +44,6 @@ class SettingsModel extends HiveObject {
         json['alwaysPrettifyLargeResponses'] as bool? ?? false,
     isDarkMode: json['isDarkMode'] as bool? ?? false,
     isCompactMode: json['isCompactMode'] as bool? ?? false,
-    reduceVisualEffects: json['reduceVisualEffects'] as bool? ?? false,
     isVerticalLayout: json['isVerticalLayout'] as bool? ?? false,
     splitRatio: (json['splitRatio'] as num?)?.toDouble() ?? 0.5,
     sideMenuWidth: (json['sideMenuWidth'] as num?)?.toDouble() ?? 300.0,
@@ -69,7 +66,6 @@ class SettingsModel extends HiveObject {
         json['saveLargeResponsesInHistory'] as bool? ?? true,
     checkForUpdatesOnStartup: json['checkForUpdatesOnStartup'] as bool? ?? true,
     skippedUpdateVersion: json['skippedUpdateVersion'] as String?,
-    enableThemeSounds: json['enableThemeSounds'] as bool? ?? false,
   );
 
   factory SettingsModel.fromEntity(SettingsEntity entity) => SettingsModel(
@@ -78,7 +74,6 @@ class SettingsModel extends HiveObject {
     alwaysPrettifyLargeResponses: entity.alwaysPrettifyLargeResponses,
     isDarkMode: entity.isDarkMode,
     isCompactMode: entity.isCompactMode,
-    reduceVisualEffects: entity.reduceVisualEffects,
     isVerticalLayout: entity.isVerticalLayout,
     splitRatio: entity.splitRatio,
     sideMenuWidth: entity.sideMenuWidth,
@@ -100,7 +95,6 @@ class SettingsModel extends HiveObject {
     saveLargeResponsesInHistory: entity.saveLargeResponsesInHistory,
     checkForUpdatesOnStartup: entity.checkForUpdatesOnStartup,
     skippedUpdateVersion: entity.skippedUpdateVersion,
-    enableThemeSounds: entity.enableThemeSounds,
   );
   @HiveField(0, defaultValue: 100)
   int historyLimit;
@@ -168,9 +162,6 @@ class SettingsModel extends HiveObject {
   @HiveField(21)
   String? clientCertPassphrase;
 
-  @HiveField(22, defaultValue: false)
-  bool reduceVisualEffects;
-
   @HiveField(23, defaultValue: 5)
   int responseHistoryLimit;
 
@@ -183,16 +174,12 @@ class SettingsModel extends HiveObject {
   @HiveField(26)
   String? skippedUpdateVersion;
 
-  @HiveField(27, defaultValue: false)
-  bool enableThemeSounds;
-
   SettingsModel copyWith({
     int? historyLimit,
     bool? saveResponseInHistory,
     bool? alwaysPrettifyLargeResponses,
     bool? isDarkMode,
     bool? isCompactMode,
-    bool? reduceVisualEffects,
     bool? isVerticalLayout,
     double? splitRatio,
     double? sideMenuWidth,
@@ -214,7 +201,6 @@ class SettingsModel extends HiveObject {
     bool? saveLargeResponsesInHistory,
     bool? checkForUpdatesOnStartup,
     Object? skippedUpdateVersion = _unchanged,
-    bool? enableThemeSounds,
   }) {
     return SettingsModel(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -224,7 +210,6 @@ class SettingsModel extends HiveObject {
           alwaysPrettifyLargeResponses ?? this.alwaysPrettifyLargeResponses,
       isDarkMode: isDarkMode ?? this.isDarkMode,
       isCompactMode: isCompactMode ?? this.isCompactMode,
-      reduceVisualEffects: reduceVisualEffects ?? this.reduceVisualEffects,
       isVerticalLayout: isVerticalLayout ?? this.isVerticalLayout,
       splitRatio: splitRatio ?? this.splitRatio,
       sideMenuWidth: sideMenuWidth ?? this.sideMenuWidth,
@@ -264,7 +249,6 @@ class SettingsModel extends HiveObject {
       skippedUpdateVersion: identical(skippedUpdateVersion, _unchanged)
           ? this.skippedUpdateVersion
           : skippedUpdateVersion as String?,
-      enableThemeSounds: enableThemeSounds ?? this.enableThemeSounds,
     );
   }
 
@@ -274,7 +258,6 @@ class SettingsModel extends HiveObject {
     'alwaysPrettifyLargeResponses': alwaysPrettifyLargeResponses,
     'isDarkMode': isDarkMode,
     'isCompactMode': isCompactMode,
-    'reduceVisualEffects': reduceVisualEffects,
     'isVerticalLayout': isVerticalLayout,
     'splitRatio': splitRatio,
     'sideMenuWidth': sideMenuWidth,
@@ -296,7 +279,6 @@ class SettingsModel extends HiveObject {
     'saveLargeResponsesInHistory': saveLargeResponsesInHistory,
     'checkForUpdatesOnStartup': checkForUpdatesOnStartup,
     'skippedUpdateVersion': skippedUpdateVersion,
-    'enableThemeSounds': enableThemeSounds,
   };
 
   SettingsEntity toEntity() => SettingsEntity(
@@ -305,7 +287,6 @@ class SettingsModel extends HiveObject {
     alwaysPrettifyLargeResponses: alwaysPrettifyLargeResponses,
     isDarkMode: isDarkMode,
     isCompactMode: isCompactMode,
-    reduceVisualEffects: reduceVisualEffects,
     isVerticalLayout: isVerticalLayout,
     splitRatio: splitRatio,
     sideMenuWidth: sideMenuWidth,
@@ -327,6 +308,5 @@ class SettingsModel extends HiveObject {
     saveLargeResponsesInHistory: saveLargeResponsesInHistory,
     checkForUpdatesOnStartup: checkForUpdatesOnStartup,
     skippedUpdateVersion: skippedUpdateVersion,
-    enableThemeSounds: enableThemeSounds,
   );
 }
