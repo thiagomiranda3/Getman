@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:auris/auris_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -141,86 +139,8 @@ BoxDecoration aurisBrandedTabIndicator(
 // ---------------------------------------------------------------------------
 // Press feedback
 // ---------------------------------------------------------------------------
-
-/// Auris-flavored press feedback: a quick scale-down on tap-down.
-///
-/// Like `GlassPress`, the [AnimationController] is created in `initState` and
-/// kept for the State's lifetime — never disposed + recreated when `animate`
-/// toggles (the SingleTickerProvider-one-ticker invariant). We merely
-/// forward/reverse it; in reduced mode we just let it sit idle.
-class AurisPress extends StatefulWidget {
-  const AurisPress({
-    required this.child,
-    required this.animate,
-    super.key,
-    this.onTap,
-    this.scaleDown,
-  });
-
-  final Widget child;
-  final bool animate;
-  final VoidCallback? onTap;
-  final double? scaleDown;
-
-  @override
-  State<AurisPress> createState() => _AurisPressState();
-}
-
-class _AurisPressState extends State<AurisPress>
-    with SingleTickerProviderStateMixin {
-  // Built in initState — never recreated (see glass_press.dart for rationale).
-  late final AnimationController _controller;
-  late Animation<double> _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: AurisTokens.durationFast, // 120 ms — crisp
-    );
-    _scale = _buildScale();
-  }
-
-  Animation<double> _buildScale() =>
-      Tween<double>(
-        begin: 1,
-        end: widget.scaleDown ?? 0.97,
-      ).animate(
-        CurvedAnimation(parent: _controller, curve: AurisTokens.curveDefault),
-      );
-
-  @override
-  void didUpdateWidget(AurisPress old) {
-    super.didUpdateWidget(old);
-    if (old.scaleDown != widget.scaleDown) _scale = _buildScale();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!widget.animate) {
-      // Reduced mode: plain tap target, no animation.
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
-        child: widget.child,
-      );
-    }
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) {
-        unawaited(_controller.reverse());
-        widget.onTap?.call();
-      },
-      onTapCancel: _controller.reverse,
-      child: ScaleTransition(scale: _scale, child: widget.child),
-    );
-  }
-}
+//
+// Press feedback is now the shared `SubtlePress`
+// (lib/core/theme/themes/shared/subtle_press.dart), wired in `auris_theme.dart`'s
+// `wrapInteractive`. The old AURIS-specific press widget was removed when all
+// themes converged on the single subtle press.

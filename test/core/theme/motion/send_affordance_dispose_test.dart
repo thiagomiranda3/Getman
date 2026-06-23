@@ -9,7 +9,7 @@
 // This flooded the console on AURIS (and rpg).
 //
 // Fix: initialize those controllers eagerly in initState (the proven pattern in
-// AurisWallpaper/AurisPress), so dispose always has a real controller.
+// AurisWallpaper), so dispose always has a real controller.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
