@@ -538,6 +538,9 @@ class _MainScreenState extends State<MainScreen> {
                     child: Scrollbar(
                       controller: _tabScrollController,
                       thumbVisibility: true,
+                      // Pin the horizontal scrollbar to the bottom edge of the
+                      // tab strip so it never paints over the top of the tabs.
+                      scrollbarOrientation: ScrollbarOrientation.bottom,
                       thickness: 4,
                       radius: const Radius.circular(2),
                       child: ReorderableListView.builder(

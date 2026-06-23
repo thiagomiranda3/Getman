@@ -281,6 +281,44 @@ void main() {
     await tester.pump(const Duration(seconds: 11));
   });
 
+  testWidgets('in-flight spinner drops its track ring (animation visible)', (
+    tester,
+  ) async {
+    // Regression: themes whose progressIndicatorTheme.circularTrackColor is
+    // nearly identical to onError (AURIS) made the spinning arc blend into the
+    // track, reading as a static ring. The spinner pins backgroundColor to
+    // transparent so only the moving arc paints.
+    const tab = HttpRequestTabEntity(
+      tabId: 'u9',
+      config: HttpRequestConfigEntity(id: 'u9', url: 'https://example.com'),
+    );
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+
+    final completer = Completer<HttpResponseEntity>();
+    when(
+      () => sendRequestUseCase.call(
+        config: any(named: 'config'),
+        envVars: any(named: 'envVars'),
+        cancelHandle: any(named: 'cancelHandle'),
+      ),
+    ).thenAnswer((_) => completer.future);
+
+    await _pump(tester, bloc, 'u9');
+    await tester.tap(find.byKey(const ValueKey('send')));
+    await tester.pump();
+
+    final spinner = tester.widget<CircularProgressIndicator>(
+      find.byType(CircularProgressIndicator),
+    );
+    expect(spinner.backgroundColor, Colors.transparent);
+
+    completer.completeError(Exception('test-cancel'), StackTrace.current);
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pump(const Duration(seconds: 11));
+  });
+
   testWidgets('WS kind shows RealtimeButton (CONNECT) instead of SEND', (
     tester,
   ) async {

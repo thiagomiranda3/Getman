@@ -393,6 +393,14 @@ class _UrlBarState extends State<UrlBar> {
                                                 strokeWidth: 2,
                                                 color:
                                                     theme.colorScheme.onError,
+                                                // Drop the track ring: some
+                                                // themes (AURIS) set a
+                                                // circularTrackColor nearly
+                                                // identical to onError, so the
+                                                // moving arc blends in and
+                                                // reads as a static ring.
+                                                backgroundColor:
+                                                    Colors.transparent,
                                               ),
                                             ),
                                             SizedBox(width: isNarrow ? 4 : 8),
