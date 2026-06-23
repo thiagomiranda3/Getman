@@ -4,6 +4,7 @@
 // (which wraps it) with a real TabsBloc fed by a mocked repository and use
 // case — the same construction pattern as tabs_bloc_test.dart.
 
+import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -14,6 +15,7 @@ import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/core/theme/themes/classic/classic_theme.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
@@ -29,6 +31,7 @@ import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/json_tree_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response_section.dart';
 import 'package:mocktail/mocktail.dart';
@@ -43,6 +46,13 @@ class MockTabsRepository extends Mock implements TabsRepository {}
 class MockSendRequestUseCase extends Mock implements SendRequestUseCase {}
 
 class MockSaveSettingsUseCase extends Mock implements SaveSettingsUseCase {}
+
+// A MockBloc for TabsBloc so we can seed arbitrary states (including
+// isSending: true) without going through LoadTabs (which resets isSending).
+class _MockTabsBloc extends MockBloc<TabsEvent, TabsState>
+    implements TabsBloc {}
+
+class _FakeTabsEvent extends Fake implements TabsEvent {}
 
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 
@@ -77,6 +87,13 @@ SettingsBloc _settingsBloc(SettingsEntity settings) {
 // ---------------------------------------------------------------------------
 
 String _body(int chars) => 'x' * chars;
+
+HttpResponseEntity _okResponse({required String body}) => HttpResponseEntity(
+  statusCode: 200,
+  body: body,
+  headers: const {},
+  durationMs: 10,
+);
 
 HttpRequestTabEntity _tabWithBody(String tabId, String body) =>
     HttpRequestTabEntity(
@@ -148,6 +165,81 @@ Future<void> _pump(
   await tester.pumpAndSettle();
 }
 
+/// Builds a [TabsState] with a single tab whose [isSending] and [response]
+/// match the given arguments.  Used to seed a [_MockTabsBloc] without going
+/// through [LoadTabs] (which resets isSending to false).
+TabsState _sendingState({
+  required bool isSending,
+  HttpResponseEntity? response,
+}) {
+  const tabId = 'sending_tab';
+  final tab = HttpRequestTabEntity(
+    tabId: tabId,
+    config: const HttpRequestConfigEntity(id: tabId),
+    isSending: isSending,
+    response: response,
+  );
+  final panel = PanelEntity(
+    id: 'p1',
+    name: 'Panel 1',
+    tabs: [tab],
+    activeTabId: tabId,
+  );
+  return TabsState(panels: [panel], activePanelId: 'p1', tabs: [tab]);
+}
+
+/// Pumps a [ResponseSection] for a tab in a given [isSending] / [response]
+/// state.  Uses classic theme so the pending indicator slot uses the default
+/// Shimmer-based widget keyed with
+/// `ValueKey('response_pending_indicator')`.
+///
+/// Uses a fixed `pump` duration instead of `pumpAndSettle` because the
+/// Shimmer-based pending indicator animates indefinitely.
+Future<void> pumpResponseSection(
+  WidgetTester tester, {
+  required bool isSending,
+  required HttpResponseEntity? response,
+}) async {
+  const tabId = 'sending_tab';
+  final bloc = _MockTabsBloc();
+  when(() => bloc.state).thenReturn(
+    _sendingState(isSending: isSending, response: response),
+  );
+  // No events will be dispatched, so no stream stub is needed.
+
+  final controller = CodeLineEditingController();
+  addTearDown(controller.dispose);
+
+  // Use classicTheme so pendingIndicator = _defaultPendingIndicator
+  // (keyed with ValueKey('response_pending_indicator')).
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: classicTheme(Brightness.light),
+      home: Scaffold(
+        body: MultiBlocProvider(
+          providers: [
+            BlocProvider<TabsBloc>.value(value: bloc),
+            BlocProvider<SettingsBloc>(
+              create: (_) => _settingsBloc(const SettingsEntity()),
+            ),
+            BlocProvider<CollectionsBloc>(
+              create: (_) => _FakeCollectionsBloc(),
+            ),
+            BlocProvider<HistoryBloc>(create: (_) => _FakeHistoryBloc()),
+          ],
+          child: ResponseSection(
+            tabId: tabId,
+            responseController: controller,
+            showMetadata: false,
+          ),
+        ),
+      ),
+    ),
+  );
+  // Use pump(duration) not pumpAndSettle: the Shimmer animates forever.
+  await tester.pump(const Duration(milliseconds: 100));
+}
+
 /// Creates and loads a [TabsBloc] whose active panel contains [tab].
 /// Uses [LoadTabs] + a mocked `repository.getPanels` — same pattern as
 /// tabs_bloc_test.dart.
@@ -185,6 +277,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(_FakeConfig());
     registerFallbackValue(_FakePanel());
+    registerFallbackValue(_FakeTabsEvent());
     registerFallbackValue(
       const HttpRequestTabEntity(
         tabId: 'fallback',
@@ -650,6 +743,45 @@ void main() {
       expect(find.byKey(const ValueKey('body_toggle_PRETTY')), findsOneWidget);
       expect(find.byKey(const ValueKey('body_toggle_RAW')), findsOneWidget);
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // Test 10: keeps the previous response visible while re-sending
+  // -------------------------------------------------------------------------
+  testWidgets('keeps the previous response visible while re-sending', (
+    tester,
+  ) async {
+    // tab.isSending == true AND tab.response != null
+    await pumpResponseSection(
+      tester,
+      isSending: true,
+      response: _okResponse(body: 'PREVIOUS'),
+    );
+    // The response body editor must be visible — CodeEditor is the
+    // canvas-based widget that re_editor uses; text inside it is not
+    // discoverable via find.text, but its presence proves the response pane
+    // is shown rather than the pending indicator.
+    // CodeEditor's presence proves the response pane is shown.
+    expect(find.byType(CodeEditor), findsOneWidget);
+    // The themed pending/skeleton indicator must NOT replace it.
+    expect(
+      find.byKey(const ValueKey('response_pending_indicator')),
+      findsNothing,
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // Test 11: shows the pending indicator when sending with no prior response
+  // -------------------------------------------------------------------------
+  testWidgets(
+    'shows the pending indicator while sending with no previous response',
+    (tester) async {
+      await pumpResponseSection(tester, isSending: true, response: null);
+      expect(
+        find.byKey(const ValueKey('response_pending_indicator')),
+        findsOneWidget,
+      );
     },
   );
 }
