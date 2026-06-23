@@ -178,37 +178,6 @@ void main() {
     );
   });
 
-  group('SettingsModel reduceVisualEffects', () {
-    test('default is false (full effects)', () {
-      expect(const SettingsEntity().reduceVisualEffects, isFalse);
-      expect(SettingsModel().reduceVisualEffects, isFalse);
-    });
-
-    test('json roundtrip preserves the flag', () {
-      final model = SettingsModel(reduceVisualEffects: true);
-      final back = SettingsModel.fromJson(model.toJson());
-      expect(back.reduceVisualEffects, isTrue);
-    });
-
-    test('entity roundtrip preserves the flag', () {
-      const entity = SettingsEntity(reduceVisualEffects: true);
-      final back = SettingsModel.fromEntity(entity).toEntity();
-      expect(back.reduceVisualEffects, isTrue);
-    });
-
-    test('legacy json without the field defaults to false', () {
-      final back = SettingsModel.fromJson({'historyLimit': 50});
-      expect(back.reduceVisualEffects, isFalse);
-    });
-
-    test('copyWith overrides the flag but keeps other fields', () {
-      const original = SettingsEntity(historyLimit: 50);
-      final copy = original.copyWith(reduceVisualEffects: true);
-      expect(copy.reduceVisualEffects, isTrue);
-      expect(copy.historyLimit, 50);
-    });
-  });
-
   group('SettingsModel workspaceBookmark (macOS security-scoped bookmark)', () {
     test('default is null', () {
       expect(const SettingsEntity().workspaceBookmark, isNull);

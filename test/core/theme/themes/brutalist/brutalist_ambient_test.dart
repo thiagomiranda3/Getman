@@ -54,12 +54,12 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       expect(find.text('app'), findsOneWidget);
       expect(tester.takeException(), isNull);
-      // Add a sentinel listener AFTER mount. bump() notifies all listeners.
+      // Add a sentinel listener AFTER mount. tick() notifies all listeners.
       // Verifies the controller is live — not the inert idle fallback.
       void onPulse() => bumps++;
       pulse
         ..addListener(onPulse)
-        ..bump();
+        ..tick();
       expect(bumps, equals(1));
       pulse.removeListener(onPulse);
     },

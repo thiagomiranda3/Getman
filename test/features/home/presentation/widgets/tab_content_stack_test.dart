@@ -306,6 +306,33 @@ void main() {
     expect(tester.widget<ExcludeFocus>(activeExclude).excluding, isFalse);
   });
 
+  // Test 5a: Switching the active tab swaps content immediately with NO
+  // transition overlay (contentTransition hook removed in Task 5).
+  testWidgets(
+    'switching tabs swaps content immediately with no transition overlay',
+    (tester) async {
+      final state = await _pumpHarness(
+        tester,
+        tabs: _tabs(['tab1', 'tab2']),
+        activeIndex: 0,
+        builder: (id) => Text('child-$id', key: ValueKey('view_$id')),
+      );
+
+      // Switch to the second tab.
+      state.update(newIndex: 1);
+      // Pump one frame — no transition overlay should ever appear.
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('content_transition_overlay')),
+        findsNothing,
+        reason: 'no transition overlay after Task 5 removal',
+      );
+      expect(find.text('child-tab2'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   // Test 5: Empty tabs list returns SizedBox.shrink without crashing.
   testWidgets('empty tab list renders SizedBox.shrink without error', (
     tester,

@@ -3,9 +3,9 @@ import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_components.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_decorations.dart';
-import 'package:getman/core/theme/themes/editorial/editorial_fade.dart';
 import 'package:getman/core/theme/themes/editorial/editorial_palette.dart';
 import 'package:getman/core/theme/themes/shared/calm_motion.dart';
+import 'package:getman/core/theme/themes/shared/subtle_press.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 ThemeData editorialTheme(
@@ -101,8 +101,12 @@ ThemeData editorialTheme(
   final decoration = AppDecoration(
     panelBox: editorialPanelBox,
     tabShape: editorialTabShape,
-    wrapInteractive: ({required child, onTap, scaleDown}) =>
-        EditorialFade(onTap: onTap, child: child),
+    wrapInteractive: ({required child, onTap, scaleDown}) => SubtlePress(
+      onTap: onTap,
+      scaleDown: scaleDown,
+      animate: !reduceEffects,
+      child: child,
+    ),
     scaffoldBackground: editorialScaffoldBackground,
   );
 

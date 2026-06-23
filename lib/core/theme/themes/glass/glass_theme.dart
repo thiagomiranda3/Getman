@@ -4,7 +4,7 @@ import 'package:getman/core/theme/themes/glass/glass_components.dart';
 import 'package:getman/core/theme/themes/glass/glass_decorations.dart';
 import 'package:getman/core/theme/themes/glass/glass_motion.dart';
 import 'package:getman/core/theme/themes/glass/glass_palette.dart';
-import 'package:getman/core/theme/themes/glass/glass_press.dart';
+import 'package:getman/core/theme/themes/shared/subtle_press.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// Apple "Liquid Glass" theme. Translucent frosted panels (real backdrop blur),
@@ -98,10 +98,10 @@ ThemeData glassTheme(
     panelBox: glassPanelBox,
     tabShape: glassTabShape,
     brandedTabIndicator: glassBrandedTabIndicator,
-    wrapInteractive: ({required child, onTap, scaleDown}) => GlassPress(
+    wrapInteractive: ({required child, onTap, scaleDown}) => SubtlePress(
       animate: !reduceEffects,
       onTap: onTap,
-      scaleDown: scaleDown ?? 0.98,
+      scaleDown: scaleDown,
       child: child,
     ),
     scaffoldBackground: reduceEffects

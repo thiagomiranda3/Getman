@@ -8,26 +8,15 @@ import 'package:getman/core/theme/motion/ambient_signals.dart';
 import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
 import 'package:provider/provider.dart';
 
-/// How long a click impulse stays alive before the widget prunes it.
-const Duration _kImpulseLifetime = Duration(milliseconds: 1400);
-
-/// @visibleForTesting impulse counter — updated by the `_AurisAmbientState` on
-/// each `_addImpulse` call; read by tests to assert click registration without
-/// accessing the private State class. Reset to 0 between tests.
-@visibleForTesting
-int debugAurisImpulseCount = 0;
-
-/// @visibleForTesting C2 sentinels — last activity/idle values read by the
-/// painter's paint() on the most recent frame. 0.0 when no pulse is plumbed.
-@visibleForTesting
-double debugAurisLastActivityLevel = 0;
+/// @visibleForTesting C2 sentinel — last idle value read by the painter's
+/// paint() on the most recent frame. 0.0 when no pulse is plumbed.
 @visibleForTesting
 double debugAurisLastIdleFactor = 0;
 
 /// Full-effects AURIS wallpaper: a scanning sci-fi HUD grid (faint gridlines)
-/// with a slow radar sweep arc and drifting telemetry ticks. This is the C1/C2
-/// foundation — [AmbientSignals] (pointer + click impulses + session pulse) is
-/// plumbed through the painter NOW so Tasks 13/14 only touch `paint()` logic.
+/// with a slow radar sweep arc and drifting telemetry ticks. [AmbientSignals]
+/// (pointer + session pulse) is plumbed through the painter so parallax and
+/// rhythm-dimming remain live.
 Widget aurisScaffoldBackgroundAnimated(
   BuildContext context, {
   required Widget child,
@@ -43,8 +32,8 @@ Widget aurisStaticScaffoldBackground(
 
 /// Scanning HUD-grid wallpaper behind the whole AURIS app. When [animate] is
 /// true a slow 30 s controller drives a radar sweep arc and a gentle gridline
-/// drift; the widget owns the [AmbientSignals] (normalized 0..1 pointer, click
-/// impulses, and a null-safe [WorkspacePulseController]) and threads them into
+/// drift; the widget owns the [AmbientSignals] (normalized 0..1 pointer and a
+/// null-safe [WorkspacePulseController]) and threads them into
 /// [_AurisHudPainter] ONCE. When [animate] is false it renders one static grid
 /// frame (no controller, no pointer, no signals).
 class _AurisAmbient extends StatefulWidget {
@@ -70,15 +59,6 @@ class _AurisAmbientState extends State<_AurisAmbient>
     const Offset(0.5, 0.5),
   );
 
-  // Active click ping seeds (VM-C1). Appended on pointer-down, pruned by age.
-  // Only populated in animated mode.
-  final ValueNotifier<List<AmbientImpulse>> _impulses =
-      ValueNotifier<List<AmbientImpulse>>(const []);
-
-  // Widget-owned monotonic clock for impulse ageing (matches AmbientImpulse's
-  // contract — a single source so born/now are comparable).
-  final Stopwatch _clock = Stopwatch();
-
   // Resolved from the provider once dependencies are available; null when no
   // provider is registered (e.g. standalone tests / web without DI).
   WorkspacePulseController? _pulse;
@@ -96,7 +76,6 @@ class _AurisAmbientState extends State<_AurisAmbient>
       duration: const Duration(seconds: 30),
     );
     if (widget.animate) {
-      _clock.start();
       WidgetsBinding.instance.addObserver(this);
       unawaited(_controller.repeat());
     }
@@ -126,13 +105,9 @@ class _AurisAmbientState extends State<_AurisAmbient>
     super.didUpdateWidget(old);
     if (old.animate == widget.animate) return;
     if (widget.animate) {
-      _clock.start();
       WidgetsBinding.instance.addObserver(this);
       unawaited(_controller.repeat());
     } else {
-      _clock
-        ..stop()
-        ..reset();
       WidgetsBinding.instance.removeObserver(this);
       _controller.stop();
     }
@@ -153,7 +128,6 @@ class _AurisAmbientState extends State<_AurisAmbient>
     if (widget.animate) WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     _pointer.dispose();
-    _impulses.dispose();
     // Only dispose the fallback we created; the provider's controller is owned
     // by the DI/provider layer, never by us.
     _ownedIdlePulse?.dispose();
@@ -164,21 +138,6 @@ class _AurisAmbientState extends State<_AurisAmbient>
   /// when present, otherwise an inert idle stand-in we own. Built once.
   WorkspacePulseController get _effectivePulse =>
       _pulse ?? (_ownedIdlePulse ??= WorkspacePulseController());
-
-  void _addImpulse(Offset normalized) {
-    final nowMs = _clock.elapsedMilliseconds;
-    final cutoff = nowMs - _kImpulseLifetime.inMilliseconds;
-    // Prune aged entries while appending the fresh one (bounded list).
-    final next = <AmbientImpulse>[
-      for (final imp in _impulses.value)
-        if (imp.bornAtMs >= cutoff) imp,
-      AmbientImpulse(position: normalized, bornAtMs: nowMs),
-    ];
-    _impulses.value = next;
-    debugAurisImpulseCount = next.length;
-    // Clicking is activity — keep the session pulse awake (no-op if null).
-    _pulse?.touch();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -195,7 +154,6 @@ class _AurisAmbientState extends State<_AurisAmbient>
     final signals = widget.animate
         ? AmbientSignals(
             pointer: _pointer,
-            impulses: _impulses,
             // Non-nullable; falls back to an inert idle controller when no
             // provider is registered (see [_effectivePulse]).
             pulse: _effectivePulse,
@@ -216,7 +174,6 @@ class _AurisAmbientState extends State<_AurisAmbient>
                 // safety, but we don't want to subscribe to a dead controller).
                 hasPulse: _pulse != null,
                 signals: signals,
-                clock: widget.animate ? _clock : null,
               ),
             ),
           ),
@@ -228,19 +185,12 @@ class _AurisAmbientState extends State<_AurisAmbient>
     if (!widget.animate) return stack;
     return Listener(
       onPointerDown: (e) {
-        // Desktop/web only — touch events don't produce ambient ripples.
+        // Keep the pulse awake on pointer-down (touch() is activity).
         if (e.kind != PointerDeviceKind.mouse &&
             e.kind != PointerDeviceKind.stylus) {
           return;
         }
-        final size = context.size;
-        if (size == null || size.isEmpty) return;
-        _addImpulse(
-          Offset(
-            (e.localPosition.dx / size.width).clamp(0.0, 1.0),
-            (e.localPosition.dy / size.height).clamp(0.0, 1.0),
-          ),
-        );
+        _pulse?.touch();
       },
       child: MouseRegion(
         onHover: (e) {
@@ -332,11 +282,6 @@ class _AurisHudPalette {
 /// sweep arc emanating from the centre, and a handful of drifting telemetry
 /// ticks along the grid.
 ///
-/// This task renders ONLY the base animated HUD (grid + sweep + ticks). The
-/// cursor force (C1), click ping (C1), and rhythm-dim (C2) land in Tasks 13/14;
-/// [signals] is already plumbed so those tasks add `paint()` logic without
-/// changing this constructor.
-///
 /// Performance: reused [Paint] objects (mutate `.color`/`.shader`); the
 /// gridline [Path] is built once and cached, invalidated only when [Size]
 /// changes; no `Paint()`/`Path()`/`Random()` allocation inside `paint()` beyond
@@ -348,7 +293,6 @@ class _AurisHudPainter extends CustomPainter {
     required this.palette,
     required this.hasPulse,
     required this.signals,
-    this.clock,
   }) : super(repaint: _repaintFor(t, signals, hasPulse));
 
   final Animation<double> t;
@@ -357,9 +301,6 @@ class _AurisHudPainter extends CustomPainter {
 
   /// Non-null only in animated mode (C1/C2 inputs).
   final AmbientSignals? signals;
-
-  /// Monotonic clock for impulse age computation; null in static mode.
-  final Stopwatch? clock;
 
   // Reused across frames — `.color`/`.shader`/`.strokeWidth` mutate per draw.
   final Paint _fillPaint = Paint();
@@ -374,8 +315,6 @@ class _AurisHudPainter extends CustomPainter {
   final Paint _spokePaint = Paint()
     ..style = PaintingStyle.stroke
     ..strokeWidth = 1.5;
-  // Reused stroke paint for click ping ripples (C1).
-  final Paint _ripplePaint = Paint()..style = PaintingStyle.stroke;
 
   // Gridline Path cache — built once, reused across frames; rebuilt only when
   // Size changes. NEVER rebuilt per frame (the drift is applied via a canvas
@@ -397,8 +336,8 @@ class _AurisHudPainter extends CustomPainter {
     (0.40, 0.34, 0.9),
   ];
 
-  // Merge only the live listenables: the controller always; pointer + impulses
-  // when present; the pulse only when a real controller is registered (the idle
+  // Merge only the live listenables: the controller always; pointer when
+  // present; the pulse only when a real controller is registered (the idle
   // fallback is never subscribed to, so it never ticks).
   static Listenable _repaintFor(
     Animation<double> t,
@@ -409,7 +348,6 @@ class _AurisHudPainter extends CustomPainter {
     return Listenable.merge([
       t,
       signals.pointer,
-      signals.impulses,
       if (hasPulse) signals.pulse,
     ]);
   }
@@ -440,19 +378,16 @@ class _AurisHudPainter extends CustomPainter {
     final v = t.value; // 0..1 over the 30 s loop
     final rect = Offset.zero & size;
 
-    // C2 session rhythm: read pulse values defensively (null-safe).
-    // activityLevel (0..1) → brighter HUD (sweep/ticks) when busy.
+    // C2 session rhythm: read idle factor defensively (null-safe).
     // idleFactor (0..1) → dimmer, calmer HUD when idle.
-    final activityLevel = signals?.pulse.activityLevel ?? 0.0;
     final idleFactor = signals?.pulse.idleFactor ?? 0.0;
-    // Write sentinels for tests.
-    debugAurisLastActivityLevel = activityLevel;
+    // Write sentinel for tests.
     debugAurisLastIdleFactor = idleFactor;
 
-    // C2 multiplier: activity brightens HUD elements (up to +40%);
-    // idle dims them (down to -30%). Grid gets a subtler effect (always faint).
-    final hudMult = (1.0 + 0.4 * activityLevel) * (1.0 - 0.3 * idleFactor);
-    final gridMult = (1.0 + 0.2 * activityLevel) * (1.0 - 0.2 * idleFactor);
+    // C2 multiplier: idle dims HUD elements (down to -30%).
+    // Grid gets a subtler effect (always faint).
+    final hudMult = 1.0 - 0.3 * idleFactor;
+    final gridMult = 1.0 - 0.2 * idleFactor;
 
     // Slightly stronger when the AurisScheme is present (the scheme-coloured
     // HUD); fainter for the neutral fallback so it never shouts.
@@ -584,36 +519,13 @@ class _AurisHudPainter extends CustomPainter {
           _tickPaint,
         );
     }
-
-    // C1 click ping: expanding target-lock ring per impulse.
-    final nowMs = clock?.elapsedMilliseconds ?? 0;
-    const kRippleLifetimeMs = 1400;
-    for (final imp in signals?.impulses.value ?? const <AmbientImpulse>[]) {
-      final ageMs = nowMs - imp.bornAtMs;
-      if (ageMs < 0 || ageMs > kRippleLifetimeMs) continue;
-      final age01 = ageMs / kRippleLifetimeMs;
-      final rippleRadius = size.shortestSide * 0.20 * age01;
-      final alpha = (has ? 0.30 : 0.18) * math.sin(age01 * math.pi);
-      if (alpha <= 0 || rippleRadius <= 0) continue;
-      final center = Offset(
-        imp.position.dx * size.width,
-        imp.position.dy * size.height,
-      );
-      _ripplePaint
-        ..shader = null
-        ..blendMode = BlendMode.plus
-        ..color = palette.sweep.withValues(alpha: alpha)
-        ..strokeWidth = 1.5;
-      canvas.drawCircle(center, rippleRadius, _ripplePaint);
-    }
   }
 
   @override
   bool shouldRepaint(covariant _AurisHudPainter old) =>
       old.palette != palette ||
       old.hasPulse != hasPulse ||
-      old.signals != signals ||
-      old.clock != clock;
+      old.signals != signals;
 }
 
 // C0-continuous oscillation in -1..1 (cheap; no trig for the drift).

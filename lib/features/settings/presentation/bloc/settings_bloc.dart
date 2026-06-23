@@ -26,10 +26,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       (e, emit) =>
           _apply(emit, (s) => s.copyWith(isCompactMode: e.isCompactMode)),
     );
-    on<UpdateReduceVisualEffects>(
-      (e, emit) =>
-          _apply(emit, (s) => s.copyWith(reduceVisualEffects: e.value)),
-    );
     on<UpdateVerticalLayout>(
       (e, emit) =>
           _apply(emit, (s) => s.copyWith(isVerticalLayout: e.isVerticalLayout)),
@@ -133,9 +129,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     on<SetSkippedUpdateVersion>(
       (e, emit) =>
           _apply(emit, (s) => s.copyWith(skippedUpdateVersion: e.version)),
-    );
-    on<UpdateEnableThemeSounds>(
-      (e, emit) => _apply(emit, (s) => s.copyWith(enableThemeSounds: e.value)),
     );
   }
   final SaveSettingsUseCase _saveSettingsUseCase;

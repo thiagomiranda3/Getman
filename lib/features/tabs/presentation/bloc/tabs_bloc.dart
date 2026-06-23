@@ -12,7 +12,6 @@ import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/failures.dart';
 import 'package:getman/core/network/http_response.dart';
-import 'package:getman/core/theme/motion/theme_reaction.dart';
 import 'package:getman/core/utils/perf_trace.dart';
 import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';
 import 'package:getman/features/chaining/domain/logic/rules_runner.dart';
@@ -144,8 +143,6 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       tabs: tabs,
       activeIndex: idx < 0 ? 0 : idx,
       isLoading: isLoading ?? state.isLoading,
-      lastReaction: state.lastReaction,
-      reactionSeq: state.reactionSeq,
     );
   }
 
@@ -461,19 +458,6 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     await _persistPanel(updated);
   }
 
-  // Monotonic reaction counter. Bumped by _fireReaction so the
-  // ThemeReactionListener fires once per terminal/start event, even for two
-  // identical responses in a row.
-  int _reactionSeq = 0;
-
-  /// Emit a reaction-only state update on top of the latest tab state.
-  /// Tabs/panels are untouched (copyWith preserves them), so buildWhen-gated
-  /// tab widgets don't rebuild — only the reaction listener reacts.
-  void _fireReaction(Emitter<TabsState> emit, ThemeReaction reaction) {
-    _reactionSeq++;
-    emit(state.copyWith(lastReaction: reaction, reactionSeq: _reactionSeq));
-  }
-
   Future<void> _onSendRequest(
     SendRequest event,
     Emitter<TabsState> emit,
@@ -498,10 +482,6 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         state.activePanelId,
       ),
     );
-    _fireReaction(
-      emit,
-      const ThemeReaction(kind: ThemeReactionKind.sendStarted),
-    );
 
     try {
       final response = await _sendRequestUseCase(
@@ -521,24 +501,12 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         ),
       );
       _markResponseDirty(tabId);
-      _fireReaction(
-        emit,
-        ThemeReaction(
-          kind: ThemeReaction.kindForStatus(response.statusCode),
-          statusCode: response.statusCode,
-          durationMs: response.durationMs,
-        ),
-      );
       await _applyRules(emit, tabId, config, response);
     } on NetworkFailure catch (f) {
       _requests.finish(tabId);
 
       if (f.type == NetworkFailureType.cancelled) {
         _applyToTab(emit, tabId, (live) => live.copyWith(isSending: false));
-        _fireReaction(
-          emit,
-          const ThemeReaction(kind: ThemeReactionKind.cancelled),
-        );
         return;
       }
 
@@ -559,14 +527,6 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         ),
       );
       _markResponseDirty(tabId);
-      _fireReaction(
-        emit,
-        ThemeReaction(
-          kind: ThemeReaction.kindForStatus(errorResponse.statusCode),
-          statusCode: errorResponse.statusCode,
-          transportFailure: _transportFailureFor(f.type),
-        ),
-      );
       // Assertions are meaningful on error responses too
       // (e.g. "status in 2xx").
       await _applyRules(emit, tabId, config, errorResponse);
@@ -576,10 +536,6 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       _requests.finish(tabId);
       log('SendRequest failed unexpectedly: $e', name: 'TabsBloc');
       _applyToTab(emit, tabId, (live) => live.copyWith(isSending: false));
-      _fireReaction(
-        emit,
-        const ThemeReaction(kind: ThemeReactionKind.networkError),
-      );
     }
   }
 
@@ -857,19 +813,3 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     await _persistPanelMeta();
   }
 }
-
-/// Maps a transport-level [NetworkFailureType] to the theme-layer
-/// [TransportFailureKind]. Returns null for failures that carry (or imply) a
-/// real HTTP status / generic reach failure — those keep the plain
-/// networkError flavor. The motion spine never imports core/error, so this
-/// mapping lives here, at the integration point.
-TransportFailureKind? _transportFailureFor(NetworkFailureType t) => switch (t) {
-  NetworkFailureType.sendTimeout ||
-  NetworkFailureType.receiveTimeout ||
-  NetworkFailureType.connectionTimeout => TransportFailureKind.timeout,
-  NetworkFailureType.badCertificate => TransportFailureKind.badCertificate,
-  NetworkFailureType.connectionError ||
-  NetworkFailureType.badResponse ||
-  NetworkFailureType.cancelled ||
-  NetworkFailureType.unknown => null,
-};

@@ -53,11 +53,10 @@ class ResponseSection extends StatelessWidget {
         final tab = state.tabs.byId(tabId);
         if (tab == null) return const SizedBox.shrink();
 
-        if (tab.isSending) {
+        final response = tab.response;
+        if (tab.isSending && response == null) {
           return context.appComponents.pendingIndicator(context);
         }
-
-        final response = tab.response;
         if (response == null) {
           return Center(
             child: Column(

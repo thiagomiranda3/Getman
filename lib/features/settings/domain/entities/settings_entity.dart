@@ -11,7 +11,6 @@ class SettingsEntity extends Equatable {
     this.alwaysPrettifyLargeResponses = false,
     this.isDarkMode = false,
     this.isCompactMode = false,
-    this.reduceVisualEffects = false,
     this.isVerticalLayout = false,
     this.splitRatio = 0.5,
     this.sideMenuWidth = 300.0,
@@ -33,7 +32,6 @@ class SettingsEntity extends Equatable {
     this.saveLargeResponsesInHistory = true,
     this.checkForUpdatesOnStartup = true,
     this.skippedUpdateVersion,
-    this.enableThemeSounds = false,
   });
   final int historyLimit;
   final bool saveResponseInHistory;
@@ -54,10 +52,6 @@ class SettingsEntity extends Equatable {
   final bool alwaysPrettifyLargeResponses;
   final bool isDarkMode;
   final bool isCompactMode;
-
-  /// When `true`, themes drop expensive effects (backdrop blur, animated
-  /// backgrounds) for performance. Default `false` = full effects everywhere.
-  final bool reduceVisualEffects;
   final bool isVerticalLayout;
   final double splitRatio;
   final double sideMenuWidth;
@@ -102,17 +96,12 @@ class SettingsEntity extends Equatable {
   /// `null` = nothing skipped.
   final String? skippedUpdateVersion;
 
-  /// When `true`, themes play sound effects on send and response events.
-  /// Default `false` = silent (opt-in).
-  final bool enableThemeSounds;
-
   SettingsEntity copyWith({
     int? historyLimit,
     bool? saveResponseInHistory,
     bool? alwaysPrettifyLargeResponses,
     bool? isDarkMode,
     bool? isCompactMode,
-    bool? reduceVisualEffects,
     bool? isVerticalLayout,
     double? splitRatio,
     double? sideMenuWidth,
@@ -134,7 +123,6 @@ class SettingsEntity extends Equatable {
     bool? saveLargeResponsesInHistory,
     bool? checkForUpdatesOnStartup,
     Object? skippedUpdateVersion = _unchanged,
-    bool? enableThemeSounds,
   }) {
     return SettingsEntity(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -144,7 +132,6 @@ class SettingsEntity extends Equatable {
           alwaysPrettifyLargeResponses ?? this.alwaysPrettifyLargeResponses,
       isDarkMode: isDarkMode ?? this.isDarkMode,
       isCompactMode: isCompactMode ?? this.isCompactMode,
-      reduceVisualEffects: reduceVisualEffects ?? this.reduceVisualEffects,
       isVerticalLayout: isVerticalLayout ?? this.isVerticalLayout,
       splitRatio: splitRatio ?? this.splitRatio,
       sideMenuWidth: sideMenuWidth ?? this.sideMenuWidth,
@@ -184,7 +171,6 @@ class SettingsEntity extends Equatable {
       skippedUpdateVersion: identical(skippedUpdateVersion, _unchanged)
           ? this.skippedUpdateVersion
           : skippedUpdateVersion as String?,
-      enableThemeSounds: enableThemeSounds ?? this.enableThemeSounds,
     );
   }
 
@@ -209,7 +195,6 @@ class SettingsEntity extends Equatable {
     alwaysPrettifyLargeResponses,
     isDarkMode,
     isCompactMode,
-    reduceVisualEffects,
     isVerticalLayout,
     splitRatio,
     sideMenuWidth,
@@ -231,6 +216,5 @@ class SettingsEntity extends Equatable {
     saveLargeResponsesInHistory,
     checkForUpdatesOnStartup,
     skippedUpdateVersion,
-    enableThemeSounds,
   ];
 }

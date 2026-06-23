@@ -5,7 +5,7 @@ import 'package:getman/core/theme/themes/rpg/rpg_components.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_decorations.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_motion.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_palette.dart';
-import 'package:getman/core/theme/themes/rpg/rpg_sparkle.dart';
+import 'package:getman/core/theme/themes/shared/subtle_press.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// Arcane Quest — an RPG-flavoured theme with sparkle-on-tap, animated
@@ -127,10 +127,10 @@ ThemeData rpgTheme(
   final decoration = AppDecoration(
     panelBox: rpgPanelBox,
     tabShape: rpgTabShape,
-    wrapInteractive: ({required child, onTap, scaleDown}) => RpgSparkle(
+    wrapInteractive: ({required child, onTap, scaleDown}) => SubtlePress(
       onTap: onTap,
-      scaleDown: scaleDown ?? 0.96,
-      sparkle: !reduceEffects,
+      scaleDown: scaleDown,
+      animate: !reduceEffects,
       child: child,
     ),
     scaffoldBackground: reduceEffects

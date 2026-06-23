@@ -11,6 +11,7 @@ import 'package:getman/core/theme/themes/auris/auris_components.dart';
 import 'package:getman/core/theme/themes/auris/auris_decorations.dart';
 import 'package:getman/core/theme/themes/auris/auris_motion.dart';
 import 'package:getman/core/theme/themes/auris/auris_palette.dart';
+import 'package:getman/core/theme/themes/shared/subtle_press.dart';
 
 /// Builds [ThemeData] for the AURIS theme.
 ///
@@ -66,7 +67,7 @@ ThemeData aurisTheme(
     // primaryColor defaults dark, which the shared default indicator can't fix.
     brandedTabIndicator: aurisBrandedTabIndicator,
     // Auris press: scale-down on tap-down; identity under reduceEffects.
-    wrapInteractive: ({required child, onTap, scaleDown}) => AurisPress(
+    wrapInteractive: ({required child, onTap, scaleDown}) => SubtlePress(
       onTap: onTap,
       scaleDown: scaleDown,
       animate: !reduceEffects,

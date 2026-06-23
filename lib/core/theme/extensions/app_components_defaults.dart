@@ -554,6 +554,7 @@ class _DefaultPendingIndicator extends StatelessWidget {
     final shimmerFill = theme.colorScheme.onSurface.withValues(alpha: 0.08);
 
     return Semantics(
+      key: const ValueKey('response_pending_indicator'),
       label: label ?? 'Loading response',
       liveRegion: true,
       child: Shimmer.fromColors(

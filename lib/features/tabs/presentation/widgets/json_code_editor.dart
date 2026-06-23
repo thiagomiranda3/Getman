@@ -133,9 +133,14 @@ class JsonCodeEditor extends StatelessWidget {
           fontSize: context.appLayout.fontSizeCode,
           fontFamily: context.appTypography.codeFontFamily,
           backgroundColor: context.appPalette.codeBackground,
-          cursorColor: theme.primaryColor,
-          selectionColor: theme.primaryColor.withValues(alpha: 0.3),
-          cursorLineColor: theme.primaryColor.withValues(
+          // Use the colorScheme accent, not the legacy `primaryColor`: in a
+          // dark theme that never sets `primaryColor` explicitly (the AURIS
+          // kit) it defaults to a dark surface, so the cursor vanishes against
+          // the dark code background. `colorScheme.primary` is the real brand
+          // accent and equals `primaryColor` in every other theme.
+          cursorColor: theme.colorScheme.primary,
+          selectionColor: theme.colorScheme.primary.withValues(alpha: 0.3),
+          cursorLineColor: theme.colorScheme.primary.withValues(
             alpha: readOnly ? 0.2 : 0.1,
           ),
         ),

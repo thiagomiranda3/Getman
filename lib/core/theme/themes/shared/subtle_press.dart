@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
-/// Subtle press feedback for CLASSIC: a quick opacity dim plus an optional tiny
-/// scale on tap — no bounce. When [animate] is false (reduceEffects) it is a
-/// plain tap target with no animation.
-class ClassicPress extends StatefulWidget {
-  const ClassicPress({
+/// Subtle, theme-agnostic press feedback: a quick opacity dim + tiny scale
+/// on tap.
+///
+/// When [animate] is false (e.g. reduceEffects is on) it is a plain
+/// [GestureDetector] with no animation. All themes share this widget as their
+/// `AppDecoration.wrapInteractive` implementation.
+class SubtlePress extends StatefulWidget {
+  const SubtlePress({
     required this.child,
     super.key,
     this.onTap,
@@ -18,10 +21,10 @@ class ClassicPress extends StatefulWidget {
   final bool animate;
 
   @override
-  State<ClassicPress> createState() => _ClassicPressState();
+  State<SubtlePress> createState() => _SubtlePressState();
 }
 
-class _ClassicPressState extends State<ClassicPress> {
+class _SubtlePressState extends State<SubtlePress> {
   bool _pressed = false;
 
   @override

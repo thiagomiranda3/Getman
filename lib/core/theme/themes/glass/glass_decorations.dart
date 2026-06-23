@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/gestures.dart';
@@ -155,20 +154,9 @@ Decoration glassBrandedTabIndicator(
   ),
 );
 
-/// How long a click impulse stays alive before the widget prunes it.
-const Duration _kImpulseLifetime = Duration(milliseconds: 1400);
-
-/// @visibleForTesting impulse counter — updated by the `_GlassWallpaperState`
-/// on each `_addImpulse` call; read by tests to assert click registration
-/// without accessing the private State class. Reset to 0 between tests.
-@visibleForTesting
-int debugGlassImpulseCount = 0;
-
-/// @visibleForTesting C2 sentinels — last activity/idle values read by the
-/// painter's paint() on the most recent frame. 0.0 when no pulse is plumbed
+/// @visibleForTesting C2 sentinel — last idle value read by the painter's
+/// paint() on the most recent frame. 0.0 when no pulse is plumbed
 /// (static / no-provider path). Read by rhythm tests to confirm C2 wiring.
-@visibleForTesting
-double debugGlassLastActivityLevel = 0;
 @visibleForTesting
 double debugGlassLastIdleFactor = 0;
 
@@ -212,14 +200,6 @@ class _GlassWallpaperState extends State<GlassWallpaper>
     const Offset(0.5, 0.35),
   );
 
-  // Active click impulse seeds (VM-C1). Appended on pointer-down, pruned by
-  // age. Only populated in animated mode.
-  final ValueNotifier<List<AmbientImpulse>> _impulses =
-      ValueNotifier<List<AmbientImpulse>>(const []);
-
-  // Widget-owned monotonic clock for impulse ageing.
-  final Stopwatch _clock = Stopwatch();
-
   // Resolved from the provider once dependencies are available; null when no
   // provider is registered (e.g. standalone tests).
   WorkspacePulseController? _pulse;
@@ -236,7 +216,6 @@ class _GlassWallpaperState extends State<GlassWallpaper>
       duration: const Duration(seconds: 40),
     );
     if (widget.animate) {
-      _clock.start();
       WidgetsBinding.instance.addObserver(this);
       unawaited(_controller.repeat());
     }
@@ -258,13 +237,9 @@ class _GlassWallpaperState extends State<GlassWallpaper>
     super.didUpdateWidget(old);
     if (old.animate == widget.animate) return;
     if (widget.animate) {
-      _clock.start();
       WidgetsBinding.instance.addObserver(this);
       unawaited(_controller.repeat());
     } else {
-      _clock
-        ..stop()
-        ..reset();
       WidgetsBinding.instance.removeObserver(this);
       _controller.stop();
     }
@@ -285,7 +260,6 @@ class _GlassWallpaperState extends State<GlassWallpaper>
     if (widget.animate) WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     _pointer.dispose();
-    _impulses.dispose();
     _ownedIdlePulse?.dispose();
     super.dispose();
   }
@@ -294,21 +268,6 @@ class _GlassWallpaperState extends State<GlassWallpaper>
   /// when present, otherwise an inert idle stand-in we own. Built once.
   WorkspacePulseController get _effectivePulse =>
       _pulse ?? (_ownedIdlePulse ??= WorkspacePulseController());
-
-  void _addImpulse(Offset normalized) {
-    final nowMs = _clock.elapsedMilliseconds;
-    final cutoff = nowMs - _kImpulseLifetime.inMilliseconds;
-    // Prune aged entries while appending the fresh one (bounded list).
-    final next = <AmbientImpulse>[
-      for (final imp in _impulses.value)
-        if (imp.bornAtMs >= cutoff) imp,
-      AmbientImpulse(position: normalized, bornAtMs: nowMs),
-    ];
-    _impulses.value = next;
-    debugGlassImpulseCount = next.length;
-    // Clicking is activity — keep the session pulse awake (no-op if null).
-    _pulse?.touch();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -327,7 +286,6 @@ class _GlassWallpaperState extends State<GlassWallpaper>
     final signals = widget.animate
         ? AmbientSignals(
             pointer: _pointer,
-            impulses: _impulses,
             pulse: _effectivePulse,
             isDark: isDark,
           )
@@ -344,7 +302,6 @@ class _GlassWallpaperState extends State<GlassWallpaper>
                 blobs: blobs,
                 signals: signals,
                 hasPulse: _pulse != null,
-                clock: widget.animate ? _clock : null,
               ),
             ),
           ),
@@ -358,19 +315,12 @@ class _GlassWallpaperState extends State<GlassWallpaper>
     if (!widget.animate) return stack;
     return Listener(
       onPointerDown: (e) {
-        // Desktop/web only — touch events don't produce ambient ripples.
+        // Keep the pulse awake on pointer-down (touch() is activity).
         if (e.kind != PointerDeviceKind.mouse &&
             e.kind != PointerDeviceKind.stylus) {
           return;
         }
-        final size = context.size;
-        if (size == null || size.isEmpty) return;
-        _addImpulse(
-          Offset(
-            (e.localPosition.dx / size.width).clamp(0.0, 1.0),
-            (e.localPosition.dy / size.height).clamp(0.0, 1.0),
-          ),
-        );
+        _pulse?.touch();
       },
       child: MouseRegion(
         onHover: (e) {
@@ -405,19 +355,15 @@ class _GlassMeshPainter extends CustomPainter {
     required this.blobs,
     this.signals,
     this.hasPulse = false,
-    this.clock,
   }) : super(repaint: _repaintFor(t, signals, hasPulse));
 
   final Animation<double> t;
   final Color base;
   final List<Color> blobs;
 
-  /// Non-null only in animated mode; drives sheen + ripples.
+  /// Non-null only in animated mode; drives sheen + parallax.
   final AmbientSignals? signals;
   final bool hasPulse;
-
-  /// Monotonic clock for impulse age computation; null in static mode.
-  final Stopwatch? clock;
 
   // Reused across blobs/frames — only `.shader`/`.color` changes per draw.
   final Paint _paint = Paint();
@@ -429,9 +375,6 @@ class _GlassMeshPainter extends CustomPainter {
   // avoid_hardcoded_brand_colors).
   final Paint _sheenPaint = Paint()..blendMode = BlendMode.plus;
 
-  // Reused stroke paint for glass ripples (C1).
-  final Paint _ripplePaint = Paint()..style = PaintingStyle.stroke;
-
   static Listenable _repaintFor(
     Animation<double> t,
     AmbientSignals? signals,
@@ -441,7 +384,6 @@ class _GlassMeshPainter extends CustomPainter {
     return Listenable.merge([
       t,
       signals.pointer,
-      signals.impulses,
       if (hasPulse) signals.pulse,
     ]);
   }
@@ -451,13 +393,10 @@ class _GlassMeshPainter extends CustomPainter {
     final v = t.value;
     final rect = Offset.zero & size;
 
-    // C2 session rhythm: read pulse values defensively (null-safe).
-    // activityLevel (0..1) → intensify blob opacity when busy.
+    // C2 session rhythm: read idle factor defensively (null-safe).
     // idleFactor (0..1) → dim and calm the mesh when idle.
-    final activityLevel = signals?.pulse.activityLevel ?? 0.0;
     final idleFactor = signals?.pulse.idleFactor ?? 0.0;
-    // Write sentinels for tests.
-    debugGlassLastActivityLevel = activityLevel;
+    // Write sentinel for tests.
     debugGlassLastIdleFactor = idleFactor;
 
     // Base fill (clear any shader left from the previous frame's last blob).
@@ -490,14 +429,13 @@ class _GlassMeshPainter extends CustomPainter {
         0.95 - 0.1 * _wave(v + 0.2) + ptrAlign.y,
       ),
     ];
-    // C2: activity intensifies blob opacity; idle dims it.
-    // Base blob alpha 0.55; boost up to 0.72 on full activity, down to 0.33 on
-    // full idle. Multipliers are cheap arithmetic — no per-frame alloc.
-    final blobAlpha =
-        (0.55 * (1 + 0.31 * activityLevel) * (1 - 0.4 * idleFactor)).clamp(
-          0.0,
-          1.0,
-        );
+    // C2: idle dims blob opacity.
+    // Base blob alpha 0.55; down to 0.33 on full idle.
+    // Multiplier is cheap arithmetic — no per-frame alloc.
+    final blobAlpha = (0.55 * (1 - 0.4 * idleFactor)).clamp(
+      0.0,
+      1.0,
+    );
     for (var i = 0; i < blobs.length; i++) {
       final blobRect = Rect.fromCircle(
         center: centers[i].alongSize(size),
@@ -518,13 +456,12 @@ class _GlassMeshPainter extends CustomPainter {
     // C2: dim the sheen when idle; intensify slightly when active.
     if (ptr != null) {
       final center = Offset(ptr.dx * size.width, ptr.dy * size.height);
-      // C2: sheen alpha dims on idle (0.06 → 0.03), brightens on activity
-      // (0.06 → 0.10). Cheap multiplier — no per-frame alloc.
-      final sheenAlpha =
-          (0.06 * (1 + 0.67 * activityLevel) * (1 - 0.5 * idleFactor)).clamp(
-            0.0,
-            1.0,
-          );
+      // C2: sheen alpha dims on idle (0.06 → 0.03). Cheap multiplier — no
+      // per-frame alloc.
+      final sheenAlpha = (0.06 * (1 - 0.5 * idleFactor)).clamp(
+        0.0,
+        1.0,
+      );
       _sheenPaint.shader =
           RadialGradient(
             colors: [
@@ -538,30 +475,6 @@ class _GlassMeshPainter extends CustomPainter {
           );
       canvas.drawRect(rect, _sheenPaint);
     }
-
-    // C1 click ripple: an expanding translucent ring per impulse. Glass variant
-    // uses BlendMode.plus so it brightens the mesh — the "liquid" look.
-    final nowMs = clock?.elapsedMilliseconds ?? 0;
-    const kRippleLifetimeMs = 1400;
-    for (final imp in signals?.impulses.value ?? const <AmbientImpulse>[]) {
-      final ageMs = nowMs - imp.bornAtMs;
-      if (ageMs < 0 || ageMs > kRippleLifetimeMs) continue;
-      final age01 = ageMs / kRippleLifetimeMs;
-      final rippleRadius = size.shortestSide * 0.25 * age01;
-      final alpha = 0.22 * math.sin(age01 * math.pi);
-      if (alpha <= 0 || rippleRadius <= 0) continue;
-      final center = Offset(
-        imp.position.dx * size.width,
-        imp.position.dy * size.height,
-      );
-      // Colors.white is allowed in lib/core/theme (exempt from lint).
-      _ripplePaint
-        ..shader = null
-        ..blendMode = BlendMode.plus
-        ..color = Colors.white.withValues(alpha: alpha)
-        ..strokeWidth = 2.0;
-      canvas.drawCircle(center, rippleRadius, _ripplePaint);
-    }
   }
 
   @override
@@ -569,8 +482,7 @@ class _GlassMeshPainter extends CustomPainter {
       old.base != base ||
       old.blobs != blobs ||
       old.signals != signals ||
-      old.hasPulse != hasPulse ||
-      old.clock != clock;
+      old.hasPulse != hasPulse;
 }
 
 // C0-continuous oscillation in -1..1 (no dart:math import in the hot path).

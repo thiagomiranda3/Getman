@@ -20,28 +20,6 @@ void main() {
       ),
     );
     expect(
-      identical(m.inFlightFrame(ctx, child: marker, isSending: true), marker),
-      isTrue,
-    );
-    expect(
-      identical(
-        m.contentTransition(ctx, child: marker, transitionKey: 'a'),
-        marker,
-      ),
-      isTrue,
-    );
-    expect(
-      identical(
-        m.tabChipTransition(
-          ctx,
-          child: marker,
-          animation: const AlwaysStoppedAnimation<double>(1),
-        ),
-        marker,
-      ),
-      isTrue,
-    );
-    expect(
       identical(m.treeDragFeedback(ctx, child: marker), marker),
       isTrue,
     );
@@ -62,12 +40,14 @@ void main() {
     Widget custom(
       BuildContext c, {
       required Widget child,
-      required bool isSending,
     }) => const SizedBox(key: ValueKey('custom'));
     const base = AppMotion();
-    final copy = base.copyWith(inFlightFrame: custom);
-    expect(identical(copy.inFlightFrame, custom), isTrue);
-    expect(identical(copy.reactionOverlay, base.reactionOverlay), isTrue);
-    expect(identical(copy.contentTransition, base.contentTransition), isTrue);
+    final copy = base.copyWith(treeDragFeedback: custom);
+    expect(identical(copy.treeDragFeedback, custom), isTrue);
+    expect(
+      identical(copy.treeExpandFlourish, base.treeExpandFlourish),
+      isTrue,
+    );
+    expect(identical(copy.treeDropHighlight, base.treeDropHighlight), isTrue);
   });
 }

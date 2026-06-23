@@ -23,7 +23,6 @@ import 'package:getman/features/home/presentation/widgets/side_menu.dart';
 import 'package:getman/features/home/presentation/widgets/tab_chip.dart';
 import 'package:getman/features/home/presentation/widgets/tab_content_stack.dart';
 import 'package:getman/features/home/presentation/widgets/tab_widget.dart';
-import 'package:getman/features/home/presentation/widgets/theme_reaction_listener.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
@@ -350,34 +349,32 @@ class _MainScreenState extends State<MainScreen> {
               },
               child: Focus(
                 focusNode: _mainFocusNode,
-                child: ThemeReactionListener(
-                  child: ChainingWriteBackListener(
-                    child: Scaffold(
-                      drawer: context.useDrawerNav
-                          ? const Drawer(child: SideMenu())
-                          : null,
-                      body: Stack(
-                        children: [
-                          if (context.useDrawerNav)
-                            _buildDrawerShell(
-                              context,
-                              theme,
-                              tabsState,
-                              activeIndex,
-                              tabs,
-                            )
-                          else
-                            _buildSplitShell(
-                              context,
-                              theme,
-                              tabsState,
-                              activeIndex,
-                              tabs,
-                              currentSideMenuWidth,
-                            ),
-                          const UpdateGate(),
-                        ],
-                      ),
+                child: ChainingWriteBackListener(
+                  child: Scaffold(
+                    drawer: context.useDrawerNav
+                        ? const Drawer(child: SideMenu())
+                        : null,
+                    body: Stack(
+                      children: [
+                        if (context.useDrawerNav)
+                          _buildDrawerShell(
+                            context,
+                            theme,
+                            tabsState,
+                            activeIndex,
+                            tabs,
+                          )
+                        else
+                          _buildSplitShell(
+                            context,
+                            theme,
+                            tabsState,
+                            activeIndex,
+                            tabs,
+                            currentSideMenuWidth,
+                          ),
+                        const UpdateGate(),
+                      ],
                     ),
                   ),
                 ),
@@ -541,6 +538,9 @@ class _MainScreenState extends State<MainScreen> {
                     child: Scrollbar(
                       controller: _tabScrollController,
                       thumbVisibility: true,
+                      // Pin the horizontal scrollbar to the bottom edge of the
+                      // tab strip so it never paints over the top of the tabs.
+                      scrollbarOrientation: ScrollbarOrientation.bottom,
                       thickness: 4,
                       radius: const Radius.circular(2),
                       child: ReorderableListView.builder(
@@ -591,41 +591,13 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-/// Plays the theme's [AppMotion.tabChipTransition] entrance animation the
-/// first time a tab chip is inserted into the strip. A 0→1 controller fires
-/// on first mount; the theme's closure drives fade/scale/size widgets.
-/// Calm themes and reduceEffects receive the identity closure (no animation).
-///
-/// The [key] MUST be the chip's [ValueKey] so [ReorderableListView] preserves
-/// per-tab identity; moving the key here (rather than on the inner TabWidget)
-/// is required — [ReorderableListView] requires every direct child to have a
-/// key.
-class _ChipEntrance extends StatefulWidget {
+/// Keyed pass-through for a tab chip. The [key] MUST be the chip's [ValueKey]
+/// so [ReorderableListView] preserves per-tab identity (its direct children
+/// need keys).
+class _ChipEntrance extends StatelessWidget {
   const _ChipEntrance({required this.child, super.key});
-
   final Widget child;
 
   @override
-  State<_ChipEntrance> createState() => _ChipEntranceState();
-}
-
-class _ChipEntranceState extends State<_ChipEntrance>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 220),
-  )..forward();
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => context.appMotion.tabChipTransition(
-    context,
-    animation: _c,
-    child: widget.child,
-  );
+  Widget build(BuildContext context) => child;
 }

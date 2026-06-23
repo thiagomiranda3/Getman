@@ -5,6 +5,36 @@ All notable changes to **Getman** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-06-23
+
+### Added
+
+- **Variable autocomplete & highlighting in more places** — type `{{` to get
+  `{{var}}` suggestions, and see resolved/unresolved tokens colored live, in the
+  request **body** (including the GraphQL VARIABLES pane), **auth** fields, and
+  **form-data** values — matching the existing URL, params, and headers
+  behavior.
+
+### Changed
+
+- **Calmer theme motion** — the animated effects have been toned down
+  considerably: button presses are now a single subtle effect, and the per-send
+  "ritual", the in-flight panel frame, status-code reactions, request/tab
+  open-close transitions, and per-click background ripples have been removed.
+  The gentle ambient drift, parallax, and idle breathing are kept.
+- **The previous response now stays visible while a request re-sends**, instead
+  of clearing to a loading state.
+
+### Removed
+
+- **THEME SOUNDS** and **REDUCE VISUAL EFFECTS** settings toggles (and the
+  underlying audio subsystem) — the toned-down motion no longer needs them.
+
+### Fixed
+
+- Assorted UI fixes; the code-editor caret and selection now use the theme
+  accent color so they stay visible on dark themes such as AURIS.
+
 ## [1.4.1] - 2026-06-19
 
 ### Fixed

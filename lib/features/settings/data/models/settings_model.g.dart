@@ -24,7 +24,6 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
           : fields[17] as bool,
       isDarkMode: fields[2] == null ? false : fields[2] as bool,
       isCompactMode: fields[3] == null ? false : fields[3] as bool,
-      reduceVisualEffects: fields[22] == null ? false : fields[22] as bool,
       isVerticalLayout: fields[4] == null ? false : fields[4] as bool,
       splitRatio: fields[5] == null ? 0.5 : (fields[5] as num).toDouble(),
       sideMenuWidth: fields[6] == null ? 300.0 : (fields[6] as num).toDouble(),
@@ -52,14 +51,13 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
           : fields[24] as bool,
       checkForUpdatesOnStartup: fields[25] == null ? true : fields[25] as bool,
       skippedUpdateVersion: fields[26] as String?,
-      enableThemeSounds: fields[27] == null ? false : fields[27] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, SettingsModel obj) {
     writer
-      ..writeByte(28)
+      ..writeByte(26)
       ..writeByte(0)
       ..write(obj.historyLimit)
       ..writeByte(1)
@@ -104,8 +102,6 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       ..write(obj.clientKeyPath)
       ..writeByte(21)
       ..write(obj.clientCertPassphrase)
-      ..writeByte(22)
-      ..write(obj.reduceVisualEffects)
       ..writeByte(23)
       ..write(obj.responseHistoryLimit)
       ..writeByte(24)
@@ -113,9 +109,7 @@ class SettingsModelAdapter extends TypeAdapter<SettingsModel> {
       ..writeByte(25)
       ..write(obj.checkForUpdatesOnStartup)
       ..writeByte(26)
-      ..write(obj.skippedUpdateVersion)
-      ..writeByte(27)
-      ..write(obj.enableThemeSounds);
+      ..write(obj.skippedUpdateVersion);
   }
 
   @override

@@ -311,9 +311,9 @@ class _RequestViewState extends State<RequestView> {
     );
   }
 
-  /// The request/response split, wrapped in the loud-theme in-flight motion
-  /// frame. Extracted to a method so the body pane's variable-context nesting
-  /// doesn't push this block past the line-length limit.
+  /// The request/response split. Extracted to a method so the body pane's
+  /// variable-context nesting doesn't push this block past the line-length
+  /// limit.
   Widget _splitPanes(
     BuildContext context, {
     required double splitRatio,
@@ -322,30 +322,20 @@ class _RequestViewState extends State<RequestView> {
     required Widget responsePane,
     required Widget splitter,
   }) {
-    return BlocSelector<TabsBloc, TabsState, bool>(
-      selector: (state) => state.tabs.byId(widget.tabId)?.isSending ?? false,
-      builder: (context, isSending) => context.appMotion.inFlightFrame(
-        context,
-        isSending: isSending,
-        child: ValueListenableBuilder<double?>(
-          valueListenable: _localSplitRatio,
-          builder: (context, local, _) {
-            final currentRatio = local ?? splitRatio;
-            return Flex(
-              direction: isVertical ? Axis.vertical : Axis.horizontal,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Flexible(flex: _ratioToFlex(currentRatio), child: requestPane),
-                splitter,
-                Flexible(
-                  flex: _ratioToFlex(1 - currentRatio),
-                  child: responsePane,
-                ),
-              ],
-            );
-          },
-        ),
-      ),
+    return ValueListenableBuilder<double?>(
+      valueListenable: _localSplitRatio,
+      builder: (context, local, _) {
+        final currentRatio = local ?? splitRatio;
+        return Flex(
+          direction: isVertical ? Axis.vertical : Axis.horizontal,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Flexible(flex: _ratioToFlex(currentRatio), child: requestPane),
+            splitter,
+            Flexible(flex: _ratioToFlex(1 - currentRatio), child: responsePane),
+          ],
+        );
+      },
     );
   }
 
