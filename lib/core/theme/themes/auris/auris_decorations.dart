@@ -131,7 +131,7 @@ BoxDecoration aurisBrandedTabIndicator(
 // The animated ambient (scanning HUD grid + radar sweep + drifting telemetry
 // ticks) lives in `auris_ambient.dart` (`aurisScaffoldBackgroundAnimated` /
 // `aurisStaticScaffoldBackground`). It was moved out of this file in Task 12 so
-// the ambient could plumb `AmbientSignals` (pointer + click impulses + session
+// the ambient could plumb `AmbientSignals` (pointer + session
 // pulse) ONCE as the C1/C2 foundation; the prior scanline+hex wallpaper that
 // lived here had no AmbientSignals wiring. `auris_theme.dart` imports the new
 // file directly.

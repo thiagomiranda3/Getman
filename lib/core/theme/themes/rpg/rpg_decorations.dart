@@ -94,13 +94,9 @@ BoxDecoration rpgTabShape(
   );
 }
 
-/// How long a click impulse stays alive before the widget prunes it.
-const Duration _kImpulseLifetime = Duration(milliseconds: 1400);
-
-/// @visibleForTesting impulse counter — updated by the
-/// `_RpgAnimatedBackgroundState` on each `_addImpulse` call; read by tests
-/// to assert click registration without accessing the private State class.
-/// Reset to 0 between tests.
+/// @visibleForTesting impulse counter — kept at 0 permanently (click ripple
+/// removed in Task 3). Used by tests to assert that no ripple is seeded.
+/// Reset to 0 between tests if needed (no-op: never mutated).
 @visibleForTesting
 int debugRpgImpulseCount = 0;
 
@@ -167,15 +163,6 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
   // Parallax pointer: convention is -1..1 from centre (existing starfield).
   final ValueNotifier<Offset> _pointer = ValueNotifier<Offset>(Offset.zero);
 
-  // Active click impulse seeds (VM-C1). Appended on pointer-down, pruned by
-  // age. Impulse positions are stored as 0..1 (separate from the -1..1
-  // parallax pointer).
-  final ValueNotifier<List<AmbientImpulse>> _impulses =
-      ValueNotifier<List<AmbientImpulse>>(const []);
-
-  // Widget-owned monotonic clock for impulse ageing.
-  final Stopwatch _clock = Stopwatch();
-
   // Resolved from the provider once dependencies are available; null when no
   // provider is registered (e.g. standalone tests).
   WorkspacePulseController? _pulse;
@@ -188,7 +175,6 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _clock.start();
     _frameNotifier = ValueNotifier<double>(0);
     _controller = AnimationController(
       vsync: this,
@@ -242,7 +228,6 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
     _controller.dispose();
     _frameNotifier.dispose();
     _pointer.dispose();
-    _impulses.dispose();
     _ownedIdlePulse?.dispose();
     super.dispose();
   }
@@ -252,21 +237,6 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
   WorkspacePulseController get _effectivePulse =>
       _pulse ?? (_ownedIdlePulse ??= WorkspacePulseController());
 
-  void _addImpulse(Offset normalized) {
-    final nowMs = _clock.elapsedMilliseconds;
-    final cutoff = nowMs - _kImpulseLifetime.inMilliseconds;
-    // Prune aged entries while appending the fresh one (bounded list).
-    final next = <AmbientImpulse>[
-      for (final imp in _impulses.value)
-        if (imp.bornAtMs >= cutoff) imp,
-      AmbientImpulse(position: normalized, bornAtMs: nowMs),
-    ];
-    _impulses.value = next;
-    debugRpgImpulseCount = next.length;
-    // Clicking is activity — keep the session pulse awake (no-op if null).
-    _pulse?.touch();
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -274,7 +244,6 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
 
     final signals = AmbientSignals(
       pointer: _pointer,
-      impulses: _impulses,
       pulse: _effectivePulse,
       isDark: isDark,
     );
@@ -309,7 +278,6 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
                   isDark: isDark,
                   signals: signals,
                   hasPulse: _pulse != null,
-                  clock: _clock,
                 ),
               ),
             ),
@@ -320,19 +288,12 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
 
     return Listener(
       onPointerDown: (e) {
-        // Desktop/web only — touch events don't produce ambient ripples.
+        // Keep the pulse awake on pointer-down (touch() is activity).
         if (e.kind != PointerDeviceKind.mouse &&
             e.kind != PointerDeviceKind.stylus) {
           return;
         }
-        final size = context.size;
-        if (size == null || size.isEmpty) return;
-        _addImpulse(
-          Offset(
-            (e.localPosition.dx / size.width).clamp(0.0, 1.0),
-            (e.localPosition.dy / size.height).clamp(0.0, 1.0),
-          ),
-        );
+        _pulse?.touch();
       },
       child: MouseRegion(
         onHover: (e) {
@@ -398,7 +359,6 @@ class _StarfieldPainter extends CustomPainter {
     required this.isDark,
     required this.signals,
     required this.hasPulse,
-    this.clock,
   }) : super(repaint: _repaintFor(tListenable, signals, hasPulse));
 
   final ValueListenable<double> tListenable;
@@ -409,9 +369,6 @@ class _StarfieldPainter extends CustomPainter {
   final AmbientSignals? signals;
   final bool hasPulse;
 
-  /// Monotonic clock for impulse age computation.
-  final Stopwatch? clock;
-
   // Reused across motes/frames — only `.color` changes per draw (the immutable
   // blur MaskFilter is set once). Allocating per mote per frame was the hot
   // spot.
@@ -420,8 +377,6 @@ class _StarfieldPainter extends CustomPainter {
   final Paint _corePaint = Paint();
   final Paint _constellationPaint = Paint()..strokeWidth = 0.5;
   final Paint _shootPaint = Paint()..strokeCap = StrokeCap.round;
-  // Reused stroke paint for shockwave ripples (C1).
-  final Paint _ripplePaint = Paint()..style = PaintingStyle.stroke;
 
   static Listenable _repaintFor(
     ValueListenable<double> t,
@@ -432,7 +387,6 @@ class _StarfieldPainter extends CustomPainter {
     return Listenable.merge([
       t,
       signals.pointer,
-      signals.impulses,
       if (hasPulse) signals.pulse,
     ]);
   }
@@ -602,28 +556,6 @@ class _StarfieldPainter extends CustomPainter {
         canvas.drawCircle(seg.head, 1.8, _corePaint);
       }
     }
-
-    // C1 click shockwave: expanding gold ring per impulse.
-    final nowMs = clock?.elapsedMilliseconds ?? 0;
-    const kRippleLifetimeMs = 1400;
-    for (final imp in signals?.impulses.value ?? const <AmbientImpulse>[]) {
-      final ageMs = nowMs - imp.bornAtMs;
-      if (ageMs < 0 || ageMs > kRippleLifetimeMs) continue;
-      final age01 = ageMs / kRippleLifetimeMs;
-      final rippleRadius = size.shortestSide * 0.22 * age01;
-      final alpha = 0.35 * math.sin(age01 * math.pi);
-      if (alpha <= 0 || rippleRadius <= 0) continue;
-      final center = Offset(
-        imp.position.dx * size.width,
-        imp.position.dy * size.height,
-      );
-      _ripplePaint
-        ..shader = null
-        ..blendMode = BlendMode.srcOver
-        ..color = RpgPalette.gold.withValues(alpha: alpha)
-        ..strokeWidth = 1.5;
-      canvas.drawCircle(center, rippleRadius, _ripplePaint);
-    }
   }
 
   Color _colorFor(double h) {
@@ -638,6 +570,5 @@ class _StarfieldPainter extends CustomPainter {
       old.motes != motes ||
       old.isDark != isDark ||
       old.signals != signals ||
-      old.hasPulse != hasPulse ||
-      old.clock != clock;
+      old.hasPulse != hasPulse;
 }

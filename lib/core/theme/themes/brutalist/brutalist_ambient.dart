@@ -8,12 +8,9 @@ import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_palette.dart';
 import 'package:provider/provider.dart';
 
-/// How long a click impulse stays alive before the widget prunes it.
-const Duration _kImpulseLifetime = Duration(milliseconds: 1400);
-
-/// @visibleForTesting impulse counter — updated by the `_BrutalistAmbientState`
-/// on each `_addImpulse` call; read by tests to assert click registration
-/// without accessing the private State class. Reset to 0 between tests.
+/// @visibleForTesting impulse counter — kept at 0 permanently (click ripple
+/// removed in Task 3). Used by tests to assert that no ripple is seeded.
+/// Reset to 0 between tests if needed (no-op: never mutated).
 @visibleForTesting
 int debugBrutalistImpulseCount = 0;
 
@@ -26,8 +23,8 @@ double debugBrutalistLastIdleFactor = 0;
 
 /// Full-effects Brutalist wallpaper: a slowly drifting risograph/halftone dot
 /// grid with a faint accent registration "ghost" offset. This is the C1/C2
-/// foundation — [AmbientSignals] (pointer + click impulses + session pulse) is
-/// plumbed through the painter now so Tasks 13/14 only touch `paint()` logic.
+/// foundation — [AmbientSignals] (pointer + session pulse) is plumbed through
+/// the painter so parallax and rhythm-dimming remain live.
 Widget brutalistScaffoldBackgroundAnimated(
   BuildContext context, {
   required Widget child,
@@ -42,10 +39,10 @@ Widget brutalistStaticScaffoldBackground(
 
 /// Risograph halftone dot-grid wallpaper behind the whole app. When [animate]
 /// is true a slow 48 s controller drifts the grid and a faint accent ghost; the
-/// widget owns the [AmbientSignals] (normalized 0..1 pointer, click impulses,
-/// and a null-safe [WorkspacePulseController]) and threads them into
-/// [_HalftonePainter] ONCE. When [animate] is false it renders one static frame
-/// (no controller, no pointer, no signals).
+/// widget owns the [AmbientSignals] (normalized 0..1 pointer and a null-safe
+/// [WorkspacePulseController]) and threads them into [_HalftonePainter] ONCE.
+/// When [animate] is false it renders one static frame (no controller, no
+/// pointer, no signals).
 class _BrutalistAmbient extends StatefulWidget {
   const _BrutalistAmbient({required this.child, required this.animate});
   final Widget child;
@@ -69,15 +66,6 @@ class _BrutalistAmbientState extends State<_BrutalistAmbient>
     const Offset(0.5, 0.5),
   );
 
-  // Active click ripple seeds (VM-C1). Appended on pointer-down, pruned by age.
-  // Only populated in animated mode.
-  final ValueNotifier<List<AmbientImpulse>> _impulses =
-      ValueNotifier<List<AmbientImpulse>>(const []);
-
-  // Widget-owned monotonic clock for impulse ageing (matches AmbientImpulse's
-  // contract — a single source so born/now are comparable).
-  final Stopwatch _clock = Stopwatch();
-
   // Null-safe in animated mode: read from the provider once dependencies are
   // available; null when no provider is registered (e.g. standalone tests).
   WorkspacePulseController? _pulse;
@@ -95,7 +83,6 @@ class _BrutalistAmbientState extends State<_BrutalistAmbient>
       duration: const Duration(seconds: 48),
     );
     if (widget.animate) {
-      _clock.start();
       WidgetsBinding.instance.addObserver(this);
       unawaited(_controller.repeat());
     }
@@ -125,13 +112,9 @@ class _BrutalistAmbientState extends State<_BrutalistAmbient>
     super.didUpdateWidget(old);
     if (old.animate == widget.animate) return;
     if (widget.animate) {
-      _clock.start();
       WidgetsBinding.instance.addObserver(this);
       unawaited(_controller.repeat());
     } else {
-      _clock
-        ..stop()
-        ..reset();
       WidgetsBinding.instance.removeObserver(this);
       _controller.stop();
     }
@@ -152,7 +135,6 @@ class _BrutalistAmbientState extends State<_BrutalistAmbient>
     if (widget.animate) WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     _pointer.dispose();
-    _impulses.dispose();
     // Only dispose the fallback we created; the provider's controller is owned
     // by the DI/provider layer, never by us.
     _ownedIdlePulse?.dispose();
@@ -164,21 +146,6 @@ class _BrutalistAmbientState extends State<_BrutalistAmbient>
   WorkspacePulseController get _effectivePulse =>
       _pulse ?? (_ownedIdlePulse ??= WorkspacePulseController());
 
-  void _addImpulse(Offset normalized) {
-    final nowMs = _clock.elapsedMilliseconds;
-    final cutoff = nowMs - _kImpulseLifetime.inMilliseconds;
-    // Prune aged entries while appending the fresh one (bounded list).
-    final next = <AmbientImpulse>[
-      for (final imp in _impulses.value)
-        if (imp.bornAtMs >= cutoff) imp,
-      AmbientImpulse(position: normalized, bornAtMs: nowMs),
-    ];
-    _impulses.value = next;
-    debugBrutalistImpulseCount = next.length;
-    // Clicking is activity — keep the session pulse awake (no-op if null).
-    _pulse?.touch();
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -187,7 +154,6 @@ class _BrutalistAmbientState extends State<_BrutalistAmbient>
     final signals = widget.animate
         ? AmbientSignals(
             pointer: _pointer,
-            impulses: _impulses,
             // Non-nullable; falls back to an inert idle controller when no
             // provider is registered (see [_effectivePulse]).
             pulse: _effectivePulse,
@@ -208,7 +174,6 @@ class _BrutalistAmbientState extends State<_BrutalistAmbient>
                 // safety, but we don't want to subscribe to a dead controller).
                 hasPulse: _pulse != null,
                 signals: signals,
-                clock: widget.animate ? _clock : null,
               ),
             ),
           ),
@@ -220,19 +185,12 @@ class _BrutalistAmbientState extends State<_BrutalistAmbient>
     if (!widget.animate) return stack;
     return Listener(
       onPointerDown: (e) {
-        // Desktop/web only — touch events don't produce ambient ripples.
+        // Keep the pulse awake on pointer-down (touch() is activity).
         if (e.kind != PointerDeviceKind.mouse &&
             e.kind != PointerDeviceKind.stylus) {
           return;
         }
-        final size = context.size;
-        if (size == null || size.isEmpty) return;
-        _addImpulse(
-          Offset(
-            (e.localPosition.dx / size.width).clamp(0.0, 1.0),
-            (e.localPosition.dy / size.height).clamp(0.0, 1.0),
-          ),
-        );
+        _pulse?.touch();
       },
       child: MouseRegion(
         onHover: (e) {
@@ -254,11 +212,6 @@ class _BrutalistAmbientState extends State<_BrutalistAmbient>
 /// faint accent "registration ghost" copy offset a pixel or two — the
 /// misaligned two-colour riso print look.
 ///
-/// This task renders ONLY the base animated grid (drift + ghost). The cursor
-/// force (C1), click ripple (C1), and rhythm-dimming (C2) land in Tasks 13/14;
-/// [signals] is already plumbed so those tasks add `paint()` logic without
-/// changing this constructor.
-///
 /// Performance: one reused [Paint] (mutate `.color`), a `Path` reused per frame
 /// for dots, no `Paint()`/`Path()`/`Random()` allocation inside `paint()`, and
 /// the dot loop is bounded by [_kMaxCols] × [_kMaxRows].
@@ -268,7 +221,6 @@ class _HalftonePainter extends CustomPainter {
     required this.isDark,
     required this.hasPulse,
     required this.signals,
-    this.clock,
   }) : super(repaint: _repaintFor(t, signals, hasPulse));
 
   final Animation<double> t;
@@ -277,9 +229,6 @@ class _HalftonePainter extends CustomPainter {
 
   /// Non-null only in animated mode (C1/C2 inputs).
   final AmbientSignals? signals;
-
-  /// Monotonic clock for impulse age computation; null in static mode.
-  final Stopwatch? clock;
 
   // Reused across dots/frames — only `.color` mutates per draw.
   final Paint _paint = Paint();
@@ -290,16 +239,13 @@ class _HalftonePainter extends CustomPainter {
   final Path _inkPath = Path();
   final Path _ghostPath = Path();
 
-  // Reused stroke paint for click ripples (C1). Not allocated in paint().
-  final Paint _ripplePaint = Paint()..style = PaintingStyle.stroke;
-
   static const int _kMaxCols = 40;
   static const int _kMaxRows = 28;
   static const double _kCell = 26; // px between dot centres
   static const double _kMaxRadius = 4.2;
 
-  // Merge only the live listenables: the controller always; pointer + impulses
-  // when present; the pulse only when a real controller is registered (the idle
+  // Merge only the live listenables: the controller always; pointer when
+  // present; the pulse only when a real controller is registered (the idle
   // fallback is never subscribed to, so it never ticks).
   static Listenable _repaintFor(
     Animation<double> t,
@@ -310,7 +256,6 @@ class _HalftonePainter extends CustomPainter {
     return Listenable.merge([
       t,
       signals.pointer,
-      signals.impulses,
       if (hasPulse) signals.pulse,
     ]);
   }
@@ -427,40 +372,13 @@ class _HalftonePainter extends CustomPainter {
           alpha: ((isDark ? 0.06 : 0.05) * alphaMult).clamp(0.0, 1.0),
         ),
     );
-
-    // C1 click ripple: an expanding ink-splat ring per impulse. Age drives both
-    // radius and alpha (peaks at mid-life via sin curve) — no per-frame alloc.
-    final nowMs = clock?.elapsedMilliseconds ?? 0;
-    const kRippleLifetimeMs = 1400;
-    final rippleColor = isDark
-        ? BrutalistPalette.textDark
-        : BrutalistPalette.primary;
-    for (final imp in signals?.impulses.value ?? const <AmbientImpulse>[]) {
-      final ageMs = nowMs - imp.bornAtMs;
-      if (ageMs < 0 || ageMs > kRippleLifetimeMs) continue;
-      final age01 = ageMs / kRippleLifetimeMs;
-      final rippleRadius = size.shortestSide * 0.18 * age01;
-      final alpha = 0.28 * math.sin(age01 * math.pi);
-      if (alpha <= 0 || rippleRadius <= 0) continue;
-      final center = Offset(
-        imp.position.dx * size.width,
-        imp.position.dy * size.height,
-      );
-      _ripplePaint
-        ..shader = null
-        ..blendMode = BlendMode.srcOver
-        ..color = rippleColor.withValues(alpha: alpha)
-        ..strokeWidth = 2.0;
-      canvas.drawCircle(center, rippleRadius, _ripplePaint);
-    }
   }
 
   @override
   bool shouldRepaint(covariant _HalftonePainter old) =>
       old.isDark != isDark ||
       old.hasPulse != hasPulse ||
-      old.signals != signals ||
-      old.clock != clock;
+      old.signals != signals;
 }
 
 // C0-continuous oscillation in -1..1 (cheap, no trig for the drift).
