@@ -14,4 +14,15 @@ void main() {
     );
     expect(responseSizeBytes(r), 1234);
   });
+
+  test('responseSizeBytes prefers bodyBytes over Content-Length header', () {
+    final r = HttpResponseEntity(
+      statusCode: 200,
+      body: '',
+      headers: const {'content-length': '9999'},
+      durationMs: 1,
+      bodyBytes: Uint8List(42),
+    );
+    expect(responseSizeBytes(r), 42);
+  });
 }
