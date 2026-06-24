@@ -1,3 +1,8 @@
+/// Largest response body we will buffer into memory to render. Beyond this the
+/// stream is abandoned and the response carries no renderable body (an "open
+/// externally" card is shown). Protects against pulling a huge video into RAM.
+const int kMaxRenderableResponseBytes = 50 * 1024 * 1024; // 50 MiB
+
 /// Response bodies larger than this are not persisted to disk (the in-memory
 /// session keeps the full body). Serializing multi-MB strings into Hive runs
 /// synchronously on the UI isolate and stalls every structural tab action.

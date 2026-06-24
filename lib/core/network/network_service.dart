@@ -1,30 +1,38 @@
 import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/failures.dart';
 import 'package:getman/core/network/cancel_handle.dart';
 import 'package:getman/core/network/dio_adapter_config.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/network/network_config.dart';
+import 'package:getman/core/utils/byte_format.dart';
+import 'package:getman/core/utils/response_media.dart';
 
 // Re-exported so existing data-layer / test importers of `network_service.dart`
 // keep resolving `NetworkCancelHandle` without churn; the domain layer imports
 // `cancel_handle.dart` directly to stay dio/flutter-free.
 export 'package:getman/core/network/cancel_handle.dart';
 
-String _jsonEncode(dynamic data) => json.encode(data);
-
 class NetworkService {
-  NetworkService({required Dio dio}) : _dio = dio;
+  NetworkService({
+    required Dio dio,
+    int maxResponseBytes = kMaxRenderableResponseBytes,
+  }) : _dio = dio,
+       _maxResponseBytes = maxResponseBytes;
   final Dio _dio;
+  final int _maxResponseBytes;
 
   static Dio buildDio([
     NetworkConfig config = NetworkConfig.defaults,
     Interceptor? cookieInterceptor,
   ]) {
-    // responseType: plain keeps the raw server bytes as a String;
-    // _stringifyBody's "if (data is String) return data" fast path then
-    // short-circuits decode/re-encode, saving two full JSON passes per response.
+    // responseType: stream delivers the body as a raw byte stream so we can
+    // cap it at _maxResponseBytes, classify it, and either decode to a String
+    // (textual) or keep the raw bytes (media/binary) without two JSON passes.
     final dio = Dio(
       BaseOptions(
         connectTimeout: Duration(milliseconds: config.connectTimeoutMs),
@@ -34,7 +42,7 @@ class NetworkService {
         maxRedirects: config.maxRedirects,
         validateStatus: (_) => true,
         listFormat: ListFormat.multi,
-        responseType: ResponseType.plain,
+        responseType: ResponseType.stream,
       ),
     );
     configureHttpAdapter(
@@ -85,21 +93,85 @@ class NetworkService {
     final cancelToken = CancelToken();
     cancelHandle?.bindCancel(cancelToken.cancel);
     try {
-      final response = await _dio.request<dynamic>(
+      final response = await _dio.request<ResponseBody>(
         url,
         data: data,
         queryParameters: queryParameters,
-        options: Options(method: method, headers: headers),
+        options: Options(
+          method: method,
+          headers: headers,
+          responseType: ResponseType.stream,
+        ),
         cancelToken: cancelToken,
       );
+      final headersMap = response.headers.map.map(
+        (k, v) => MapEntry(k, v.join(', ')),
+      );
+      final status = response.statusCode ?? 0;
+
+      // Early-out: declared length already over the cap → don't read at all.
+      final declared = int.tryParse(
+        response.headers.value('content-length') ?? '',
+      );
+      if (declared != null && declared > _maxResponseBytes) {
+        cancelToken.cancel();
+        stopwatch.stop();
+        return HttpResponseEntity(
+          statusCode: status,
+          body: _tooLargePlaceholder(headersMap, url, declared),
+          headers: headersMap,
+          durationMs: stopwatch.elapsedMilliseconds,
+        );
+      }
+
+      final stream = response.data?.stream;
+      final builder = BytesBuilder(copy: false);
+      var overflow = false;
+      if (stream != null) {
+        await for (final chunk in stream) {
+          builder.add(chunk);
+          if (builder.length > _maxResponseBytes) {
+            overflow = true;
+            cancelToken.cancel();
+            break;
+          }
+        }
+      }
       stopwatch.stop();
 
-      final body = await _stringifyBody(response.data);
+      if (overflow) {
+        return HttpResponseEntity(
+          statusCode: status,
+          body: _tooLargePlaceholder(headersMap, url, builder.length),
+          headers: headersMap,
+          durationMs: stopwatch.elapsedMilliseconds,
+        );
+      }
+
+      final bytes = builder.takeBytes();
+      final contentType = contentTypeOf(headersMap);
+      final kind = bytes.isEmpty
+          ? ResponseMediaKind.textual
+          : classifyResponseMedia(
+              contentType: contentType,
+              url: url,
+              sniffBytes: bytes,
+            );
+
+      if (kind == ResponseMediaKind.textual) {
+        return HttpResponseEntity(
+          statusCode: status,
+          body: bytes.isEmpty ? '' : utf8.decode(bytes, allowMalformed: true),
+          headers: headersMap,
+          durationMs: stopwatch.elapsedMilliseconds,
+        );
+      }
       return HttpResponseEntity(
-        statusCode: response.statusCode ?? 0,
-        body: body,
-        headers: response.headers.map.map((k, v) => MapEntry(k, v.join(', '))),
+        statusCode: status,
+        body: _mediaPlaceholder(contentType, kind, bytes.length),
+        headers: headersMap,
         durationMs: stopwatch.elapsedMilliseconds,
+        bodyBytes: bytes,
       );
     } on DioException catch (e) {
       stopwatch.stop();
@@ -110,15 +182,19 @@ class NetworkService {
     }
   }
 
-  Future<String> _stringifyBody(dynamic data) async {
-    if (data == null) return '';
-    if (data is String) return data;
-    try {
-      return await compute(_jsonEncode, data);
-    } on Object catch (e) {
-      debugPrint('NetworkService._stringifyBody failed: $e');
-      return data.toString();
-    }
+  String _mediaPlaceholder(String? contentType, ResponseMediaKind kind, int n) {
+    final label = contentType ?? kind.name;
+    return '[$label · ${formatBytes(n)} — open the PREVIEW tab to view]';
+  }
+
+  String _tooLargePlaceholder(
+    Map<String, String> headers,
+    String url,
+    int size,
+  ) {
+    final ct = contentTypeOf(headers) ?? 'binary';
+    final sz = formatBytes(size);
+    return '[$ct · $sz — too large to buffer; open externally]';
   }
 
   @visibleForTesting
