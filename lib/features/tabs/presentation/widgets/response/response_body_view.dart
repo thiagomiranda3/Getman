@@ -7,6 +7,7 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/utils/json_path.dart';
 import 'package:getman/core/utils/json_utils.dart';
+import 'package:getman/core/utils/response_media.dart';
 import 'package:getman/features/chaining/domain/entities/extraction_rule.dart';
 import 'package:getman/features/chaining/presentation/bloc/rules_bloc.dart';
 import 'package:getman/features/chaining/presentation/bloc/rules_event.dart';
@@ -19,18 +20,16 @@ import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart'
 import 'package:getman/features/tabs/presentation/widgets/response/json_tree_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_body_controls.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_large_body_view.dart';
+import 'package:getman/features/tabs/presentation/widgets/response/viewers/response_media_panel.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:uuid/uuid.dart';
 
 /// How the response body is displayed in the sub-threshold path.
 enum _BodyMode { pretty, raw, tree }
 
-/// BODY tab: renders the response body. Sub-threshold bodies go through a
-/// Pretty/Raw/Tree toggle (the JSON editor or a collapsible tree); bodies over
-/// [kLargeResponseViewerChars] fall back to a plain-text viewer (unless the
-/// user opts into highlighting). TREE is only offered for JSON object/array
-/// bodies under the large threshold.
-class ResponseBodyView extends StatefulWidget {
+/// BODY tab: thin dispatcher. Routes non-textual responses to
+/// [ResponseMediaPanel] and textual responses to [_TextualResponseBody].
+class ResponseBodyView extends StatelessWidget {
   const ResponseBodyView({
     required this.tabId,
     required this.responseController,
@@ -40,10 +39,54 @@ class ResponseBodyView extends StatefulWidget {
   final CodeLineEditingController responseController;
 
   @override
-  State<ResponseBodyView> createState() => _ResponseBodyViewState();
+  Widget build(BuildContext context) {
+    return BlocBuilder<TabsBloc, TabsState>(
+      buildWhen: (prev, next) {
+        final p = prev.tabs.byId(tabId)?.response;
+        final n = next.tabs.byId(tabId)?.response;
+        return p?.body != n?.body ||
+            p?.bodyBytes?.length != n?.bodyBytes?.length ||
+            contentTypeOf(p?.headers ?? const {}) !=
+                contentTypeOf(n?.headers ?? const {});
+      },
+      builder: (context, state) {
+        final tab = state.tabs.byId(tabId);
+        final resp = tab?.response;
+        final kind = classifyResponseMedia(
+          contentType: contentTypeOf(resp?.headers ?? const {}),
+          url: tab?.config.url,
+          sniffBytes: resp?.bodyBytes,
+        );
+        if (resp != null && kind != ResponseMediaKind.textual) {
+          return ResponseMediaPanel(tabId: tabId);
+        }
+        return _TextualResponseBody(
+          tabId: tabId,
+          responseController: responseController,
+        );
+      },
+    );
+  }
 }
 
-class _ResponseBodyViewState extends State<ResponseBodyView> {
+/// BODY tab: renders the response body for textual responses. Sub-threshold
+/// bodies go through a Pretty/Raw/Tree toggle (the JSON editor or a collapsible
+/// tree); bodies over [kLargeResponseViewerChars] fall back to a plain-text
+/// viewer (unless the user opts into highlighting). TREE is only offered for
+/// JSON object/array bodies under the large threshold.
+class _TextualResponseBody extends StatefulWidget {
+  const _TextualResponseBody({
+    required this.tabId,
+    required this.responseController,
+  });
+  final String tabId;
+  final CodeLineEditingController responseController;
+
+  @override
+  State<_TextualResponseBody> createState() => _TextualResponseBodyState();
+}
+
+class _TextualResponseBodyState extends State<_TextualResponseBody> {
   int _pendingSyncId = 0;
 
   // Pretty (prettified JSON) / Raw (verbatim) / Tree (collapsible). Applies to

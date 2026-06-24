@@ -91,6 +91,35 @@ Future<void> saveJsonFileWithFeedback(
   );
 }
 
+/// Prompts for a destination and writes raw [bytes] there, reporting via
+/// snackbar. Mirrors saveTextFileWithFeedback but for binary content.
+Future<void> saveBytesFileWithFeedback(
+  BuildContext context, {
+  required Uint8List bytes,
+  required String fileName,
+  required String dialogTitle,
+  List<String> allowedExtensions = const ['bin'],
+}) async {
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  try {
+    final path = await FilePicker.saveFile(
+      dialogTitle: dialogTitle,
+      fileName: fileName,
+      type: FileType.custom,
+      allowedExtensions: allowedExtensions,
+      bytes: bytes,
+    );
+    if (path == null) return;
+    if (!kIsWeb) {
+      await File(path).writeAsBytes(bytes);
+    }
+    messenger?.showSnackBar(SnackBar(content: Text('Saved to $path')));
+  } on Object catch (e) {
+    debugPrint('Save failed: $e');
+    messenger?.showSnackBar(SnackBar(content: Text('Save failed: $e')));
+  }
+}
+
 /// Lets the user pick one or more `.json` files, runs each through [parse]
 /// (which may yield several entities per file), reports per-file failures in
 /// a snackbar, and hands all successfully parsed entities to [onImported].
