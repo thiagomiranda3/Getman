@@ -2,9 +2,12 @@ import 'dart:convert';
 
 import 'package:getman/core/network/http_response.dart';
 
-/// Best-effort response size in bytes: a numeric `Content-Length` header when
-/// present, else the UTF-8 byte length of the body.
+/// Best-effort response size in bytes: prefers [HttpResponseEntity.bodyBytes]
+/// if present, else a numeric `Content-Length` header, else the UTF-8 byte
+/// length of the body.
 int responseSizeBytes(HttpResponseEntity response) {
+  final bytes = response.bodyBytes;
+  if (bytes != null) return bytes.length;
   for (final e in response.headers.entries) {
     if (e.key.toLowerCase() == 'content-length') {
       final n = int.tryParse(e.value.trim());

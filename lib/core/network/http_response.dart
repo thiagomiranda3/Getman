@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:equatable/equatable.dart';
 
 class HttpResponseEntity extends Equatable {
@@ -6,22 +8,37 @@ class HttpResponseEntity extends Equatable {
     required this.body,
     required this.headers,
     required this.durationMs,
+    this.bodyBytes,
   });
   final int statusCode;
   final String body;
   final Map<String, String> headers;
   final int durationMs;
 
-  /// Returns a copy with [body] replaced, keeping status/headers/duration —
-  /// used when an over-limit response body is swapped for a placeholder before
-  /// persisting.
+  /// Raw bytes for a non-textual (media/binary) response. Held **in memory
+  /// only** — never persisted to Hive — so it is null on a restored tab or an
+  /// older time-travel history entry. Null for textual responses.
+  final Uint8List? bodyBytes;
+
+  /// Returns a copy with [body] replaced, keeping status/headers/duration/bytes
+  /// — used when an over-limit text body is swapped for a placeholder before
+  /// persisting. Media bytes ride along (they are dropped at the model layer).
   HttpResponseEntity copyWithBody(String body) => HttpResponseEntity(
     statusCode: statusCode,
     body: body,
     headers: headers,
     durationMs: durationMs,
+    bodyBytes: bodyBytes,
   );
 
+  // bodyBytes itself is excluded from props — a list compare on multi-MB
+  // buffers every rebuild is unacceptable. Its length is a cheap discriminator.
   @override
-  List<Object?> get props => [statusCode, body, headers, durationMs];
+  List<Object?> get props => [
+    statusCode,
+    body,
+    headers,
+    durationMs,
+    bodyBytes?.length,
+  ];
 }
