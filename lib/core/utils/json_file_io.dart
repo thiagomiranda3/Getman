@@ -43,11 +43,11 @@ Future<String?> readPickedFile(PlatformFile file) async {
   return null;
 }
 
-/// Prompts for a destination and writes [jsonString] there. Shows the outcome
-/// in a snackbar. No-op when the user cancels the picker.
-Future<void> saveJsonFileWithFeedback(
+/// Prompts for a destination and writes [content] there. Shows the outcome in a
+/// snackbar. No-op when the user cancels the picker. Content-type agnostic.
+Future<void> saveTextFileWithFeedback(
   BuildContext context, {
-  required String jsonString,
+  required String content,
   required String fileName,
   required String dialogTitle,
   List<String> allowedExtensions = const ['json'],
@@ -59,19 +59,36 @@ Future<void> saveJsonFileWithFeedback(
       fileName: fileName,
       type: FileType.custom,
       allowedExtensions: allowedExtensions,
-      bytes: utf8.encode(jsonString),
+      bytes: utf8.encode(content),
     );
     if (path == null) return;
     // On desktop saveFile only returns the chosen path; the write is ours.
     // On web the bytes parameter already triggered the download.
     if (!kIsWeb) {
-      await File(path).writeAsString(jsonString);
+      await File(path).writeAsString(content);
     }
     messenger?.showSnackBar(SnackBar(content: Text('Exported to $path')));
   } on Object catch (e) {
     debugPrint('Export failed: $e');
     messenger?.showSnackBar(SnackBar(content: Text('Export failed: $e')));
   }
+}
+
+/// Back-compat JSON wrapper around [saveTextFileWithFeedback].
+Future<void> saveJsonFileWithFeedback(
+  BuildContext context, {
+  required String jsonString,
+  required String fileName,
+  required String dialogTitle,
+  List<String> allowedExtensions = const ['json'],
+}) {
+  return saveTextFileWithFeedback(
+    context,
+    content: jsonString,
+    fileName: fileName,
+    dialogTitle: dialogTitle,
+    allowedExtensions: allowedExtensions,
+  );
 }
 
 /// Lets the user pick one or more `.json` files, runs each through [parse]
