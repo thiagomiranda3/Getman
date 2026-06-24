@@ -5,11 +5,11 @@ import 'package:getman/core/utils/apidoc/collection_to_api_doc.dart';
 import 'package:getman/core/utils/apidoc/openapi_serializer.dart';
 import 'package:getman/core/utils/openapi/collection_builder.dart';
 import 'package:getman/core/utils/openapi/spec_loader.dart';
-import 'package:getman/core/utils/openapi/spec_normalizer.dart'; // adjust if needed
+import 'package:getman/core/utils/openapi/spec_normalizer.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 
 void main() {
-  test('export → import preserves method, path, and tag', () {
+  test('export → import preserves method and path', () {
     const root = CollectionNodeEntity(
       id: 'r',
       name: 'Petstore',
@@ -33,7 +33,7 @@ void main() {
     );
 
     final json = OpenApiSerializer.toJson(CollectionToApiDoc.build(root));
-    final api = normalizeSpec(loadSpec(json)); // adjust call to real API
+    final api = normalizeSpec(loadSpec(json));
     final imported = buildImport(api).root;
 
     // Find the single leaf in the imported tree.

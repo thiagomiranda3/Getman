@@ -187,7 +187,7 @@ class _SheetBody extends StatelessWidget {
             },
           ),
           _Action(
-            icon: Icons.description_outlined,
+            icon: Icons.article_outlined,
             label: 'EXPORT AS API DOCS…',
             onTap: () {
               Navigator.of(context).pop();
