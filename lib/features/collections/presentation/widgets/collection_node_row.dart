@@ -23,6 +23,7 @@ class CollectionNodeRow extends StatefulWidget {
     required this.onToggle,
     required this.rowWidth,
     required this.rowHeight,
+    this.isSelected = false,
     super.key,
   });
   final CollectionNodeEntity node;
@@ -31,6 +32,11 @@ class CollectionNodeRow extends StatefulWidget {
   final VoidCallback onToggle;
   final double rowWidth;
   final double rowHeight;
+
+  /// Whether this row is the saved request linked to the currently-focused
+  /// tab — painted with an accent bar + tint so the user can see which tree
+  /// node their active tab came from.
+  final bool isSelected;
 
   @override
   State<CollectionNodeRow> createState() => _CollectionNodeRowState();
@@ -171,7 +177,17 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 decoration: BoxDecoration(
-                  color: _isHovered ? theme.hoverColor : Colors.transparent,
+                  color: widget.isSelected
+                      ? theme.primaryColor.withValues(alpha: 0.12)
+                      : (_isHovered ? theme.hoverColor : Colors.transparent),
+                  border: widget.isSelected
+                      ? Border(
+                          left: BorderSide(
+                            color: theme.primaryColor,
+                            width: layout.borderThick,
+                          ),
+                        )
+                      : null,
                 ),
                 child: Padding(
                   padding: EdgeInsets.only(left: indent),
