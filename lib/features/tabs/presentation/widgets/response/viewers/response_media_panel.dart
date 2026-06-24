@@ -34,7 +34,9 @@ class _ResponseMediaPanelState extends State<ResponseMediaPanel> {
         final pr = p.tabs.byId(widget.tabId)?.response;
         final nr = n.tabs.byId(widget.tabId)?.response;
         return pr?.bodyBytes?.length != nr?.bodyBytes?.length ||
-            pr?.body != nr?.body;
+            pr?.body != nr?.body ||
+            contentTypeOf(pr?.headers ?? const {}) !=
+                contentTypeOf(nr?.headers ?? const {});
       },
       builder: (context, state) {
         final tab = state.tabs.byId(widget.tabId);
@@ -84,6 +86,8 @@ class _ResponseMediaPanelState extends State<ResponseMediaPanel> {
           bytes: bytes,
         );
       case ResponseMediaKind.textual:
+        assert(false, 'textual responses must not reach _viewer');
+        return const SizedBox.shrink();
       case ResponseMediaKind.pdf:
       case ResponseMediaKind.html:
       case ResponseMediaKind.csv:
