@@ -1,9 +1,10 @@
-// Widget test for the H2 fix: the collections tree must keep folders expanded
-// across an unrelated mutation (rename/add/favorite). The TreeController keys
-// expansion by node identity; mutations rebuild non-equal CollectionNodeEntity
-// objects (copyWith rewrites the ancestor chain), so expansion was lost. The
-// fix keys expansion by node.id.
+// Widget tests for the collections tree:
+//  - H2 fix: folders stay expanded across unrelated mutations.
+//  - Import menu opens.
+//  - Active-tab linkage: focusing a tab linked to a saved request auto-expands
+//    its ancestor folders and highlights the matching row.
 
+import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,15 +15,36 @@ import 'package:getman/features/collections/domain/repositories/collections_repo
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/collections/presentation/widgets/collection_node_row.dart';
 import 'package:getman/features/collections/presentation/widgets/collections_list.dart';
+import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockCollectionsRepository extends Mock implements CollectionsRepository {}
 
+class MockTabsBloc extends MockBloc<TabsEvent, TabsState> implements TabsBloc {}
+
+class _FakeTabsEvent extends Fake implements TabsEvent {}
+
+HttpRequestTabEntity _tab(String tabId, {String? linkedNodeId}) =>
+    HttpRequestTabEntity(
+      tabId: tabId,
+      config: HttpRequestConfigEntity(id: tabId),
+      collectionNodeId: linkedNodeId,
+    );
+
+TabsState _stateWith(HttpRequestTabEntity tab) => TabsState(tabs: [tab]);
+
 void main() {
   late MockCollectionsRepository repo;
 
-  setUpAll(() => registerFallbackValue(<CollectionNodeEntity>[]));
+  setUpAll(() {
+    registerFallbackValue(<CollectionNodeEntity>[]);
+    registerFallbackValue(_FakeTabsEvent());
+  });
 
   setUp(() {
     repo = MockCollectionsRepository();
@@ -36,11 +58,43 @@ void main() {
     saveDebounce: const Duration(milliseconds: 5),
   );
 
+  // Builds the widget under a CollectionsBloc + a MockTabsBloc.
+  // [tabsStates], if given, are emitted so the active-tab listener fires.
+  Widget host(
+    CollectionsBloc collections,
+    MockTabsBloc tabs, {
+    TabsState tabsInitial = const TabsState(),
+    List<TabsState> tabsStates = const [],
+  }) {
+    when(() => tabs.state).thenReturn(
+      tabsStates.isNotEmpty ? tabsStates.last : tabsInitial,
+    );
+    whenListen(
+      tabs,
+      Stream<TabsState>.fromIterable(tabsStates),
+      initialState: tabsInitial,
+    );
+    return MaterialApp(
+      theme: brutalistTheme(Brightness.light),
+      home: Scaffold(
+        body: MultiBlocProvider(
+          providers: [
+            BlocProvider<CollectionsBloc>.value(value: collections),
+            BlocProvider<TabsBloc>.value(value: tabs),
+          ],
+          child: const CollectionsList(),
+        ),
+      ),
+    );
+  }
+
   testWidgets('folder stays expanded after a child inside it is renamed', (
     tester,
   ) async {
     final bloc = build();
     addTearDown(bloc.close);
+    final tabs = MockTabsBloc();
+    addTearDown(tabs.close);
 
     const child = CollectionNodeEntity(
       id: 'C',
@@ -63,32 +117,19 @@ void main() {
     bloc.add(const ReplaceCollections([folder, sibling]));
     await bloc.stream.first;
 
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: brutalistTheme(Brightness.light),
-        home: Scaffold(
-          body: BlocProvider.value(value: bloc, child: const CollectionsList()),
-        ),
-      ),
-    );
+    await tester.pumpWidget(host(bloc, tabs));
     await tester.pumpAndSettle();
 
-    // Folder is collapsed initially → its child is not rendered.
-    // Names render verbatim (no uppercasing).
     expect(find.text('ChildReq'), findsNothing);
 
-    // Expand the folder.
     await tester.tap(find.text('Folder'));
     await tester.pumpAndSettle();
     expect(find.text('ChildReq'), findsOneWidget);
 
-    // Rename the child *inside* the folder. This rewrites the folder's
-    // ancestor chain into a non-equal entity — the case that collapsed it.
     bloc.add(const RenameNode('C', 'ChildRenamed'));
     await bloc.stream.first;
     await tester.pumpAndSettle();
 
-    // The folder must still be expanded, showing the renamed child.
     expect(find.text('ChildRenamed'), findsOneWidget);
   });
 
@@ -97,23 +138,62 @@ void main() {
   ) async {
     final bloc = build();
     addTearDown(bloc.close);
+    final tabs = MockTabsBloc();
+    addTearDown(tabs.close);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: brutalistTheme(Brightness.light),
-        home: Scaffold(
-          body: BlocProvider.value(value: bloc, child: const CollectionsList()),
-        ),
-      ),
-    );
+    await tester.pumpWidget(host(bloc, tabs));
     await tester.pumpAndSettle();
 
-    // Tap the import affordance (only the menu opens — selecting an item is not
-    // exercised here, so the coordinator's other blocs/services aren't needed).
     await tester.tap(find.byIcon(Icons.file_upload));
     await tester.pumpAndSettle();
 
     expect(find.text('FROM POSTMAN'), findsOneWidget);
     expect(find.text('FROM OPENAPI / SWAGGER'), findsOneWidget);
   });
+
+  testWidgets(
+    'focusing a tab linked to a request inside a collapsed folder reveals + '
+    'highlights it',
+    (tester) async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      final tabs = MockTabsBloc();
+      addTearDown(tabs.close);
+
+      const child = CollectionNodeEntity(
+        id: 'req-1',
+        name: 'GetUser',
+        isFolder: false,
+        config: HttpRequestConfigEntity(id: 'req-1'),
+      );
+      const folder = CollectionNodeEntity(
+        id: 'F',
+        name: 'ApiFolder',
+        children: [child],
+      );
+
+      bloc.add(const ReplaceCollections([folder]));
+      await bloc.stream.first;
+
+      // Emit a state whose active tab is linked to the nested request.
+      await tester.pumpWidget(
+        host(
+          bloc,
+          tabs,
+          tabsStates: [_stateWith(_tab('t1', linkedNodeId: 'req-1'))],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The folder auto-expanded → the nested request row is now rendered.
+      expect(find.text('GetUser'), findsOneWidget);
+
+      // And that row is marked selected.
+      final row = tester.widget<CollectionNodeRow>(
+        find.byType(CollectionNodeRow).last,
+      );
+      expect(row.node.id, 'req-1');
+      expect(row.isSelected, isTrue);
+    },
+  );
 }

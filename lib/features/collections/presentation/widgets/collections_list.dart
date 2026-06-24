@@ -11,6 +11,7 @@ import 'package:getman/core/utils/json_file_io.dart';
 import 'package:getman/core/utils/postman/postman_collection_mapper.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
+import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
@@ -19,6 +20,8 @@ import 'package:getman/features/collections/presentation/widgets/example_row.dar
 import 'package:getman/features/collections/presentation/widgets/spec_import_dialog.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 
 class CollectionsList extends StatefulWidget {
@@ -46,20 +49,110 @@ class _CollectionsListState extends State<CollectionsList> {
   // Defers the recursive filter + force-expand until typing pauses, so each
   // keystroke doesn't walk the whole tree and rebuild the node forest.
   final Debouncer _searchDebouncer = Debouncer();
+  // The id of the saved request linked to the currently-focused tab, or null
+  // (unlinked tab / no tabs / linked node deleted). Drives the row highlight.
+  String? _selectedNodeId;
+  // Owns the TreeView's vertical scroll so we can scroll the selected row into
+  // view when the focused tab changes.
+  final ScrollController _verticalController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _rebuildTree();
     _searchController.addListener(() => _searchDebouncer.run(_rebuildTree));
+    _selectedNodeId = _activeLinkedNodeId(context.read<TabsBloc>().state);
+    final initial = _selectedNodeId;
+    if (initial != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _revealAndScrollTo(initial);
+      });
+    }
   }
 
   @override
   void dispose() {
+    _verticalController.dispose();
     _searchDebouncer.dispose();
     _searchController.dispose();
     super.dispose();
   }
+
+  /// The collectionNodeId of the active panel's focused tab, or null when the
+  /// tab is unlinked, there are no tabs, or the index is out of range.
+  String? _activeLinkedNodeId(TabsState s) {
+    if (s.activeIndex < 0 || s.activeIndex >= s.tabs.length) return null;
+    return s.tabs[s.activeIndex].collectionNodeId;
+  }
+
+  /// React to the focused tab changing: update the highlight, then (if the tab
+  /// links to a known node) expand its ancestor folders and scroll it in.
+  void _onSelectedNodeChanged(String? id) {
+    setState(() => _selectedNodeId = id);
+    if (id != null) _revealAndScrollTo(id);
+  }
+
+  /// Expand the ancestor folders of [id] and scroll its row into view. No-op if
+  /// the node isn't in the current tree.
+  void _revealAndScrollTo(String id) {
+    final collections = context.read<CollectionsBloc>().state.collections;
+    if (CollectionsTreeHelper.findNode(collections, id) == null) return;
+    final ancestors = CollectionsTreeHelper.ancestorFolderIds(collections, id);
+    final before = _expandedIds.length;
+    _expandedIds.addAll(ancestors);
+    if (_expandedIds.length != before) {
+      _rebuildTree();
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scrollToNode(id);
+    });
+  }
+
+  /// Scroll the vertical viewport so the row for [id] is visible. Uses the
+  /// fixed row height; honours the current expansion state.
+  void _scrollToNode(String id) {
+    if (!_verticalController.hasClients) return;
+    final index = _visibleRowIndexOf(id);
+    if (index == null) return;
+    final rowHeight = _rowHeight();
+    final target = (index * rowHeight).clamp(
+      0.0,
+      _verticalController.position.maxScrollExtent,
+    );
+    unawaited(
+      _verticalController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      ),
+    );
+  }
+
+  /// The display-order (flattened, expansion-aware) row index of node [id], or
+  /// null if it isn't currently visible.
+  int? _visibleRowIndexOf(String id) {
+    var row = 0;
+    int? walk(List<TreeViewNode<_TreeItem>> nodes) {
+      for (final n in nodes) {
+        final item = n.content;
+        if (item is _NodeItem && item.node.id == id) return row;
+        row++;
+        if (item is _NodeItem && _expandedIds.contains(item.node.id)) {
+          final found = walk(n.children);
+          if (found != null) return found;
+        }
+      }
+      return null;
+    }
+
+    return walk(_tree);
+  }
+
+  /// The fixed row height the TreeView uses (mirrors the build()-time calc).
+  double _rowHeight() =>
+      context.appLayout.treeRowExtent > context.touchTargetMin
+      ? context.appLayout.treeRowExtent
+      : context.touchTargetMin;
 
   /// Recompute the tree from the current collections state + search query, and
   /// force-expand matching folders while searching. Called outside of `build`
@@ -178,9 +271,19 @@ class _CollectionsListState extends State<CollectionsList> {
     final theme = Theme.of(context);
     final layout = context.appLayout;
 
-    return BlocListener<CollectionsBloc, CollectionsState>(
-      listenWhen: (prev, next) => prev.collections != next.collections,
-      listener: (_, _) => _rebuildTree(),
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<CollectionsBloc, CollectionsState>(
+          listenWhen: (prev, next) => prev.collections != next.collections,
+          listener: (_, _) => _rebuildTree(),
+        ),
+        BlocListener<TabsBloc, TabsState>(
+          listenWhen: (prev, next) =>
+              _activeLinkedNodeId(prev) != _activeLinkedNodeId(next),
+          listener: (_, state) =>
+              _onSelectedNodeChanged(_activeLinkedNodeId(state)),
+        ),
+      ],
       child: Column(
         children: [
           Padding(
@@ -309,6 +412,9 @@ class _CollectionsListState extends State<CollectionsList> {
                     final tree = TreeView<_TreeItem>(
                       tree: _tree,
                       controller: _treeController,
+                      verticalDetails: ScrollableDetails.vertical(
+                        controller: _verticalController,
+                      ),
                       // Indentation is applied manually in the row (see
                       // CollectionNodeRow) so the hover/drag highlight spans
                       // the full row width.
@@ -347,6 +453,7 @@ class _CollectionsListState extends State<CollectionsList> {
                           onToggle: () => _treeController.toggleNode(node),
                           rowWidth: rowWidth,
                           rowHeight: rowHeight,
+                          isSelected: nodeItem.node.id == _selectedNodeId,
                         );
                       },
                     );
