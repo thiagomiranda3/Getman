@@ -19,6 +19,16 @@ void main() {
       expect(slugFilename('***'), 'untitled');
       expect(slugFilename(''), 'untitled');
     });
+
+    test('lowercases and replaces non-alphanumerics with underscores', () {
+      expect(slugFilename('My API!'), 'my_api');
+      expect(slugFilename('  Spaced  Name  '), 'spaced_name');
+    });
+
+    test('empty/garbage becomes untitled', () {
+      expect(slugFilename('   '), 'untitled');
+      expect(slugFilename('***'), 'untitled');
+    });
   });
 
   group('importSummaryMessage', () {

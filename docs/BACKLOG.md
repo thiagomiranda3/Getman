@@ -463,20 +463,14 @@
   dynamic vars) + an importer; web/no-shell falls back to verbatim.
 - **Effort**: S–M.
 
-### DW3 — Generate OpenAPI / Markdown docs *from* a collection
-- **Idea**: the reverse of the existing OpenAPI import — emit an OpenAPI spec or
-  a Markdown API doc from a collection. (No docs generation exists today;
-  Postman paywalls this.)
-- **Seam**: reverse the `core/utils/openapi/` normalizers + a Markdown emitter;
-  export via `json_file_io`.
-- **Effort**: M–L.
-
 ### DW4 — OpenAPI drift detection
 - **Idea**: re-sync a collection imported from a spec when that spec changes;
   flag added/removed/changed endpoints instead of a blind re-import.
 - **Seam**: `core/utils/openapi/*` (normalized model already exists) + a diff
   over the normalized spec.
-- **Effort**: M–L. **Pairs with**: DW3.
+- **Effort**: M–L. **Pairs with**: DW3 (shipped — collection→API-docs export
+  via the `ApiDoc` IR in `core/utils/apidoc/`; reuse that IR + the importer's
+  normalized model for the diff).
 
 ### DW5 — Global / scoped variables
 - **Idea**: today there are environment + collection variables; add a **global**
