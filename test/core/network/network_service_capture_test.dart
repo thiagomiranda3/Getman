@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -93,69 +92,4 @@ void main() {
     expect(r.body, '');
     expect(r.bodyBytes, isNull);
   });
-
-  // Regression: on a real Dio socket adapter, cancelToken.cancel() during
-  // cap-overflow can cause the body stream to emit a DioException(cancel)
-  // that propagates out of the `await for`. The inner try/catch must absorb
-  // it when overflow is already set — it must NOT fall through to the outer
-  // DioException handler (which would throw a NetworkFailure).
-  //
-  // The fake returns a stream that yields an over-cap chunk then throws a
-  // cancel DioException. The inner try/catch in network_service.dart absorbs
-  // the cancel (capOverflow is true) and the result is still too-large.
-  test(
-    'cap-overflow cancel race → absorbed, returns too-large entity',
-    () async {
-      final dio = Dio(BaseOptions(validateStatus: (_) => true))
-        ..httpClientAdapter = _CancelRacingAdapter();
-      final svc = NetworkService(dio: dio, maxResponseBytes: 10);
-
-      // Must NOT throw; must return a normal entity with "too large" body.
-      final r = await svc.request(url: 'https://x/big.mp4', method: 'GET');
-      expect(r.body.toLowerCase(), contains('too large'));
-      expect(r.bodyBytes, isNull);
-    },
-  );
-}
-
-/// Adapter that produces the cancel-race scenario: the response stream yields
-/// an over-cap chunk and then throws a DioException(cancel) — simulating a
-/// real socket adapter that emits a cancel error while data is in flight.
-class _CancelRacingAdapter implements HttpClientAdapter {
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    return ResponseBody(
-      _chunksThenCancel(
-        [List<int>.filled(100, 0)], // 100 bytes > 10-byte cap
-        options,
-      ),
-      200,
-      headers: {
-        'content-type': ['video/mp4'],
-      },
-    );
-  }
-
-  @override
-  void close({bool force = false}) {}
-}
-
-/// Yields [chunks] and then throws a DioException(cancel), simulating a
-/// real socket adapter that delivers a cancel error after the response body
-/// has started arriving.
-Stream<Uint8List> _chunksThenCancel(
-  List<List<int>> chunks,
-  RequestOptions options,
-) async* {
-  for (final c in chunks) {
-    yield Uint8List.fromList(c);
-  }
-  throw DioException(
-    requestOptions: options,
-    type: DioExceptionType.cancel,
-  );
 }

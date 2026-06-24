@@ -92,11 +92,6 @@ class NetworkService {
     final stopwatch = Stopwatch()..start();
     final cancelToken = CancelToken();
     cancelHandle?.bindCancel(cancelToken.cancel);
-    // Hoisted outside the try/catch so the DioException handler can read it.
-    // Set to true when the accumulation loop exceeds _maxResponseBytes; a
-    // cap-overflow cancel that subsequently races into the outer catch must
-    // still produce a normal "too large" entity rather than a NetworkFailure.
-    var capOverflow = false;
     try {
       final response = await _dio.request<ResponseBody>(
         url,
@@ -131,26 +126,20 @@ class NetworkService {
 
       final stream = response.data?.stream;
       final builder = BytesBuilder(copy: false);
+      var overflow = false;
       if (stream != null) {
-        try {
-          await for (final chunk in stream) {
-            builder.add(chunk);
-            if (builder.length > _maxResponseBytes) {
-              capOverflow = true;
-              cancelToken.cancel();
-              break;
-            }
+        await for (final chunk in stream) {
+          builder.add(chunk);
+          if (builder.length > _maxResponseBytes) {
+            overflow = true;
+            cancelToken.cancel();
+            break;
           }
-        } on DioException catch (e) {
-          // Cap-overflow cancel raced the `break` — absorb it; `capOverflow`
-          // drives the result below. Re-throw anything else so it falls
-          // through to the outer handler (genuine transport cancel, etc.).
-          if (!(capOverflow && e.type == DioExceptionType.cancel)) rethrow;
         }
       }
       stopwatch.stop();
 
-      if (capOverflow) {
+      if (overflow) {
         return HttpResponseEntity(
           statusCode: status,
           body: _tooLargePlaceholder(headersMap, url, builder.length),
@@ -186,21 +175,6 @@ class NetworkService {
       );
     } on DioException catch (e) {
       stopwatch.stop();
-      // If a cap-overflow cancel raced through Dio's adapter pipeline and
-      // escaped the inner try/catch (e.g. via subscription.cancel() rejection
-      // propagating through handleResponseStream), absorb it and return the
-      // too-large placeholder. Any cancel that is NOT from an overflow is
-      // a genuine user/transport cancel → NetworkFailure as normal.
-      if (capOverflow && e.type == DioExceptionType.cancel) {
-        // Cap-overflow cancel escaped through Dio's pipeline. Return a
-        // generic too-large entity (headers/size unavailable at this point).
-        return HttpResponseEntity(
-          statusCode: 0,
-          body: '[too large to buffer — open externally]',
-          headers: const {},
-          durationMs: stopwatch.elapsedMilliseconds,
-        );
-      }
       throw mapDioException(e);
     } catch (e) {
       stopwatch.stop();
