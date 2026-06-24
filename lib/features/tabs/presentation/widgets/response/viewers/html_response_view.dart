@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
@@ -28,18 +28,19 @@ class HtmlResponseView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: EdgeInsets.all(layout.tabSpacing),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: ElevatedButton.icon(
-              key: const ValueKey('html_open_in_browser'),
-              icon: const Icon(Icons.open_in_browser),
-              label: const Text('OPEN IN BROWSER'),
-              onPressed: () => _openInBrowser(context),
+        if (!kIsWeb)
+          Padding(
+            padding: EdgeInsets.all(layout.tabSpacing),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: ElevatedButton.icon(
+                key: const ValueKey('html_open_in_browser'),
+                icon: const Icon(Icons.open_in_browser),
+                label: const Text('OPEN IN BROWSER'),
+                onPressed: () => _openInBrowser(context),
+              ),
             ),
           ),
-        ),
         Expanded(
           child: ColoredBox(
             color: context.appPalette.codeBackground,
