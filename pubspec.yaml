@@ -24,6 +24,7 @@ dependencies:
   hive_ce_flutter: ^2.3.4
   package_info_plus: ^8.0.0
   path_provider: ^2.1.5
+  pdfx: ^2.9.2
   provider: ^6.1.2
   re_editor: ^0.9.0
   re_highlight: ^0.0.3
