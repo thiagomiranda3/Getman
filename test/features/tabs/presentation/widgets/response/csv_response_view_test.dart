@@ -36,4 +36,22 @@ void main() {
     // 'a;b;c' as one cell proves comma (not semicolon) was the delimiter.
     expect(find.text('a;b;c'), findsOneWidget);
   });
+
+  testWidgets('does not throw on non-UTF-8 (malformed) bytes', (tester) async {
+    // Invalid UTF-8 sequence — must decode with replacement chars, not throw.
+    final csv = Uint8List.fromList([
+      0xFF,
+      0xFE,
+      0x41,
+      0x2C,
+      0x42,
+    ]); // ...,A,B-ish
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: resolveTheme('classic')(Brightness.light, isCompact: false),
+        home: Scaffold(body: CsvResponseView(bytes: csv)),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
 }
