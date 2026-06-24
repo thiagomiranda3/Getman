@@ -134,6 +134,14 @@ class YamlEmitter {
           ..write(pad)
           ..writeln('-');
         _emitList(item, indent + 2, buf);
+      } else if (item is Map && item.isEmpty) {
+        buf
+          ..write(pad)
+          ..writeln('- {}');
+      } else if (item is List && item.isEmpty) {
+        buf
+          ..write(pad)
+          ..writeln('- []');
       } else {
         buf
           ..write(pad)
@@ -152,17 +160,23 @@ class YamlEmitter {
 
   static String _scalarString(String s) {
     if (!_needsQuote(s)) return s;
-    final escaped = s.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+    final escaped = s
+        .replaceAll(r'\', r'\\')
+        .replaceAll('"', r'\"')
+        .replaceAll('\n', r'\n')
+        .replaceAll('\r', r'\r')
+        .replaceAll('\t', r'\t');
     return '"$escaped"';
   }
 
   /// Quote only when leaving the scalar bare would change its meaning: empty,
-  /// padded, structurally ambiguous (`: ` / trailing `:` / ` #`), starting with
-  /// a YAML indicator char, or parseable as a bool/null/number. A URL
-  /// (`https://x` — colon without a following space) and a dotted version
-  /// (`1.0.0` — not a valid number) stay bare.
+  /// padded, contains control characters, structurally ambiguous (`: ` /
+  /// trailing `:` / ` #`), starting with a YAML indicator char, or parseable
+  /// as a bool/null/number. A URL (`https://x` — colon without a following
+  /// space) and a dotted version (`1.0.0` — not a valid number) stay bare.
   static bool _needsQuote(String s) {
     if (s.isEmpty || s != s.trim()) return true;
+    if (s.contains(RegExp(r'[\x00-\x1f]'))) return true;
     if (s.contains(': ') || s.endsWith(':') || s.contains(' #')) return true;
     if (_indicators.contains(s[0])) return true;
     final lower = s.toLowerCase();

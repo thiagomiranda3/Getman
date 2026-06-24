@@ -1,6 +1,7 @@
 // test/core/utils/apidoc/yaml_emitter_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/utils/apidoc/yaml_emitter.dart';
+import 'package:yaml/yaml.dart';
 
 void main() {
   test('emits nested maps with 2-space indent; dotted versions stay bare', () {
@@ -67,5 +68,31 @@ void main() {
       ],
     });
     expect(yaml, 'items:\n  - props: {}\n');
+  });
+
+  test(
+    'a string with an embedded newline emits a single-line quoted scalar',
+    () {
+      final yaml = YamlEmitter.emit({'desc': 'line1\nline2'});
+      // single line, newline escaped, parses back to the original value
+      expect(yaml, 'desc: "line1\\nline2"\n');
+      expect(loadYaml(yaml), {'desc': 'line1\nline2'});
+    },
+  );
+
+  test('control-char strings round-trip through a real YAML parser', () {
+    final tree = {
+      'info': {'title': 'My API', 'version': '1.0.0'},
+      'example': {'body': 'a\nb\tc', 'note': 'x: y'},
+    };
+    final parsed = loadYaml(YamlEmitter.emit(tree)) as YamlMap;
+    // loadYaml returns YamlMap; compare via scalar leaf assertions
+    expect((parsed['info'] as YamlMap)['title'], 'My API');
+    expect((parsed['example'] as YamlMap)['body'], 'a\nb\tc');
+    expect((parsed['example'] as YamlMap)['note'], 'x: y');
+  });
+
+  test('a bare empty map as a direct list item stays inline', () {
+    expect(YamlEmitter.emit([<String, dynamic>{}]), '- {}\n');
   });
 }
