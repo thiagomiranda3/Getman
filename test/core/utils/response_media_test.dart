@@ -106,6 +106,22 @@ void main() {
         ResponseMediaKind.binary,
       );
     });
+    test('magic bytes detect short signatures (JPEG 3-byte, GZIP 2-byte)', () {
+      // JPEG header is 3 bytes: [0xFF, 0xD8, 0xFF]
+      expect(
+        classifyResponseMedia(
+          sniffBytes: Uint8List.fromList([0xFF, 0xD8, 0xFF]),
+        ),
+        ResponseMediaKind.image,
+      );
+      // GZIP header is 2 bytes: [0x1F, 0x8B]
+      expect(
+        classifyResponseMedia(
+          sniffBytes: Uint8List.fromList([0x1F, 0x8B]),
+        ),
+        ResponseMediaKind.binary,
+      );
+    });
     test('nothing matches → textual', () {
       expect(classifyResponseMedia(), ResponseMediaKind.textual);
     });
@@ -121,6 +137,12 @@ void main() {
     });
     test('defaults to bin', () {
       expect(mediaExtension(), 'bin');
+    });
+    test('xhtml+xml returns html extension', () {
+      expect(
+        mediaExtension(contentType: 'application/xhtml+xml'),
+        'html',
+      );
     });
   });
 }

@@ -74,7 +74,7 @@ ResponseMediaKind? _kindFromExtension(String? ext) {
 }
 
 ResponseMediaKind? _kindFromMagic(Uint8List? b) {
-  if (b == null || b.length < 4) return null;
+  if (b == null || b.length < 2) return null;
   bool starts(List<int> sig) {
     if (b.length < sig.length) return false;
     for (var i = 0; i < sig.length; i++) {
@@ -114,7 +114,6 @@ const _binaryContentTypes = {
   'application/gzip',
   'application/x-gzip',
   'application/x-tar',
-  'application/octet-stream-binary',
 };
 
 const _kindByExt = <String, ResponseMediaKind>{
@@ -155,6 +154,7 @@ const _extFromContentType = <String, String>{
   'text/csv': 'csv',
   'application/csv': 'csv',
   'text/html': 'html',
+  'application/xhtml+xml': 'html',
   'video/mp4': 'mp4',
   'video/webm': 'webm',
   'video/quicktime': 'mov',
