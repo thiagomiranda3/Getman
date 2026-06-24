@@ -9,6 +9,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/viewers/binary_response_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/viewers/csv_response_view.dart';
+import 'package:getman/features/tabs/presentation/widgets/response/viewers/html_response_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/viewers/image_response_view.dart';
 
 enum _MediaTab { preview, raw }
@@ -79,7 +80,6 @@ class _ResponseMediaPanelState extends State<ResponseMediaPanel> {
     String? contentType,
     String? url,
   ) {
-    // Phase 3/4: add html, pdf, video, audio cases here.
     switch (kind) {
       case ResponseMediaKind.image:
         return ImageResponseView(
@@ -94,8 +94,12 @@ class _ResponseMediaPanelState extends State<ResponseMediaPanel> {
           key: const ValueKey('media_preview_csv'),
           bytes: bytes,
         );
-      case ResponseMediaKind.pdf:
       case ResponseMediaKind.html:
+        return HtmlResponseView(
+          key: const ValueKey('media_preview_html'),
+          bytes: bytes,
+        );
+      case ResponseMediaKind.pdf:
       case ResponseMediaKind.video:
       case ResponseMediaKind.audio:
       case ResponseMediaKind.binary:
