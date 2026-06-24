@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/presentation/widgets/export_api_docs_dialog.dart';
-import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 
 void main() {
   const node = CollectionNodeEntity(
@@ -43,7 +42,12 @@ void main() {
     expect(out.content.startsWith('# My API'), isTrue);
   });
 
-  test('buildExport surfaces warnings (unresolvable server)', () {
+  test('buildExport reports no warnings for a clean absolute URL', () {
+    final out = buildExport(node, null, ExportDocFormat.openApiJson);
+    expect(out.warnings, isEmpty);
+  });
+
+  test('buildExport surfaces a warning for an unresolvable server URL', () {
     final out = buildExport(
       const CollectionNodeEntity(
         id: 'r',
@@ -53,15 +57,14 @@ void main() {
             id: 'a',
             name: 'x',
             isFolder: false,
-            config: HttpRequestConfigEntity(id: 'c', url: '{{baseUrl}}/x'),
+            config: HttpRequestConfigEntity(id: 'c', url: 'orphan/path'),
           ),
         ],
       ),
-      EnvironmentEntity(name: 'empty'),
+      null,
       ExportDocFormat.openApiJson,
     );
-    // base var has no value → server '{baseUrl}', not a hard warning here,
-    // but with no env at all it would warn. Just assert the record shape:
-    expect(out.warnings, isA<List<String>>());
+    expect(out.warnings, isNotEmpty);
+    expect(out.warnings.first, contains('Could not determine'));
   });
 }
