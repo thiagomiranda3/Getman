@@ -386,4 +386,48 @@ void main() {
       expect(r.secretKeys, isEmpty);
     });
   });
+
+  group('ancestorFolderIds', () {
+    test('returns empty for a root node', () {
+      final nodes = [folder('a', 'A'), leaf('b', 'B')];
+      expect(CollectionsTreeHelper.ancestorFolderIds(nodes, 'a'), isEmpty);
+      expect(CollectionsTreeHelper.ancestorFolderIds(nodes, 'b'), isEmpty);
+    });
+
+    test('returns empty for an unknown id', () {
+      final nodes = [
+        folder('a', 'A', children: [leaf('b', 'B')]),
+      ];
+      expect(CollectionsTreeHelper.ancestorFolderIds(nodes, 'zzz'), isEmpty);
+    });
+
+    test('returns ordered ancestor ids (root first) for a nested leaf', () {
+      final nodes = [
+        folder(
+          'root',
+          'Root',
+          children: [
+            folder(
+              'mid',
+              'Mid',
+              children: [leaf('deep', 'Deep')],
+            ),
+          ],
+        ),
+      ];
+      expect(
+        CollectionsTreeHelper.ancestorFolderIds(nodes, 'deep'),
+        ['root', 'mid'],
+      );
+    });
+
+    test('excludes the target node itself', () {
+      final nodes = [
+        folder('root', 'Root', children: [leaf('child', 'Child')]),
+      ];
+      final ids = CollectionsTreeHelper.ancestorFolderIds(nodes, 'child');
+      expect(ids, ['root']);
+      expect(ids, isNot(contains('child')));
+    });
+  });
 }

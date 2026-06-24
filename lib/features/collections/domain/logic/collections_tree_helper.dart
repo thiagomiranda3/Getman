@@ -132,6 +132,18 @@ class CollectionsTreeHelper {
     return null;
   }
 
+  /// The ids of every ancestor folder on the path down to [id] (root first,
+  /// nearest parent last), excluding [id] itself. Empty if [id] is a root node
+  /// or is not found. Used to auto-expand a node into view.
+  static List<String> ancestorFolderIds(
+    List<CollectionNodeEntity> nodes,
+    String id,
+  ) {
+    final path = _pathTo(nodes, id);
+    if (path == null || path.length < 2) return const [];
+    return [for (final node in path.sublist(0, path.length - 1)) node.id];
+  }
+
   /// Append [example] to the node's saved examples (newest last). No-op if the
   /// id is missing.
   static List<CollectionNodeEntity> addExampleToNode(
