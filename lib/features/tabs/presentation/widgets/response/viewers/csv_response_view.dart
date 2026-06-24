@@ -15,7 +15,7 @@ class CsvResponseView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final layout = context.appLayout;
-    final rows = Csv().decode(utf8.decode(bytes, allowMalformed: true));
+    final rows = Csv(autoDetect: false).decode(utf8.decode(bytes));
     if (rows.isEmpty) {
       return const Center(child: Text('Empty CSV'));
     }

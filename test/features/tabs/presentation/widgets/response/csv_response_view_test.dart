@@ -20,4 +20,20 @@ void main() {
     expect(find.text('Doe, John'), findsOneWidget);
     expect(find.text('a,b'), findsOneWidget);
   });
+
+  testWidgets('pins comma delimiter even when data is semicolon-heavy', (
+    tester,
+  ) async {
+    // Each line has 3 semicolons and 1 comma. Auto-detect would pick ';' and
+    // mangle the table; pinning to ',' must keep 'a;b;c' as a single cell.
+    final csv = Uint8List.fromList('a;b;c,d\ne;f;g,h'.codeUnits);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: resolveTheme('classic')(Brightness.light, isCompact: false),
+        home: Scaffold(body: CsvResponseView(bytes: csv)),
+      ),
+    );
+    // 'a;b;c' as one cell proves comma (not semicolon) was the delimiter.
+    expect(find.text('a;b;c'), findsOneWidget);
+  });
 }
