@@ -12,6 +12,7 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/collection_variables_dialog.dart';
+import 'package:getman/features/collections/presentation/widgets/export_api_docs_dialog.dart';
 
 /// The trailing more-actions menu on a collection node row
 /// (rename / describe / delete / favorite / add-subfolder / export).
@@ -70,6 +71,8 @@ class CollectionNodeMenu extends StatelessWidget {
             _showAddSubfolderDialog(context);
           case 'export':
             unawaited(_exportNode(context));
+          case 'export_docs':
+            unawaited(ExportApiDocsDialog.show(context, node));
         }
       },
       itemBuilder: (context) => [
@@ -130,6 +133,16 @@ class CollectionNodeMenu extends StatelessWidget {
           value: 'export',
           child: Text(
             'EXPORT TO POSTMAN',
+            style: TextStyle(
+              fontSize: layout.fontSizeSmall,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'export_docs',
+          child: Text(
+            'EXPORT AS API DOCS…',
             style: TextStyle(
               fontSize: layout.fontSizeSmall,
               fontWeight: FontWeight.bold,

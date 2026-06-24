@@ -13,6 +13,7 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/collection_variables_dialog.dart';
+import 'package:getman/features/collections/presentation/widgets/export_api_docs_dialog.dart';
 
 /// Touch-first replacement for the three-dot context menu. Opened via long-
 /// press on a collection node when `BuildContext.isPhone` is true. Exposes
@@ -183,6 +184,14 @@ class _SheetBody extends StatelessWidget {
             onTap: () {
               Navigator.of(context).pop();
               unawaited(_exportNode(context, node));
+            },
+          ),
+          _Action(
+            icon: Icons.description_outlined,
+            label: 'EXPORT AS API DOCS…',
+            onTap: () {
+              Navigator.of(context).pop();
+              unawaited(ExportApiDocsDialog.show(context, node));
             },
           ),
           _Action(
