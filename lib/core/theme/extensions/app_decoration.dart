@@ -37,6 +37,17 @@ typedef FrostWrapper =
       BorderRadius? borderRadius,
     });
 
+/// Per-theme frosted dialog surface. When non-null, `ResponsiveDialogScaffold`
+/// renders the centered dialog as a custom card built from this (clip + blur +
+/// translucent fill) instead of a plain `AlertDialog`. Null for every theme
+/// that uses an opaque dialog (all themes except Liquid Glass at full effects).
+typedef DialogSurfaceBuilder =
+    Widget Function(
+      BuildContext context, {
+      required Widget child,
+      required BorderRadius borderRadius,
+    });
+
 /// Default [FrostWrapper]: returns [child] unchanged. Themes that don't frost
 /// (everything except Liquid Glass) inherit this via the constructor default,
 /// so they are completely unaffected by the hook.
@@ -54,6 +65,7 @@ class AppDecoration extends ThemeExtension<AppDecoration> {
     required this.scaffoldBackground,
     this.frost = _identityFrost,
     this.brandedTabIndicator,
+    this.dialogSurface,
   });
   final PanelBoxBuilder panelBox;
   final TabShapeBuilder tabShape;
@@ -74,6 +86,10 @@ class AppDecoration extends ThemeExtension<AppDecoration> {
   final Decoration Function(BuildContext context, {bool topBorder})?
   brandedTabIndicator;
 
+  /// See [DialogSurfaceBuilder]. Glass sets this at full effects; everything
+  /// else leaves it null and keeps the standard `AlertDialog`.
+  final DialogSurfaceBuilder? dialogSurface;
+
   @override
   AppDecoration copyWith({
     PanelBoxBuilder? panelBox,
@@ -83,6 +99,7 @@ class AppDecoration extends ThemeExtension<AppDecoration> {
     FrostWrapper? frost,
     Decoration Function(BuildContext context, {bool topBorder})?
     brandedTabIndicator,
+    DialogSurfaceBuilder? dialogSurface,
   }) {
     return AppDecoration(
       panelBox: panelBox ?? this.panelBox,
@@ -91,6 +108,7 @@ class AppDecoration extends ThemeExtension<AppDecoration> {
       scaffoldBackground: scaffoldBackground ?? this.scaffoldBackground,
       frost: frost ?? this.frost,
       brandedTabIndicator: brandedTabIndicator ?? this.brandedTabIndicator,
+      dialogSurface: dialogSurface ?? this.dialogSurface,
     );
   }
 
