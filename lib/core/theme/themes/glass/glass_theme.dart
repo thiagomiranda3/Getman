@@ -22,6 +22,7 @@ ThemeData glassTheme(
   final isDark = brightness == Brightness.dark;
   final accent = isDark ? GlassPalette.accentDark : GlassPalette.accentLight;
   final panel = isDark ? GlassPalette.panelDark : GlassPalette.panelLight;
+  final dialogBg = isDark ? GlassPalette.dialogDark : GlassPalette.dialogLight;
   final border = isDark ? GlassPalette.borderDark : GlassPalette.borderLight;
   final text = isDark ? GlassPalette.textDark : GlassPalette.textLight;
   final textSoft = isDark
@@ -110,7 +111,10 @@ ThemeData glassTheme(
   );
   final effectiveDecoration = reduceEffects
       ? decoration
-      : decoration.copyWith(frost: glassFrost);
+      : decoration.copyWith(
+          frost: glassFrost,
+          dialogSurface: glassDialogSurface,
+        );
 
   final base = ThemeData(
     useMaterial3: true,
@@ -266,7 +270,7 @@ ThemeData glassTheme(
       ),
     ),
     dialogTheme: DialogThemeData(
-      backgroundColor: panel,
+      backgroundColor: dialogBg,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(shape.dialogRadius),
         side: BorderSide(color: border, width: layout.borderThin),
