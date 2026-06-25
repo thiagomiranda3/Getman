@@ -89,7 +89,7 @@ Widget glassDialogSurface(
         ),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: theme.cardColor, // translucent panel (~40%)
+            color: theme.cardColor, // glass panel fill; the blur frosts it
             borderRadius: borderRadius,
             border: Border.all(
               color: theme.dividerColor,

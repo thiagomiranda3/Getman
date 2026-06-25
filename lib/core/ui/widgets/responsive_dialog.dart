@@ -101,11 +101,12 @@ class ResponsiveDialogScaffold extends StatelessWidget {
   }
 }
 
-// Material AlertDialog default paddings, reproduced so the frosted-card dialog
-// matches the standard dialog layout exactly.
+// Material AlertDialog default paddings + button gap, reproduced so the
+// frosted-card dialog matches the standard dialog layout exactly.
 const EdgeInsets _kDialogTitlePadding = EdgeInsets.fromLTRB(24, 24, 24, 0);
 const EdgeInsets _kDialogContentPadding = EdgeInsets.fromLTRB(24, 20, 24, 24);
 const EdgeInsets _kDialogActionsPadding = EdgeInsets.fromLTRB(8, 0, 8, 8);
+const double _kDialogButtonSpacing = 8;
 
 /// The inner column of a frosted-card dialog: title, scrollable content, and
 /// an actions bar — mirroring `AlertDialog`'s structure so content does not
@@ -151,7 +152,7 @@ class _DialogBody extends StatelessWidget {
             padding: _kDialogActionsPadding,
             child: OverflowBar(
               alignment: MainAxisAlignment.end,
-              spacing: 8,
+              spacing: _kDialogButtonSpacing,
               overflowAlignment: OverflowBarAlignment.end,
               children: actions!,
             ),
