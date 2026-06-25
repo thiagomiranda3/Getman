@@ -91,6 +91,96 @@ void main() {
     expect(responses.map((r) => r.statusCode), contains(404));
   });
 
+  test('inherit auth is mapped to none on the operation', () {
+    final root = CollectionNodeEntity(
+      id: 'r',
+      name: 'API',
+      children: [
+        CollectionNodeEntity(
+          id: 'a',
+          name: 'Get',
+          isFolder: false,
+          config: HttpRequestConfigEntity(
+            id: 'c',
+            url: 'https://api.test.com/x',
+            auth: const AuthConfig(type: AuthType.inherit).toMap(),
+          ),
+        ),
+      ],
+    );
+    final op = CollectionToApiDoc.build(root).operations.single;
+    expect(op.security.type, AuthType.none);
+  });
+
+  test('example at same status as live response suppresses the live one', () {
+    final root = CollectionNodeEntity(
+      id: 'r',
+      name: 'API',
+      children: [
+        CollectionNodeEntity(
+          id: 'a',
+          name: 'Get',
+          isFolder: false,
+          config: const HttpRequestConfigEntity(
+            id: 'c',
+            url: 'https://api.test.com/x',
+            statusCode: 200,
+            responseBody: '{"live":true}',
+          ),
+          examples: [
+            SavedExampleEntity(
+              id: 'e1',
+              name: 'myExample',
+              capturedAt: DateTime(2026),
+              config: const HttpRequestConfigEntity(
+                id: 'ec',
+                url: 'https://api.test.com/x',
+                statusCode: 200,
+                responseBody: '{"example":true}',
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+    final responses = CollectionToApiDoc.build(
+      root,
+    ).operations.single.responses;
+    expect(responses.where((r) => r.statusCode == 200).length, 1);
+    expect(
+      responses.single.description,
+      'Example: myExample',
+    );
+  });
+
+  test(
+    'non-JSON live response body falls back to text/plain content type',
+    () {
+      const root = CollectionNodeEntity(
+        id: 'r',
+        name: 'API',
+        children: [
+          CollectionNodeEntity(
+            id: 'a',
+            name: 'Get',
+            isFolder: false,
+            config: HttpRequestConfigEntity(
+              id: 'c',
+              url: 'https://api.test.com/x',
+              statusCode: 200,
+              responseBody: 'not json at all',
+            ),
+          ),
+        ],
+      );
+      final response = CollectionToApiDoc.build(
+        root,
+      ).operations.single.responses.single;
+      expect(response.body!.contentType, 'text/plain');
+      expect(response.body!.example, 'not json at all');
+    },
+  );
+
   test('bearer auth is carried on the operation', () {
     final root = CollectionNodeEntity(
       id: 'r',
