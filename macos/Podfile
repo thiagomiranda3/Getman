@@ -29,6 +29,12 @@ flutter_macos_podfile_setup
 target 'Runner' do
   use_frameworks!
 
+  # Silence noisy warnings from third-party pods (e.g. media_kit_video's
+  # POD_CONFIGURATION_DEBUG macro-redefinition + objc_ownership header
+  # warnings). This only affects pod targets — the Runner app target and our
+  # Dart analysis are unaffected.
+  inhibit_all_warnings!
+
   flutter_install_all_macos_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
     inherit! :search_paths
