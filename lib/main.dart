@@ -31,10 +31,12 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/updates/presentation/update_controller.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
   // All Google Fonts variants the app uses are bundled in assets/google_fonts/.
   // Disallow runtime fetching so a missing variant fails loudly in debug
   // instead of silently downloading over HTTP (jank + offline breakage).

@@ -11,6 +11,7 @@ import 'package:getman/features/tabs/presentation/widgets/response/viewers/binar
 import 'package:getman/features/tabs/presentation/widgets/response/viewers/csv_response_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/viewers/html_response_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/viewers/image_response_view.dart';
+import 'package:getman/features/tabs/presentation/widgets/response/viewers/media_response_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/viewers/pdf_response_view.dart';
 
 enum _MediaTab { preview, raw }
@@ -106,7 +107,21 @@ class _ResponseMediaPanelState extends State<ResponseMediaPanel> {
           bytes: bytes,
         );
       case ResponseMediaKind.video:
+        return MediaResponseView(
+          key: const ValueKey('media_preview_video'),
+          bytes: bytes,
+          isVideo: true,
+          contentType: contentType,
+          url: url,
+        );
       case ResponseMediaKind.audio:
+        return MediaResponseView(
+          key: const ValueKey('media_preview_audio'),
+          bytes: bytes,
+          isVideo: false,
+          contentType: contentType,
+          url: url,
+        );
       case ResponseMediaKind.binary:
         return BinaryResponseView(
           bytes: bytes,
