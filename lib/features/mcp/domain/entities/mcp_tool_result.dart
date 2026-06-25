@@ -13,7 +13,7 @@ class McpToolResult extends Equatable {
   factory McpToolResult.fromJson(Map<String, dynamic> result) {
     final content = (result['content'] as List?) ?? const [];
     final raw = content
-        .whereType<Map>()
+        .whereType<Map<dynamic, dynamic>>()
         .map((m) => m.cast<String, dynamic>())
         .toList();
     final text = raw
