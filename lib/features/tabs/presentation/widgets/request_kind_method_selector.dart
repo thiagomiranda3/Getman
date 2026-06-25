@@ -58,6 +58,7 @@ class RequestKindMethodSelector extends StatelessWidget {
                   child: Text('WS'),
                 ),
                 DropdownMenuItem(value: RequestKind.sse, child: Text('SSE')),
+                DropdownMenuItem(value: RequestKind.mcp, child: Text('MCP')),
               ],
               onChanged: (k) {
                 if (k != null && tab.config.kind != k) {

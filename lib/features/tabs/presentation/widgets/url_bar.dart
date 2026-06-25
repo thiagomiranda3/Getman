@@ -19,6 +19,7 @@ import 'package:getman/features/collections/presentation/bloc/collections_state.
 import 'package:getman/features/environments/domain/logic/active_environment_helper.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
+import 'package:getman/features/mcp/presentation/widgets/mcp_connect_button.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
@@ -427,6 +428,13 @@ class _UrlBarState extends State<UrlBar> {
                                         ),
                                 ),
                               ),
+                            )
+                          else if (tab.config.kind == RequestKind.mcp)
+                            McpConnectButton(
+                              tabId: tab.tabId,
+                              config: tab.config,
+                              isNarrow: isNarrow,
+                              activeVars: _activeVariables(context),
                             )
                           else
                             RealtimeButton(
