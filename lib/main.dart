@@ -21,6 +21,7 @@ import 'package:getman/features/environments/presentation/bloc/environments_bloc
 import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
+import 'package:getman/features/mcp/presentation/bloc/mcp_bloc.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
@@ -214,6 +215,7 @@ class MyApp extends StatelessWidget {
           ),
           BlocProvider(create: (_) => di.sl<RulesBloc>()),
           BlocProvider(create: (_) => di.sl<RealtimeBloc>()),
+          BlocProvider(create: (_) => di.sl<McpBloc>()),
         ],
         child: NetworkSettingsListener(
           child: WorkspaceSyncListener(

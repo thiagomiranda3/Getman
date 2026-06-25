@@ -4,6 +4,7 @@ import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/cookie_interceptor.dart';
 import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/in_memory_cookie_store.dart';
+import 'package:getman/core/network/mcp_service.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/network/realtime_service.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
@@ -40,6 +41,7 @@ import 'package:getman/features/history/domain/repositories/history_repository.d
 import 'package:getman/features/history/domain/usecases/history_usecases.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
+import 'package:getman/features/mcp/presentation/bloc/mcp_bloc.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
 import 'package:getman/features/settings/data/datasources/settings_local_data_source.dart';
 import 'package:getman/features/settings/data/models/settings_model.dart';
@@ -242,6 +244,9 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     // Features - Realtime (WebSocket / SSE)
     ..registerLazySingleton(RealtimeService.new)
     ..registerLazySingleton(() => RealtimeBloc(service: sl()))
+    // Features - MCP (Model Context Protocol client over Streamable HTTP)
+    ..registerLazySingleton(McpService.new)
+    ..registerLazySingleton(() => McpBloc(service: sl()))
     // Features - Home
     ..registerLazySingleton(() => const TabDirtyChecker())
     // Features - Updates (GitHub release auto-update)
