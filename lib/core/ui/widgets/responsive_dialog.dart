@@ -24,11 +24,31 @@ class ResponsiveDialogScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!context.isDialogFullscreen) {
-      return AlertDialog(
-        title: DefaultTextStyle.merge(child: title, style: const TextStyle()),
-        content: content,
-        contentPadding: contentPadding,
-        actions: actions,
+      final surface = context.appDecoration.dialogSurface;
+      if (surface == null) {
+        return AlertDialog(
+          title: DefaultTextStyle.merge(child: title, style: const TextStyle()),
+          content: content,
+          contentPadding: contentPadding,
+          actions: actions,
+        );
+      }
+      // Frosted-card path (glass, full effects). Reuse the base Dialog for the
+      // same centering / insetPadding / min-width as AlertDialog, but transparent
+      // so the frosted surface is the only visible card.
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: surface(
+          context,
+          borderRadius: BorderRadius.circular(context.appShape.dialogRadius),
+          child: _DialogBody(
+            title: title,
+            content: content,
+            actions: actions,
+            contentPadding: contentPadding,
+          ),
+        ),
       );
     }
 
@@ -77,6 +97,66 @@ class ResponsiveDialogScaffold extends StatelessWidget {
                 ),
               ),
             ),
+    );
+  }
+}
+
+// Material AlertDialog default paddings, reproduced so the frosted-card dialog
+// matches the standard dialog layout exactly.
+const EdgeInsets _kDialogTitlePadding = EdgeInsets.fromLTRB(24, 24, 24, 0);
+const EdgeInsets _kDialogContentPadding = EdgeInsets.fromLTRB(24, 20, 24, 24);
+const EdgeInsets _kDialogActionsPadding = EdgeInsets.fromLTRB(8, 0, 8, 8);
+
+/// The inner column of a frosted-card dialog: title, scrollable content, and
+/// an actions bar — mirroring `AlertDialog`'s structure so content does not
+/// reflow.
+class _DialogBody extends StatelessWidget {
+  const _DialogBody({
+    required this.title,
+    required this.content,
+    this.actions,
+    this.contentPadding,
+  });
+
+  final Widget title;
+  final Widget content;
+  final List<Widget>? actions;
+  final EdgeInsetsGeometry? contentPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    final dialogTheme = Theme.of(context).dialogTheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: _kDialogTitlePadding,
+          child: DefaultTextStyle.merge(
+            style: dialogTheme.titleTextStyle ?? const TextStyle(),
+            child: title,
+          ),
+        ),
+        Flexible(
+          child: SingleChildScrollView(
+            padding: contentPadding ?? _kDialogContentPadding,
+            child: DefaultTextStyle.merge(
+              style: dialogTheme.contentTextStyle ?? const TextStyle(),
+              child: content,
+            ),
+          ),
+        ),
+        if (actions != null && actions!.isNotEmpty)
+          Padding(
+            padding: _kDialogActionsPadding,
+            child: OverflowBar(
+              alignment: MainAxisAlignment.end,
+              spacing: 8,
+              overflowAlignment: OverflowBarAlignment.end,
+              children: actions!,
+            ),
+          ),
+      ],
     );
   }
 }
