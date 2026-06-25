@@ -5,6 +5,46 @@ All notable changes to **Getman** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-06-25
+
+### Added
+
+- **Rich response viewers** — responses are now rendered by content type instead
+  of always falling back to raw text:
+  - **Images** preview inline.
+  - **Video & audio** play in an embedded player.
+  - **PDF** renders inline with page navigation.
+  - **CSV** displays as a sortable table.
+  - **HTML** shows the source with an **open-in-browser** action (source-only on
+    the web build).
+  - Other **binary** payloads get a dedicated viewer.
+
+  A new **PREVIEW** mode sits alongside **RAW** so you can always drop back to the
+  bytes/text. (Media bytes are captured for the live response only — they are not
+  written to history.)
+- **Export collections as API documentation** — export a collection to
+  **OpenAPI 3.0.3** (JSON or YAML) or **Markdown** from the collection node menu.
+  The export dialog lets you pick the format and the environment to resolve
+  `{{variables}}` against.
+- **Active request highlighted in the collections tree** — the request linked to
+  the current tab is now highlighted with an accent bar and revealed (its parent
+  folders expand) so you can always see where the open request lives.
+
+### Changed
+
+- **Liquid Glass — dialogs now render as a frosted, blurred card**, matching the
+  rest of the theme's glass surfaces.
+
+### Fixed
+
+- **Find-in-editor panel** — searching the request body / response is faster, and
+  **Enter** now steps to the next match.
+- **Keyboard shortcuts use the platform-correct modifier** — ⌘ on macOS, Ctrl
+  elsewhere — and **Save (⌘/Ctrl+S)** now works correctly while you're typing in a
+  code editor (the editor no longer swallows or misfires the shortcut).
+- **AURIS** — corrected the favorite-folder icon color and the request-tab hover
+  color.
+
 ## [1.6.1] - 2026-06-23
 
 ### Added
@@ -182,4 +222,5 @@ workflow. Runs on macOS, Windows, and Linux.
   machine.
 - Ships for **macOS**, **Windows**, and **Linux** desktop.
 
+[1.7.0]: https://github.com/thiagomiranda3/Getman/releases/tag/v1.7.0
 [1.0.0]: https://github.com/thiagomiranda3/Getman/releases/tag/1.0.0
