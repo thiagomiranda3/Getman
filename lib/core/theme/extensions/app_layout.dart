@@ -43,6 +43,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
     required this.splitterLineSize,
     required this.foldGutterWidth,
     required this.quickListMaxHeight,
+    required this.mcpEditorPaneHeight,
   });
   final double pagePadding;
   final double sectionSpacing;
@@ -97,6 +98,10 @@ class AppLayout extends ThemeExtension<AppLayout> {
   /// quick environment switcher — caps the list so the modal stays bounded.
   final double quickListMaxHeight;
 
+  /// Height of each JSON code editor pane (input schema + arguments) in the
+  /// MCP tool detail panel.
+  final double mcpEditorPaneHeight;
+
   @override
   AppLayout copyWith({
     bool? isCompact,
@@ -140,6 +145,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
     double? splitterLineSize,
     double? foldGutterWidth,
     double? quickListMaxHeight,
+    double? mcpEditorPaneHeight,
   }) {
     return AppLayout(
       isCompact: isCompact ?? this.isCompact,
@@ -188,6 +194,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
       splitterLineSize: splitterLineSize ?? this.splitterLineSize,
       foldGutterWidth: foldGutterWidth ?? this.foldGutterWidth,
       quickListMaxHeight: quickListMaxHeight ?? this.quickListMaxHeight,
+      mcpEditorPaneHeight: mcpEditorPaneHeight ?? this.mcpEditorPaneHeight,
     );
   }
 
@@ -252,6 +259,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
       splitterLineSize: l(splitterLineSize, other.splitterLineSize),
       foldGutterWidth: l(foldGutterWidth, other.foldGutterWidth),
       quickListMaxHeight: l(quickListMaxHeight, other.quickListMaxHeight),
+      mcpEditorPaneHeight: l(mcpEditorPaneHeight, other.mcpEditorPaneHeight),
     );
   }
 
@@ -297,6 +305,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
     splitterLineSize: 3,
     foldGutterWidth: 20,
     quickListMaxHeight: 360,
+    mcpEditorPaneHeight: 160,
   );
 
   static const compact = AppLayout(
@@ -341,5 +350,6 @@ class AppLayout extends ThemeExtension<AppLayout> {
     splitterLineSize: 2,
     foldGutterWidth: 16,
     quickListMaxHeight: 280,
+    mcpEditorPaneHeight: 160,
   );
 }

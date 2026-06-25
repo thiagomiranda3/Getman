@@ -4,12 +4,33 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/utils/environment_resolver.dart';
+import 'package:getman/core/utils/request_variable_resolver.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/mcp/domain/entities/mcp_tool.dart';
 import 'package:getman/features/mcp/presentation/bloc/mcp_bloc.dart';
 import 'package:getman/features/mcp/presentation/bloc/mcp_event.dart';
 import 'package:getman/features/mcp/presentation/bloc/mcp_state.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart';
 import 'package:re_editor/re_editor.dart';
+
+/// Recursively resolves `{{var}}` tokens in JSON argument values.
+/// Only String leaves are substituted; non-string values pass through
+/// unchanged.
+dynamic _resolveArg(dynamic value, Map<String, String> vars) {
+  if (value is String) return EnvironmentResolver.resolve(value, vars);
+  if (value is Map<String, dynamic>) {
+    return value.map((k, v) => MapEntry(k, _resolveArg(v, vars)));
+  }
+  if (value is List<dynamic>) {
+    return value.map((e) => _resolveArg(e, vars)).toList();
+  }
+  return value;
+}
 
 /// Post-connect MCP UI for one tab: tool list, the selected tool's schema +
 /// JSON arguments editor + CALL, the last result, and a session log.
@@ -50,6 +71,21 @@ class _McpPanelState extends State<McpPanel> {
         : const JsonEncoder.withIndent('  ').convert(tool.inputSchema);
   }
 
+  /// Returns the merged variable map (collection vars overlaid by active
+  /// environment) for the current tab — same approach as url_bar.dart.
+  Map<String, String> _activeVariables(BuildContext context) {
+    final envState = context.read<EnvironmentsBloc>().state;
+    final settings = context.read<SettingsBloc>().state.settings;
+    final collections = context.read<CollectionsBloc>().state.collections;
+    final tab = context.read<TabsBloc>().state.tabs.byId(widget.tabId);
+    return RequestVariableResolver.variablesFor(
+      environments: envState.environments,
+      activeEnvironmentId: settings.activeEnvironmentId,
+      collections: collections,
+      collectionNodeId: tab?.collectionNodeId,
+    );
+  }
+
   void _call(BuildContext context, String toolName) {
     final raw = _args.text.trim().isEmpty ? '{}' : _args.text;
     Map<String, dynamic>? parsed;
@@ -64,11 +100,15 @@ class _McpPanelState extends State<McpPanel> {
       return;
     }
     setState(() => _argsError = null);
+    final activeVars = _activeVariables(context);
+    final resolved = parsed.map(
+      (k, v) => MapEntry(k, _resolveArg(v, activeVars)),
+    );
     context.read<McpBloc>().add(
       McpToolCallRequested(
         tabId: widget.tabId,
         toolName: toolName,
-        arguments: parsed,
+        arguments: resolved,
       ),
     );
   }
@@ -236,7 +276,7 @@ class _ToolDetail extends StatelessWidget {
           ),
           SizedBox(height: layout.inputPaddingVertical),
           SizedBox(
-            height: 160,
+            height: layout.mcpEditorPaneHeight,
             child: JsonCodeEditor(
               controller: schemaController,
               readOnly: true,
@@ -250,7 +290,7 @@ class _ToolDetail extends StatelessWidget {
           ),
           SizedBox(height: layout.inputPaddingVertical),
           SizedBox(
-            height: 160,
+            height: layout.mcpEditorPaneHeight,
             child: JsonCodeEditor(
               controller: argsController,
               autofocus: false,
