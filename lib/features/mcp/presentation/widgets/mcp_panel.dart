@@ -35,6 +35,9 @@ class _McpPanelState extends State<McpPanel> {
     super.dispose();
   }
 
+  // Fix 2: _syncForTool is no longer called from within build(). It is
+  // scheduled via addPostFrameCallback so controller.text mutations
+  // (which call notifyListeners) never fire mid-build.
   void _syncForTool(McpTool? tool) {
     if (tool?.name == _editingTool) return;
     _editingTool = tool?.name;
@@ -117,7 +120,13 @@ class _McpPanelState extends State<McpPanel> {
         final selected = s.tools.firstWhereOrNull(
           (t) => t.name == s.selectedTool,
         );
-        _syncForTool(selected);
+        // Schedule off-build: avoids notifyListeners mid-build when the
+        // selected tool changes and the controller text needs updating.
+        if (selected?.name != _editingTool) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _syncForTool(selected));
+          });
+        }
 
         return Padding(
           padding: EdgeInsets.all(layout.inputPadding),
@@ -158,6 +167,7 @@ class _McpPanelState extends State<McpPanel> {
                     argsError: _argsError,
                     calling: s.calling,
                     resultText: _resultText(s),
+                    log: s.log,
                     onCall: () => _call(context, selected.name),
                   ),
                 )
@@ -190,6 +200,7 @@ class _ToolDetail extends StatelessWidget {
     required this.argsError,
     required this.calling,
     required this.resultText,
+    required this.log,
     required this.onCall,
   });
 
@@ -199,6 +210,7 @@ class _ToolDetail extends StatelessWidget {
   final String? argsError;
   final bool calling;
   final String resultText;
+  final List<String> log;
   final VoidCallback onCall;
 
   @override
@@ -270,6 +282,39 @@ class _ToolDetail extends StatelessWidget {
             Text('Result', style: TextStyle(fontWeight: typo.titleWeight)),
             SizedBox(height: layout.inputPaddingVertical),
             SelectableText(resultText),
+          ],
+          // Fix 1: collapsible session log, shown when log is non-empty.
+          // Lives inside the SingleChildScrollView — no RenderFlex overflow.
+          if (log.isNotEmpty) ...[
+            SizedBox(height: layout.inputPaddingVertical),
+            ExpansionTile(
+              key: const ValueKey('mcp_session_log'),
+              title: Text(
+                'Session log',
+                style: TextStyle(fontWeight: typo.titleWeight),
+              ),
+              children: [
+                for (final entry in log)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        vertical: layout.inputPaddingVertical / 2,
+                        horizontal: layout.inputPadding,
+                      ),
+                      child: Text(
+                        entry,
+                        style: TextStyle(
+                          fontFamily: typo.codeFontFamily,
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.8,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ],
         ],
       ),

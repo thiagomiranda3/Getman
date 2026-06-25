@@ -1,4 +1,5 @@
-// Widget tests for McpPanel: disconnected hint, tool list + no overflow.
+// Widget tests for McpPanel: disconnected hint, tool list + no overflow,
+// and session log expansion.
 // Fixtures verified against the real entity/state signatures in mcp_state.dart,
 // mcp_tool.dart, and mcp_tool_result.dart.
 
@@ -78,4 +79,34 @@ void main() {
     expect(find.textContaining('result text'), findsWidgets);
     expect(tester.takeException(), isNull); // no RenderFlex overflow
   });
+
+  testWidgets(
+    'connected with session log shows log entries after expansion',
+    (tester) async {
+      await tester.pumpWidget(
+        harness(
+          const McpState(
+            sessions: {
+              't1': McpTabSession(
+                status: McpConnectionStatus.connected,
+                tools: [
+                  McpTool(name: 'add', description: 'Add', inputSchema: {}),
+                ],
+                selectedTool: 'add',
+                log: ['→ initialize', '← tools/list'],
+              ),
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      // The log tile may be below the viewport — scroll it into view first.
+      await tester.ensureVisible(find.text('Session log'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Session log'));
+      await tester.pumpAndSettle();
+      expect(find.text('→ initialize'), findsOneWidget);
+      expect(tester.takeException(), isNull); // no RenderFlex overflow
+    },
+  );
 }
