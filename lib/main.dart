@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -90,82 +91,61 @@ const List<LogicalKeyboardKey> _tabDigitKeys = [
   LogicalKeyboardKey.digit9,
 ];
 
-/// Global keyboard shortcuts. Built once (not const) so the Cmd/Ctrl+1..9
-/// jump-to-tab bindings can be generated in a loop. Actions are resolved at the
-/// root (new tab / command palette) and in `MainScreen` (tab/send/save/focus).
+/// Whether the primary shortcut modifier is ⌘ (meta) — true only on macOS,
+/// where every app uses Cmd; Ctrl is the primary modifier everywhere else.
+/// (Web on a Mac reports `TargetPlatform.macOS`, so browser builds match too.)
+bool get _useMetaPrimary => defaultTargetPlatform == TargetPlatform.macOS;
+
+/// Builds the global keyboard-shortcut map for one platform convention.
+///
+/// [useMeta] picks the *primary* modifier: ⌘ on macOS, Ctrl on Windows/Linux.
+/// Each shortcut is bound to that single modifier only — so on macOS Ctrl+S no
+/// longer saves, and on Windows the ⌘/Windows key no longer triggers app
+/// actions. The lone exception is the tab-switch pair (`Ctrl+Tab` /
+/// `Ctrl+Shift+Tab`), which is Ctrl on every platform: ⌘+Tab is the macOS app
+/// switcher, and Ctrl+Tab is the universal in-app tab-cycle convention.
+///
+/// Exposed for tests so both platform variants can be asserted without an
+/// `debugDefaultTargetPlatformOverride` dance.
 @visibleForTesting
-final Map<ShortcutActivator, Intent> appShortcuts = {
-  const SingleActivator(LogicalKeyboardKey.keyN, control: true):
-      const NewTabIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyN, meta: true):
-      const NewTabIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyW, control: true):
-      const CloseTabIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyW, meta: true):
-      const CloseTabIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyS, control: true):
-      const SaveRequestIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyS, meta: true):
-      const SaveRequestIntent(),
-  const SingleActivator(LogicalKeyboardKey.enter, control: true):
-      const SendRequestIntent(),
-  const SingleActivator(LogicalKeyboardKey.enter, meta: true):
-      const SendRequestIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyB, control: true):
-      const BeautifyJsonIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyB, meta: true):
-      const BeautifyJsonIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyK, control: true):
-      const CommandPaletteIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyK, meta: true):
-      const CommandPaletteIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyE, control: true):
-      const SwitchEnvironmentIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyE, meta: true):
-      const SwitchEnvironmentIntent(),
-  const SingleActivator(LogicalKeyboardKey.tab, control: true):
-      const NextTabIntent(),
-  const SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true):
-      const PrevTabIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyL, control: true):
-      const FocusUrlIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyL, meta: true):
-      const FocusUrlIntent(),
-  for (var i = 0; i < _tabDigitKeys.length; i++) ...{
-    SingleActivator(_tabDigitKeys[i], meta: true): JumpToTabIntent(i),
-    SingleActivator(_tabDigitKeys[i], control: true): JumpToTabIntent(i),
-  },
-  const SingleActivator(LogicalKeyboardKey.keyN, control: true, shift: true):
-      const NewPanelIntent(),
-  const SingleActivator(LogicalKeyboardKey.keyN, meta: true, shift: true):
-      const NewPanelIntent(),
-  const SingleActivator(
-    LogicalKeyboardKey.bracketRight,
-    control: true,
-    shift: true,
-  ): const NextPanelIntent(),
-  const SingleActivator(
-    LogicalKeyboardKey.bracketRight,
-    meta: true,
-    shift: true,
-  ): const NextPanelIntent(),
-  const SingleActivator(
-    LogicalKeyboardKey.bracketLeft,
-    control: true,
-    shift: true,
-  ): const PrevPanelIntent(),
-  const SingleActivator(
-    LogicalKeyboardKey.bracketLeft,
-    meta: true,
-    shift: true,
-  ): const PrevPanelIntent(),
-  for (var i = 0; i < _tabDigitKeys.length; i++) ...{
-    SingleActivator(_tabDigitKeys[i], control: true, shift: true):
-        JumpToPanelIntent(i),
-    SingleActivator(_tabDigitKeys[i], meta: true, shift: true):
-        JumpToPanelIntent(i),
-  },
-};
+Map<ShortcutActivator, Intent> buildAppShortcuts({required bool useMeta}) {
+  SingleActivator primary(LogicalKeyboardKey key, {bool shift = false}) =>
+      SingleActivator(key, control: !useMeta, meta: useMeta, shift: shift);
+
+  return {
+    primary(LogicalKeyboardKey.keyN): const NewTabIntent(),
+    primary(LogicalKeyboardKey.keyW): const CloseTabIntent(),
+    primary(LogicalKeyboardKey.keyS): const SaveRequestIntent(),
+    primary(LogicalKeyboardKey.enter): const SendRequestIntent(),
+    primary(LogicalKeyboardKey.keyB): const BeautifyJsonIntent(),
+    primary(LogicalKeyboardKey.keyK): const CommandPaletteIntent(),
+    primary(LogicalKeyboardKey.keyE): const SwitchEnvironmentIntent(),
+    primary(LogicalKeyboardKey.keyL): const FocusUrlIntent(),
+    // Tab-switch stays Ctrl on every platform (⌘+Tab is the OS app switcher).
+    const SingleActivator(LogicalKeyboardKey.tab, control: true):
+        const NextTabIntent(),
+    const SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true):
+        const PrevTabIntent(),
+    for (var i = 0; i < _tabDigitKeys.length; i++)
+      primary(_tabDigitKeys[i]): JumpToTabIntent(i),
+    primary(LogicalKeyboardKey.keyN, shift: true): const NewPanelIntent(),
+    primary(LogicalKeyboardKey.bracketRight, shift: true):
+        const NextPanelIntent(),
+    primary(LogicalKeyboardKey.bracketLeft, shift: true):
+        const PrevPanelIntent(),
+    for (var i = 0; i < _tabDigitKeys.length; i++)
+      primary(_tabDigitKeys[i], shift: true): JumpToPanelIntent(i),
+  };
+}
+
+/// Global keyboard shortcuts for the running platform (⌘ on macOS, Ctrl
+/// elsewhere). Built once at load from [buildAppShortcuts]. Actions are
+/// resolved at the root (new tab / command palette) and in `MainScreen`
+/// (tab/send/save/focus).
+@visibleForTesting
+final Map<ShortcutActivator, Intent> appShortcuts = buildAppShortcuts(
+  useMeta: _useMetaPrimary,
+);
 
 class MyApp extends StatelessWidget {
   const MyApp({required this.initialSettings, super.key});

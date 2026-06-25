@@ -67,20 +67,29 @@ BoxDecoration aurisTabShape(
     );
   }
 
+  // The inactive fill/indicator are a *same-hue, zero-alpha* color, NOT
+  // `Colors.transparent`. The tab's `AnimatedContainer` lerps this fill toward
+  // the opaque LIGHT hover/active surfaces; `Color.lerp` from premultiplied
+  // black (`Colors.transparent` is RGB 0,0,0) lands on a muddy mid-gray that
+  // flashes dark against AURIS's light surfaces (the reported light-mode hover
+  // flicker; masked in dark mode). Keeping the same RGB at alpha 0 makes the
+  // fade alpha-only, so it stays light throughout. Visually identical at rest.
   final Color bg;
   if (active) {
     bg = scheme.surfacePanel;
   } else if (hovered) {
     bg = scheme.surfaceInset;
   } else {
-    bg = Colors.transparent;
+    bg = scheme.surfacePanel.withValues(alpha: 0);
   }
 
   return BoxDecoration(
     color: bg,
     border: Border(
       bottom: BorderSide(
-        color: active ? scheme.primaryActive : Colors.transparent,
+        color: active
+            ? scheme.primaryActive
+            : scheme.primaryActive.withValues(alpha: 0),
         width: layout.borderThick,
       ),
     ),

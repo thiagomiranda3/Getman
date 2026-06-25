@@ -8,6 +8,25 @@ import 'package:re_highlight/re_highlight.dart';
 import 'package:re_highlight/styles/atom-one-dark.dart';
 import 'package:re_highlight/styles/atom-one-light.dart';
 
+/// re_editor's default shortcut map binds its (no-op) `save` action to Cmd+S
+/// on macOS (Ctrl+S elsewhere) and *consumes* the key. While a code editor held
+/// focus that swallowed the app's own Cmd+S before it could reach the global
+/// `SaveRequestIntent` — so on macOS Cmd+S did nothing and only the leaked
+/// Ctrl+S saved. Dropping the `save` activator (re_editor has no save handler
+/// anyway) lets the keystroke bubble up to the app's platform-correct shortcut.
+class _NoSaveCodeShortcutsActivatorsBuilder
+    extends CodeShortcutsActivatorsBuilder {
+  const _NoSaveCodeShortcutsActivatorsBuilder();
+
+  static const _defaults = DefaultCodeShortcutsActivatorsBuilder();
+
+  @override
+  List<ShortcutActivator>? build(CodeShortcutType type) {
+    if (type == CodeShortcutType.save) return null;
+    return _defaults.build(type);
+  }
+}
+
 /// Shared highlighter — `langJson` is registered once and reused for every
 /// line. The engine is pure (no mutable per-call state) so a single instance
 /// is safe to share across editors.
@@ -124,6 +143,10 @@ class JsonCodeEditor extends StatelessWidget {
         readOnly: readOnly,
         wordWrap: wordWrap,
         autofocus: autofocus,
+        // Drop re_editor's built-in Cmd/Ctrl+S so the app's own save shortcut
+        // fires (see [_NoSaveCodeShortcutsActivatorsBuilder]).
+        shortcutsActivatorsBuilder:
+            const _NoSaveCodeShortcutsActivatorsBuilder(),
         findBuilder: (context, controller, readOnly) =>
             CodeFindPanel(controller: controller, readOnly: readOnly),
         // Token colours come from [jsonHighlightSpanBuilder] on the controller,

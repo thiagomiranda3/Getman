@@ -33,6 +33,12 @@ void main() {
     config: HttpRequestConfigEntity(id: 'req-1'),
   );
 
+  const favoriteFolder = CollectionNodeEntity(
+    id: 'fav-1',
+    name: 'Favorites',
+    isFavorite: true,
+  );
+
   Widget host({required bool isSelected}) {
     final bloc = buildBloc();
     return MaterialApp(
@@ -48,6 +54,26 @@ void main() {
             rowWidth: 300,
             rowHeight: 44,
             isSelected: isSelected,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget favoriteHost(ThemeData theme) {
+    final bloc = buildBloc();
+    return MaterialApp(
+      theme: theme,
+      home: Scaffold(
+        body: BlocProvider<CollectionsBloc>.value(
+          value: bloc,
+          child: const CollectionNodeRow(
+            node: favoriteFolder,
+            isExpanded: false,
+            depth: 0,
+            onToggle: _noop,
+            rowWidth: 300,
+            rowHeight: 44,
           ),
         ),
       ),
@@ -88,4 +114,26 @@ void main() {
 
     expect(selectedDecoration(tester), isNull);
   });
+
+  // Regression: the favorite-folder star used `theme.primaryColor`, which AURIS
+  // leaves unset so Material defaults it to `colorScheme.surface` in dark mode
+  // (near-black) — the star vanished into the background. It must use the brand
+  // accent (`colorScheme.primary`), which is visible in both brightnesses.
+  testWidgets('AURIS dark: favorite star is the visible brand accent', (
+    tester,
+  ) async {
+    final theme = resolveTheme('auris')(Brightness.dark, isCompact: false);
+    await tester.pumpWidget(favoriteHost(theme));
+    await tester.pumpAndSettle();
+
+    final star = tester.widget<Icon>(find.byIcon(Icons.star));
+    expect(star.color, theme.colorScheme.primary);
+    expect(
+      star.color,
+      isNot(theme.colorScheme.surface),
+      reason: 'star must not match the surface/background color',
+    );
+  });
 }
+
+void _noop() {}

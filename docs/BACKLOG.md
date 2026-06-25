@@ -182,13 +182,6 @@
   events); register an action registry instead of jump-only entries.
 - **Effort**: M.
 
-### DL5 — Delightful first-run + live sample collection
-- **Idea**: a 30-second "wow" on first launch, seeded with a working sample
-  collection (e.g. httpbin) so a new user sends a real request immediately.
-- **Seam**: `features/home` + a first-run flag on `SettingsEntity` (new
-  `HiveField`, next free **27**).
-- **Effort**: M.
-
 ### DL7 — Pinned quick-access request bar
 - **Idea**: favorites exist in the tree; add a pinned launch strip for daily-
   driver requests, one tap to open as a tab.

@@ -106,8 +106,13 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
                       Icon(
                         node.isFavorite ? Icons.star : Icons.folder,
                         size: layout.iconSize,
+                        // `colorScheme.primary` (the brand accent), not
+                        // `primaryColor`: AURIS leaves `primaryColor` unset, so
+                        // Material defaults it to `colorScheme.surface`
+                        // (near-black) in dark mode — the star vanished into
+                        // the background. Other themes set the two the same.
                         color: node.isFavorite
-                            ? theme.primaryColor
+                            ? theme.colorScheme.primary
                             : theme.colorScheme.secondary,
                       ),
                       const SizedBox(width: 8),
