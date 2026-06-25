@@ -15,5 +15,12 @@ void main() {
       expect(RequestKind.fromWire(99), RequestKind.http);
       expect(RequestKind.fromWire(null), RequestKind.http);
     });
+
+    test('label returns the short protocol badge text', () {
+      expect(RequestKind.http.label, 'HTTP');
+      expect(RequestKind.webSocket.label, 'WS');
+      expect(RequestKind.sse.label, 'SSE');
+      expect(RequestKind.mcp.label, 'MCP');
+    });
   });
 }

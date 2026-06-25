@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
@@ -216,7 +217,12 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
                       else
                         SizedBox(width: layout.smallIconSize),
                       MethodBadge(
-                        method: node.config?.method ?? 'GET',
+                        // Non-HTTP kinds (WS/SSE/MCP) have no method — show the
+                        // protocol label instead of a misleading "GET".
+                        method: switch (node.config?.kind ?? RequestKind.http) {
+                          RequestKind.http => node.config?.method ?? 'GET',
+                          final kind => kind.label,
+                        },
                         small: true,
                       ),
                       const SizedBox(width: 8),

@@ -13,6 +13,14 @@ enum RequestKind {
 
   final int wire;
 
+  /// Short uppercase label for the kind badge (collections tree, etc.).
+  String get label => switch (this) {
+    RequestKind.http => 'HTTP',
+    RequestKind.webSocket => 'WS',
+    RequestKind.sse => 'SSE',
+    RequestKind.mcp => 'MCP',
+  };
+
   static RequestKind fromWire(int? value) {
     for (final k in RequestKind.values) {
       if (k.wire == value) return k;
