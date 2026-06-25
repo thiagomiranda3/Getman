@@ -111,6 +111,13 @@ const double _kDialogButtonSpacing = 8;
 /// The inner column of a frosted-card dialog: title, scrollable content, and
 /// an actions bar — mirroring `AlertDialog`'s structure so content does not
 /// reflow.
+///
+/// Note: unlike `AlertDialog` (which bounds its content via `Flexible`), the
+/// content here gets *unbounded* height inside a `SingleChildScrollView`, so a
+/// caller passing a bare `Column`/`ListView` must self-bound it (e.g. a
+/// `ConstrainedBox`/`SizedBox`/`shrinkWrap`) — exactly as every current dialog
+/// already does. Only the glass full-effects path renders this, so a missing
+/// bound would surface as a glass-only "unbounded height" error.
 class _DialogBody extends StatelessWidget {
   const _DialogBody({
     required this.title,
@@ -133,9 +140,15 @@ class _DialogBody extends StatelessWidget {
       children: [
         Padding(
           padding: _kDialogTitlePadding,
-          child: DefaultTextStyle.merge(
-            style: dialogTheme.titleTextStyle ?? const TextStyle(),
-            child: title,
+          // namesRoute mirrors AlertDialog so screen readers announce the
+          // dialog by its title (the AlertDialog path gets this for free).
+          child: Semantics(
+            namesRoute: true,
+            container: true,
+            child: DefaultTextStyle.merge(
+              style: dialogTheme.titleTextStyle ?? const TextStyle(),
+              child: title,
+            ),
           ),
         ),
         Flexible(
