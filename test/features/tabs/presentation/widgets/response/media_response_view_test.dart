@@ -9,7 +9,7 @@ void main() {
   testWidgets('constructs and shows controls/fallback', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
-        theme: resolveTheme('classic')(Brightness.light),
+        theme: resolveTheme('classic')(Brightness.light, isCompact: false),
         home: Scaffold(
           body: MediaResponseView(
             bytes: Uint8List.fromList([0, 1, 2, 3]),
@@ -20,7 +20,14 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
+    await tester.pump(); // start the async load
+    await tester.pump(
+      const Duration(milliseconds: 100),
+    ); // let it fail + degrade
     expect(find.byType(MediaResponseView), findsOneWidget);
+    expect(
+      tester.takeException(),
+      isNull,
+    ); // failure must be caught, not thrown
   });
 }
