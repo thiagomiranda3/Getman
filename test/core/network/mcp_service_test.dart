@@ -152,7 +152,7 @@ void main() {
       // tools/call (SSE)
       resp(_sseBody({
         'jsonrpc': '2.0',
-        'id': 3,
+        'id': 2,
         'result': {
           'content': [
             {'type': 'text', 'text': 'hello'},
