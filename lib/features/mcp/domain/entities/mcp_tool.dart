@@ -10,12 +10,12 @@ class McpTool extends Equatable {
   });
 
   factory McpTool.fromJson(Map<String, dynamic> json) => McpTool(
-        name: (json['name'] as String?) ?? '',
-        description: (json['description'] as String?) ?? '',
-        inputSchema:
-            (json['inputSchema'] as Map?)?.cast<String, dynamic>() ??
-                const <String, dynamic>{},
-      );
+    name: (json['name'] as String?) ?? '',
+    description: (json['description'] as String?) ?? '',
+    inputSchema:
+        (json['inputSchema'] as Map?)?.cast<String, dynamic>() ??
+        const <String, dynamic>{},
+  );
 
   final String name;
   final String description;

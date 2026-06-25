@@ -18,7 +18,8 @@ class McpSession extends Equatable {
     Map<String, dynamic> result, {
     String? sessionId,
   }) {
-    final info = (result['serverInfo'] as Map?)?.cast<String, dynamic>() ??
+    final info =
+        (result['serverInfo'] as Map?)?.cast<String, dynamic>() ??
         const <String, dynamic>{};
     return McpSession(
       sessionId: sessionId ?? '',
@@ -34,6 +35,10 @@ class McpSession extends Equatable {
   final String serverVersion;
 
   @override
-  List<Object?> get props =>
-      [sessionId, protocolVersion, serverName, serverVersion];
+  List<Object?> get props => [
+    sessionId,
+    protocolVersion,
+    serverName,
+    serverVersion,
+  ];
 }

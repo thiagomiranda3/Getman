@@ -20,8 +20,7 @@ class McpException implements Exception {
   final String message;
   final int? code;
   @override
-  String toString() =>
-      'McpException(${code == null ? '' : '$code: '}$message)';
+  String toString() => 'McpException(${code == null ? '' : '$code: '}$message)';
 }
 
 /// A live MCP session over Streamable HTTP. One per connected tab.
@@ -43,15 +42,15 @@ class McpService {
   final Dio _dio;
 
   static Dio _buildDio() => Dio(
-        BaseOptions(
-          connectTimeout: const Duration(seconds: 30),
-          receiveTimeout: const Duration(seconds: 60),
-          // MCP servers may answer with a JSON-RPC error at HTTP 200, or with
-          // 4xx/5xx — read every status so we can surface the body either way.
-          validateStatus: (_) => true,
-          responseType: ResponseType.stream,
-        ),
-      );
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 60),
+      // MCP servers may answer with a JSON-RPC error at HTTP 200, or with
+      // 4xx/5xx — read every status so we can surface the body either way.
+      validateStatus: (_) => true,
+      responseType: ResponseType.stream,
+    ),
+  );
 
   /// Performs the `initialize` handshake, captures the `Mcp-Session-Id`
   /// header, sends the `notifications/initialized` notification, and returns a
@@ -130,17 +129,16 @@ class _HttpMcpConnection implements McpConnection {
       {'jsonrpc': '2.0', 'id': ++_nextId, 'method': method, 'params': params};
 
   Options _options() => Options(
-        responseType: ResponseType.stream,
-        headers: {
-          ..._headers,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json, text/event-stream',
-          if (_session.sessionId.isNotEmpty)
-            'Mcp-Session-Id': _session.sessionId,
-          if (_session.protocolVersion.isNotEmpty)
-            'MCP-Protocol-Version': _session.protocolVersion,
-        },
-      );
+    responseType: ResponseType.stream,
+    headers: {
+      ..._headers,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
+      if (_session.sessionId.isNotEmpty) 'Mcp-Session-Id': _session.sessionId,
+      if (_session.protocolVersion.isNotEmpty)
+        'MCP-Protocol-Version': _session.protocolVersion,
+    },
+  );
 
   /// Sends a JSON-RPC request and returns `(result, responseHeaders)`. Throws
   /// [McpException] on a JSON-RPC `error` or a missing/invalid result.
@@ -201,8 +199,7 @@ class _HttpMcpConnection implements McpConnection {
         response.headers.map[Headers.contentTypeHeader] ??
         body.headers[Headers.contentTypeHeader] ??
         const <String>[];
-    final contentType =
-        headerValues.isNotEmpty ? headerValues.first : '';
+    final contentType = headerValues.isNotEmpty ? headerValues.first : '';
 
     if (contentType.contains('text/event-stream')) {
       final parser = SseParser();

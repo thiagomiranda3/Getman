@@ -131,8 +131,9 @@ void main() {
     when(() => repository.savePanelMeta(any(), any())).thenAnswer((_) async {});
   });
 
-  testWidgets('shows CONNECT when disconnected and dispatches connect',
-      (tester) async {
+  testWidgets('shows CONNECT when disconnected and dispatches connect', (
+    tester,
+  ) async {
     const tabId = 'mc1';
     const config = HttpRequestConfigEntity(
       id: tabId,

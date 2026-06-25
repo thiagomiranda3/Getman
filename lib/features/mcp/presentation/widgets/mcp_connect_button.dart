@@ -48,7 +48,8 @@ class McpConnectButton extends StatelessWidget {
                       bloc.add(McpDisconnectRequested(tabId));
                       return;
                     }
-                    final current = context
+                    final current =
+                        context
                             .read<TabsBloc>()
                             .state
                             .tabs
