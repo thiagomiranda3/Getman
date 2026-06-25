@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/theme_registry.dart';
+import 'package:getman/core/theme/themes/glass/glass_decorations.dart';
 import 'package:getman/core/theme/themes/glass/glass_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -169,6 +170,57 @@ void main() {
             reason: '$id should keep the default filled indicator',
           );
         }
+      },
+    );
+
+    test('dialogSurface hook is set only at full effects', () {
+      for (final b in [Brightness.light, Brightness.dark]) {
+        final full = glassTheme(b).extension<AppDecoration>()!;
+        final reduced = glassTheme(
+          b,
+          reduceEffects: true,
+        ).extension<AppDecoration>()!;
+        expect(full.dialogSurface, isNotNull, reason: 'full effects → frosted');
+        expect(
+          reduced.dialogSurface,
+          isNull,
+          reason: 'reduced → opaque AlertDialog',
+        );
+      }
+    });
+
+    test('dialog background is an opaque colour (readable without blur)', () {
+      for (final b in [Brightness.light, Brightness.dark]) {
+        for (final r in [false, true]) {
+          final bg = glassTheme(
+            b,
+            reduceEffects: r,
+          ).dialogTheme.backgroundColor!;
+          expect(
+            bg.a,
+            1.0,
+            reason: 'glass dialog bg must be fully opaque ($b r=$r)',
+          );
+        }
+      }
+    });
+
+    testWidgets(
+      'glassDialogSurface blurs its backdrop (BackdropFilter present)',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: glassTheme(Brightness.dark),
+            home: Builder(
+              builder: (ctx) => glassDialogSurface(
+                ctx,
+                borderRadius: BorderRadius.circular(24),
+                child: const SizedBox(width: 100, height: 100),
+              ),
+            ),
+          ),
+        );
+        expect(find.byType(BackdropFilter), findsOneWidget);
       },
     );
   });

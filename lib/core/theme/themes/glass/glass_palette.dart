@@ -15,6 +15,13 @@ class GlassPalette {
   static const Color panelLight = Color(0x6BFFFFFF); // white @ ~42%
   static const Color panelDark = Color(0x66282A3A); // smoked charcoal @ ~40%
 
+  // ── Opaque dialog surface (reduceEffects fallback + frosted-card base) ──
+  // Dialogs render without the in-app backdrop blur, so they need a solid,
+  // readable surface when blur is off. A near-white cool tint (light) and an
+  // opaque charcoal (dark), distinct from the translucent panel above.
+  static const Color dialogLight = Color(0xFFF4F6FC);
+  static const Color dialogDark = Color(0xFF20222E);
+
   // ── Hairline "specular" borders ────────────────────────────────────────────
   static const Color borderLight = Color(0xB3FFFFFF); // white @ ~70%
   static const Color borderDark = Color(0x24FFFFFF); // white @ ~14%

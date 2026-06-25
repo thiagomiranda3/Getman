@@ -68,6 +68,41 @@ Widget glassFrost(
   );
 }
 
+/// The frosted **dialog** card: like [glassFrost] (clip + real backdrop blur)
+/// but it also paints the translucent panel fill + hairline border, so the card
+/// is a complete surface the dialog content sits in. Used via
+/// `AppDecoration.dialogSurface` at full effects only.
+Widget glassDialogSurface(
+  BuildContext context, {
+  required Widget child,
+  required BorderRadius borderRadius,
+}) {
+  final theme = Theme.of(context);
+  final layout = context.appLayout;
+  return RepaintBoundary(
+    child: ClipRRect(
+      borderRadius: borderRadius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: kGlassBlurSigma,
+          sigmaY: kGlassBlurSigma,
+        ),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.cardColor, // glass panel fill; the blur frosts it
+            borderRadius: borderRadius,
+            border: Border.all(
+              color: theme.dividerColor,
+              width: layout.borderThin,
+            ),
+          ),
+          child: child,
+        ),
+      ),
+    ),
+  );
+}
+
 /// The selected-tab "glass lozenge": a vertical specular gradient (a bright
 /// near-white highlight at the top fading into the accent), a hairline
 /// highlight border, and a soft accent glow. This is what makes a selected tab
