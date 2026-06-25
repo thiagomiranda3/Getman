@@ -135,6 +135,29 @@ void main() {
     );
   });
 
+  test('urlencoded body → x-www-form-urlencoded object with example', () {
+    final doc = CollectionToApiDoc.build(
+      _rootWith(
+        const HttpRequestConfigEntity(
+          id: 'c',
+          method: 'POST',
+          url: 'https://api.test.com/form',
+          bodyType: BodyType.urlencoded,
+          formFields: [
+            MultipartFieldEntity(name: 'a', value: '1'),
+            MultipartFieldEntity(name: 'b', value: '2'),
+          ],
+        ),
+      ),
+    );
+    final body = doc.operations.single.requestBody!;
+    expect(body.contentType, 'application/x-www-form-urlencoded');
+    expect(body.schema!.type, 'object');
+    expect(body.schema!.properties['a']!.type, 'string');
+    expect(body.schema!.properties['b']!.type, 'string');
+    expect(body.example, {'a': '1', 'b': '2'});
+  });
+
   test('Content-Type and Accept are excluded from header params', () {
     final doc = CollectionToApiDoc.build(
       _rootWith(

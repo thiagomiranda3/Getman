@@ -77,5 +77,31 @@ void main() {
       expect(doc.servers.single.url, '{baseUrl}');
       expect(doc.servers.single.variables.containsKey('baseUrl'), isTrue);
     });
+
+    test(
+      'bare path with no scheme and no var falls back to server "/" with warning',
+      () {
+        const root = CollectionNodeEntity(
+          id: 'r',
+          name: 'API',
+          children: [
+            CollectionNodeEntity(
+              id: 'a',
+              name: 'Orphan',
+              isFolder: false,
+              config: HttpRequestConfigEntity(
+                id: 'c',
+                url: 'orphan/path',
+              ),
+            ),
+          ],
+        );
+        final doc = CollectionToApiDoc.build(root); // no env
+        expect(doc.servers.single.url, '/');
+        expect(doc.warnings, hasLength(1));
+        expect(doc.warnings.single, contains('Could not determine'));
+        expect(doc.operations.single.path, '/orphan/path');
+      },
+    );
   });
 }

@@ -18,6 +18,13 @@ void main() {
     expect(op.responses, isEmpty);
   });
 
+  test('ApiServer value-equality with variables', () {
+    expect(
+      const ApiServer(url: 'a', variables: {'k': 'v'}),
+      equals(const ApiServer(url: 'a', variables: {'k': 'v'})),
+    );
+  });
+
   test('value objects compare by value (Equatable)', () {
     const a = ApiParam(name: 'id', isRequired: true);
     const b = ApiParam(name: 'id', isRequired: true);

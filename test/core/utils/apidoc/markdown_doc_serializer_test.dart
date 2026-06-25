@@ -37,6 +37,33 @@ void main() {
     expect(md, contains('`200` — OK'));
   });
 
+  test('response body example renders as fenced json block', () {
+    const doc = ApiDoc(
+      title: 'API',
+      operations: [
+        ApiOperation(
+          method: 'GET',
+          path: '/items',
+          summary: 'List items',
+          responses: [
+            ApiResponse(
+              statusCode: 200,
+              description: 'OK',
+              body: ApiBody(
+                contentType: 'application/json',
+                example: {'id': 1},
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+    final md = MarkdownDocSerializer.toMarkdown(doc);
+    expect(md, contains('`200` — OK'));
+    expect(md, contains('```json'));
+    expect(md, contains('"id": 1'));
+  });
+
   test('untagged operations fall under General', () {
     const doc = ApiDoc(
       title: 'API',
