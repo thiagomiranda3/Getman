@@ -59,10 +59,12 @@ class McpConnectButton extends StatelessWidget {
                     bloc.add(
                       McpConnectRequested(
                         tabId: tabId,
+                        // Trim: a stray trailing space/newline in the URL would
+                        // be percent-encoded into the path and 404 the server.
                         url: EnvironmentResolver.resolve(
                           current.url,
                           activeVars,
-                        ),
+                        ).trim(),
                         headers: EnvironmentResolver.resolveMap(
                           current.headers,
                           activeVars,

@@ -156,7 +156,14 @@ class _HttpMcpConnection implements McpConnection {
     );
     final message = await _readMessage(response, envelope['id'] as int);
     if (message == null) {
-      throw McpException('Empty response from server for $method');
+      final ct =
+          response.headers.map[Headers.contentTypeHeader]?.join(',') ??
+          response.data?.headers[Headers.contentTypeHeader]?.join(',') ??
+          '';
+      throw McpException(
+        'Empty/unparseable response for $method '
+        '(HTTP ${response.statusCode}, content-type "$ct")',
+      );
     }
     final error = message['error'];
     if (error is Map<String, dynamic>) {
