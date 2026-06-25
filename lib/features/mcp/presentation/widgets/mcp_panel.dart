@@ -4,33 +4,16 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
-import 'package:getman/core/utils/environment_resolver.dart';
-import 'package:getman/core/utils/request_variable_resolver.dart';
-import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
-import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
+import 'package:getman/core/ui/widgets/tab_variable_context_builder.dart';
+import 'package:getman/core/utils/layered_variable_context.dart';
 import 'package:getman/features/mcp/domain/entities/mcp_tool.dart';
+import 'package:getman/features/mcp/domain/mcp_argument_resolver.dart';
 import 'package:getman/features/mcp/presentation/bloc/mcp_bloc.dart';
 import 'package:getman/features/mcp/presentation/bloc/mcp_event.dart';
 import 'package:getman/features/mcp/presentation/bloc/mcp_state.dart';
-import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
-import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
-import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart';
+import 'package:getman/features/tabs/presentation/widgets/variable_code_autocomplete.dart';
 import 'package:re_editor/re_editor.dart';
-
-/// Recursively resolves `{{var}}` tokens in JSON argument values.
-/// Only String leaves are substituted; non-string values pass through
-/// unchanged.
-dynamic _resolveArg(dynamic value, Map<String, String> vars) {
-  if (value is String) return EnvironmentResolver.resolve(value, vars);
-  if (value is Map<String, dynamic>) {
-    return value.map((k, v) => MapEntry(k, _resolveArg(v, vars)));
-  }
-  if (value is List<dynamic>) {
-    return value.map((e) => _resolveArg(e, vars)).toList();
-  }
-  return value;
-}
 
 /// Post-connect MCP UI for one tab: tool list, the selected tool's schema +
 /// JSON arguments editor + CALL, the last result, and a session log.
@@ -44,16 +27,62 @@ class McpPanel extends StatefulWidget {
 }
 
 class _McpPanelState extends State<McpPanel> {
-  final CodeLineEditingController _args = createJsonCodeController();
+  // The arguments editor is variable-aware: its span builder reads the live
+  // variable context + token colours via closures at paint time, so an env or
+  // theme change recolours `{{var}}` tokens on the next forceRepaint — the same
+  // wiring the request body editor uses.
+  late final CodeLineEditingController _args;
   final CodeLineEditingController _schema = createJsonCodeController();
+  final CodeLineEditingController _result = createJsonCodeController();
   String? _argsError;
   String? _editingTool;
+  String _lastResultText = '';
+
+  LayeredVariableContext _argsVarContext = LayeredVariableContext.empty;
+  Color _resolvedColor = Colors.transparent;
+  Color _unresolvedColor = Colors.transparent;
+
+  @override
+  void initState() {
+    super.initState();
+    _args = createJsonCodeController(
+      variablesProvider: () => _argsVarContext.allVariables,
+      resolvedColor: () => _resolvedColor,
+      unresolvedColor: () => _unresolvedColor,
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Theme is available here (not in initState). Recolour `{{var}}` tokens
+    // when the variable palette changes (dark/light or theme switch).
+    final palette = context.appPalette;
+    if (_resolvedColor != palette.variableResolved ||
+        _unresolvedColor != palette.variableUnresolved) {
+      _resolvedColor = palette.variableResolved;
+      _unresolvedColor = palette.variableUnresolved;
+      _args.forceRepaint();
+    }
+  }
 
   @override
   void dispose() {
     _args.dispose();
     _schema.dispose();
+    _result.dispose();
     super.dispose();
+  }
+
+  /// Stores the latest layered variable context (env + collection + dynamic)
+  /// for the args editor's span builder and repaints visible lines so an env or
+  /// collection switch recolours tokens without waiting for a keystroke.
+  void _syncArgsVarContext(LayeredVariableContext ctx) {
+    if (_argsVarContext == ctx) return;
+    _argsVarContext = ctx;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _args.forceRepaint();
+    });
   }
 
   // Fix 2: _syncForTool is no longer called from within build(). It is
@@ -71,21 +100,6 @@ class _McpPanelState extends State<McpPanel> {
         : const JsonEncoder.withIndent('  ').convert(tool.inputSchema);
   }
 
-  /// Returns the merged variable map (collection vars overlaid by active
-  /// environment) for the current tab — same approach as url_bar.dart.
-  Map<String, String> _activeVariables(BuildContext context) {
-    final envState = context.read<EnvironmentsBloc>().state;
-    final settings = context.read<SettingsBloc>().state.settings;
-    final collections = context.read<CollectionsBloc>().state.collections;
-    final tab = context.read<TabsBloc>().state.tabs.byId(widget.tabId);
-    return RequestVariableResolver.variablesFor(
-      environments: envState.environments,
-      activeEnvironmentId: settings.activeEnvironmentId,
-      collections: collections,
-      collectionNodeId: tab?.collectionNodeId,
-    );
-  }
-
   void _call(BuildContext context, String toolName) {
     final raw = _args.text.trim().isEmpty ? '{}' : _args.text;
     Map<String, dynamic>? parsed;
@@ -100,10 +114,8 @@ class _McpPanelState extends State<McpPanel> {
       return;
     }
     setState(() => _argsError = null);
-    final activeVars = _activeVariables(context);
-    final resolved = parsed.map(
-      (k, v) => MapEntry(k, _resolveArg(v, activeVars)),
-    );
+    // Resolve `{{var}}` against the same live context that highlights them.
+    final resolved = resolveMcpArguments(parsed, _argsVarContext.allVariables);
     context.read<McpBloc>().add(
       McpToolCallRequested(
         tabId: widget.tabId,
@@ -168,6 +180,18 @@ class _McpPanelState extends State<McpPanel> {
           });
         }
 
+        // Push the latest result into its read-only editor off-build, for the
+        // same reason — only when it actually changed.
+        final resultText = _resultText(s);
+        if (resultText != _lastResultText) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _result.text = resultText;
+              _lastResultText = resultText;
+            }
+          });
+        }
+
         return Padding(
           padding: EdgeInsets.all(layout.inputPadding),
           child: Column(
@@ -202,11 +226,33 @@ class _McpPanelState extends State<McpPanel> {
                 Expanded(
                   child: _ToolDetail(
                     tool: selected,
-                    argsController: _args,
+                    argsEditor: SizedBox(
+                      height: layout.mcpEditorPaneHeight,
+                      // Feeds live env/collection variables to the args editor's
+                      // highlighter (and, via _syncArgsVarContext, to CALL-time
+                      // resolution). Rebuilds only on env/collection change.
+                      child: TabVariableContextBuilder(
+                        tabId: widget.tabId,
+                        builder: (context, ctx) {
+                          _syncArgsVarContext(ctx);
+                          // Wrap with the `{{` variable autocomplete dropdown,
+                          // same as the request body editor.
+                          return wrapBodyWithVariableAutocomplete(
+                            contextProvider: () => ctx,
+                            child: JsonCodeEditor(
+                              controller: _args,
+                              autofocus: false,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                     schemaController: _schema,
+                    resultController: _result,
                     argsError: _argsError,
                     calling: s.calling,
-                    resultText: _resultText(s),
+                    hasResult: resultText.isNotEmpty,
+                    resultIsError: s.lastResult?.isError ?? false,
                     log: s.log,
                     onCall: () => _call(context, selected.name),
                   ),
@@ -235,21 +281,25 @@ class _McpPanelState extends State<McpPanel> {
 class _ToolDetail extends StatelessWidget {
   const _ToolDetail({
     required this.tool,
-    required this.argsController,
+    required this.argsEditor,
     required this.schemaController,
+    required this.resultController,
     required this.argsError,
     required this.calling,
-    required this.resultText,
+    required this.hasResult,
+    required this.resultIsError,
     required this.log,
     required this.onCall,
   });
 
   final McpTool tool;
-  final CodeLineEditingController argsController;
+  final Widget argsEditor;
   final CodeLineEditingController schemaController;
+  final CodeLineEditingController resultController;
   final String? argsError;
   final bool calling;
-  final String resultText;
+  final bool hasResult;
+  final bool resultIsError;
   final List<String> log;
   final VoidCallback onCall;
 
@@ -289,13 +339,7 @@ class _ToolDetail extends StatelessWidget {
             style: TextStyle(fontWeight: typo.titleWeight),
           ),
           SizedBox(height: layout.inputPaddingVertical),
-          SizedBox(
-            height: layout.mcpEditorPaneHeight,
-            child: JsonCodeEditor(
-              controller: argsController,
-              autofocus: false,
-            ),
-          ),
+          argsEditor,
           if (argsError != null) ...[
             SizedBox(height: layout.inputPaddingVertical),
             Text(
@@ -317,11 +361,25 @@ class _ToolDetail extends StatelessWidget {
               ),
             ),
           ),
-          if (resultText.isNotEmpty) ...[
+          if (hasResult) ...[
             SizedBox(height: layout.inputPadding),
-            Text('Result', style: TextStyle(fontWeight: typo.titleWeight)),
+            Text(
+              resultIsError ? 'Result (error)' : 'Result',
+              style: TextStyle(
+                fontWeight: typo.titleWeight,
+                color: resultIsError ? theme.colorScheme.error : null,
+              ),
+            ),
             SizedBox(height: layout.inputPaddingVertical),
-            SelectableText(resultText),
+            SizedBox(
+              height: layout.mcpEditorPaneHeight,
+              child: JsonCodeEditor(
+                key: const ValueKey('mcp_result_view'),
+                controller: resultController,
+                readOnly: true,
+                autofocus: false,
+              ),
+            ),
           ],
           // Fix 1: collapsible session log, shown when log is non-empty.
           // Lives inside the SingleChildScrollView — no RenderFlex overflow.

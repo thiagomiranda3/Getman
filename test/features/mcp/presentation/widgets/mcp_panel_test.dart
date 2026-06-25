@@ -8,20 +8,60 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/theme/theme_registry.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
 import 'package:getman/features/mcp/domain/entities/mcp_tool.dart';
 import 'package:getman/features/mcp/domain/entities/mcp_tool_result.dart';
 import 'package:getman/features/mcp/presentation/bloc/mcp_bloc.dart';
 import 'package:getman/features/mcp/presentation/bloc/mcp_event.dart';
 import 'package:getman/features/mcp/presentation/bloc/mcp_state.dart';
 import 'package:getman/features/mcp/presentation/widgets/mcp_panel.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockMcpBloc extends MockBloc<McpEvent, McpState> implements McpBloc {}
 
+class _MockSettingsBloc extends MockBloc<SettingsEvent, SettingsState>
+    implements SettingsBloc {}
+
+class _MockEnvironmentsBloc
+    extends MockBloc<EnvironmentsEvent, EnvironmentsState>
+    implements EnvironmentsBloc {}
+
+class _MockCollectionsBloc extends MockBloc<CollectionsEvent, CollectionsState>
+    implements CollectionsBloc {}
+
+class _MockTabsBloc extends MockBloc<TabsEvent, TabsState>
+    implements TabsBloc {}
+
 void main() {
   late _MockMcpBloc mcp;
+  late _MockSettingsBloc settings;
+  late _MockEnvironmentsBloc environments;
+  late _MockCollectionsBloc collections;
+  late _MockTabsBloc tabs;
 
-  setUp(() => mcp = _MockMcpBloc());
+  setUp(() {
+    mcp = _MockMcpBloc();
+    // The args editor's TabVariableContextBuilder reads these blocs at build.
+    settings = _MockSettingsBloc();
+    environments = _MockEnvironmentsBloc();
+    collections = _MockCollectionsBloc();
+    tabs = _MockTabsBloc();
+    when(() => settings.state).thenReturn(SettingsState.initial());
+    when(() => environments.state).thenReturn(const EnvironmentsState());
+    when(() => collections.state).thenReturn(CollectionsState());
+    when(() => tabs.state).thenReturn(const TabsState());
+  });
 
   Widget harness(McpState state) {
     when(() => mcp.state).thenReturn(state);
@@ -32,8 +72,14 @@ void main() {
       // positional arg.
       theme: resolveTheme('classic')(Brightness.light),
       home: Scaffold(
-        body: BlocProvider<McpBloc>.value(
-          value: mcp,
+        body: MultiBlocProvider(
+          providers: [
+            BlocProvider<McpBloc>.value(value: mcp),
+            BlocProvider<SettingsBloc>.value(value: settings),
+            BlocProvider<EnvironmentsBloc>.value(value: environments),
+            BlocProvider<CollectionsBloc>.value(value: collections),
+            BlocProvider<TabsBloc>.value(value: tabs),
+          ],
           child: const SizedBox(
             width: 800,
             height: 600,
@@ -76,7 +122,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('add'), findsWidgets);
     expect(find.text('echo'), findsWidgets);
-    expect(find.textContaining('result text'), findsWidgets);
+    // The result renders in a read-only JSON code editor (not plain text), so
+    // assert the Result section + its editor are present.
+    expect(find.text('Result'), findsOneWidget);
+    expect(find.byKey(const ValueKey('mcp_result_view')), findsOneWidget);
     expect(tester.takeException(), isNull); // no RenderFlex overflow
   });
 
