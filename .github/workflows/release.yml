@@ -57,6 +57,11 @@ jobs:
     runs-on: windows-latest
     env:
       VERSION: ${{ github.event.inputs.tag || github.ref_name }}
+      # pdfx downloads pdfium and configures it with a nested CMake whose
+      # cmake_minimum_required predates 3.5; CMake 4.x on the runner refuses
+      # that unless we raise the policy floor. This env var is CMake's own
+      # suggested remedy and propagates into the nested configure.
+      CMAKE_POLICY_VERSION_MINIMUM: '3.5'
     steps:
       - uses: actions/checkout@v4
 
@@ -101,16 +106,19 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ github.event.inputs.tag || github.ref_name }}
+      # Same nested-pdfium / CMake-4 policy-floor issue as Windows (see above).
+      CMAKE_POLICY_VERSION_MINIMUM: '3.5'
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
-          # GStreamer dev packages are required by the audioplayers_linux plugin
-          # (sound effects) — its CMakeLists does pkg_check_modules(... gstreamer-1.0).
+          # libmpv is required by media_kit_video — its CMakeLists links
+          # PkgConfig::mpv, so the build fails to configure without the dev
+          # package; mpv provides the runtime libmpv for native playback.
           sudo apt-get install -y ninja-build libgtk-3-dev clang cmake pkg-config \
-            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+            libmpv-dev mpv
 
       - uses: subosito/flutter-action@v2
         with:
