@@ -1,5 +1,4 @@
 import 'package:bloc_test/bloc_test.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/network/mcp_service.dart';
 import 'package:getman/features/mcp/domain/entities/mcp_session.dart';
@@ -121,6 +120,44 @@ void main() {
     verify: (b) {
       expect(b.state.sessionFor('t1').status, McpConnectionStatus.disconnected);
       verify(() => conn.close()).called(1);
+    },
+  );
+
+  blocTest<McpBloc, McpState>(
+    'selecting a tool clears lastResult and sets selectedTool',
+    build: () {
+      when(
+        () => service.connect(any(), headers: any(named: 'headers')),
+      ).thenAnswer((_) async => conn);
+      when(
+        () =>
+            conn.callTool(any(), any(), cancelToken: any(named: 'cancelToken')),
+      ).thenAnswer(
+        (_) async => const McpToolResult(
+          isError: false,
+          textBlocks: ['prior'],
+          rawBlocks: [],
+        ),
+      );
+      return McpBloc(service: service);
+    },
+    act: (b) async {
+      b.add(const McpConnectRequested(tabId: 't1', url: 'https://mcp.dev/'));
+      await Future<void>.delayed(Duration.zero);
+      b.add(
+        const McpToolCallRequested(
+          tabId: 't1',
+          toolName: 'add',
+          arguments: {'a': 1},
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      b.add(const McpToolSelected(tabId: 't1', toolName: 'add'));
+    },
+    verify: (b) {
+      final s = b.state.sessionFor('t1');
+      expect(s.lastResult, isNull);
+      expect(s.selectedTool, 'add');
     },
   );
 }

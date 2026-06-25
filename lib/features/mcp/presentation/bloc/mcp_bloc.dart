@@ -101,7 +101,11 @@ class McpBloc extends Bloc<McpEvent, McpState> {
     emit(
       state.withSession(
         event.tabId,
-        base.copyWith(calling: true, selectedTool: event.toolName),
+        base.copyWith(
+          calling: true,
+          selectedTool: event.toolName,
+          lastResult: base.lastResult,
+        ),
       ),
     );
     try {
@@ -127,6 +131,7 @@ class McpBloc extends Bloc<McpEvent, McpState> {
             calling: false,
             errorMessage: e.toString(),
             log: [...after.log, 'Call failed: $e'],
+            lastResult: after.lastResult,
           ),
         ),
       );
