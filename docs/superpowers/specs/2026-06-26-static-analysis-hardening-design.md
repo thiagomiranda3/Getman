@@ -22,6 +22,9 @@ What it does **not** yet catch:
 3. Code-complexity outliers (no cyclomatic-complexity / parameter-count / function-length budget).
 4. Dead code and unused files (the analyzer only finds unused *private* members and imports).
 5. Dependency vulnerabilities and stale dependencies (no supply-chain tooling at all).
+6. Two cheap lint gaps: VGA pins `close_sinks` to `ignore` (no undisposed-sink
+   detection), and `discarded_futures` (the non-async companion to the
+   already-enabled `unawaited_futures`) is off.
 
 This effort closes those gaps. The user chose **hard-gate everything now**: every
 new check must fail CI, and the codebase must be made clean against each as part of
@@ -55,6 +58,8 @@ this work (not warn-first).
 | B Equatable props | TBD | 49 files use `equatable`; expect a small handful of intentional exclusions to `// ignore` |
 | D metrics | TBD | thresholds calibrated against measured distribution before gating |
 | E unused code/files | TBD | will surface real dead code (e.g. the unwired `AppDropdown<T>` noted in CLAUDE.md §4.8) |
+| G `close_sinks` | **0** | measured 2026-06-26 with `close_sinks: warning` override |
+| G `discarded_futures` | **0** | measured 2026-06-26 with `discarded_futures: true` |
 
 ## 4. Components
 
@@ -147,6 +152,24 @@ Each rule ships a `*_test.dart` under `tools/getman_lints/test/` using the
   - `github-actions` (the pinned actions in the workflows)
   - Weekly schedule, grouped updates to limit PR noise.
 
+### G. Config-only leak / async lints (`analysis_options.yaml`)
+
+Two VGA-baseline tweaks, both already clean (0 violations, measured 2026-06-26 →
+hard-gate is free):
+
+- **`close_sinks`** — VGA enables the rule but pins it to `ignore` in its `errors:`
+  block. Re-promote it in the project's own `analyzer.errors:` block
+  (`close_sinks: warning`) to catch undisposed `StreamController`/`Sink`s
+  (relevant to `RealtimeService` and stream-owning blocs). Known to be
+  false-positive-prone on ownership transfer; any false positive gets a per-line
+  `// ignore: close_sinks` + reason.
+- **`discarded_futures`** — not in VGA. Add `discarded_futures: true` to
+  `linter.rules`. Companion to the already-enabled `unawaited_futures`: flags
+  fire-and-forget futures in *non*-async contexts (constructors, `void` callbacks).
+  Intentional fire-and-forget sites use `unawaited(...)` or `// ignore`.
+
+Both ride the existing `flutter analyze` pass — no new CI step or hook line.
+
 ## 5. Wiring & process changes
 
 - **`.githooks/pre-commit`** — `solid_lints` rides the existing `custom_lint` step
@@ -167,7 +190,8 @@ Each rule ships a `*_test.dart` under `tools/getman_lints/test/` using the
 ## 6. Implementation order (suggested)
 
 1. **A1/A2/A3** (custom rules, already-clean) — TDD each, wire into the existing
-   `getman_lints` plugin entry point. Lowest risk; immediate gate.
+   `getman_lints` plugin entry point. Lowest risk; immediate gate. Land **G**
+   (the two `analysis_options.yaml` lint tweaks, also already-clean) alongside.
 2. **B** (`equatable_props_complete`) — TDD; then run against `lib/`, fix/ignore the
    surfaced handful.
 3. **D** (`solid_lints` metrics) — add dep, configure the 3 rules, verify only
@@ -193,15 +217,13 @@ Each rule ships a `*_test.dart` under `tools/getman_lints/test/` using the
 
 - Feature-isolation enforcement (section 2 rationale).
 - Relocating `HttpRequestConfig` out of `history/data` (load-bearing typeId migration).
-- Config-only leak/future lints surfaced earlier but **not selected** this round —
-  re-promoting `close_sinks` (VGA pins it to `ignore`) and adding `discarded_futures`.
-  Noted here so they aren't lost; can be a cheap follow-up if desired.
 - DCM-provided rules beyond unused-code/files (e.g. its own `list_all_equatable_fields`).
 
 ## 9. Success criteria
 
 - All four new `getman_lints` rules implemented + tested; `lib/` clean against them.
 - Three `solid_lints` metric rules active (and only those), `lib/` clean.
+- `close_sinks` re-promoted + `discarded_futures` enabled; `flutter analyze` clean.
 - DCM unused-code/files green in CI; dead code removed.
 - OSV-Scanner + Dependabot live in CI/repo.
 - Pre-commit hook + CI + CLAUDE.md updated.
