@@ -41,6 +41,10 @@ linter:
     # Companion to unawaited_futures (already on): flags fire-and-forget futures
     # in non-async contexts (constructors, void callbacks). Not in VGA.
     discarded_futures: true
+    # VGA pins close_sinks to `ignore`; re-enable it here so the rule actually
+    # runs. The `errors: close_sinks: warning` remap above then meaningfully
+    # sets severity. Without this entry the remap is a no-op (disabled rule).
+    close_sinks: true
 
     # Disabled: `public_member_api_docs` requires a doc comment on every public
     # member. It targets *published package* APIs; Getman is an application, so

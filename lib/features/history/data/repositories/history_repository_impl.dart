@@ -34,6 +34,9 @@ class HistoryRepositoryImpl implements HistoryRepository {
   Stream<List<HttpRequestConfigEntity>> watchHistory() {
     StreamSubscription<void>? sub;
     Timer? debounce;
+    // Ownership-transfer: onCancel closes the controller when the subscriber
+    // cancels; the lint can't trace the close() call inside a closure.
+    // ignore: close_sinks
     late StreamController<List<HttpRequestConfigEntity>> controller;
 
     Future<void> push() async {

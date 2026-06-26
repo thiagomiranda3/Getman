@@ -22,6 +22,8 @@ void main() {
     when(() => repo.watchHistory()).thenAnswer((_) => controller.stream);
   });
 
+  tearDown(() => controller.close());
+
   HistoryBloc build() =>
       HistoryBloc(watchHistoryUseCase: WatchHistoryUseCase(repo));
 
