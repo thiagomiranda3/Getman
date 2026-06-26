@@ -73,13 +73,28 @@ custom_lint:
     - bloc_depends_on_abstractions
     - platform_io_outside_io_files
     - equatable_props_complete
-    # solid_lints — cherry-picked metrics only. These are regression-gate
-    # baselines set just above the current codebase max (theme builders, entity
-    # copyWiths, and the cURL parser are legitimately above a "healthy" bar) —
-    # they block FUTURE drift beyond these bounds, and are tunable downward
-    # later. NOTE the flat/sibling YAML format: the threshold key sits at the
-    # SAME indent as the rule name (custom_lint_core reads sibling keys in the
-    # list-map entry, not children nested under the rule name).
+    # solid_lints — cherry-picked metrics only. Regression-gate baselines set
+    # just above the current codebase max so the gate is green now and only
+    # FUTURE drift beyond these bounds is blocked (tunable downward later).
+    #
+    # SCOPING NOTE: the standalone `dart run custom_lint` runner reads ONLY the
+    # package-root analysis_options (it does NOT honor nested test/ or
+    # integration_test/ analysis_options, unlike the IDE analysis server), and
+    # neither custom_lint nor solid_lints offers a per-rule path/glob exclude —
+    # so these three metrics necessarily apply to test/ + integration_test/ too.
+    #   - cyclomatic_complexity (50): driven by lib/ (curl_utils.parse ≈ 49-50);
+    #     no test exceeds it — this is a meaningful PRODUCTION-code threshold.
+    #   - number_of_parameters (50): driven by lib/ (SettingsEntity.copyWith ≈ 47
+    #     params); no test has >8 params — also a meaningful PRODUCTION threshold.
+    #   - function_lines_of_code (1000): INFLATED by long test main() bodies (the
+    #     largest test main() ≈ 937 lines). The lib/-only max is ~380
+    #     (rpgTheme builder), so a production-meaningful value would be ~400;
+    #     1000 only keeps the test bodies green. Tighten to 400 once test main()s
+    #     are excludable (e.g. a future custom_lint with path-glob exclude).
+    #
+    # NOTE the flat/sibling YAML format: the threshold key sits at the SAME indent
+    # as the rule name (custom_lint_core reads sibling keys in the list-map entry,
+    # not children nested under the rule name).
     - cyclomatic_complexity:
       max_complexity: 50
     - number_of_parameters:
