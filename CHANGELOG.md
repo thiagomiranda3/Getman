@@ -5,6 +5,28 @@ All notable changes to **Getman** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-06-26
+
+### Added
+
+- **MCP client support** — connect to **Model Context Protocol** servers over
+  HTTP and call their tools right from Getman. Pick **MCP** in the request-kind
+  selector, enter the server URL, and press **CONNECT** to list the available
+  tools; fill in a tool's arguments — with `{{variable}}` resolution, just like
+  requests — and call it to see the JSON-rendered result. The MCP protocol is
+  labelled alongside the request in the collections tree.
+
+### Changed
+
+- **Large JSON responses are much more responsive** — the **TREE** view now
+  parses lazily and off the UI thread, so opening a big JSON response no longer
+  blocks the interface. Variable highlighting in editors does a single pass and
+  skips lines with no `{{…}}` tokens, and a response's size is computed once
+  instead of on every rebuild.
+- **Very large responses stay smooth** — bodies above ~3 MiB now render as fast
+  plain text instead of attempting full syntax highlighting, keeping scrolling
+  and editing fluid.
+
 ## [1.7.0] - 2026-06-25
 
 ### Added
@@ -222,5 +244,6 @@ workflow. Runs on macOS, Windows, and Linux.
   machine.
 - Ships for **macOS**, **Windows**, and **Linux** desktop.
 
+[1.8.0]: https://github.com/thiagomiranda3/Getman/releases/tag/v1.8.0
 [1.7.0]: https://github.com/thiagomiranda3/Getman/releases/tag/v1.7.0
 [1.0.0]: https://github.com/thiagomiranda3/Getman/releases/tag/1.0.0
