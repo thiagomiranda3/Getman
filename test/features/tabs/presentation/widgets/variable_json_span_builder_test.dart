@@ -132,6 +132,43 @@ void main() {
     expect(run, isNotNull);
     expect(run?.style?.color, const Color(0xFFFF0000));
   });
+
+  testWidgets('line without {{ returns the base highlight unchanged', (
+    tester,
+  ) async {
+    late TextSpan base;
+    late TextSpan got;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) {
+            const line = CodeLine('"plainKey": "no variables here"');
+            base = jsonHighlightSpanBuilder(
+              context: context,
+              index: 0,
+              codeLine: line,
+              textSpan: TextSpan(text: line.text),
+              style: const TextStyle(),
+            );
+            got = variableAwareJsonSpan(
+              context: context,
+              index: 0,
+              codeLine: line,
+              textSpan: TextSpan(text: line.text),
+              style: const TextStyle(),
+              variables: const {'plainKey': 'x'},
+              resolvedColor: const Color(0xFF00FF00),
+              unresolvedColor: const Color(0xFFFF0000),
+            );
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+    // No `{{` in the line -> identical to the base JSON highlight (no recolor).
+    expect(got.toPlainText(), base.toPlainText());
+    expect(got, equals(base));
+  });
 }
 
 /// Depth-first search the span tree for the child whose text == [needle].
