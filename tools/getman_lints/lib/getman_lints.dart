@@ -1,3 +1,4 @@
+import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/error/error.dart' hide LintCode;
 import 'package:analyzer/error/listener.dart';
 import 'package:custom_lint_builder/custom_lint_builder.dart';
@@ -14,6 +15,7 @@ class _GetmanLints extends PluginBase {
     DomainNoInfrastructureImports(),
     BlocDependsOnAbstractions(),
     PlatformIoOutsideIoFiles(),
+    EquatablePropsComplete(),
   ];
 }
 
@@ -194,6 +196,106 @@ class PlatformIoOutsideIoFiles extends DartLintRule {
           uri.startsWith('package:package_info_plus/');
       if (banned) reporter.atNode(node, _code);
     });
+  }
+}
+
+/// Enforces "Equatable on every state/event" correctness: for a class that
+/// `extends Equatable` (or mixes `EquatableMixin`), every declared instance
+/// field must appear in the `props` getter. A field omitted from `props` makes
+/// distinct values compare equal (states silently fail to rebuild).
+///
+/// Detection is syntactic: it matches the `extends Equatable` / `with
+/// EquatableMixin` clause by name and parses the identifiers in the `props`
+/// list literal. Limitation: it does not follow indirect inheritance (a class
+/// extending a base that extends Equatable). Deliberately-excluded fields use
+/// `// ignore: equatable_props_complete` + a reason.
+class EquatablePropsComplete extends DartLintRule {
+  const EquatablePropsComplete() : super(code: _code);
+
+  static const _code = LintCode(
+    name: 'equatable_props_complete',
+    problemMessage:
+        'This Equatable class omits one or more instance fields from `props`; '
+        'distinct values will compare equal. Add the missing field(s) to props, '
+        'or exclude one deliberately with `// ignore: equatable_props_complete`.',
+    errorSeverity: ErrorSeverity.WARNING,
+  );
+
+  @override
+  void run(
+    CustomLintResolver resolver,
+    ErrorReporter reporter,
+    CustomLintContext context,
+  ) {
+    if (!_posix(resolver.path).contains('/lib/')) return;
+
+    context.registry.addClassDeclaration((node) {
+      if (!_isEquatable(node)) return;
+
+      // Collect declared instance field names (static fields are excluded).
+      final fields = <String>{};
+      for (final member in node.members) {
+        if (member is FieldDeclaration && !member.isStatic) {
+          for (final v in member.fields.variables) {
+            fields.add(v.name.lexeme);
+          }
+        }
+      }
+      if (fields.isEmpty) return;
+
+      // Find the `props` getter and collect simple identifiers in its returned
+      // list literal (handles `=> [a, b]` and a block body `{ return [a, b]; }`).
+      final propsNames = _propsIdentifiers(node);
+      if (propsNames == null) return; // no recognizable props getter
+
+      final missing = fields.difference(propsNames);
+      if (missing.isNotEmpty) {
+        reporter.atToken(node.name, _code);
+      }
+    });
+  }
+
+  bool _isEquatable(ClassDeclaration node) {
+    final ext = node.extendsClause?.superclass.name2.lexeme;
+    if (ext == 'Equatable') return true;
+    final withClause = node.withClause;
+    if (withClause != null) {
+      for (final t in withClause.mixinTypes) {
+        if (t.name2.lexeme == 'EquatableMixin') return true;
+      }
+    }
+    return false;
+  }
+
+  Set<String>? _propsIdentifiers(ClassDeclaration node) {
+    for (final member in node.members) {
+      if (member is MethodDeclaration &&
+          member.isGetter &&
+          member.name.lexeme == 'props') {
+        final body = member.body;
+        ListLiteral? list;
+        if (body is ExpressionFunctionBody) {
+          final expr = body.expression;
+          if (expr is ListLiteral) list = expr;
+        } else if (body is BlockFunctionBody) {
+          for (final stmt in body.block.statements) {
+            if (stmt is ReturnStatement && stmt.expression is ListLiteral) {
+              list = stmt.expression! as ListLiteral;
+              break;
+            }
+          }
+        }
+        if (list == null) return null;
+        final names = <String>{};
+        for (final element in list.elements) {
+          if (element is SimpleIdentifier) names.add(element.name);
+          // `...super.props`, method calls, etc. are ignored (can't attribute
+          // to a local field name) — they neither add nor remove coverage.
+        }
+        return names;
+      }
+    }
+    return null;
   }
 }
 
