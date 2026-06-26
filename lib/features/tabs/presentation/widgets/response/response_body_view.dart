@@ -137,7 +137,8 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
               .state
               .settings
               .alwaysPrettifyLargeResponses &&
-          rawBody != kResponseBodyTooLargePlaceholder;
+          rawBody != kResponseBodyTooLargePlaceholder &&
+          canHighlightBody(rawBody.length);
       if (autoPrettify) {
         final prettified = await JsonUtils.prettify(rawBody);
         if (!mounted || syncId != _pendingSyncId) return;
@@ -316,6 +317,13 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
   Future<void> _prettifyAndOptIn() async {
     final body = _largeBody;
     if (body == null) return;
+    if (!canHighlightBody(body.length)) {
+      showAppSnackBar(
+        context,
+        'Body too large to highlight (over 3 MB) — showing plain text',
+      );
+      return;
+    }
     final syncId = ++_pendingSyncId;
     final prettified = await JsonUtils.prettify(body);
     if (!mounted || syncId != _pendingSyncId) return;

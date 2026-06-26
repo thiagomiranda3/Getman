@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/theme/theme_ids.dart';
 import 'package:getman/core/theme/theme_registry.dart';
@@ -67,9 +68,11 @@ HttpRequestTabEntity _tabWith(String body) => HttpRequestTabEntity(
 );
 
 /// Pumps [ResponseBodyView] seeded with a tab whose response body is [body].
-/// The [settings] parameter seeds [SettingsBloc] — pass a custom
-/// `SettingsEntity` to parameterise (e.g. Task 6 will wire
-/// `alwaysPrettifyLargeResponses` here).
+/// Pass [alwaysPrettifyLargeResponses] to enable the opt-in auto-prettify
+/// setting (wired through the seeded [SettingsBloc]). The lower-level
+/// [settings] parameter allows full control; when both are provided
+/// [alwaysPrettifyLargeResponses] takes precedence over whatever is in
+/// [settings].
 ///
 /// Calls `tester.runAsync` + `pumpAndSettle` to let the initial `_syncBody`
 /// async prettify (which uses `compute`) finish before returning.
@@ -77,7 +80,11 @@ Future<void> pumpResponseBodyView(
   WidgetTester tester, {
   required String body,
   SettingsEntity settings = const SettingsEntity(),
+  bool alwaysPrettifyLargeResponses = false,
 }) async {
+  final effectiveSettings = alwaysPrettifyLargeResponses
+      ? settings.copyWith(alwaysPrettifyLargeResponses: true)
+      : settings;
   final controller = CodeLineEditingController();
   addTearDown(controller.dispose);
   await tester.pumpWidget(
@@ -93,7 +100,8 @@ Future<void> pumpResponseBodyView(
           create: (_) => _FakeHistoryBloc(const HistoryState()),
         ),
         BlocProvider<SettingsBloc>(
-          create: (_) => _FakeSettingsBloc(SettingsState(settings: settings)),
+          create: (_) =>
+              _FakeSettingsBloc(SettingsState(settings: effectiveSettings)),
         ),
         BlocProvider<RulesBloc>(
           create: (_) => _FakeRulesBloc(),
@@ -156,5 +164,20 @@ void main() {
       findsOneWidget,
       reason: 'disabled TREE must be wrapped in a Tooltip',
     );
+  });
+
+  testWidgets('over-cap body stays plain text under alwaysPrettify', (
+    tester,
+  ) async {
+    final huge = 'x' * (kMaxHighlightChars + 1024); // > 3 MiB, not JSON
+    await pumpResponseBodyView(
+      tester,
+      body: huge,
+      alwaysPrettifyLargeResponses: true,
+    );
+    await tester.pumpAndSettle();
+    // Plain-text large path: a SelectableText, no CodeEditor.
+    expect(find.byType(SelectableText), findsOneWidget);
+    expect(find.byType(CodeEditor), findsNothing);
   });
 }
