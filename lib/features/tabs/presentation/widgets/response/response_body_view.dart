@@ -105,6 +105,14 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
   bool _showFullPreview = false;
   bool _highlightingOptedIn = false;
 
+  // Hoisted out of [_suggestVariableName] so the patterns compile once, not on
+  // every "Extract to {{var}}" click.
+  static final RegExp _dotTailRe = RegExp(r'\.([A-Za-z_$][\w$]*)$');
+  static final RegExp _bracketTailRe = RegExp(r'\[(.+)\]$');
+  static final RegExp _quoteStripRe = RegExp('''['"]''');
+  static final RegExp _nonIdentRe = RegExp('[^A-Za-z0-9_]');
+  static final RegExp _digitsRe = RegExp(r'^[0-9]+$');
+
   @override
   void initState() {
     super.initState();
@@ -210,17 +218,17 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
   /// falls back to `value` for array-index or unnamed tails.
   static String _suggestVariableName(String jsonPath) {
     var raw = '';
-    final dot = RegExp(r'\.([A-Za-z_$][\w$]*)$').firstMatch(jsonPath);
+    final dot = _dotTailRe.firstMatch(jsonPath);
     if (dot != null) {
       raw = dot.group(1)!;
     } else {
-      final bracket = RegExp(r'\[(.+)\]$').firstMatch(jsonPath);
+      final bracket = _bracketTailRe.firstMatch(jsonPath);
       if (bracket != null) {
-        raw = bracket.group(1)!.replaceAll(RegExp('''['"]'''), '');
+        raw = bracket.group(1)!.replaceAll(_quoteStripRe, '');
       }
     }
-    final cleaned = raw.replaceAll(RegExp('[^A-Za-z0-9_]'), '_');
-    if (cleaned.isEmpty || RegExp(r'^[0-9]+$').hasMatch(cleaned)) {
+    final cleaned = raw.replaceAll(_nonIdentRe, '_');
+    if (cleaned.isEmpty || _digitsRe.hasMatch(cleaned)) {
       return 'value';
     }
     return cleaned;
