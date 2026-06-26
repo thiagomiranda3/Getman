@@ -29,7 +29,7 @@ Getman is a high-performance, aesthetically pleasing HTTP client built with Flut
 - **Style**: `google_fonts` (Lexend base, JetBrainsMono in code editors).
 - **Realtime**: `web_socket_channel` (WebSocket; SSE rides on `dio` response streams via `SseParser`).
 - **File I/O**: `file_picker` (import/export, binary & multipart bodies).
-- **Static analysis** (three independent passes — all part of the done-bar, see §5): `very_good_analysis` (strict lint baseline, via `fvm flutter analyze`); `custom_lint` running the project-local architecture rules in `tools/getman_lints/` (via `fvm dart run custom_lint`); and `bloc_lint` (the bloc team's rules, via `fvm dart run bloc_tools:bloc lint lib`). All three are gated by the `.githooks/pre-commit` hook (+ `dart format`).
+- **Static analysis** (four independent passes — all part of the done-bar, see §5): `very_good_analysis` (strict lint baseline, via `fvm flutter analyze`; also enforces `close_sinks` + `discarded_futures`); `custom_lint` running the six project-local architecture rules in `tools/getman_lints/` plus three `solid_lints` metric gates (via `fvm dart run custom_lint`); the `getman_lints` fixtures self-test (`cd tools/getman_lints/example && fvm dart run custom_lint`); and `bloc_lint` (the bloc team's rules, via `fvm dart run bloc_tools:bloc lint lib`). All four are gated by the `.githooks/pre-commit` hook (+ `dart format`). CI additionally runs OSV-Scanner (dependency vulnerability scan) and Dependabot (automated dependency update PRs).
 - **Loading UI**: `shimmer` (response-pending skeleton).
 - **Auto-update**: `updat ^1.4.0` (GitHub-release updater) + `package_info_plus` (current version) + `path_provider` (download path); `provider ^6.1.2` exposes `UpdateController` (a `ChangeNotifier`) app-wide via `ChangeNotifierProvider`. **Web-safety**: only `lib/features/updates/presentation/update_gate_io.dart` imports `updat`, `dart:io`, `package_info_plus`, and `path_provider`; web uses `update_gate_stub.dart` via the conditional export in `update_gate.dart`.
 
@@ -243,7 +243,8 @@ Entity ↔ Model boundary: every data-layer model implements `toEntity()` / `fro
 
 ```
 fvm flutter analyze                                           # very_good_analysis — must be 0 issues
-fvm dart run custom_lint                                      # Getman architecture rules (tools/getman_lints)
+fvm dart run custom_lint                                      # Getman architecture rules (tools/getman_lints) + solid_lints metrics
+( cd tools/getman_lints/example && fvm dart run custom_lint ) # getman_lints fixtures self-test (verifies rule regressions)
 fvm dart run bloc_tools:bloc lint lib                         # bloc_lint (run against lib; stdin closed in CI)
 fvm dart format lib test tools                                # formatter — the commit hook enforces it
 fvm flutter test                                              # all tests must be green
@@ -252,7 +253,9 @@ fvm flutter run -d macos                                      # desktop run; sup
 bash tool/coverage.sh                                         # unit/widget coverage report (coverage/html/index.html)
 ```
 
-Verification bar (the `.githooks/pre-commit` hook runs the first four automatically — enable once per clone with `git config core.hooksPath .githooks`): **all of `fvm flutter analyze`, `fvm dart run custom_lint`, and `fvm dart run bloc_tools:bloc lint lib` report no issues, the tree is `dart format`-clean, AND `fvm flutter test` is 100% green** before reporting work done. The three analysis passes are independent — a clean `flutter analyze` does NOT imply custom_lint/bloc_lint are clean (they run as separate processes).
+Verification bar (the `.githooks/pre-commit` hook runs the first five automatically — enable once per clone with `git config core.hooksPath .githooks`): **all of `fvm flutter analyze`, `fvm dart run custom_lint` (including the 4 new architecture rules + 3 solid_lints metric gates), the `getman_lints` fixtures self-test, and `fvm dart run bloc_tools:bloc lint lib` report no issues, the tree is `dart format`-clean, AND `fvm flutter test` is 100% green** before reporting work done. The analysis passes are independent — a clean `flutter analyze` does NOT imply custom_lint/bloc_lint/fixtures are clean (they run as separate processes).
+
+**CI-enforced supply-chain checks (not local):** OSV-Scanner scans `pubspec.lock` for known vulnerabilities on every push/PR (via the `osv-scan` reusable workflow); Dependabot sends automated PRs for outdated pub + GitHub Actions dependencies. These run automatically in CI and do not require a local command.
 
 ---
 
@@ -292,7 +295,21 @@ Verification bar (the `.githooks/pre-commit` hook runs the first four automatica
 
 ### Workflow
 - **Verify before claiming done**: a feature is NOT done until the full static-analysis stack is clean **and** tests are green. Run, and confirm zero issues from, **all** of: `fvm flutter analyze` (very_good_analysis), `fvm dart run custom_lint` (Getman architecture rules), and `fvm dart run bloc_tools:bloc lint lib` (bloc_lint) — plus `fvm dart format` cleanliness and `fvm flutter test`. These are separate passes; never assume a clean `flutter analyze` covers custom_lint or bloc_lint. The `.githooks/pre-commit` hook enforces the analysis + format gate on every commit (`git config core.hooksPath .githooks` to enable per clone; bypass only via `--no-verify`).
-- **New custom_lint rules go in `tools/getman_lints/`**: it is its own package (`custom_lint_builder` plugin) excluded from the app analyzer. Today it ships `avoid_get_it_in_widgets` (no `sl`/`GetIt` outside `lib/core/di/` + `main.dart`) and `avoid_hardcoded_brand_colors` (no `Colors.black/white/red` outside `lib/core/theme/`). Suppress a justified exception with a per-line `// ignore: <rule>` + a one-line reason.
+- **New custom_lint rules go in `tools/getman_lints/`**: it is its own package (`custom_lint_builder` plugin) excluded from the app analyzer. Every new rule **must ship a `// expect_lint:` fixture** in `tools/getman_lints/example/lib/` — the fixtures self-test is part of the pre-commit hook and CI gate so rule regressions are caught immediately. Run `( cd tools/getman_lints/example && fvm dart run custom_lint )` to verify fixtures locally. Suppress a justified exception with a per-line `// ignore: <rule>` + a one-line reason (note: `equatable_props_complete` is anchored to the class name, so the `// ignore:` must be directly above the class declaration, not above a field).
+
+  The full set of rules shipped in `tools/getman_lints/`:
+  - `avoid_get_it_in_widgets` — no `sl`/`GetIt` outside `lib/core/di/` + `main.dart`.
+  - `avoid_hardcoded_brand_colors` — no `Colors.black/white/red` outside `lib/core/theme/`.
+  - `domain_no_infrastructure_imports` — files under `*/domain/` must not import `package:flutter/`, `dart:ui`, `dart:io`, `package:dio/`, `package:hive_ce/`, or any sibling `data/` path. Keeps the domain layer pure Dart.
+  - `bloc_depends_on_abstractions` — BLoC files (matched by `*_bloc.dart` / `*_event.dart` / `*_state.dart`) must not import concrete data-layer packages (`package:hive_ce/`, `package:dio/`, or project `*/data/*.dart` paths). BLoCs depend on abstract Repository types only.
+  - `platform_io_outside_io_files` — imports of `dart:io`, `package:updat/`, `package:package_info_plus/`, or `package:path_provider/` are forbidden outside files whose basename ends in `_io.dart`. This is the machine-enforced form of the `*_io.dart` platform-safety convention (web-safety gate).
+  - `equatable_props_complete` — `Equatable` subclasses must include all declared instance fields in `props`; missing fields cause silent equality bugs.
+
+  **`solid_lints` metrics** (regression-gate baselines, not style targets): `cyclomatic_complexity: 50`, `number_of_parameters: 50`, `function_lines_of_code: 1000`. These are intentionally permissive — they catch new runaway additions, not pre-existing complexity. Note: the `function_lines_of_code` threshold appears inflated in practice because the standalone `custom_lint` runner reads `analysis_options.yaml` at the package root (which includes the test directory); large test files count toward FLOC. Refactor existing functions below these limits opportunistically, but do not let new code exceed them.
+
+  **`very_good_analysis` extras now on**: `close_sinks` (unmatched stream-sink `close()` calls) and `discarded_futures` (fire-and-forget `Future` values not explicitly unawaited or handled) — both are enabled in `analysis_options.yaml` and enforced by `flutter analyze`.
+
+  **DCM (unused-code/files) is a planned follow-up** — DCM's free tier currently requires a license key; it will be wired into CI after DCM relicenses to MIT on 2026-07-16. Do not wire it before that date.
 - **Hive regen is not optional**: after any `@HiveField` or `@HiveType` change, rerun `build_runner` (now `hive_ce_generator`).
 - **Surgical edits**: don't restructure unrelated code. One concern per change.
 - **Keep the wiki in sync**: any change that adds or alters how a feature is *used* — a new feature, a new/renamed setting, a changed keyboard shortcut, a new body/auth/code-gen type, a renamed UI label, changed defaults or limits — must be reflected in the GitHub wiki as part of the same work, not deferred. The wiki is the separate `Getman.wiki.git` repo: clone `https://github.com/thiagomiranda3/Getman.wiki.git`, edit the relevant `*.md` page (one per feature; nav lives in `_Sidebar.md`, and add a page there if you create one), then commit + push (default branch `master`); it serves at <https://github.com/thiagomiranda3/Getman/wiki>. Keep wording accurate to the code (verbatim UI labels). Purely internal refactors with no behavior/usage change don't need a wiki edit. (One-time setup only: a brand-new wiki's `.wiki.git` 404s on clone/push until its first page is created in the web UI — no API exists for that; ours is already initialized.)

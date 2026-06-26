@@ -39,3 +39,16 @@ class Plain {
   Plain(this.a);
   final int a;
 }
+
+// Pins the "ignore must be class-level" contract: a `// ignore:` on the field
+// does NOT suppress the diagnostic because it is anchored to the class name.
+// The class IS still flagged — the expect_lint below must remain present.
+// expect_lint: equatable_props_complete
+class FieldLevelIgnoreState extends Equatable {
+  const FieldLevelIgnoreState(this.a, this.b);
+  final int a;
+  // ignore: equatable_props_complete  ← field-level; does NOT suppress the class lint
+  final int b;
+  @override
+  List<Object?> get props => [a];
+}

@@ -38,6 +38,10 @@ $FLUTTER analyze || fail "analyzer reported issues"
 step "custom_lint (Getman architecture rules)"
 $DART run custom_lint || fail "custom_lint reported issues"
 
+step "custom_lint fixtures (getman_lints self-test)"
+( cd tools/getman_lints/example && $DART run custom_lint ) \
+  || fail "getman_lints fixtures failed — a rule regressed"
+
 step "bloc lint"
 $DART run bloc_tools:bloc lint lib </dev/null || fail "bloc_lint reported issues"
 

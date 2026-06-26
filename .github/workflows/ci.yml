@@ -46,6 +46,14 @@ jobs:
         continue-on-error: true
         run: dart run custom_lint 2>&1 | tee custom_lint.log
 
+      - name: custom_lint fixtures (getman_lints self-test)
+        id: lint_fixtures
+        continue-on-error: true
+        run: |
+          cd tools/getman_lints/example
+          dart pub get
+          dart run custom_lint 2>&1 | tee ../../../lint_fixtures.log
+
       - name: bloc_lint
         id: bloc_lint
         continue-on-error: true
@@ -69,6 +77,7 @@ jobs:
         env:
           ANALYZE: ${{ steps.analyze.outcome }}
           CUSTOM_LINT: ${{ steps.custom_lint.outcome }}
+          LINT_FIXTURES: ${{ steps.lint_fixtures.outcome }}
           BLOC_LINT: ${{ steps.bloc_lint.outcome }}
           FORMAT: ${{ steps.format.outcome }}
           TEST: ${{ steps.test.outcome }}
@@ -76,7 +85,7 @@ jobs:
         run: |
           icon() { [ "$1" = success ] && printf '✅ Passed' || printf '❌ Failed'; }
           all_pass=true
-          for o in "$ANALYZE" "$CUSTOM_LINT" "$BLOC_LINT" "$FORMAT" "$TEST"; do
+          for o in "$ANALYZE" "$CUSTOM_LINT" "$LINT_FIXTURES" "$BLOC_LINT" "$FORMAT" "$TEST"; do
             [ "$o" = success ] || all_pass=false
           done
 
@@ -91,6 +100,7 @@ jobs:
             echo "| :--- | :--- |"
             echo "| \`flutter analyze\` | $(icon "$ANALYZE") |"
             echo "| \`custom_lint\` | $(icon "$CUSTOM_LINT") |"
+            echo "| \`lint fixtures\` | $(icon "$LINT_FIXTURES") |"
             echo "| \`bloc_lint\` | $(icon "$BLOC_LINT") |"
             echo "| \`dart format\` | $(icon "$FORMAT") |"
             echo "| \`flutter test\` | $(icon "$TEST") |"
@@ -112,6 +122,7 @@ jobs:
           }
           append_log "flutter analyze" "$ANALYZE" analyze.log
           append_log "custom_lint" "$CUSTOM_LINT" custom_lint.log
+          append_log "lint fixtures" "$LINT_FIXTURES" lint_fixtures.log
           append_log "bloc_lint" "$BLOC_LINT" bloc_lint.log
           append_log "dart format" "$FORMAT" format.log
           append_log "flutter test" "$TEST" test.log
@@ -134,6 +145,7 @@ jobs:
         if: >-
           steps.analyze.outcome != 'success' ||
           steps.custom_lint.outcome != 'success' ||
+          steps.lint_fixtures.outcome != 'success' ||
           steps.bloc_lint.outcome != 'success' ||
           steps.format.outcome != 'success' ||
           steps.test.outcome != 'success'
