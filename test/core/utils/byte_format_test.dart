@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/network/http_response.dart';
@@ -24,5 +25,21 @@ void main() {
       bodyBytes: Uint8List(42),
     );
     expect(responseSizeBytes(r), 42);
+  });
+
+  group('responseSizeBytes memoization', () {
+    test('multibyte body: stable across repeated calls', () {
+      // No bodyBytes, no content-length -> utf8 fallback path.
+      final resp = HttpResponseEntity(
+        statusCode: 200,
+        body: 'café ☕ ${'x' * 1000}', // multibyte, so chars != bytes
+        headers: const {},
+        durationMs: 1,
+      );
+      final expected = utf8.encode(resp.body).length;
+      expect(responseSizeBytes(resp), expected);
+      // Second call must return the identical value (memoized, not recomputed).
+      expect(responseSizeBytes(resp), expected);
+    });
   });
 }
