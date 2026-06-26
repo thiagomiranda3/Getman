@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   plain text instead of attempting full syntax highlighting, keeping scrolling
   and editing fluid.
 
+### Fixed
+
+- **PDF responses no longer crash on platforms without PDF rendering support** —
+  the viewer now detects unsupported platforms up front and shows the "Cannot
+  render PDF" fallback instead of throwing.
+
 ## [1.7.0] - 2026-06-25
 
 ### Added
