@@ -11,6 +11,7 @@ class _GetmanLints extends PluginBase {
   List<LintRule> getLintRules(CustomLintConfigs configs) => const [
     AvoidGetItInWidgets(),
     AvoidHardcodedBrandColors(),
+    DomainNoInfrastructureImports(),
   ];
 }
 
@@ -115,6 +116,45 @@ class AvoidHardcodedBrandColors extends DartLintRule {
       if (isBanned) {
         reporter.atNode(node, _code);
       }
+    });
+  }
+}
+
+/// Enforces "domain layer has zero imports from data/ or Flutter UI" (CLAUDE.md
+/// §2): a file under any `domain/` directory may import only pure Dart +
+/// equatable — never Flutter, dart:io/dart:ui, dio, hive, or a feature's data/.
+class DomainNoInfrastructureImports extends DartLintRule {
+  const DomainNoInfrastructureImports() : super(code: _code);
+
+  static const _code = LintCode(
+    name: 'domain_no_infrastructure_imports',
+    problemMessage:
+        'The domain layer must be pure Dart + equatable. Do not import Flutter, '
+        'dart:io/dart:ui, dio, hive, or a feature data/ layer from domain/ '
+        '(CLAUDE.md §2).',
+    errorSeverity: ErrorSeverity.WARNING,
+  );
+
+  @override
+  void run(
+    CustomLintResolver resolver,
+    ErrorReporter reporter,
+    CustomLintContext context,
+  ) {
+    final path = _posix(resolver.path);
+    if (!path.contains('/lib/') || !path.contains('/domain/')) return;
+
+    context.registry.addImportDirective((node) {
+      final uri = node.uri.stringValue;
+      if (uri == null) return;
+      final banned =
+          uri == 'dart:io' ||
+          uri == 'dart:ui' ||
+          uri.startsWith('package:flutter/') ||
+          uri.startsWith('package:dio/') ||
+          uri.startsWith('package:hive') ||
+          (uri.startsWith('package:getman/') && uri.contains('/data/'));
+      if (banned) reporter.atNode(node, _code);
     });
   }
 }
