@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
@@ -100,6 +101,9 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
   Object? _decoded;
   bool _treeAvailable = false;
 
+  // True while a background (or inline) decode for the tree is in flight.
+  bool _treeDecoding = false;
+
   // Large-mode state: non-null when the current body exceeds the threshold.
   String? _largeBody;
   bool _showFullPreview = false;
@@ -167,21 +171,24 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
     // Only apply if no newer sync was started and we're still mounted.
     if (!mounted || syncId != _pendingSyncId) return;
     widget.responseController.text = text;
-    // Decode once for the tree view; cache the instance so the tree keeps its
-    // expansion state across rebuilds. Falls back out of tree mode if the body
-    // isn't a JSON object/array.
-    final decoded = (rawBody == null || isPlaceholder)
-        ? null
-        : JsonPath.tryDecode(rawBody);
-    final treeOk = decoded is Map || decoded is List;
+    // Tree decode is now LAZY (see _decodeForTree): enable TREE optimistically
+    // from a cheap shape probe; the real (possibly off-isolate) decode happens
+    // only when the user selects TREE. This removes the synchronous jsonDecode
+    // that previously ran on every response arrival.
+    final treeMaybe = _looksLikeJson(rawBody) && !isPlaceholder;
     setState(() {
       _largeBody = null;
       _showFullPreview = false;
       _highlightingOptedIn = false;
-      _decoded = decoded;
-      _treeAvailable = treeOk;
-      if (_mode == _BodyMode.tree && !treeOk) _mode = _BodyMode.pretty;
+      _decoded = null;
+      _treeDecoding = false;
+      _treeAvailable = treeMaybe;
+      if (_mode == _BodyMode.tree && !treeMaybe) _mode = _BodyMode.pretty;
     });
+    // If the user is already viewing TREE and the body changed, re-decode now.
+    if (_mode == _BodyMode.tree && treeMaybe) {
+      unawaited(_decodeForTree());
+    }
   }
 
   /// Creates a JSONPath extraction rule from a tree node and appends it to the
@@ -234,19 +241,67 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
     return cleaned;
   }
 
+  /// Cheap shape probe — a JSON object/array body starts with `{`/`[`. Used to
+  /// enable TREE optimistically without paying a full decode on arrival.
+  static bool _looksLikeJson(String? body) {
+    if (body == null) return false;
+    final t = body.trimLeft();
+    return t.startsWith('{') || t.startsWith('[');
+  }
+
+  /// Decodes the current body for the tree, lazily and off the UI isolate for
+  /// large bodies. On a parse miss (or a JSON scalar), disables TREE and falls
+  /// back to PRETTY. Guarded by [_pendingSyncId] so a newer body wins.
+  Future<void> _decodeForTree() async {
+    final body = context
+        .read<TabsBloc>()
+        .state
+        .tabs
+        .byId(widget.tabId)
+        ?.response
+        ?.body;
+    if (body == null || body == kResponseBodyTooLargePlaceholder) {
+      setState(() {
+        _treeAvailable = false;
+        if (_mode == _BodyMode.tree) _mode = _BodyMode.pretty;
+      });
+      return;
+    }
+    final syncId = _pendingSyncId;
+    setState(() => _treeDecoding = true);
+    final decoded = body.length > kTreeInlineDecodeLimit
+        ? await compute(JsonPath.tryDecode, body)
+        : JsonPath.tryDecode(body);
+    if (!mounted || syncId != _pendingSyncId) return;
+    final treeOk = decoded is Map || decoded is List;
+    setState(() {
+      _treeDecoding = false;
+      if (treeOk) {
+        _decoded = decoded;
+      } else {
+        _treeAvailable = false;
+        if (_mode == _BodyMode.tree) _mode = _BodyMode.pretty;
+      }
+    });
+    if (!treeOk) showAppSnackBar(context, 'Not a JSON object/array');
+  }
+
   /// Resets tree state (large mode has no tree). Call inside a setState.
   void _clearTreeState() {
     _decoded = null;
     _treeAvailable = false;
+    _treeDecoding = false;
     if (_mode == _BodyMode.tree) _mode = _BodyMode.pretty;
   }
 
   void _setMode(_BodyMode mode) {
     if (_mode == mode) return;
     setState(() => _mode = mode);
-    // Switching the editor's pretty/raw rendering needs a re-sync; switching to
-    // the tree uses the already-cached decode (no editor reload).
-    if (mode != _BodyMode.tree) {
+    if (mode == _BodyMode.tree) {
+      // Lazy: decode only now, and only if not already decoded/in-flight.
+      if (_decoded == null && !_treeDecoding) unawaited(_decodeForTree());
+    } else {
+      // Switching the editor's pretty/raw rendering needs a re-sync.
       final body = context
           .read<TabsBloc>()
           .state
@@ -342,7 +397,12 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
         ),
         Expanded(
           child: _mode == _BodyMode.tree
-              ? JsonTreeView(data: _decoded, onExtract: _extractToVariable)
+              ? (_decoded != null
+                    ? JsonTreeView(
+                        data: _decoded,
+                        onExtract: _extractToVariable,
+                      )
+                    : const Center(child: CircularProgressIndicator()))
               : _buildEditorMode(),
         ),
       ],

@@ -20,3 +20,8 @@ const int kLargeResponseViewerChars = 512 * 1024; // 512 KiB
 /// In plain-text large mode, only this prefix is rendered until the user
 /// asks for the full body.
 const int kLargeResponsePreviewChars = 256 * 1024; // 256 KiB
+
+/// JSON bodies at or below this size decode inline (sub-millisecond); larger
+/// bodies decode in a background isolate via `compute()` so selecting TREE on a
+/// big response never stalls the UI thread.
+const int kTreeInlineDecodeLimit = 64 * 1024; // 64 KiB
