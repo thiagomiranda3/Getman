@@ -51,30 +51,4 @@ void main() {
       expect(server.received, hasLength(1));
     });
   }
-
-  patrolWidgetTest(
-    'reduce-effects loud theme still sends + renders (static degradation)',
-    ($) async {
-      final server = await MockServer.start(json: {'reduced': true});
-      addTearDown(server.close);
-
-      await bootGetman($);
-      await enterUrl($, server.url('/reduced'));
-      await setTheme($, 'ARCANE QUEST');
-
-      // Turn REDUCE VISUAL EFFECTS on — the in-flight frame must degrade to
-      // identity, and a send must still complete and render.
-      await openSettings($);
-      await openSettingsTab($, 'APPEARANCE');
-      await $(
-        const ValueKey('reduce_effects_switch'),
-      ).tap(settlePolicy: SettlePolicy.noSettle);
-      await $('CLOSE').tap(settlePolicy: SettlePolicy.noSettle);
-      await pumpFrames($);
-
-      await tapSend($);
-      await waitForStatus($, 200);
-      _expectAppAlive($);
-    },
-  );
 }

@@ -162,7 +162,15 @@ void main() {
     await $('Prod').tap();
     await $.pumpAndSettle();
     await sendTo($, '{{base}}/ping');
-    await waitForStatus($, 200);
+    // The dev response (also a 200) stays on screen during the re-send (a
+    // re-send keeps the prior response until the new one lands — no flicker),
+    // so waiting on the 200 status chip would match the *stale* dev response
+    // and race the network call. Pump until the prod server actually receives.
+    for (var i = 0; i < 100 && prod.received.isEmpty; i++) {
+      await $.tester.pump(const Duration(milliseconds: 50));
+    }
     expect(prod.received, hasLength(1));
+    // And the switch really moved the base URL: dev got only the first request.
+    expect(dev.received, hasLength(1));
   });
 }

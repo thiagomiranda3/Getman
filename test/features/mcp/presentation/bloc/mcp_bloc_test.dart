@@ -160,4 +160,113 @@ void main() {
       expect(s.selectedTool, 'add');
     },
   );
+
+  blocTest<McpBloc, McpState>(
+    'reconnecting the same tab tears down the previous connection',
+    build: () {
+      final conn2 = _MockConnection();
+      when(() => conn2.session).thenReturn(session);
+      when(conn2.listTools).thenAnswer((_) async => [tool]);
+      when(conn2.close).thenAnswer((_) async {});
+      var calls = 0;
+      when(
+        () => service.connect(any(), headers: any(named: 'headers')),
+      ).thenAnswer((_) async => calls++ == 0 ? conn : conn2);
+      return McpBloc(service: service);
+    },
+    act: (b) async {
+      b.add(const McpConnectRequested(tabId: 't1', url: 'https://mcp.dev/'));
+      await Future<void>.delayed(Duration.zero);
+      b.add(const McpConnectRequested(tabId: 't1', url: 'https://mcp.dev/'));
+    },
+    verify: (b) {
+      // The first connection is closed when the same tab reconnects.
+      verify(() => conn.close()).called(1);
+      expect(b.state.sessionFor('t1').status, McpConnectionStatus.connected);
+    },
+  );
+
+  blocTest<McpBloc, McpState>(
+    'connections are isolated per tab',
+    build: () {
+      when(
+        () => service.connect(any(), headers: any(named: 'headers')),
+      ).thenAnswer((_) async => conn);
+      return McpBloc(service: service);
+    },
+    act: (b) async {
+      b.add(const McpConnectRequested(tabId: 't1', url: 'https://mcp.dev/'));
+      await Future<void>.delayed(Duration.zero);
+      b.add(const McpToolSelected(tabId: 't1', toolName: 'add'));
+    },
+    verify: (b) {
+      expect(b.state.sessionFor('t1').status, McpConnectionStatus.connected);
+      expect(b.state.sessionFor('t1').selectedTool, 'add');
+      // A tab that never connected keeps the default disconnected session.
+      final other = b.state.sessionFor('t2');
+      expect(other.status, McpConnectionStatus.disconnected);
+      expect(other.tools, isEmpty);
+    },
+  );
+
+  blocTest<McpBloc, McpState>(
+    'a failed tool call keeps the prior result and records the error',
+    build: () {
+      when(
+        () => service.connect(any(), headers: any(named: 'headers')),
+      ).thenAnswer((_) async => conn);
+      var calls = 0;
+      when(
+        () =>
+            conn.callTool(any(), any(), cancelToken: any(named: 'cancelToken')),
+      ).thenAnswer((_) async {
+        if (calls++ == 0) {
+          return const McpToolResult(
+            isError: false,
+            textBlocks: ['ok'],
+            rawBlocks: [],
+          );
+        }
+        throw McpException('tool blew up');
+      });
+      return McpBloc(service: service);
+    },
+    act: (b) async {
+      b.add(const McpConnectRequested(tabId: 't1', url: 'https://mcp.dev/'));
+      await Future<void>.delayed(Duration.zero);
+      b.add(
+        const McpToolCallRequested(tabId: 't1', toolName: 'add', arguments: {}),
+      );
+      await Future<void>.delayed(Duration.zero);
+      b.add(
+        const McpToolCallRequested(tabId: 't1', toolName: 'add', arguments: {}),
+      );
+    },
+    verify: (b) {
+      final s = b.state.sessionFor('t1');
+      expect(s.calling, isFalse);
+      expect(s.errorMessage, contains('tool blew up'));
+      // The prior successful result is retained so the pane isn't blanked.
+      expect(s.lastResult?.textBlocks, ['ok']);
+    },
+  );
+
+  blocTest<McpBloc, McpState>(
+    'a tool call with no live connection is a no-op',
+    build: () => McpBloc(service: service),
+    act: (b) => b.add(
+      const McpToolCallRequested(
+        tabId: 'ghost',
+        toolName: 'add',
+        arguments: {},
+      ),
+    ),
+    expect: () => const <McpState>[],
+    verify: (b) {
+      expect(
+        b.state.sessionFor('ghost').status,
+        McpConnectionStatus.disconnected,
+      );
+    },
+  );
 }
