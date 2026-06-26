@@ -30,6 +30,15 @@ class _PdfResponseViewState extends State<PdfResponseView> {
 
   Future<void> _loadDocument() async {
     try {
+      // pdfx's PdfDocument.openData calls assertHasPdfSupport() WITHOUT
+      // awaiting it, so on a platform with no pdfium binding (e.g. the headless
+      // test VM / CI) that assert throws a *detached* async error no try/catch
+      // here can catch. Pre-check support (awaited) and fall back instead of
+      // ever invoking openData on an unsupported platform.
+      if (!await hasPdfSupport()) {
+        if (mounted) setState(() => _error = PlatformNotSupportedException());
+        return;
+      }
       final doc = await PdfDocument.openData(widget.bytes);
       if (!mounted) {
         await doc.close();
@@ -38,7 +47,7 @@ class _PdfResponseViewState extends State<PdfResponseView> {
       setState(
         () => _controller = PdfControllerPinch(document: Future.value(doc)),
       );
-    } on Exception catch (e) {
+    } on Object catch (e) {
       if (mounted) setState(() => _error = e);
     }
   }
