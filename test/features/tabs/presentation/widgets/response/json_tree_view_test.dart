@@ -116,4 +116,36 @@ void main() {
       expect(find.text('Extract to {{var}}'), findsNothing);
     });
   });
+
+  group('flattenVisibleJsonTree (pure)', () {
+    test('collapsed root shows only first-level rows', () {
+      final data = {
+        'a': 1,
+        'b': {'c': 2},
+      };
+      final nodes = flattenVisibleJsonTree(data: data, expanded: <String>{});
+      expect(nodes.map((n) => n.path).toList(), [r'$.a', r'$.b']);
+    });
+
+    test('expanded paths reveal their children in order', () {
+      final data = {
+        'a': 1,
+        'b': {'c': 2},
+      };
+      final nodes = flattenVisibleJsonTree(
+        data: data,
+        expanded: {r'$.b'},
+      );
+      expect(nodes.map((n) => n.path).toList(), [r'$.a', r'$.b', r'$.b.c']);
+    });
+
+    test('top-level list indexes by position', () {
+      final nodes = flattenVisibleJsonTree(
+        data: [10, 20],
+        expanded: <String>{},
+      );
+      expect(nodes.map((n) => n.path).toList(), [r'$[0]', r'$[1]']);
+      expect(nodes.map((n) => n.label).toList(), ['[0]', '[1]']);
+    });
+  });
 }
