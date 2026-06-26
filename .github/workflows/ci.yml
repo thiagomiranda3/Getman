@@ -22,7 +22,7 @@ jobs:
       run:
         shell: bash # ensures pipefail so `cmd | tee` reflects cmd's exit code
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: subosito/flutter-action@v2
         with:
@@ -133,7 +133,7 @@ jobs:
 
       - name: Upload comment artifact
         if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ci-comment
           path: |
