@@ -2,7 +2,7 @@
 
 // expect_lint: domain_no_infrastructure_imports
 import 'package:flutter/material.dart';
-// expect_lint: domain_no_infrastructure_imports
+// expect_lint: domain_no_infrastructure_imports, platform_io_outside_io_files
 import 'dart:io';
 // expect_lint: domain_no_infrastructure_imports
 import 'package:dio/dio.dart';

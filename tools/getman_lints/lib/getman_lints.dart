@@ -13,6 +13,7 @@ class _GetmanLints extends PluginBase {
     AvoidHardcodedBrandColors(),
     DomainNoInfrastructureImports(),
     BlocDependsOnAbstractions(),
+    PlatformIoOutsideIoFiles(),
   ];
 }
 
@@ -153,6 +154,44 @@ class BlocDependsOnAbstractions extends DartLintRule {
           uri.startsWith('package:dio/') ||
           uri.startsWith('package:hive') ||
           (uri.startsWith('package:getman/') && uri.contains('/data/'));
+      if (banned) reporter.atNode(node, _code);
+    });
+  }
+}
+
+/// Enforces web-safety (CLAUDE.md §1): dart:io / updat / path_provider /
+/// package_info_plus may only be imported from `*_io.dart` files (the
+/// conditional-import native-side convention). Keeps web builds clean.
+class PlatformIoOutsideIoFiles extends DartLintRule {
+  const PlatformIoOutsideIoFiles() : super(code: _code);
+
+  static const _code = LintCode(
+    name: 'platform_io_outside_io_files',
+    problemMessage:
+        'dart:io / updat / path_provider / package_info_plus may only be '
+        'imported from a *_io.dart file (conditional-import native side). Move '
+        'native code behind an *_io.dart + stub split to keep web builds clean '
+        '(CLAUDE.md §1).',
+    errorSeverity: ErrorSeverity.WARNING,
+  );
+
+  @override
+  void run(
+    CustomLintResolver resolver,
+    ErrorReporter reporter,
+    CustomLintContext context,
+  ) {
+    final path = _posix(resolver.path);
+    if (!path.contains('/lib/') || path.endsWith('_io.dart')) return;
+
+    context.registry.addImportDirective((node) {
+      final uri = node.uri.stringValue;
+      if (uri == null) return;
+      final banned =
+          uri == 'dart:io' ||
+          uri.startsWith('package:updat/') ||
+          uri.startsWith('package:path_provider/') ||
+          uri.startsWith('package:package_info_plus/');
       if (banned) reporter.atNode(node, _code);
     });
   }
