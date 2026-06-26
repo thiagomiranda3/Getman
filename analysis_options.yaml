@@ -92,9 +92,14 @@ custom_lint:
     #     1000 only keeps the test bodies green. Tighten to 400 once test main()s
     #     are excludable (e.g. a future custom_lint with path-glob exclude).
     #
-    # NOTE the flat/sibling YAML format: the threshold key sits at the SAME indent
-    # as the rule name (custom_lint_core reads sibling keys in the list-map entry,
-    # not children nested under the rule name).
+    # ⚠️ YAML FORMAT — do NOT change the indentation below. Each `max_*` key must
+    # be a SIBLING of its rule-name key inside the same list-map entry, i.e. at the
+    # same column as the rule name (6 spaces — aligned under the rule name, NOT
+    # indented one level deeper). custom_lint_core reads the threshold as a sibling
+    # key in the list-map entry. If you indent `max_*` one level deeper it becomes a
+    # nested child, the threshold is dropped back to the solid_lints default, and
+    # the gate silently changes (CI will then flip red on the existing baseline).
+    # Correct:  `- cyclomatic_complexity:` then `  max_complexity: 50` (same column).
     - cyclomatic_complexity:
       max_complexity: 50
     - number_of_parameters:
