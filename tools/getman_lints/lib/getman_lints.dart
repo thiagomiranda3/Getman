@@ -12,6 +12,7 @@ class _GetmanLints extends PluginBase {
     AvoidGetItInWidgets(),
     AvoidHardcodedBrandColors(),
     DomainNoInfrastructureImports(),
+    BlocDependsOnAbstractions(),
   ];
 }
 
@@ -116,6 +117,43 @@ class AvoidHardcodedBrandColors extends DartLintRule {
       if (isBanned) {
         reporter.atNode(node, _code);
       }
+    });
+  }
+}
+
+/// Enforces "BLoCs depend on abstract Repository types, never ...Impl/Hive/Dio
+/// directly" (CLAUDE.md §2/§7): a `*_bloc.dart` / `*_cubit.dart` file may not
+/// import a data/ layer, dio, or hive. Detection is by import directory/package,
+/// not an `Impl` name heuristic.
+class BlocDependsOnAbstractions extends DartLintRule {
+  const BlocDependsOnAbstractions() : super(code: _code);
+
+  static const _code = LintCode(
+    name: 'bloc_depends_on_abstractions',
+    problemMessage:
+        'BLoCs/Cubits must depend on abstract Repository types. Do not import a '
+        'data/ layer, dio, or hive directly from a bloc/cubit (CLAUDE.md §2/§7).',
+    errorSeverity: ErrorSeverity.WARNING,
+  );
+
+  @override
+  void run(
+    CustomLintResolver resolver,
+    ErrorReporter reporter,
+    CustomLintContext context,
+  ) {
+    final path = _posix(resolver.path);
+    if (!path.contains('/lib/')) return;
+    if (!path.endsWith('_bloc.dart') && !path.endsWith('_cubit.dart')) return;
+
+    context.registry.addImportDirective((node) {
+      final uri = node.uri.stringValue;
+      if (uri == null) return;
+      final banned =
+          uri.startsWith('package:dio/') ||
+          uri.startsWith('package:hive') ||
+          (uri.startsWith('package:getman/') && uri.contains('/data/'));
+      if (banned) reporter.atNode(node, _code);
     });
   }
 }
