@@ -25,7 +25,7 @@ dependencies:
   media_kit: ^1.2.6
   media_kit_libs_video: ^1.0.7
   media_kit_video: ^2.0.1
-  package_info_plus: ^8.0.0
+  package_info_plus: ^9.0.1
   path_provider: ^2.1.5
   pdfx: ^2.9.2
   provider: ^6.1.2
@@ -62,10 +62,10 @@ dev_dependencies:
   # (not the full `patrol` package) because patrol's native automation does not
   # support macOS desktop (alpha, no native support); the finder API is all we
   # need and runs under integration_test without a native test harness.
-  patrol_finders: ^3.2.0
+  patrol_finders: ^3.5.0
   plugin_platform_interface: ^2.1.8
   solid_lints: ^0.3.0
-  very_good_analysis: ^10.2.0
+  very_good_analysis: ^10.3.0
 
 flutter:
   uses-material-design: true
