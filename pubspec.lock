@@ -1171,6 +1171,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  solid_lints:
+    dependency: "direct dev"
+    description:
+      name: solid_lints
+      sha256: "1658712054a35742446256dad1cbf6d7754eba913bd689bbad87fe83df8cefe8"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.3.3"
   source_gen:
     dependency: transitive
     description:

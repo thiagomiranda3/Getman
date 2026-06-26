@@ -59,3 +59,30 @@ bloc:
     - avoid_public_fields
     - prefer_file_naming_conventions
     - prefer_void_public_cubit_methods
+
+# custom_lint runs in opt-in mode: only the rules listed here are active. This
+# keeps solid_lints scoped to the three pure-metric rules (no VGA overlap) while
+# preserving the getman_lints architecture rules.
+custom_lint:
+  enable_all_lint_rules: false
+  rules:
+    # getman_lints (project-local architecture rules)
+    - avoid_get_it_in_widgets
+    - avoid_hardcoded_brand_colors
+    - domain_no_infrastructure_imports
+    - bloc_depends_on_abstractions
+    - platform_io_outside_io_files
+    - equatable_props_complete
+    # solid_lints — cherry-picked metrics only. These are regression-gate
+    # baselines set just above the current codebase max (theme builders, entity
+    # copyWiths, and the cURL parser are legitimately above a "healthy" bar) —
+    # they block FUTURE drift beyond these bounds, and are tunable downward
+    # later. NOTE the flat/sibling YAML format: the threshold key sits at the
+    # SAME indent as the rule name (custom_lint_core reads sibling keys in the
+    # list-map entry, not children nested under the rule name).
+    - cyclomatic_complexity:
+      max_complexity: 50
+    - number_of_parameters:
+      max_parameters: 50
+    - function_lines_of_code:
+      max_lines: 1000
