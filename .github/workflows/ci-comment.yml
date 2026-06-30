@@ -24,7 +24,7 @@ jobs:
       - name: Download comment artifact
         id: download
         continue-on-error: true # CI may have failed before uploading (e.g. pub get)
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: ci-comment
           run-id: ${{ github.event.workflow_run.id }}
@@ -37,7 +37,7 @@ jobs:
 
       - name: Post sticky comment
         if: steps.download.outcome == 'success'
-        uses: marocchino/sticky-pull-request-comment@v3
+        uses: marocchino/sticky-pull-request-comment@d4d6b0936434b21bc8345ad45a440c5f7d2c40ff # v3
         with:
           header: getman-ci-summary
           number: ${{ steps.pr.outputs.number }}
