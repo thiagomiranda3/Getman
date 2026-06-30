@@ -154,7 +154,6 @@ class MyApp extends StatelessWidget {
   // Part of the public constructor consumed by widget tests; the boot settings
   // are applied via SettingsBloc seeding in di.init(), so the field itself is
   // not read inside build().
-  // ignore: unreachable_from_main
   final SettingsEntity initialSettings;
 
   @override

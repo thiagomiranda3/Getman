@@ -12,9 +12,8 @@ import 'package:getman/features/history/presentation/bloc/history_state.dart';
 /// `watchHistory()` — which yields the current list on subscribe, so no
 /// explicit load event is needed.
 class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
-  HistoryBloc({required WatchHistoryUseCase watchHistoryUseCase})
-    : _watchHistoryUseCase = watchHistoryUseCase,
-      super(const HistoryState(isLoading: true)) {
+  HistoryBloc({required this._watchHistoryUseCase})
+    : super(const HistoryState(isLoading: true)) {
     on<HistoryUpdated>(_onHistoryUpdated);
 
     // Guard against the stream emitting during/after close() — otherwise

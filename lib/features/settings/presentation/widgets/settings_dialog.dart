@@ -581,28 +581,35 @@ class _SettingsDialogState extends State<SettingsDialog>
     Key? switchKey,
   }) {
     final layout = context.appLayout;
-    return ListTile(
-      contentPadding: EdgeInsets.symmetric(horizontal: layout.inputPadding),
-      leading: icon == null ? null : Icon(icon, size: layout.iconSize),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: layout.fontSizeNormal,
-          fontWeight: context.appTypography.titleWeight,
+    // A transparency Material gives the row its own ink surface. Under the
+    // glass theme the dialog wraps its content in a frosted card (a colored
+    // DecoratedBox); Flutter 3.44 asserts when a ListTile's nearest background
+    // ancestor is that colored box rather than a Material.
+    return Material(
+      type: MaterialType.transparency,
+      child: ListTile(
+        contentPadding: EdgeInsets.symmetric(horizontal: layout.inputPadding),
+        leading: icon == null ? null : Icon(icon, size: layout.iconSize),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontSize: layout.fontSizeNormal,
+            fontWeight: context.appTypography.titleWeight,
+          ),
         ),
-      ),
-      subtitle: subtitle == null
-          ? null
-          : Text(subtitle, style: TextStyle(fontSize: layout.fontSizeSmall)),
-      trailing: KeyedSubtree(
-        key: switchKey,
-        child: context.appComponents.toggle(
-          context,
-          value: value,
-          onChanged: onChanged,
+        subtitle: subtitle == null
+            ? null
+            : Text(subtitle, style: TextStyle(fontSize: layout.fontSizeSmall)),
+        trailing: KeyedSubtree(
+          key: switchKey,
+          child: context.appComponents.toggle(
+            context,
+            value: value,
+            onChanged: onChanged,
+          ),
         ),
+        onTap: () => onChanged(!value),
       ),
-      onTap: () => onChanged(!value),
     );
   }
 }

@@ -4,8 +4,7 @@ import 'package:equatable/equatable.dart';
 enum ExtractionKind {
   jsonPath('jsonPath'),
   header('header'),
-  regex('regex')
-  ;
+  regex('regex');
 
   const ExtractionKind(this.wire);
   final String wire;

@@ -157,7 +157,7 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
             return SizeTransition(
               sizeFactor: _sizeAnimation,
               axis: Axis.horizontal,
-              axisAlignment: -1,
+              alignment: Alignment.topLeft,
               child: ReorderableDragStartListener(
                 index: widget.index,
                 child: LongPressDraggable<String>(

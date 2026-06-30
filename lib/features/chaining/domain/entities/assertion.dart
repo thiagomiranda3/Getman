@@ -5,8 +5,7 @@ enum AssertionTarget {
   statusCode('statusCode'),
   responseTime('responseTime'),
   bodyJsonPath('bodyJsonPath'),
-  header('header')
-  ;
+  header('header');
 
   const AssertionTarget(this.wire);
   final String wire;
@@ -27,8 +26,7 @@ enum AssertionComparator {
   lessThan('lessThan'),
   greaterThan('greaterThan'),
   inRange('inRange'),
-  exists('exists')
-  ;
+  exists('exists');
 
   const AssertionComparator(this.wire);
   final String wire;

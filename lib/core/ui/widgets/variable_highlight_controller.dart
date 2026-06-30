@@ -13,8 +13,8 @@ typedef VariableEnterCallback =
 class VariableHighlightController extends TextEditingController {
   VariableHighlightController({
     super.text,
-    Map<String, String> variables = const {},
-  }) : _variables = variables;
+    this._variables = const {},
+  });
   Map<String, String> _variables;
 
   // Theme-dependent, so they can't be known at construction time (no

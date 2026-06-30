@@ -13,8 +13,7 @@ enum CodeGenTarget {
   nodeAxios('Node.js — axios'),
   pythonRequests('Python — requests'),
   goNetHttp('Go — net/http'),
-  javaOkHttp('Java — OkHttp')
-  ;
+  javaOkHttp('Java — OkHttp');
 
   const CodeGenTarget(this.label);
 

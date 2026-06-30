@@ -103,24 +103,32 @@ class _ExportApiDocsDialogState extends State<ExportApiDocsDialog> {
             onChanged: (v) {
               if (v != null) setState(() => _format = v);
             },
-            child: const Column(
-              children: [
-                RadioListTile<ExportDocFormat>(
-                  key: ValueKey('fmt_openapi_json'),
-                  value: ExportDocFormat.openApiJson,
-                  title: Text('OpenAPI 3.0.3 (JSON)'),
-                ),
-                RadioListTile<ExportDocFormat>(
-                  key: ValueKey('fmt_openapi_yaml'),
-                  value: ExportDocFormat.openApiYaml,
-                  title: Text('OpenAPI 3.0.3 (YAML)'),
-                ),
-                RadioListTile<ExportDocFormat>(
-                  key: ValueKey('fmt_markdown'),
-                  value: ExportDocFormat.markdown,
-                  title: Text('Markdown'),
-                ),
-              ],
+            // A transparency Material gives the radio rows their own ink
+            // surface. Under the glass theme the dialog wraps its content in a
+            // frosted card (a colored DecoratedBox); Flutter 3.44 asserts when
+            // a (Radio)ListTile's nearest background ancestor is that colored
+            // box rather than a Material.
+            child: const Material(
+              type: MaterialType.transparency,
+              child: Column(
+                children: [
+                  RadioListTile<ExportDocFormat>(
+                    key: ValueKey('fmt_openapi_json'),
+                    value: ExportDocFormat.openApiJson,
+                    title: Text('OpenAPI 3.0.3 (JSON)'),
+                  ),
+                  RadioListTile<ExportDocFormat>(
+                    key: ValueKey('fmt_openapi_yaml'),
+                    value: ExportDocFormat.openApiYaml,
+                    title: Text('OpenAPI 3.0.3 (YAML)'),
+                  ),
+                  RadioListTile<ExportDocFormat>(
+                    key: ValueKey('fmt_markdown'),
+                    value: ExportDocFormat.markdown,
+                    title: Text('Markdown'),
+                  ),
+                ],
+              ),
             ),
           ),
           SizedBox(height: layout.tabSpacing),

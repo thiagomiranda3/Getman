@@ -437,26 +437,34 @@ class _DefaultDataRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
-    return ListTile(
-      dense: true,
-      title: Text(
-        label,
-        style: TextStyle(
-          fontWeight: context.appTypography.titleWeight,
-          fontSize: layout.fontSizeNormal,
-          // Both highlight states use primaryColor — the views always show the
-          // key in primaryColor regardless of highlight state.
-          color: theme.primaryColor,
+    // A transparency Material gives the row its own ink/background surface.
+    // The views render these rows inside a themed panel (a colored DecoratedBox
+    // via panelBox); Flutter 3.44 asserts when a ListTile's nearest background
+    // ancestor is that colored box rather than a Material. Transparency paints
+    // nothing, so the panel behind it still shows through.
+    return Material(
+      type: MaterialType.transparency,
+      child: ListTile(
+        dense: true,
+        title: Text(
+          label,
+          style: TextStyle(
+            fontWeight: context.appTypography.titleWeight,
+            fontSize: layout.fontSizeNormal,
+            // Both highlight states use primaryColor — the views always show
+            // the key in primaryColor regardless of highlight state.
+            color: theme.primaryColor,
+          ),
         ),
-      ),
-      subtitle: Text(
-        value,
-        style: TextStyle(
-          fontSize: layout.fontSizeNormal,
-          fontWeight: highlight ? context.appTypography.titleWeight : null,
-          color: highlight
-              ? theme.colorScheme.primary
-              : theme.colorScheme.onSurface,
+        subtitle: Text(
+          value,
+          style: TextStyle(
+            fontSize: layout.fontSizeNormal,
+            fontWeight: highlight ? context.appTypography.titleWeight : null,
+            color: highlight
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurface,
+          ),
         ),
       ),
     );

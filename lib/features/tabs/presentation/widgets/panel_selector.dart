@@ -331,7 +331,7 @@ class _PanelMenuCard extends StatelessWidget {
                     shrinkWrap: true,
                     buildDefaultDragHandles: false,
                     itemCount: panels.length,
-                    onReorder: (oldIndex, newIndex) => context
+                    onReorderItem: (oldIndex, newIndex) => context
                         .read<TabsBloc>()
                         .add(ReorderPanels(oldIndex, newIndex)),
                     proxyDecorator: (child, index, animation) => Material(

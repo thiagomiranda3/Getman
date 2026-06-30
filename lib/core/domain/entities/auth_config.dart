@@ -9,8 +9,7 @@ enum AuthType {
   inherit('inherit'),
   bearer('bearer'),
   basic('basic'),
-  apiKey('apikey')
-  ;
+  apiKey('apikey');
 
   const AuthType(this.wire);
 
@@ -27,8 +26,7 @@ enum AuthType {
 /// Where an API-key credential is placed on the outgoing request.
 enum ApiKeyLocation {
   header('header'),
-  query('query')
-  ;
+  query('query');
 
   const ApiKeyLocation(this.wire);
 

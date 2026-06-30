@@ -7,8 +7,7 @@ enum BodyType {
   urlencoded('urlencoded'),
   multipart('multipart'),
   binary('binary'),
-  graphql('graphql')
-  ;
+  graphql('graphql');
 
   const BodyType(this.wire);
 

@@ -9,16 +9,12 @@ import 'package:getman/features/environments/presentation/bloc/environments_stat
 
 class EnvironmentsBloc extends Bloc<EnvironmentsEvent, EnvironmentsState> {
   EnvironmentsBloc({
-    required GetEnvironmentsUseCase getEnvironmentsUseCase,
-    required SaveEnvironmentsUseCase saveEnvironmentsUseCase,
-    required PutEnvironmentUseCase putEnvironmentUseCase,
-    required DeleteEnvironmentUseCase deleteEnvironmentUseCase,
+    required this._getEnvironmentsUseCase,
+    required this._saveEnvironmentsUseCase,
+    required this._putEnvironmentUseCase,
+    required this._deleteEnvironmentUseCase,
     List<EnvironmentEntity> initialEnvironments = const [],
-  }) : _getEnvironmentsUseCase = getEnvironmentsUseCase,
-       _saveEnvironmentsUseCase = saveEnvironmentsUseCase,
-       _putEnvironmentUseCase = putEnvironmentUseCase,
-       _deleteEnvironmentUseCase = deleteEnvironmentUseCase,
-       super(EnvironmentsState(environments: initialEnvironments)) {
+  }) : super(EnvironmentsState(environments: initialEnvironments)) {
     on<LoadEnvironments>(_onLoad);
     on<AddEnvironment>(_onAdd);
     on<UpdateEnvironment>(_onUpdate);

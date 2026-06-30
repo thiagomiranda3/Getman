@@ -20,13 +20,13 @@ or set up a fresh machine.
 
 ### Flutter (via FVM)
 
-Getman pins **Flutter `3.41.6`** in [`.fvmrc`](../.fvmrc). Use
+Getman pins **Flutter `3.44.4`** in [`.fvmrc`](../.fvmrc). Use
 [FVM](https://fvm.app) so your local toolchain matches CI exactly — a
 different Flutter version can produce different output or fail codegen.
 
 ```sh
 dart pub global activate fvm   # or: brew install fvm  (macOS)
-fvm install                    # installs the pinned 3.41.6 into this repo
+fvm install                    # installs the pinned 3.44.4 into this repo
 ```
 
 Every `flutter` / `dart` command below is prefixed with `fvm` so it runs
