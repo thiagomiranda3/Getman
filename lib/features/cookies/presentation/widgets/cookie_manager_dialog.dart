@@ -186,35 +186,42 @@ class _CookieManagerDialogState extends State<CookieManagerDialog> {
       if (cookie.expiresEpochMs == null) 'session',
     ].join(' · ');
 
-    return ListTile(
-      dense: true,
-      contentPadding: EdgeInsets.zero,
-      title: Text(
-        '${cookie.name} = ${cookie.value}',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontWeight: context.appTypography.titleWeight,
-          fontSize: layout.fontSizeNormal,
-          color: theme.primaryColor,
+    // A transparency Material gives the tile its own ink surface. The dialog
+    // renders these rows inside a themed surface (the glass frosted card / a
+    // colored panel), and Flutter 3.44 asserts when a ListTile's nearest
+    // background ancestor is that colored box rather than a Material.
+    return Material(
+      type: MaterialType.transparency,
+      child: ListTile(
+        dense: true,
+        contentPadding: EdgeInsets.zero,
+        title: Text(
+          '${cookie.name} = ${cookie.value}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontWeight: context.appTypography.titleWeight,
+            fontSize: layout.fontSizeNormal,
+            color: theme.primaryColor,
+          ),
         ),
-      ),
-      subtitle: Text(
-        flags,
-        style: TextStyle(
-          fontSize: layout.fontSizeSmall,
-          color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+        subtitle: Text(
+          flags,
+          style: TextStyle(
+            fontSize: layout.fontSizeSmall,
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+          ),
         ),
-      ),
-      trailing: IconButton(
-        key: ValueKey('delete_cookie_${cookie.name}'),
-        icon: Icon(
-          Icons.delete_outline,
-          size: layout.iconSize,
-          color: theme.colorScheme.error,
+        trailing: IconButton(
+          key: ValueKey('delete_cookie_${cookie.name}'),
+          icon: Icon(
+            Icons.delete_outline,
+            size: layout.iconSize,
+            color: theme.colorScheme.error,
+          ),
+          tooltip: 'Delete cookie',
+          onPressed: () => _confirmDelete(cookie),
         ),
-        tooltip: 'Delete cookie',
-        onPressed: () => _confirmDelete(cookie),
       ),
     );
   }

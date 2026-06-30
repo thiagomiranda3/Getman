@@ -26,30 +26,38 @@ class UpdateSettingsSection extends StatelessWidget {
           buildWhen: (p, n) =>
               p.settings.checkForUpdatesOnStartup !=
               n.settings.checkForUpdatesOnStartup,
-          builder: (context, state) => ListTile(
-            contentPadding: EdgeInsets.symmetric(
-              horizontal: layout.inputPadding,
-            ),
-            leading: Icon(Icons.system_update, size: layout.iconSize),
-            title: Text(
-              'CHECK FOR UPDATES ON STARTUP',
-              style: TextStyle(
-                fontSize: layout.fontSizeNormal,
-                fontWeight: context.appTypography.titleWeight,
+          // A transparency Material gives the row its own ink surface. Under
+          // the glass theme the settings dialog wraps its content in a frosted
+          // card (a colored DecoratedBox); Flutter 3.44 asserts when a
+          // ListTile's nearest background ancestor is that colored box rather
+          // than a Material.
+          builder: (context, state) => Material(
+            type: MaterialType.transparency,
+            child: ListTile(
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: layout.inputPadding,
               ),
-            ),
-            trailing: KeyedSubtree(
-              key: const ValueKey('check_updates_switch'),
-              child: context.appComponents.toggle(
-                context,
-                value: state.settings.checkForUpdatesOnStartup,
-                onChanged: (v) =>
-                    bloc.add(UpdateCheckForUpdatesOnStartup(enabled: v)),
+              leading: Icon(Icons.system_update, size: layout.iconSize),
+              title: Text(
+                'CHECK FOR UPDATES ON STARTUP',
+                style: TextStyle(
+                  fontSize: layout.fontSizeNormal,
+                  fontWeight: context.appTypography.titleWeight,
+                ),
               ),
-            ),
-            onTap: () => bloc.add(
-              UpdateCheckForUpdatesOnStartup(
-                enabled: !state.settings.checkForUpdatesOnStartup,
+              trailing: KeyedSubtree(
+                key: const ValueKey('check_updates_switch'),
+                child: context.appComponents.toggle(
+                  context,
+                  value: state.settings.checkForUpdatesOnStartup,
+                  onChanged: (v) =>
+                      bloc.add(UpdateCheckForUpdatesOnStartup(enabled: v)),
+                ),
+              ),
+              onTap: () => bloc.add(
+                UpdateCheckForUpdatesOnStartup(
+                  enabled: !state.settings.checkForUpdatesOnStartup,
+                ),
               ),
             ),
           ),

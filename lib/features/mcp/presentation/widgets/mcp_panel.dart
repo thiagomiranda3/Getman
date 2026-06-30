@@ -385,33 +385,40 @@ class _ToolDetail extends StatelessWidget {
           // Lives inside the SingleChildScrollView — no RenderFlex overflow.
           if (log.isNotEmpty) ...[
             SizedBox(height: layout.inputPaddingVertical),
-            ExpansionTile(
-              key: const ValueKey('mcp_session_log'),
-              title: Text(
-                'Session log',
-                style: TextStyle(fontWeight: typo.titleWeight),
-              ),
-              children: [
-                for (final entry in log)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        vertical: layout.inputPaddingVertical / 2,
-                        horizontal: layout.inputPadding,
-                      ),
-                      child: Text(
-                        entry,
-                        style: TextStyle(
-                          fontFamily: typo.codeFontFamily,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.8,
+            // ExpansionTile builds a ListTile header; a transparency Material
+            // gives it its own ink surface so Flutter 3.44 doesn't assert when
+            // the panel's themed surface (a colored DecoratedBox) is its
+            // nearest background ancestor.
+            Material(
+              type: MaterialType.transparency,
+              child: ExpansionTile(
+                key: const ValueKey('mcp_session_log'),
+                title: Text(
+                  'Session log',
+                  style: TextStyle(fontWeight: typo.titleWeight),
+                ),
+                children: [
+                  for (final entry in log)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          vertical: layout.inputPaddingVertical / 2,
+                          horizontal: layout.inputPadding,
+                        ),
+                        child: Text(
+                          entry,
+                          style: TextStyle(
+                            fontFamily: typo.codeFontFamily,
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.8,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ],
         ],
