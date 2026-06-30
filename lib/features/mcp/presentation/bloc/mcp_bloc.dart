@@ -9,9 +9,7 @@ import 'package:getman/features/mcp/presentation/bloc/mcp_state.dart';
 /// RealtimeBloc's teardown discipline: a connection is closed on disconnect, on
 /// reconnect for the same tab, and on bloc close.
 class McpBloc extends Bloc<McpEvent, McpState> {
-  McpBloc({required McpService service})
-    : _service = service,
-      super(const McpState()) {
+  McpBloc({required this._service}) : super(const McpState()) {
     on<McpConnectRequested>(_onConnect);
     on<McpDisconnectRequested>(_onDisconnect);
     on<McpToolSelected>(_onToolSelected);

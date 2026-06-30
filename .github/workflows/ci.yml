@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 env:
-  FLUTTER_VERSION: '3.41.6'
+  FLUTTER_VERSION: '3.44.4'
 
 jobs:
   checks:
@@ -154,17 +154,24 @@ jobs:
           exit 1
 
   # Fork-safe dependency-vuln gate: scan pubspec.lock and FAIL the job on a
-  # known vulnerability (fail-on-vuln defaults to true). SARIF upload is
-  # disabled (upload-sarif: false) so this needs only contents: read — no
-  # security-events: write / actions: read — and therefore runs cleanly on
-  # fork PRs, where the workflow token is downgraded to read-only.
+  # known vulnerability. We use the standalone scanner action (not the reusable
+  # workflow) on purpose: the reusable workflow statically declares
+  # `security-events: write` + `actions: read` at its top level, which can't be
+  # satisfied by a `contents: read` caller — that triggers a startup_failure on
+  # every run and would also break on fork PRs (where the token is downgraded
+  # to read-only). The standalone action only needs `contents: read`, uploads
+  # no SARIF, and osv-scanner exits non-zero on a vulnerability, so the job
+  # fails the build natively. Pinned to @v2.3.8 (the docker image tag matches),
+  # so the action's "behavior may change in minor patches" caveat does not apply.
   osv-scan:
     name: OSV-Scanner (dependency vulnerabilities)
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.3.8
-    with:
-      scan-args: |-
-        --lockfile=./pubspec.lock
-      upload-sarif: false
-      fail-on-vuln: true
+    runs-on: ubuntu-latest
     permissions:
       contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Scan pubspec.lock for known vulnerabilities
+        uses: google/osv-scanner-action/osv-scanner-action@v2.3.8
+        with:
+          scan-args: |-
+            --lockfile=./pubspec.lock

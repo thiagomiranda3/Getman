@@ -300,7 +300,7 @@ void main() {
     // of a ReorderableDragStartListener handle inside an overlay is flaky; the
     // drag gesture itself is covered by extras_test's tab-reorder. Here we
     // assert the *panel order persists* through the bloc + reopened dropdown.)
-    _tabsBloc($).add(const ReorderPanels(0, 3));
+    _tabsBloc($).add(const ReorderPanels(0, 2));
     await $.pumpAndSettle();
 
     expect(_panels($).map((p) => p.name), ['Panel 2', 'Panel 3', 'Panel 1']);

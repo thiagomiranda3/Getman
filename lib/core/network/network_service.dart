@@ -19,10 +19,9 @@ export 'package:getman/core/network/cancel_handle.dart';
 
 class NetworkService {
   NetworkService({
-    required Dio dio,
-    int maxResponseBytes = kMaxRenderableResponseBytes,
-  }) : _dio = dio,
-       _maxResponseBytes = maxResponseBytes;
+    required this._dio,
+    this._maxResponseBytes = kMaxRenderableResponseBytes,
+  });
   final Dio _dio;
   final int _maxResponseBytes;
 

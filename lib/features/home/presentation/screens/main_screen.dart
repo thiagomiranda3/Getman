@@ -548,7 +548,7 @@ class _MainScreenState extends State<MainScreen> {
                         scrollDirection: Axis.horizontal,
                         itemCount: tabs.length,
                         buildDefaultDragHandles: false,
-                        onReorder: (oldIndex, newIndex) => context
+                        onReorderItem: (oldIndex, newIndex) => context
                             .read<TabsBloc>()
                             .add(ReorderTabs(oldIndex, newIndex)),
                         proxyDecorator: (child, index, animation) => Material(

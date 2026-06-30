@@ -28,13 +28,10 @@ import 'package:uuid/uuid.dart';
 
 class TabsBloc extends Bloc<TabsEvent, TabsState> {
   TabsBloc({
-    required TabsRepository repository,
-    required SendRequestUseCase sendRequestUseCase,
-    GetRequestRulesUseCase? getRequestRulesUseCase,
-  }) : _repository = repository,
-       _sendRequestUseCase = sendRequestUseCase,
-       _getRequestRulesUseCase = getRequestRulesUseCase,
-       super(const TabsState()) {
+    required this._repository,
+    required this._sendRequestUseCase,
+    this._getRequestRulesUseCase,
+  }) : super(const TabsState()) {
     on<LoadTabs>(_onLoadTabs);
     on<AddTab>(_onAddTab);
     on<RemoveTab>(_onRemoveTab);
@@ -355,10 +352,10 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     if (state.panels.isEmpty) return;
     final active = _activePanel;
     final tabs = [...active.tabs];
-    var newIndex = event.newIndex;
-    if (event.oldIndex < newIndex) newIndex -= 1;
+    // newIndex is already adjusted for the removed item by the source
+    // ReorderableListView.onReorderItem callback — no manual decrement.
     final item = tabs.removeAt(event.oldIndex);
-    tabs.insert(newIndex, item);
+    tabs.insert(event.newIndex, item);
     final updated = active.copyWith(tabs: tabs);
     emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     await _persistPanel(updated);
@@ -739,10 +736,10 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     Emitter<TabsState> emit,
   ) async {
     final panels = [...state.panels];
-    var newIndex = event.newIndex;
-    if (event.oldIndex < newIndex) newIndex -= 1;
+    // newIndex is already adjusted for the removed item by the source
+    // ReorderableListView.onReorderItem callback — no manual decrement.
     final item = panels.removeAt(event.oldIndex);
-    panels.insert(newIndex, item);
+    panels.insert(event.newIndex, item);
     emit(_derive(panels, state.activePanelId));
     await _persistPanelMeta();
   }

@@ -12,13 +12,10 @@ import 'package:uuid/uuid.dart';
 
 class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
   CollectionsBloc({
-    required GetCollectionsUseCase getCollectionsUseCase,
-    required SaveCollectionsUseCase saveCollectionsUseCase,
-    Duration saveDebounce = const Duration(seconds: 2),
-  }) : _getCollectionsUseCase = getCollectionsUseCase,
-       _saveCollectionsUseCase = saveCollectionsUseCase,
-       _saveDebounce = saveDebounce,
-       super(CollectionsState()) {
+    required this._getCollectionsUseCase,
+    required this._saveCollectionsUseCase,
+    this._saveDebounce = const Duration(seconds: 2),
+  }) : super(CollectionsState()) {
     on<LoadCollections>(_onLoadCollections);
     on<AddFolder>(_onAddFolder);
     on<SaveRequestToCollection>(_onSaveRequestToCollection);

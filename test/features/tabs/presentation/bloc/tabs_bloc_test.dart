@@ -202,7 +202,9 @@ void main() {
 
     test('ReorderTabs persists only the panel', () async {
       await loadWith([tab('a'), tab('b'), tab('c')]);
-      bloc.add(const ReorderTabs(0, 3));
+      // onReorderItem convention: newIndex is already adjusted for the removed
+      // item, so moving index 0 to the end is (0, 2), not (0, 3).
+      bloc.add(const ReorderTabs(0, 2));
       await pumpEventQueue();
 
       verify(
