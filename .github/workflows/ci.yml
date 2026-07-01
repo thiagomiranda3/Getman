@@ -11,6 +11,13 @@ on:
 permissions:
   contents: read
 
+# Cancel superseded runs: a new push to the same PR (or to master) aborts the
+# in-flight run for that ref — faster feedback, fewer wasted runner minutes.
+# Keyed by ref so different PRs never cancel each other.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   FLUTTER_VERSION: '3.44.4'
 
@@ -22,9 +29,9 @@ jobs:
       run:
         shell: bash # ensures pipefail so `cmd | tee` reflects cmd's exit code
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
@@ -35,6 +42,27 @@ jobs:
       # Each check runs to completion (continue-on-error) so the summary
       # comment can report every gate, not just the first failure. The final
       # step fails the job if any gate did not pass.
+
+      - name: Codegen up to date (build_runner)
+        id: codegen
+        continue-on-error: true
+        # Regenerate Hive adapters etc.; fail if the committed *.g.dart drifted.
+        # Catches a contributor forgetting to rerun build_runner after a
+        # @HiveType / @HiveField change (CLAUDE.md §3) — the typeIds are
+        # load-bearing, so a stale adapter is a real bug, not a nit.
+        run: |
+          dart run build_runner build --delete-conflicting-outputs 2>&1 | tee codegen.log
+          if ! git diff --quiet -- '*.dart'; then
+            {
+              echo
+              echo "Generated files are stale. Run locally and commit the result:"
+              echo "  dart run build_runner build --delete-conflicting-outputs"
+              echo
+              echo "Drifted files:"
+              git diff --stat -- '*.dart'
+            } | tee -a codegen.log
+            exit 1
+          fi
 
       - name: Analyze (very_good_analysis)
         id: analyze
@@ -67,7 +95,7 @@ jobs:
       - name: Test
         id: test
         continue-on-error: true
-        run: flutter test 2>&1 | tee test.log
+        run: flutter test --coverage 2>&1 | tee test.log
 
       # Build the comment body + record the PR number into an artifact. The
       # comment itself is posted by the CI Comment workflow (it has the write
@@ -75,6 +103,7 @@ jobs:
       - name: Build summary comment
         if: github.event_name == 'pull_request'
         env:
+          CODEGEN: ${{ steps.codegen.outcome }}
           ANALYZE: ${{ steps.analyze.outcome }}
           CUSTOM_LINT: ${{ steps.custom_lint.outcome }}
           LINT_FIXTURES: ${{ steps.lint_fixtures.outcome }}
@@ -85,7 +114,7 @@ jobs:
         run: |
           icon() { [ "$1" = success ] && printf '✅ Passed' || printf '❌ Failed'; }
           all_pass=true
-          for o in "$ANALYZE" "$CUSTOM_LINT" "$LINT_FIXTURES" "$BLOC_LINT" "$FORMAT" "$TEST"; do
+          for o in "$CODEGEN" "$ANALYZE" "$CUSTOM_LINT" "$LINT_FIXTURES" "$BLOC_LINT" "$FORMAT" "$TEST"; do
             [ "$o" = success ] || all_pass=false
           done
 
@@ -98,6 +127,7 @@ jobs:
             echo
             echo "| Check | Result |"
             echo "| :--- | :--- |"
+            echo "| \`build_runner\` (codegen up to date) | $(icon "$CODEGEN") |"
             echo "| \`flutter analyze\` | $(icon "$ANALYZE") |"
             echo "| \`custom_lint\` | $(icon "$CUSTOM_LINT") |"
             echo "| \`lint fixtures\` | $(icon "$LINT_FIXTURES") |"
@@ -106,6 +136,28 @@ jobs:
             echo "| \`flutter test\` | $(icon "$TEST") |"
             echo
           } > comment.md
+
+          # Coverage line — uses the same filter as `tool/coverage.sh` (excludes
+          # generated, abstract repositories, native-only platform files, and
+          # main.dart) so the number matches a local `bash tool/coverage.sh`.
+          # Reported only — not a gate (no arbitrary threshold to break CI).
+          if [ -f coverage/lcov.info ]; then
+            COV=$(awk -F: '
+              /^SF:/ {
+                f=$0; sub(/^SF:/,"",f);
+                skip = (f ~ /\.g\.dart$/) ||
+                       (f ~ /\/domain\/repositories\//) ||
+                       (f ~ /update_gate_io\.dart$/) ||
+                       (f ~ /dio_adapter_config_io\.dart$/) ||
+                       (f ~ /(^|\/)main\.dart$/)
+              }
+              /^LF:/ { if (!skip) tlf += substr($0,4) }
+              /^LH:/ { if (!skip) tlh += substr($0,4) }
+              END { if (tlf>0) printf "%.1f%%  (%d/%d lines)", 100*tlh/tlf, tlh, tlf; else printf "n/a" }
+            ' coverage/lcov.info)
+            echo "**Coverage (filtered):** ${COV}" >> comment.md
+            echo >> comment.md
+          fi
 
           append_log() {
             if [ "$2" != success ] && [ -f "$3" ]; then
@@ -120,6 +172,7 @@ jobs:
               } >> comment.md
             fi
           }
+          append_log "build_runner" "$CODEGEN" codegen.log
           append_log "flutter analyze" "$ANALYZE" analyze.log
           append_log "custom_lint" "$CUSTOM_LINT" custom_lint.log
           append_log "lint fixtures" "$LINT_FIXTURES" lint_fixtures.log
@@ -133,7 +186,7 @@ jobs:
 
       - name: Upload comment artifact
         if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ci-comment
           path: |
@@ -143,6 +196,7 @@ jobs:
 
       - name: Fail if any check failed
         if: >-
+          steps.codegen.outcome != 'success' ||
           steps.analyze.outcome != 'success' ||
           steps.custom_lint.outcome != 'success' ||
           steps.lint_fixtures.outcome != 'success' ||
@@ -153,6 +207,42 @@ jobs:
           echo "One or more checks failed — see the job logs / PR comment above."
           exit 1
 
+  # Compile smoke test for the web target. `analyze` + `test` do NOT catch a
+  # broken conditional export / platform-guarded import — the `*_io.dart` /
+  # web-stub machinery (update_gate, dio_adapter_config, the rich-response
+  # viewers) only fails at an actual web compile. Today that surfaces just at
+  # release-tag time; this catches it on every PR.
+  build-web:
+    name: Build (web smoke)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build web --release
+
+  # Secret scan: gitleaks fails the job if a credential/key/token is committed.
+  # Free for public repos (no license key required). Read-only token only — it
+  # writes a job-summary, not a PR comment, so fork PRs are safe.
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0 # gitleaks diffs the PR's commits — needs full history
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # Fork-safe dependency-vuln gate: scan pubspec.lock and FAIL the job on a
   # known vulnerability. We use the standalone scanner action (not the reusable
   # workflow) on purpose: the reusable workflow statically declares
@@ -161,7 +251,7 @@ jobs:
   # every run and would also break on fork PRs (where the token is downgraded
   # to read-only). The standalone action only needs `contents: read`, uploads
   # no SARIF, and osv-scanner exits non-zero on a vulnerability, so the job
-  # fails the build natively. Pinned to @v2.3.8 (the docker image tag matches),
+  # fails the build natively. Pinned to v2.3.8 (the docker image tag matches),
   # so the action's "behavior may change in minor patches" caveat does not apply.
   osv-scan:
     name: OSV-Scanner (dependency vulnerabilities)
@@ -169,9 +259,9 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - name: Scan pubspec.lock for known vulnerabilities
-        uses: google/osv-scanner-action/osv-scanner-action@v2.3.8
+        uses: google/osv-scanner-action/osv-scanner-action@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
         with:
           scan-args: |-
             --lockfile=./pubspec.lock

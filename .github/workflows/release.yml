@@ -24,9 +24,9 @@ jobs:
     env:
       VERSION: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
@@ -46,7 +46,7 @@ jobs:
           hdiutil create -volname "Getman" -srcfolder dmg_staging \
             -ov -format UDZO "getman-${VERSION}-macos-arm64.dmg"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: macos
           path: getman-*-macos-arm64.dmg
@@ -63,9 +63,9 @@ jobs:
       # suggested remedy and propagates into the nested configure.
       CMAKE_POLICY_VERSION_MINIMUM: '3.5'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
@@ -95,7 +95,7 @@ jobs:
           $ver = $env:VERSION -replace '^v',''
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion="$ver" windows\installer.iss
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: windows
           path: build/installer/getman-*-windows-x64-setup.exe
@@ -109,7 +109,7 @@ jobs:
       # Same nested-pdfium / CMake-4 policy-floor issue as Windows (see above).
       CMAKE_POLICY_VERSION_MINIMUM: '3.5'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Install Linux build dependencies
         run: |
@@ -120,7 +120,7 @@ jobs:
           sudo apt-get install -y ninja-build libgtk-3-dev clang cmake pkg-config \
             libmpv-dev mpv
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
@@ -147,7 +147,7 @@ jobs:
           ./appimagetool-x86_64.AppImage --appimage-extract-and-run \
             "$APPDIR" "getman-${VERSION}-linux-x86_64.AppImage"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: linux
           path: getman-*-linux-x86_64.AppImage
@@ -159,9 +159,9 @@ jobs:
     env:
       VERSION: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
@@ -174,7 +174,7 @@ jobs:
         run: |
           (cd build/web && zip -r "../../getman-${VERSION}-web.zip" .)
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: web
           path: getman-*-web.zip
@@ -186,9 +186,9 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: artifacts
           merge-multiple: true
@@ -208,7 +208,7 @@ jobs:
             echo "Release ${GITHUB_REF_NAME}." > release_notes.md
           fi
 
-      - uses: softprops/action-gh-release@v3
+      - uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
         with:
           draft: false
           body_path: release_notes.md
