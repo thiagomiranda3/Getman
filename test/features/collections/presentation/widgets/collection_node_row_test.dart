@@ -7,6 +7,7 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/collection_node_row.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -134,6 +135,76 @@ void main() {
       reason: 'star must not match the surface/background color',
     );
   });
+
+  // Regression: leaf request rows had no DragTarget, so dropping a request onto
+  // another request inside a folder fell through to the list-level root target
+  // and moved it to the ROOT. A leaf drop must land in the target's folder.
+  testWidgets(
+    'dropping a request onto a request inside a folder moves it into that '
+    'folder, not to the root',
+    (tester) async {
+      const draggedId = 'dragged';
+      final tree = <CollectionNodeEntity>[
+        const CollectionNodeEntity(
+          id: 'f1',
+          name: 'Folder1',
+          children: [requestNode], // req-1 lives inside Folder1
+        ),
+        const CollectionNodeEntity(
+          id: draggedId,
+          name: 'Dragged',
+          isFolder: false,
+          config: HttpRequestConfigEntity(id: draggedId),
+        ),
+      ];
+      when(() => repo.getCollections()).thenAnswer((_) async => tree);
+
+      final bloc = buildBloc()..add(const LoadCollections());
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: resolveTheme('brutalist')(Brightness.light, isCompact: false),
+          home: Scaffold(
+            body: BlocProvider<CollectionsBloc>.value(
+              value: bloc,
+              child: const CollectionNodeRow(
+                node: requestNode, // the leaf that lives inside Folder1
+                isExpanded: false,
+                depth: 1,
+                onToggle: _noop,
+                rowWidth: 300,
+                rowHeight: 44,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final dragTarget = tester.widget<DragTarget<String>>(
+        find.byType(DragTarget<String>),
+      );
+      dragTarget.onAcceptWithDetails!(
+        DragTargetDetails<String>(data: draggedId, offset: Offset.zero),
+      );
+      // Let the MoveNode handler emit, then fire the bloc's debounced-save
+      // timer so no timer is left pending when the widget tree is disposed.
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 3));
+
+      final folder = bloc.state.collections.firstWhere((n) => n.id == 'f1');
+      expect(
+        folder.children.map((c) => c.id),
+        containsAll(<String>['req-1', draggedId]),
+        reason: 'dragged request should land inside Folder1',
+      );
+      expect(
+        bloc.state.collections.map((n) => n.id),
+        isNot(contains(draggedId)),
+        reason: 'dragged request should no longer be at the root',
+      );
+    },
+  );
 }
 
 void _noop() {}

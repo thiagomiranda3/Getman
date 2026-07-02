@@ -5,6 +5,7 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/collection_node_menu.dart';
@@ -159,7 +160,7 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
                   ),
             );
     } else {
-      content = SizedBox(
+      final leafInner = SizedBox(
         width: widget.rowWidth,
         height: widget.rowHeight,
         child: context.appDecoration.wrapInteractive(
@@ -260,6 +261,40 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
           ),
         ),
       );
+
+      content = isPhone
+          ? leafInner
+          : DragTarget<String>(
+              onWillAcceptWithDetails: (details) {
+                if (details.data == node.id) return false;
+                setState(() => _isDragOver = true);
+                return true;
+              },
+              onLeave: (_) => setState(() => _isDragOver = false),
+              onAcceptWithDetails: (details) {
+                setState(() => _isDragOver = false);
+                final bloc = context.read<CollectionsBloc>();
+                // Dropping onto a request moves the dragged node into that
+                // request's containing folder (or root when it sits at the top
+                // level), so it lands beside the row instead of falling through
+                // to the list-level root drop target.
+                bloc.add(
+                  MoveNode(
+                    details.data,
+                    CollectionsTreeHelper.parentIdOf(
+                      bloc.state.collections,
+                      node.id,
+                    ),
+                  ),
+                );
+              },
+              builder: (context, candidateData, rejectedData) =>
+                  context.appMotion.treeDropHighlight(
+                    context,
+                    active: _isDragOver,
+                    child: leafInner,
+                  ),
+            );
     }
 
     if (isPhone) return content;

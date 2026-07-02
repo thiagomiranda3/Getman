@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/features/tabs/presentation/widgets/code_find_panel.dart';
 import 'package:getman/features/tabs/presentation/widgets/variable_json_span_builder.dart';
@@ -8,22 +9,41 @@ import 'package:re_highlight/re_highlight.dart';
 import 'package:re_highlight/styles/atom-one-dark.dart';
 import 'package:re_highlight/styles/atom-one-light.dart';
 
-/// re_editor's default shortcut map binds its (no-op) `save` action to Cmd+S
-/// on macOS (Ctrl+S elsewhere) and *consumes* the key. While a code editor held
-/// focus that swallowed the app's own Cmd+S before it could reach the global
-/// `SaveRequestIntent` — so on macOS Cmd+S did nothing and only the leaked
-/// Ctrl+S saved. Dropping the `save` activator (re_editor has no save handler
-/// anyway) lets the keystroke bubble up to the app's platform-correct shortcut.
-class _NoSaveCodeShortcutsActivatorsBuilder
-    extends CodeShortcutsActivatorsBuilder {
-  const _NoSaveCodeShortcutsActivatorsBuilder();
+/// Adapts re_editor's default shortcut map so two chords the editor would
+/// otherwise *consume* bubble up to the app's global shortcuts instead:
+///
+/// * **Cmd/Ctrl+S** — re_editor binds it to a no-op `save` action and swallows
+///   the key, so the app's own `SaveRequestIntent` never fired (on macOS Cmd+S
+///   did nothing; only the leaked Ctrl+S saved). We drop the `save` activator
+///   entirely.
+/// * **Cmd/Ctrl+Enter** — re_editor lists it under `newLine`, so while the body
+///   editor held focus the app's `SendRequestIntent` never fired (the chord
+///   just inserted a newline). We strip that one activator from `newLine` while
+///   keeping plain Enter / Shift+Enter / numpad-Enter for normal newlines.
+@visibleForTesting
+class AppCodeShortcutsActivatorsBuilder extends CodeShortcutsActivatorsBuilder {
+  const AppCodeShortcutsActivatorsBuilder();
 
   static const _defaults = DefaultCodeShortcutsActivatorsBuilder();
 
   @override
   List<ShortcutActivator>? build(CodeShortcutType type) {
     if (type == CodeShortcutType.save) return null;
-    return _defaults.build(type);
+    final activators = _defaults.build(type);
+    if (type == CodeShortcutType.newLine && activators != null) {
+      return activators.where((a) => !_isSendRequestChord(a)).toList();
+    }
+    return activators;
+  }
+
+  /// The app binds Cmd+Enter (macOS) / Ctrl+Enter (elsewhere) to sending the
+  /// request. Matches exactly that chord so it is removed from `newLine`;
+  /// Shift/Alt or numpad-Enter variants are left alone.
+  static bool _isSendRequestChord(ShortcutActivator activator) {
+    if (activator is! SingleActivator) return false;
+    if (activator.trigger != LogicalKeyboardKey.enter) return false;
+    if (activator.shift || activator.alt) return false;
+    return activator.meta || activator.control;
   }
 }
 
@@ -143,10 +163,10 @@ class JsonCodeEditor extends StatelessWidget {
         readOnly: readOnly,
         wordWrap: wordWrap,
         autofocus: autofocus,
-        // Drop re_editor's built-in Cmd/Ctrl+S so the app's own save shortcut
-        // fires (see [_NoSaveCodeShortcutsActivatorsBuilder]).
-        shortcutsActivatorsBuilder:
-            const _NoSaveCodeShortcutsActivatorsBuilder(),
+        // Let the app's global Cmd/Ctrl+S (save) and Cmd/Ctrl+Enter (send)
+        // shortcuts fire even while this editor has focus
+        // (see [AppCodeShortcutsActivatorsBuilder]).
+        shortcutsActivatorsBuilder: const AppCodeShortcutsActivatorsBuilder(),
         findBuilder: (context, controller, readOnly) =>
             CodeFindPanel(controller: controller, readOnly: readOnly),
         // Token colours come from [jsonHighlightSpanBuilder] on the controller,
