@@ -5,6 +5,24 @@ All notable changes to **Getman** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2026-07-02
+
+### Fixed
+
+- **Send the request with `Cmd/Ctrl + Enter` from inside the request editor** —
+  the shortcut previously did nothing while the body editor held focus (the
+  keystroke was captured as a newline) and only worked from elsewhere in the
+  app. It now sends the request as expected. Plain `Enter`, `Shift + Enter`, and
+  numpad `Enter` still insert newlines in the editor.
+- **The app window now remembers its size and position across restarts
+  (macOS)** — Getman no longer reopens at the default small size after you
+  resize the window; it restores whatever size and position you left it at.
+- **Dropping a request onto an item inside an open folder keeps it in that
+  folder** — dragging a request onto another request that lives inside a folder
+  now places it in that folder (beside the target) instead of incorrectly
+  moving it out to the top level. Dropping onto a folder, or onto empty space
+  for the root, is unchanged.
+
 ## [1.8.0] - 2026-06-26
 
 ### Added
