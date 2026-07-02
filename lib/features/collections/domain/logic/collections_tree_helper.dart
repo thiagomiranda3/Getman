@@ -144,6 +144,18 @@ class CollectionsTreeHelper {
     return [for (final node in path.sublist(0, path.length - 1)) node.id];
   }
 
+  /// The id of the node that directly contains [id] (its immediate parent), or
+  /// null when [id] is a root-level node or is not found.
+  ///
+  /// Drives "drop into the same container" for drag-and-drop: dropping a node
+  /// onto a request that lives inside a folder resolves to that folder's id, so
+  /// the dragged node lands beside it rather than falling through to the root.
+  static String? parentIdOf(List<CollectionNodeEntity> nodes, String id) {
+    final path = _pathTo(nodes, id);
+    if (path == null || path.length < 2) return null;
+    return path[path.length - 2].id;
+  }
+
   /// Append [example] to the node's saved examples (newest last). No-op if the
   /// id is missing.
   static List<CollectionNodeEntity> addExampleToNode(

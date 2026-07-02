@@ -430,4 +430,47 @@ void main() {
       expect(ids, isNot(contains('child')));
     });
   });
+
+  group('parentIdOf', () {
+    test('returns null for a root-level node (folder or leaf)', () {
+      final nodes = [folder('a', 'A'), leaf('b', 'B')];
+      expect(CollectionsTreeHelper.parentIdOf(nodes, 'a'), isNull);
+      expect(CollectionsTreeHelper.parentIdOf(nodes, 'b'), isNull);
+    });
+
+    test('returns null for an unknown id', () {
+      final nodes = [
+        folder('a', 'A', children: [leaf('b', 'B')]),
+      ];
+      expect(CollectionsTreeHelper.parentIdOf(nodes, 'zzz'), isNull);
+    });
+
+    test('returns the containing folder id for a leaf inside a folder', () {
+      final nodes = [
+        folder('f1', 'Folder1', children: [leaf('r1', 'R1'), leaf('r2', 'R2')]),
+      ];
+      // Dropping onto r2 (inside Folder1) must resolve to Folder1, not root.
+      expect(CollectionsTreeHelper.parentIdOf(nodes, 'r2'), 'f1');
+    });
+
+    test('returns the nearest folder id for a deeply nested node', () {
+      final nodes = [
+        folder(
+          'root',
+          'Root',
+          children: [
+            folder('mid', 'Mid', children: [leaf('deep', 'Deep')]),
+          ],
+        ),
+      ];
+      expect(CollectionsTreeHelper.parentIdOf(nodes, 'deep'), 'mid');
+    });
+
+    test('returns the parent folder id for a nested folder', () {
+      final nodes = [
+        folder('root', 'Root', children: [folder('child', 'Child')]),
+      ];
+      expect(CollectionsTreeHelper.parentIdOf(nodes, 'child'), 'root');
+    });
+  });
 }
