@@ -17,6 +17,7 @@ import 'package:getman/features/chaining/presentation/bloc/rules_bloc.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
 import 'package:getman/features/collections/presentation/widgets/workspace_sync_listener.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
@@ -197,6 +198,7 @@ class MyApp extends StatelessWidget {
           BlocProvider(create: (_) => di.sl<RulesBloc>()),
           BlocProvider(create: (_) => di.sl<RealtimeBloc>()),
           BlocProvider(create: (_) => di.sl<McpBloc>()),
+          BlocProvider(create: (_) => di.sl<ReviewBloc>()),
         ],
         child: NetworkSettingsListener(
           child: WorkspaceSyncListener(

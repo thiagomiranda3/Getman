@@ -1,4 +1,5 @@
 import 'package:get_it/get_it.dart';
+import 'package:getman/core/git/git_service.dart';
 import 'package:getman/core/navigation/app_router.dart';
 import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/cookie_interceptor.dart';
@@ -22,10 +23,12 @@ import 'package:getman/features/collections/data/datasources/workspace_data_sour
 import 'package:getman/features/collections/data/models/collection_node_model.dart';
 import 'package:getman/features/collections/data/models/saved_example_model.dart';
 import 'package:getman/features/collections/data/repositories/collections_repository_impl.dart';
+import 'package:getman/features/collections/data/services/workspace_review_service.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
 import 'package:getman/features/cookies/data/hive_cookie_persistence.dart';
 import 'package:getman/features/cookies/data/models/stored_cookie_model.dart';
 import 'package:getman/features/environments/data/datasources/environments_local_data_source.dart';
@@ -184,6 +187,9 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     ..registerLazySingleton(
       () => WorkspaceSyncService(createWorkspaceDataSource()),
     )
+    ..registerLazySingleton<GitService>(createGitService)
+    ..registerLazySingleton(() => WorkspaceReviewService(sl()))
+    ..registerFactory(() => ReviewBloc(service: sl()))
     // Features - Chaining (no-code extraction + assertions)
     ..registerLazySingleton(
       () => RulesBloc(
