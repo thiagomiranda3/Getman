@@ -1,11 +1,11 @@
 import 'dart:developer';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:getman/features/collections/data/services/workspace_review_service.dart';
+import 'package:getman/features/collections/domain/review_service.dart';
 import 'package:getman/features/collections/presentation/bloc/review_event.dart';
 import 'package:getman/features/collections/presentation/bloc/review_state.dart';
 
-/// Drives the Review Changes dialog over [WorkspaceReviewService]. git's index
+/// Drives the Review Changes dialog over [ReviewService]. git's index
 /// is the source of truth, so stage/unstage/commit re-run the review.
 class ReviewBloc extends Bloc<ReviewEvent, ReviewState> {
   ReviewBloc({required this._service}) : super(const ReviewState()) {
@@ -17,7 +17,7 @@ class ReviewBloc extends Bloc<ReviewEvent, ReviewState> {
     on<InitRepo>(_onInit);
   }
 
-  final WorkspaceReviewService _service;
+  final ReviewService _service;
 
   Future<void> _onLoad(LoadReview event, Emitter<ReviewState> emit) async {
     emit(state.copyWith(status: ReviewStatus.loading));

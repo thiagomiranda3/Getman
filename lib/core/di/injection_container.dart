@@ -26,6 +26,7 @@ import 'package:getman/features/collections/data/repositories/collections_reposi
 import 'package:getman/features/collections/data/services/workspace_review_service.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
+import 'package:getman/features/collections/domain/review_service.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
@@ -188,7 +189,7 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
       () => WorkspaceSyncService(createWorkspaceDataSource()),
     )
     ..registerLazySingleton<GitService>(createGitService)
-    ..registerLazySingleton(() => WorkspaceReviewService(sl()))
+    ..registerLazySingleton<ReviewService>(() => WorkspaceReviewService(sl()))
     ..registerFactory(() => ReviewBloc(service: sl()))
     // Features - Chaining (no-code extraction + assertions)
     ..registerLazySingleton(

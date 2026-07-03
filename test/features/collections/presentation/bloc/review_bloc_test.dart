@@ -1,14 +1,14 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getman/features/collections/data/services/workspace_review_service.dart';
 import 'package:getman/features/collections/domain/entities/review_entry.dart';
 import 'package:getman/features/collections/domain/logic/semantic_diff.dart';
+import 'package:getman/features/collections/domain/review_service.dart';
 import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/review_event.dart';
 import 'package:getman/features/collections/presentation/bloc/review_state.dart';
 import 'package:mocktail/mocktail.dart';
 
-class _MockService extends Mock implements WorkspaceReviewService {}
+class _MockService extends Mock implements ReviewService {}
 
 void main() {
   late _MockService service;

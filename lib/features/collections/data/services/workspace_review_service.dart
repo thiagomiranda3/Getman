@@ -5,10 +5,11 @@ import 'package:getman/core/utils/workspace/workspace_collection_serializer.dart
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/entities/review_entry.dart';
 import 'package:getman/features/collections/domain/logic/semantic_diff.dart';
+import 'package:getman/features/collections/domain/review_service.dart';
 
 /// Composes [GitService] + the workspace serializer into a reviewable change
 /// set. Pure of `dart:io` — all filesystem/git access goes through [GitService].
-class WorkspaceReviewService {
+class WorkspaceReviewService implements ReviewService {
   WorkspaceReviewService(this._git);
   final GitService _git;
 
@@ -17,6 +18,7 @@ class WorkspaceReviewService {
   static const String _folderMeta = '.folder.json';
   static const String _reqExt = '.req.json';
 
+  @override
   Future<ReviewResult> review(String root) async {
     if (!await _git.isAvailable()) return ReviewResult.empty;
     if (!await _git.isRepo(root)) {
@@ -43,9 +45,13 @@ class WorkspaceReviewService {
     );
   }
 
+  @override
   Future<void> init(String root) => _git.init(root);
+  @override
   Future<void> stage(String root, String path) => _git.stage(root, [path]);
+  @override
   Future<void> unstage(String root, String path) => _git.unstage(root, [path]);
+  @override
   Future<void> commit(String root, String message) =>
       _git.commit(root, message);
 
