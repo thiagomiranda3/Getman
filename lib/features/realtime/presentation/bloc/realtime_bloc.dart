@@ -23,9 +23,7 @@ class _FramesBatchReceived extends RealtimeEvent {
 /// the TabsBloc request-manager teardown discipline: every connection is closed
 /// on disconnect, on a new connect for the same tab, and on bloc close.
 class RealtimeBloc extends Bloc<RealtimeEvent, RealtimeState> {
-  RealtimeBloc({required RealtimeService service})
-    : _service = service,
-      super(const RealtimeState()) {
+  RealtimeBloc({required this._service}) : super(const RealtimeState()) {
     on<Connect>(_onConnect);
     on<SendRealtimeMessage>(_onSend);
     on<Disconnect>(_onDisconnect);

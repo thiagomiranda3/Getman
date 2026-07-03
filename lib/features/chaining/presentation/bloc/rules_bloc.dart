@@ -12,11 +12,9 @@ import 'package:getman/features/chaining/presentation/bloc/rules_state.dart';
 /// is sufficient; switching tabs re-dispatches [LoadRules].
 class RulesBloc extends Bloc<RulesEvent, RulesState> {
   RulesBloc({
-    required GetRequestRulesUseCase getRequestRulesUseCase,
-    required SaveRequestRulesUseCase saveRequestRulesUseCase,
-  }) : _getRequestRulesUseCase = getRequestRulesUseCase,
-       _saveRequestRulesUseCase = saveRequestRulesUseCase,
-       super(const RulesState()) {
+    required this._getRequestRulesUseCase,
+    required this._saveRequestRulesUseCase,
+  }) : super(const RulesState()) {
     on<LoadRules>(_onLoad);
     on<SaveRules>(_onSave);
     on<AddExtractionRule>(_onAddExtractionRule);

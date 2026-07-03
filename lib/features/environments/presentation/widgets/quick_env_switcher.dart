@@ -145,7 +145,11 @@ class _QuickEnvSwitcherState extends State<QuickEnvSwitcher> {
                 itemCount: _rows.length,
                 itemBuilder: (context, i) {
                   final row = _rows[i];
-                  return ColoredBox(
+                  // Material (not ColoredBox) is the ListTile's nearest
+                  // background/ink ancestor — Flutter 3.44 asserts against a
+                  // colored ColoredBox sitting between a ListTile and its
+                  // Material, which would hide the row background/splash.
+                  return Material(
                     key: ValueKey('quick_env_row_$i'),
                     color: i == selected ? highlight : Colors.transparent,
                     child: ListTile(

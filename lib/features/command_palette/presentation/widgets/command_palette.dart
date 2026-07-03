@@ -290,7 +290,12 @@ class _CommandPaletteState extends State<CommandPalette> {
                         itemCount: results.length,
                         itemBuilder: (context, i) {
                           final c = results[i];
-                          return ColoredBox(
+                          // Material (not ColoredBox) is the ListTile's
+                          // nearest background/ink ancestor — Flutter 3.44
+                          // asserts against a colored ColoredBox between a
+                          // ListTile and its Material, which would hide the
+                          // row background/splash.
+                          return Material(
                             key: ValueKey('palette_result_$i'),
                             color: i == selected
                                 ? highlight

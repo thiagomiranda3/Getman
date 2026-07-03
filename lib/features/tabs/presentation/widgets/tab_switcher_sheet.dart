@@ -97,7 +97,7 @@ class TabSwitcherSheet extends StatelessWidget {
                             padding: EdgeInsets.all(layout.pagePadding / 2),
                             itemCount: tabs.length,
                             buildDefaultDragHandles: false,
-                            onReorder: (oldIndex, newIndex) => context
+                            onReorderItem: (oldIndex, newIndex) => context
                                 .read<TabsBloc>()
                                 .add(ReorderTabs(oldIndex, newIndex)),
                             itemBuilder: (_, index) {

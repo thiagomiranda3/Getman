@@ -12,8 +12,8 @@ import 'package:flutter/foundation.dart';
 /// (e.g. reduceEffects or a calm theme).
 class WorkspacePulseController extends ChangeNotifier {
   WorkspacePulseController({
-    Duration tickInterval = const Duration(seconds: 1),
-  }) : _tickInterval = tickInterval;
+    this._tickInterval = const Duration(seconds: 1),
+  });
 
   final Duration _tickInterval;
   Timer? _timer;

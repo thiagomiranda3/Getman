@@ -6,8 +6,7 @@ enum RequestKind {
   http(0),
   webSocket(1),
   sse(2),
-  mcp(3)
-  ;
+  mcp(3);
 
   const RequestKind(this.wire);
 

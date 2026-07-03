@@ -13,10 +13,9 @@ const int _historyLimitMin = 1;
 
 class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   SettingsBloc({
-    required SaveSettingsUseCase saveSettingsUseCase,
+    required this._saveSettingsUseCase,
     SettingsEntity? initialSettings,
-  }) : _saveSettingsUseCase = saveSettingsUseCase,
-       super(
+  }) : super(
          SettingsState(settings: initialSettings ?? const SettingsEntity()),
        ) {
     on<UpdateDarkMode>(

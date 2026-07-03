@@ -98,7 +98,7 @@ Future<void> setMethod(PatrolTester $, String method) async {
   await slowMo($);
 }
 
-/// Selects a request [kind] label — `HTTP`, `WS`, or `SSE`.
+/// Selects a request [kind] label — `HTTP`, `WS`, `SSE`, or `MCP`.
 Future<void> setRequestKind(PatrolTester $, String kind) async {
   await $(const ValueKey('request_kind_selector')).tap();
   await $(kind).tap();

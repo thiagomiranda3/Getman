@@ -7,13 +7,17 @@ import '../support/actions.dart';
 import '../support/app_harness.dart';
 import '../support/mock_server.dart';
 
-/// Theme display order starting from a value OTHER than the default
-/// (BRUTALIST) so the first selection is never the already-selected theme
-/// (re-selecting the current value makes the dropdown label ambiguous).
+/// Theme display order starting from a value OTHER than the boot default
+/// (CLASSIC) so the first selection is never the already-selected theme
+/// (re-selecting the current value makes the dropdown label ambiguous). Every
+/// registered theme appears; CLASSIC is placed mid-list so it's never selected
+/// while already active.
 const _themeOrder = [
   'EDITORIAL',
   'ARCANE QUEST',
+  'AURIS',
   'DRACULA',
+  'CLASSIC',
   'LIQUID GLASS',
   'BRUTALIST',
 ];
@@ -27,15 +31,18 @@ void _expectAppAlive(PatrolTester $) {
 }
 
 /// Stress the theming + visual-mode toggles: every theme in light + dark,
-/// rapid back-and-forth switching, the LIQUID GLASS reduce-effects toggle
-/// (regression guard for the toggle-twice controller-recreate crash), and
-/// compact mode. RPG/glass animate forever, so this never uses pumpAndSettle
-/// (the helpers use bounded pumps). Any unhandled exception fails the test.
+/// rapid back-and-forth switching, and compact mode. RPG/glass animate forever,
+/// so this never uses pumpAndSettle (the helpers use bounded pumps). Any
+/// unhandled exception fails the test.
+///
+/// (The old "REDUCE VISUAL EFFECTS toggled repeatedly" guard was dropped when
+/// that setting was removed from the app — `reduceEffects` is now a fixed
+/// `false`, so there is no user-facing toggle to exercise.)
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   patrolWidgetTest('every theme renders in light and dark', ($) async {
-    await bootGetman($); // starts on BRUTALIST, light
+    await bootGetman($); // starts on CLASSIC, light
 
     for (final name in _themeOrder) {
       await setTheme($, name);
@@ -47,28 +54,6 @@ void main() {
       await setTheme($, name);
       _expectAppAlive($);
     }
-  });
-
-  patrolWidgetTest('LIQUID GLASS reduce-effects toggled repeatedly is stable', (
-    $,
-  ) async {
-    await bootGetman($);
-    await setTheme($, 'LIQUID GLASS');
-
-    // Toggle REDUCE VISUAL EFFECTS several times in one settings session — this
-    // is the path that previously crashed (SingleTicker controller recreate).
-    await openSettings($);
-    await openSettingsTab($, 'APPEARANCE');
-    for (var i = 0; i < 4; i++) {
-      await $(
-        const ValueKey('reduce_effects_switch'),
-      ).tap(settlePolicy: SettlePolicy.noSettle);
-      await pumpFrames($);
-    }
-    await $('CLOSE').tap(settlePolicy: SettlePolicy.noSettle);
-    await pumpFrames($);
-
-    _expectAppAlive($);
   });
 
   patrolWidgetTest('rapid glass<->flat theme switching is stable', ($) async {

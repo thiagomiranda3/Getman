@@ -1,3 +1,4 @@
+import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/error/error.dart' hide LintCode;
 import 'package:analyzer/error/listener.dart';
 import 'package:custom_lint_builder/custom_lint_builder.dart';
@@ -11,6 +12,10 @@ class _GetmanLints extends PluginBase {
   List<LintRule> getLintRules(CustomLintConfigs configs) => const [
     AvoidGetItInWidgets(),
     AvoidHardcodedBrandColors(),
+    DomainNoInfrastructureImports(),
+    BlocDependsOnAbstractions(),
+    PlatformIoOutsideIoFiles(),
+    EquatablePropsComplete(),
   ];
 }
 
@@ -115,6 +120,220 @@ class AvoidHardcodedBrandColors extends DartLintRule {
       if (isBanned) {
         reporter.atNode(node, _code);
       }
+    });
+  }
+}
+
+/// Enforces "BLoCs depend on abstract Repository types, never ...Impl/Hive/Dio
+/// directly" (CLAUDE.md §2/§7): a `*_bloc.dart` / `*_cubit.dart` file may not
+/// import a data/ layer, dio, or hive. Detection is by import directory/package,
+/// not an `Impl` name heuristic.
+class BlocDependsOnAbstractions extends DartLintRule {
+  const BlocDependsOnAbstractions() : super(code: _code);
+
+  static const _code = LintCode(
+    name: 'bloc_depends_on_abstractions',
+    problemMessage:
+        'BLoCs/Cubits must depend on abstract Repository types. Do not import a '
+        'data/ layer, dio, or hive directly from a bloc/cubit (CLAUDE.md §2/§7).',
+    errorSeverity: ErrorSeverity.WARNING,
+  );
+
+  @override
+  void run(
+    CustomLintResolver resolver,
+    ErrorReporter reporter,
+    CustomLintContext context,
+  ) {
+    final path = _posix(resolver.path);
+    if (!path.contains('/lib/')) return;
+    if (!path.endsWith('_bloc.dart') && !path.endsWith('_cubit.dart')) return;
+
+    context.registry.addImportDirective((node) {
+      final uri = node.uri.stringValue;
+      if (uri == null) return;
+      final banned =
+          uri.startsWith('package:dio/') ||
+          uri.startsWith('package:hive') ||
+          (uri.startsWith('package:getman/') && uri.contains('/data/'));
+      if (banned) reporter.atNode(node, _code);
+    });
+  }
+}
+
+/// Enforces web-safety (CLAUDE.md §1): dart:io / updat / path_provider /
+/// package_info_plus may only be imported from `*_io.dart` files (the
+/// conditional-import native-side convention). Keeps web builds clean.
+class PlatformIoOutsideIoFiles extends DartLintRule {
+  const PlatformIoOutsideIoFiles() : super(code: _code);
+
+  static const _code = LintCode(
+    name: 'platform_io_outside_io_files',
+    problemMessage:
+        'dart:io / updat / path_provider / package_info_plus may only be '
+        'imported from a *_io.dart file (conditional-import native side). Move '
+        'native code behind an *_io.dart + stub split to keep web builds clean '
+        '(CLAUDE.md §1).',
+    errorSeverity: ErrorSeverity.WARNING,
+  );
+
+  @override
+  void run(
+    CustomLintResolver resolver,
+    ErrorReporter reporter,
+    CustomLintContext context,
+  ) {
+    final path = _posix(resolver.path);
+    if (!path.contains('/lib/') || path.endsWith('_io.dart')) return;
+
+    context.registry.addImportDirective((node) {
+      final uri = node.uri.stringValue;
+      if (uri == null) return;
+      final banned =
+          uri == 'dart:io' ||
+          uri.startsWith('package:updat/') ||
+          uri.startsWith('package:path_provider/') ||
+          uri.startsWith('package:package_info_plus/');
+      if (banned) reporter.atNode(node, _code);
+    });
+  }
+}
+
+/// Enforces "Equatable on every state/event" correctness: for a class that
+/// `extends Equatable` (or mixes `EquatableMixin`), every declared instance
+/// field must appear in the `props` getter. A field omitted from `props` makes
+/// distinct values compare equal (states silently fail to rebuild).
+///
+/// Detection is syntactic: it matches the `extends Equatable` / `with
+/// EquatableMixin` clause by name and parses the identifiers in the `props`
+/// list literal. Limitation: it does not follow indirect inheritance (a class
+/// extending a base that extends Equatable). Deliberately-excluded fields use
+/// `// ignore: equatable_props_complete` + a reason.
+class EquatablePropsComplete extends DartLintRule {
+  const EquatablePropsComplete() : super(code: _code);
+
+  static const _code = LintCode(
+    name: 'equatable_props_complete',
+    problemMessage:
+        'This Equatable class omits one or more instance fields from `props`; '
+        'distinct values will compare equal. Add the missing field(s) to props, '
+        'or exclude one deliberately with `// ignore: equatable_props_complete`.',
+    errorSeverity: ErrorSeverity.WARNING,
+  );
+
+  @override
+  void run(
+    CustomLintResolver resolver,
+    ErrorReporter reporter,
+    CustomLintContext context,
+  ) {
+    if (!_posix(resolver.path).contains('/lib/')) return;
+
+    context.registry.addClassDeclaration((node) {
+      if (!_isEquatable(node)) return;
+
+      // Collect declared instance field names (static fields are excluded).
+      final fields = <String>{};
+      for (final member in node.members) {
+        if (member is FieldDeclaration && !member.isStatic) {
+          for (final v in member.fields.variables) {
+            fields.add(v.name.lexeme);
+          }
+        }
+      }
+      if (fields.isEmpty) return;
+
+      // Find the `props` getter and collect simple identifiers in its returned
+      // list literal (handles `=> [a, b]` and a block body `{ return [a, b]; }`).
+      final propsNames = _propsIdentifiers(node);
+      if (propsNames == null) return; // no recognizable props getter
+
+      final missing = fields.difference(propsNames);
+      if (missing.isNotEmpty) {
+        reporter.atToken(node.name, _code);
+      }
+    });
+  }
+
+  bool _isEquatable(ClassDeclaration node) {
+    final ext = node.extendsClause?.superclass.name2.lexeme;
+    if (ext == 'Equatable') return true;
+    final withClause = node.withClause;
+    if (withClause != null) {
+      for (final t in withClause.mixinTypes) {
+        if (t.name2.lexeme == 'EquatableMixin') return true;
+      }
+    }
+    return false;
+  }
+
+  Set<String>? _propsIdentifiers(ClassDeclaration node) {
+    for (final member in node.members) {
+      if (member is MethodDeclaration &&
+          member.isGetter &&
+          member.name.lexeme == 'props') {
+        final body = member.body;
+        ListLiteral? list;
+        if (body is ExpressionFunctionBody) {
+          final expr = body.expression;
+          if (expr is ListLiteral) list = expr;
+        } else if (body is BlockFunctionBody) {
+          for (final stmt in body.block.statements) {
+            if (stmt is ReturnStatement && stmt.expression is ListLiteral) {
+              list = stmt.expression! as ListLiteral;
+              break;
+            }
+          }
+        }
+        if (list == null) return null;
+        final names = <String>{};
+        for (final element in list.elements) {
+          if (element is SimpleIdentifier) names.add(element.name);
+          // `...super.props`, method calls, etc. are ignored (can't attribute
+          // to a local field name) — they neither add nor remove coverage.
+        }
+        return names;
+      }
+    }
+    return null;
+  }
+}
+
+/// Enforces "domain layer has zero imports from data/ or Flutter UI" (CLAUDE.md
+/// §2): a file under any `domain/` directory may import only pure Dart +
+/// equatable — never Flutter, dart:io/dart:ui, dio, hive, or a feature's data/.
+class DomainNoInfrastructureImports extends DartLintRule {
+  const DomainNoInfrastructureImports() : super(code: _code);
+
+  static const _code = LintCode(
+    name: 'domain_no_infrastructure_imports',
+    problemMessage:
+        'The domain layer must be pure Dart + equatable. Do not import Flutter, '
+        'dart:io/dart:ui, dio, hive, or a feature data/ layer from domain/ '
+        '(CLAUDE.md §2).',
+    errorSeverity: ErrorSeverity.WARNING,
+  );
+
+  @override
+  void run(
+    CustomLintResolver resolver,
+    ErrorReporter reporter,
+    CustomLintContext context,
+  ) {
+    final path = _posix(resolver.path);
+    if (!path.contains('/lib/') || !path.contains('/domain/')) return;
+
+    context.registry.addImportDirective((node) {
+      final uri = node.uri.stringValue;
+      if (uri == null) return;
+      final banned =
+          uri == 'dart:io' ||
+          uri == 'dart:ui' ||
+          uri.startsWith('package:flutter/') ||
+          uri.startsWith('package:dio/') ||
+          uri.startsWith('package:hive') ||
+          (uri.startsWith('package:getman/') && uri.contains('/data/'));
+      if (banned) reporter.atNode(node, _code);
     });
   }
 }

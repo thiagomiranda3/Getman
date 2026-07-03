@@ -26,10 +26,26 @@ TextSpan variableAwareJsonSpan({
     style: style,
   );
   final text = codeLine.text;
+  // Fast-out: no `{{` on the line means no variable token is possible, so the
+  // (regex) scan + run flattening is pure waste. Most JSON lines hit this.
+  if (!text.contains('{{')) return base;
+
   final matches = EnvironmentResolver.findVariables(text).toList();
   if (matches.isEmpty) return base;
 
-  // 1. Flatten `base` into runs: List of (start, end, style).
+  // Precompute each match's color once (ascending, non-overlapping ranges).
+  final ranges = <({int start, int end, Color color})>[];
+  for (final m in matches) {
+    final resolved =
+        variables.containsKey(m.name) || EnvironmentResolver.isDynamic(m.name);
+    ranges.add((
+      start: m.start,
+      end: m.end,
+      color: resolved ? resolvedColor : unresolvedColor,
+    ));
+  }
+
+  // 1. Flatten `base` into contiguous runs: (start, end, style).
   final runs = <({int start, int end, TextStyle style})>[];
   var cursor = 0;
   void visit(InlineSpan span, TextStyle inherited) {
@@ -52,28 +68,25 @@ TextSpan variableAwareJsonSpan({
     runs.add((start: 0, end: text.length, style: style));
   }
 
-  // 2. Build a per-character color override for variable ranges.
-  Color? overrideAt(int i) {
-    for (final m in matches) {
-      if (i >= m.start && i < m.end) {
-        final resolved =
-            variables.containsKey(m.name) ||
-            EnvironmentResolver.isDynamic(m.name);
-        return resolved ? resolvedColor : unresolvedColor;
-      }
-    }
-    return null;
-  }
-
-  // 3. Re-emit runs, splitting where the variable override changes the color.
+  // 2. Single sweep: runs and ranges are both ascending, so one monotonic
+  // pointer `mi` over the ranges suffices. O(line + matches), no per-char scan.
   final children = <InlineSpan>[];
+  var mi = 0;
   for (final run in runs) {
     var i = run.start;
     while (i < run.end) {
-      final color = overrideAt(i);
-      var j = i + 1;
-      while (j < run.end && overrideAt(j) == color) {
-        j++;
+      while (mi < ranges.length && ranges[mi].end <= i) {
+        mi++;
+      }
+      final inRange =
+          mi < ranges.length && i >= ranges[mi].start && i < ranges[mi].end;
+      final color = inRange ? ranges[mi].color : null;
+      final int j;
+      if (inRange) {
+        j = ranges[mi].end < run.end ? ranges[mi].end : run.end;
+      } else {
+        final nextStart = mi < ranges.length ? ranges[mi].start : run.end;
+        j = nextStart < run.end ? nextStart : run.end;
       }
       final segStyle = color == null
           ? run.style

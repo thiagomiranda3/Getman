@@ -2,6 +2,9 @@ import 'dart:typed_data';
 
 import 'package:equatable/equatable.dart';
 
+// bodyBytes participates in equality via bodyBytes?.length in props; a full
+// multi-MB byte compare every rebuild is intentionally avoided.
+// ignore: equatable_props_complete
 class HttpResponseEntity extends Equatable {
   const HttpResponseEntity({
     required this.statusCode,

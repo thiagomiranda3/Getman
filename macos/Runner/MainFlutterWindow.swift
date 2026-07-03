@@ -13,6 +13,14 @@ class MainFlutterWindow: NSWindow {
     self.contentViewController = flutterViewController
     self.setFrame(windowFrame, display: true)
 
+    // Remember the window's size and position across launches. `setFrameUsingName`
+    // restores the frame saved from a previous session (no-op on first run, so the
+    // XIB default size above still applies), and `setFrameAutosaveName` makes AppKit
+    // persist the frame to NSUserDefaults whenever the user resizes or moves it.
+    let autosaveName = NSWindow.FrameAutosaveName("GetmanMainWindow")
+    _ = self.setFrameUsingName(autosaveName)
+    _ = self.setFrameAutosaveName(autosaveName)
+
     RegisterGeneratedPlugins(registry: flutterViewController)
     workspaceBookmarkPlugin.register(
       registrar: flutterViewController.registrar(forPlugin: "WorkspaceBookmarkPlugin"))

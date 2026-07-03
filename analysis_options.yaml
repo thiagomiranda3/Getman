@@ -24,6 +24,10 @@ analyzer:
   # verification bar in CLAUDE.md §5).
   plugins:
     - custom_lint
+  errors:
+    # VGA enables `close_sinks` but pins it to `ignore`; re-promote it so
+    # undisposed StreamController/Sink fields are caught (RealtimeService etc.).
+    close_sinks: warning
 
 linter:
   rules:
@@ -34,6 +38,13 @@ linter:
     always_use_package_imports: true
     directives_ordering: true
     unawaited_futures: true
+    # Companion to unawaited_futures (already on): flags fire-and-forget futures
+    # in non-async contexts (constructors, void callbacks). Not in VGA.
+    discarded_futures: true
+    # VGA pins close_sinks to `ignore`; re-enable it here so the rule actually
+    # runs. The `errors: close_sinks: warning` remap above then meaningfully
+    # sets severity. Without this entry the remap is a no-op (disabled rule).
+    close_sinks: true
 
     # Disabled: `public_member_api_docs` requires a doc comment on every public
     # member. It targets *published package* APIs; Getman is an application, so
@@ -52,3 +63,50 @@ bloc:
     - avoid_public_fields
     - prefer_file_naming_conventions
     - prefer_void_public_cubit_methods
+
+# custom_lint runs in opt-in mode: only the rules listed here are active. This
+# keeps solid_lints scoped to the three pure-metric rules (no VGA overlap) while
+# preserving the getman_lints architecture rules.
+custom_lint:
+  enable_all_lint_rules: false
+  rules:
+    # getman_lints (project-local architecture rules)
+    - avoid_get_it_in_widgets
+    - avoid_hardcoded_brand_colors
+    - domain_no_infrastructure_imports
+    - bloc_depends_on_abstractions
+    - platform_io_outside_io_files
+    - equatable_props_complete
+    # solid_lints — cherry-picked metrics only. Regression-gate baselines set
+    # just above the current codebase max so the gate is green now and only
+    # FUTURE drift beyond these bounds is blocked (tunable downward later).
+    #
+    # SCOPING NOTE: the standalone `dart run custom_lint` runner reads ONLY the
+    # package-root analysis_options (it does NOT honor nested test/ or
+    # integration_test/ analysis_options, unlike the IDE analysis server), and
+    # neither custom_lint nor solid_lints offers a per-rule path/glob exclude —
+    # so these three metrics necessarily apply to test/ + integration_test/ too.
+    #   - cyclomatic_complexity (50): driven by lib/ (curl_utils.parse ≈ 49-50);
+    #     no test exceeds it — this is a meaningful PRODUCTION-code threshold.
+    #   - number_of_parameters (50): driven by lib/ (SettingsEntity.copyWith ≈ 47
+    #     params); no test has >8 params — also a meaningful PRODUCTION threshold.
+    #   - function_lines_of_code (1000): INFLATED by long test main() bodies (the
+    #     largest test main() ≈ 937 lines). The lib/-only max is ~380
+    #     (rpgTheme builder), so a production-meaningful value would be ~400;
+    #     1000 only keeps the test bodies green. Tighten to 400 once test main()s
+    #     are excludable (e.g. a future custom_lint with path-glob exclude).
+    #
+    # ⚠️ YAML FORMAT — do NOT change the indentation below. Each `max_*` key must
+    # be a SIBLING of its rule-name key inside the same list-map entry, i.e. at the
+    # same column as the rule name (6 spaces — aligned under the rule name, NOT
+    # indented one level deeper). custom_lint_core reads the threshold as a sibling
+    # key in the list-map entry. If you indent `max_*` one level deeper it becomes a
+    # nested child, the threshold is dropped back to the solid_lints default, and
+    # the gate silently changes (CI will then flip red on the existing baseline).
+    # Correct:  `- cyclomatic_complexity:` then `  max_complexity: 50` (same column).
+    - cyclomatic_complexity:
+      max_complexity: 50
+    - number_of_parameters:
+      max_parameters: 50
+    - function_lines_of_code:
+      max_lines: 1000

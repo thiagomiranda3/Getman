@@ -4,9 +4,9 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart'
     show TabDirtyChecker;
 
-// _configById is a lazily-memoized cache derived from `collections` (excluded
-// from props), so equality/immutability semantics are unaffected.
-// ignore: must_be_immutable
+// _configById is a derived memoization cache (built from `collections`);
+// excluded from equality by design, so equality/immutability are unaffected.
+// ignore: must_be_immutable, equatable_props_complete
 class CollectionsState extends Equatable {
   CollectionsState({
     this.collections = const [],

@@ -7,6 +7,9 @@ import 'package:getman/features/history/data/models/request_config_model.dart';
 import 'package:getman/features/history/data/repositories/history_repository_impl.dart';
 
 class _FakeHistoryDataSource implements HistoryLocalDataSource {
+  // Test-only broadcast controller; each test cancels its subscription or uses
+  // .first — no genuine resource leak (broadcast controllers buffer nothing).
+  // ignore: close_sinks
   final StreamController<void> controller = StreamController<void>.broadcast();
   int reads = 0;
   List<HttpRequestConfig> data = [];

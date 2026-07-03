@@ -25,8 +25,103 @@ class JsonTreeView extends StatefulWidget {
   State<JsonTreeView> createState() => _JsonTreeViewState();
 }
 
+/// A single visible row in the JSON tree.
+class JsonTreeNode {
+  JsonTreeNode({
+    required this.path,
+    required this.label,
+    required this.value,
+    required this.depth,
+  });
+
+  final String path;
+  final String label;
+  final Object? value;
+  final int depth;
+
+  bool get isContainer => value is Map || value is List;
+
+  /// Compact preview shown to the right of the key.
+  String get preview {
+    final v = value;
+    if (v is Map) return '{ ${v.length} }';
+    if (v is List) return '[ ${v.length} ]';
+    if (v is String) return '"$v"';
+    return v == null ? 'null' : v.toString();
+  }
+}
+
+/// Flattens [data] into the visible row list given the set of [expanded] paths.
+/// Pure (no widget/state deps) so it is unit-testable and benchmarkable, and so
+/// the view can memoize its result across rebuilds that don't change
+/// data/expansion. Paths use [JsonPathBuilder] grammar.
+List<JsonTreeNode> flattenVisibleJsonTree({
+  required Object? data,
+  required Set<String> expanded,
+}) {
+  final out = <JsonTreeNode>[];
+
+  void flatten(Object? value, String path, String label, int depth) {
+    out.add(JsonTreeNode(path: path, label: label, value: value, depth: depth));
+    if (!expanded.contains(path)) return;
+    if (value is Map) {
+      for (final e in value.entries) {
+        flatten(
+          e.value,
+          JsonPathBuilder.appendKey(path, e.key.toString()),
+          e.key.toString(),
+          depth + 1,
+        );
+      }
+    } else if (value is List) {
+      for (var i = 0; i < value.length; i++) {
+        flatten(
+          value[i],
+          JsonPathBuilder.appendIndex(path, i),
+          '[$i]',
+          depth + 1,
+        );
+      }
+    }
+  }
+
+  if (data is Map) {
+    for (final e in data.entries) {
+      flatten(
+        e.value,
+        JsonPathBuilder.appendKey(JsonPathBuilder.root, e.key.toString()),
+        e.key.toString(),
+        0,
+      );
+    }
+  } else if (data is List) {
+    for (var i = 0; i < data.length; i++) {
+      flatten(
+        data[i],
+        JsonPathBuilder.appendIndex(JsonPathBuilder.root, i),
+        '[$i]',
+        0,
+      );
+    }
+  } else {
+    out.add(
+      JsonTreeNode(
+        path: JsonPathBuilder.root,
+        label: r'$',
+        value: data,
+        depth: 0,
+      ),
+    );
+  }
+  return out;
+}
+
 class _JsonTreeViewState extends State<JsonTreeView> {
   final Set<String> _expanded = {};
+
+  // Cached flattened rows; invalidated only when data or expansion changes —
+  // not on theme/hover-driven rebuilds.
+  List<JsonTreeNode>? _flat;
 
   @override
   void initState() {
@@ -39,6 +134,7 @@ class _JsonTreeViewState extends State<JsonTreeView> {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.data, widget.data)) {
       _expanded.clear();
+      _flat = null;
       _seedExpansion();
     }
   }
@@ -67,73 +163,14 @@ class _JsonTreeViewState extends State<JsonTreeView> {
     }
   }
 
-  List<_Node> _visible() {
-    final out = <_Node>[];
-    final root = widget.data;
-    if (root is Map) {
-      _addMap(root, JsonPathBuilder.root, 0, out);
-    } else if (root is List) {
-      _addList(root, JsonPathBuilder.root, 0, out);
-    } else {
-      out.add(
-        _Node(path: JsonPathBuilder.root, label: r'$', value: root, depth: 0),
-      );
-    }
-    return out;
-  }
-
-  void _flatten(
-    Object? value,
-    String path,
-    String label,
-    int depth,
-    List<_Node> out,
-  ) {
-    out.add(_Node(path: path, label: label, value: value, depth: depth));
-    if (!_expanded.contains(path)) return;
-    if (value is Map) {
-      _addMap(value, path, depth + 1, out);
-    } else if (value is List) {
-      _addList(value, path, depth + 1, out);
-    }
-  }
-
-  void _addMap(
-    Map<dynamic, dynamic> map,
-    String path,
-    int depth,
-    List<_Node> out,
-  ) {
-    for (final e in map.entries) {
-      _flatten(
-        e.value,
-        JsonPathBuilder.appendKey(path, e.key.toString()),
-        e.key.toString(),
-        depth,
-        out,
-      );
-    }
-  }
-
-  void _addList(List<dynamic> list, String path, int depth, List<_Node> out) {
-    for (var i = 0; i < list.length; i++) {
-      _flatten(
-        list[i],
-        JsonPathBuilder.appendIndex(path, i),
-        '[$i]',
-        depth,
-        out,
-      );
-    }
-  }
-
   void _toggle(String path) {
     setState(() {
       if (!_expanded.remove(path)) _expanded.add(path);
+      _flat = null;
     });
   }
 
-  void _copyValue(_Node node) {
+  void _copyValue(JsonTreeNode node) {
     final text = node.value is Map || node.value is List
         ? const JsonEncoder.withIndent('  ').convert(node.value)
         : node.value?.toString() ?? 'null';
@@ -141,7 +178,7 @@ class _JsonTreeViewState extends State<JsonTreeView> {
     showAppSnackBar(context, 'Value copied');
   }
 
-  void _copyPath(_Node node) {
+  void _copyPath(JsonTreeNode node) {
     unawaited(Clipboard.setData(ClipboardData(text: node.path)));
     showAppSnackBar(context, 'Path copied: ${node.path}');
   }
@@ -149,7 +186,10 @@ class _JsonTreeViewState extends State<JsonTreeView> {
   @override
   Widget build(BuildContext context) {
     final palette = context.appPalette;
-    final nodes = _visible();
+    final nodes = _flat ??= flattenVisibleJsonTree(
+      data: widget.data,
+      expanded: _expanded,
+    );
 
     return ColoredBox(
       color: palette.codeBackground,
@@ -172,31 +212,6 @@ class _JsonTreeViewState extends State<JsonTreeView> {
   }
 }
 
-class _Node {
-  _Node({
-    required this.path,
-    required this.label,
-    required this.value,
-    required this.depth,
-  });
-
-  final String path;
-  final String label;
-  final Object? value;
-  final int depth;
-
-  bool get isContainer => value is Map || value is List;
-
-  /// Compact preview shown to the right of the key.
-  String get preview {
-    final v = value;
-    if (v is Map) return '{ ${v.length} }';
-    if (v is List) return '[ ${v.length} ]';
-    if (v is String) return '"$v"';
-    return v == null ? 'null' : v.toString();
-  }
-}
-
 class _TreeRow extends StatefulWidget {
   const _TreeRow({
     required this.node,
@@ -207,7 +222,7 @@ class _TreeRow extends StatefulWidget {
     required this.onExtract,
   });
 
-  final _Node node;
+  final JsonTreeNode node;
   final bool expanded;
   final VoidCallback onToggle;
   final VoidCallback onCopyValue;

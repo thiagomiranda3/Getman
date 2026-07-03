@@ -38,7 +38,22 @@ $FLUTTER analyze || fail "analyzer reported issues"
 step "custom_lint (Getman architecture rules)"
 $DART run custom_lint || fail "custom_lint reported issues"
 
+step "custom_lint fixtures (getman_lints self-test)"
+( cd tools/getman_lints/example && $DART run custom_lint ) \
+  || fail "getman_lints fixtures failed — a rule regressed"
+
 step "bloc lint"
 $DART run bloc_tools:bloc lint lib </dev/null || fail "bloc_lint reported issues"
+
+# Optional local secret scan — mirrors the gitleaks CI gate. Only runs if
+# gitleaks is installed (`brew install gitleaks`); CI scans regardless, so a
+# contributor without it isn't blocked, just unprotected locally.
+if command -v gitleaks >/dev/null 2>&1; then
+  step "gitleaks (staged secret scan)"
+  gitleaks protect --staged --redact --no-banner \
+    || fail "gitleaks flagged a potential secret in staged changes (or failed to run)"
+else
+  printf '\033[2m• gitleaks not installed — skipping local secret scan (CI still scans)\033[0m\n'
+fi
 
 printf '\033[32m✓ pre-commit checks passed\033[0m\n'

@@ -174,33 +174,41 @@ class _HistoryItemWidget extends StatelessWidget {
           bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
         ),
       ),
-      child: ListTile(
-        dense: true,
-        onTap: onTap,
-        title: Text(
-          config.url.isEmpty ? '(NO URL)' : config.url,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: layout.fontSizeNormal,
-            fontWeight: context.appTypography.titleWeight,
+      // The hover background is painted by HoverHighlight's AnimatedContainer
+      // (a colored BoxDecoration). A transparency Material gives the ListTile
+      // its own ink surface so Flutter 3.44 doesn't assert that the colored
+      // container hides the tile's background/splash — the hover color behind
+      // it still shows through.
+      child: Material(
+        type: MaterialType.transparency,
+        child: ListTile(
+          dense: true,
+          onTap: onTap,
+          title: Text(
+            config.url.isEmpty ? '(NO URL)' : config.url,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: layout.fontSizeNormal,
+              fontWeight: context.appTypography.titleWeight,
+            ),
           ),
-        ),
-        subtitle: Row(
-          children: [
-            MethodBadge(method: config.method, small: true),
-            if (config.statusCode != null) ...[
-              const SizedBox(width: 8),
-              Text(
-                config.statusCode.toString(),
-                style: TextStyle(
-                  color: context.appPalette.statusColor(config.statusCode!),
-                  fontWeight: context.appTypography.displayWeight,
-                  fontSize: layout.fontSizeNormal,
+          subtitle: Row(
+            children: [
+              MethodBadge(method: config.method, small: true),
+              if (config.statusCode != null) ...[
+                const SizedBox(width: 8),
+                Text(
+                  config.statusCode.toString(),
+                  style: TextStyle(
+                    color: context.appPalette.statusColor(config.statusCode!),
+                    fontWeight: context.appTypography.displayWeight,
+                    fontSize: layout.fontSizeNormal,
+                  ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

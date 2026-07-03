@@ -144,7 +144,7 @@ Windows: click "More info" → "Run anyway".
 
 ## Running from source
 
-Getman targets Flutter `3.41.6` (pinned via `.fvmrc`). Use
+Getman targets Flutter `3.44.4` (pinned via `.fvmrc`). Use
 [FVM](https://fvm.app) so your local build matches CI:
 
 ```sh
