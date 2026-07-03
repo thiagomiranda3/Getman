@@ -22,7 +22,10 @@ void main() {
   group('RequestConfigDiff', () {
     test('added request reports every non-empty field as added', () {
       final d = RequestConfigDiff.diff(null, cfg(method: 'POST'));
-      expect(d.changes.any((c) => c.field == 'method' && c.kind == ChangeKind.added), isTrue);
+      expect(
+        d.changes.any((c) => c.field == 'method' && c.kind == ChangeKind.added),
+        isTrue,
+      );
     });
 
     test('method + url changes are reported as changed with before/after', () {
@@ -43,11 +46,14 @@ void main() {
         cfg(headers: {'A': '9', 'C': '3'}),
       );
       final labels = d.changes.map((c) => '${c.field}:${c.kind.name}').toSet();
-      expect(labels, containsAll(<String>{
-        "header 'A':changed",
-        "header 'B':removed",
-        "header 'C':added",
-      }));
+      expect(
+        labels,
+        containsAll(<String>{
+          "header 'A':changed",
+          "header 'B':removed",
+          "header 'C':added",
+        }),
+      );
     });
 
     test('auth change is reported without leaking values', () {
@@ -88,7 +94,12 @@ void main() {
 
     test('variable add reported per key', () {
       final d = FolderNodeDiff.diff(folder(), folder(variables: {'x': '1'}));
-      expect(d.changes.any((c) => c.field == "variable 'x'" && c.kind == ChangeKind.added), isTrue);
+      expect(
+        d.changes.any(
+          (c) => c.field == "variable 'x'" && c.kind == ChangeKind.added,
+        ),
+        isTrue,
+      );
     });
   });
 }

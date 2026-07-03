@@ -164,8 +164,7 @@ class FolderNodeDiff {
 
     final beforeOrder =
         before?.children.map((c) => c.name).toList() ?? const [];
-    final afterOrder =
-        after?.children.map((c) => c.name).toList() ?? const [];
+    final afterOrder = after?.children.map((c) => c.name).toList() ?? const [];
     if (!_listEq.equals(beforeOrder, afterOrder)) {
       out.add(
         FieldChange(
