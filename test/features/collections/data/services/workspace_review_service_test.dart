@@ -20,10 +20,10 @@ String reqJson(
     'id': 'id-$name',
     'method': method,
     'url': url,
-    'headers': {},
+    'headers': <String, dynamic>{},
     'body': '',
     'bodyType': 'raw',
-    'auth': {},
+    'auth': <String, dynamic>{},
   },
 });
 

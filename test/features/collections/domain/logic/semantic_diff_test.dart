@@ -80,7 +80,6 @@ void main() {
     }) => CollectionNodeEntity(
       id: 'f',
       name: name,
-      isFolder: true,
       children: children,
       variables: variables,
     );
