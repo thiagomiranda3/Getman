@@ -17,6 +17,9 @@ import 'package:getman/features/collections/presentation/bloc/collections_bloc.d
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/collection_node_row.dart';
 import 'package:getman/features/collections/presentation/widgets/collections_list.dart';
+import 'package:getman/features/settings/domain/entities/settings_entity.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
@@ -26,6 +29,8 @@ import 'package:mocktail/mocktail.dart';
 class MockCollectionsRepository extends Mock implements CollectionsRepository {}
 
 class MockTabsBloc extends MockBloc<TabsEvent, TabsState> implements TabsBloc {}
+
+class MockSettingsBloc extends Mock implements SettingsBloc {}
 
 class _FakeTabsEvent extends Fake implements TabsEvent {}
 
@@ -74,6 +79,11 @@ void main() {
       Stream<TabsState>.fromIterable(tabsStates),
       initialState: tabsInitial,
     );
+    final settings = MockSettingsBloc();
+    when(() => settings.state).thenReturn(
+      const SettingsState(settings: SettingsEntity()),
+    );
+    when(() => settings.stream).thenAnswer((_) => const Stream.empty());
     return MaterialApp(
       theme: brutalistTheme(Brightness.light),
       home: Scaffold(
@@ -81,6 +91,7 @@ void main() {
           providers: [
             BlocProvider<CollectionsBloc>.value(value: collections),
             BlocProvider<TabsBloc>.value(value: tabs),
+            BlocProvider<SettingsBloc>.value(value: settings),
           ],
           child: const CollectionsList(),
         ),

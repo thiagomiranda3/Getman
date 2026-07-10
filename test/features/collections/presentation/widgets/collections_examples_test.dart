@@ -14,6 +14,9 @@ import 'package:getman/features/collections/domain/usecases/collections_usecases
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/collections_list.dart';
+import 'package:getman/features/settings/domain/entities/settings_entity.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
@@ -27,6 +30,8 @@ class MockCollectionsRepository extends Mock implements CollectionsRepository {}
 class MockTabsRepository extends Mock implements TabsRepository {}
 
 class MockSendRequestUseCase extends Mock implements SendRequestUseCase {}
+
+class MockSettingsBloc extends Mock implements SettingsBloc {}
 
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 
@@ -119,6 +124,12 @@ void main() {
     addTearDown(collectionsBloc.close);
     addTearDown(tabsBloc.close);
 
+    final settingsBloc = MockSettingsBloc();
+    when(() => settingsBloc.state).thenReturn(
+      const SettingsState(settings: SettingsEntity()),
+    );
+    when(() => settingsBloc.stream).thenAnswer((_) => const Stream.empty());
+
     await tester.pumpWidget(
       MaterialApp(
         theme: brutalistTheme(Brightness.light),
@@ -127,6 +138,7 @@ void main() {
             providers: [
               BlocProvider.value(value: collectionsBloc),
               BlocProvider.value(value: tabsBloc),
+              BlocProvider<SettingsBloc>.value(value: settingsBloc),
             ],
             child: const CollectionsList(),
           ),
