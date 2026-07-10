@@ -21,7 +21,11 @@ class ReviewChangesButton extends StatelessWidget {
           child: IconButton(
             key: const ValueKey('review_changes_button'),
             tooltip: 'Review changes',
-            icon: Icon(Icons.rule, size: context.appLayout.iconSize),
+            icon: Icon(
+              Icons.rule,
+              size: context.appLayout.iconSize,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
             onPressed: () => ReviewChangesDialog.show(context, root: root),
           ),
         );

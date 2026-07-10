@@ -123,7 +123,10 @@ class _ReviewChangesBodyState extends State<ReviewChangesBody> {
                   iconFor: _icon,
                 ),
               ),
-              const VerticalDivider(width: 1),
+              VerticalDivider(
+                width: context.appLayout.borderThick,
+                thickness: context.appLayout.borderThin,
+              ),
               Expanded(child: SemanticDiffView(diff: selected.diff)),
             ],
           ),
