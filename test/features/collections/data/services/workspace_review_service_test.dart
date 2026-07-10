@@ -27,6 +27,14 @@ String reqJson(
   },
 });
 
+String folderJson(String name, {required List<String> childOrder}) =>
+    jsonEncode({
+      'id': 'id-$name',
+      'name': name,
+      'isFavorite': false,
+      'childOrder': childOrder,
+    });
+
 void main() {
   late _MockGit git;
   late WorkspaceReviewService service;
@@ -98,6 +106,36 @@ void main() {
       final entry = (await service.review(root)).entries.single;
       expect(entry.changeType, ChangeType.added);
       expect(entry.staged, isFalse);
+    },
+  );
+
+  test(
+    'a folder child reorder produces a non-empty child order diff',
+    () async {
+      when(() => git.status(root)).thenAnswer(
+        (_) async => const [
+          GitStatusEntry(
+            indexStatus: ' ',
+            worktreeStatus: 'M',
+            path: 'folder/.folder.json',
+          ),
+        ],
+      );
+      when(
+        () => git.headContent(root, 'folder/.folder.json'),
+      ).thenAnswer((_) async => folderJson('Folder', childOrder: ['a', 'b']));
+      when(
+        () => git.workingContent(root, 'folder/.folder.json'),
+      ).thenAnswer((_) async => folderJson('Folder', childOrder: ['b', 'a']));
+
+      final entry = (await service.review(root)).entries.single;
+      expect(entry.nodeKind, NodeKind.folder);
+      expect(entry.changeType, ChangeType.modified);
+      expect(entry.diff.changes, isNotEmpty);
+      expect(
+        entry.diff.changes.any((c) => c.field == 'child order'),
+        isTrue,
+      );
     },
   );
 

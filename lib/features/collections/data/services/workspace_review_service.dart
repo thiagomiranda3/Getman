@@ -125,6 +125,13 @@ class WorkspaceReviewService implements ReviewService {
   static CollectionNodeEntity? _parseFolder(String? raw) {
     final json = _decode(raw);
     if (json == null) return null;
-    return WorkspaceCollectionSerializer.folderFromJson(json, const []);
+    final childOrder = WorkspaceCollectionSerializer.childOrder(json);
+    // Placeholder children exist only so FolderNodeDiff's
+    // children.map((c) => c.name) can detect reordering from the
+    // .folder.json childOrder slugs — name = slug is intentional.
+    final children = [
+      for (final slug in childOrder) CollectionNodeEntity(id: slug, name: slug),
+    ];
+    return WorkspaceCollectionSerializer.folderFromJson(json, children);
   }
 }
