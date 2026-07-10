@@ -87,6 +87,10 @@ class ReviewBloc extends Bloc<ReviewEvent, ReviewState> {
       await _service.init(event.root);
     } on Object catch (e) {
       log('init failed: $e', name: 'ReviewBloc');
+      emit(
+        state.copyWith(status: ReviewStatus.error, errorMessage: e.toString()),
+      );
+      return;
     }
     add(LoadReview(event.root));
   }

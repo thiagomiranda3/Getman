@@ -95,8 +95,26 @@ class _ReviewChangesBodyState extends State<ReviewChangesBody> {
         ),
       );
     }
+
+    final showError =
+        state.status == ReviewStatus.error && state.errorMessage != null;
+    final errorBanner = showError
+        ? _ErrorBanner(message: state.errorMessage!)
+        : null;
+
     if (state.entries.isEmpty) {
-      return const Center(child: Text('No changes to review.'));
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (errorBanner != null) ...[
+              errorBanner,
+              SizedBox(height: context.appLayout.inputPadding),
+            ],
+            const Text('No changes to review.'),
+          ],
+        ),
+      );
     }
 
     final selected = state.entries.firstWhere(
@@ -110,6 +128,10 @@ class _ReviewChangesBodyState extends State<ReviewChangesBody> {
 
     return Column(
       children: [
+        if (errorBanner != null) ...[
+          errorBanner,
+          SizedBox(height: context.appLayout.inputPadding),
+        ],
         Expanded(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -158,6 +180,35 @@ class _ReviewChangesBodyState extends State<ReviewChangesBody> {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Inline error banner surfaced above the commit row when a review load or
+/// commit attempt fails (e.g. missing git identity on first run).
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final layout = context.appLayout;
+    return Container(
+      key: const ValueKey('review_error_banner'),
+      width: double.infinity,
+      padding: EdgeInsets.all(layout.inputPadding),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.error,
+        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+      ),
+      child: Text(
+        message,
+        style: TextStyle(
+          color: theme.colorScheme.onError,
+          fontWeight: context.appTypography.bodyWeight,
+        ),
+      ),
     );
   }
 }

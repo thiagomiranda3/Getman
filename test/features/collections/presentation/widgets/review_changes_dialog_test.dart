@@ -88,4 +88,22 @@ void main() {
     );
     expect(find.textContaining('Initialize git'), findsOneWidget);
   });
+
+  testWidgets('surfaces the error message after a failed commit', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(
+        const ReviewState(
+          status: ReviewStatus.error,
+          entries: [entry],
+          selectedPath: 'a.req.json',
+          errorMessage: 'boom',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('boom'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

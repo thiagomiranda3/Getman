@@ -88,4 +88,20 @@ void main() {
     act: (b) => b.add(const LoadReview(root)),
     verify: (b) => expect(b.state.status, ReviewStatus.error),
   );
+
+  blocTest<ReviewBloc, ReviewState>(
+    'InitRepo failure → error status, no reload',
+    build: () {
+      when(
+        () => service.init(root),
+      ).thenThrow(Exception('Please tell me who you are'));
+      return ReviewBloc(service: service);
+    },
+    act: (b) => b.add(const InitRepo(root)),
+    verify: (b) {
+      expect(b.state.status, ReviewStatus.error);
+      expect(b.state.errorMessage, contains('Please tell me who you are'));
+      verifyNever(() => service.review(root));
+    },
+  );
 }
