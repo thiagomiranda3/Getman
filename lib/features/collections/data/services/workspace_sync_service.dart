@@ -18,6 +18,8 @@ class WorkspaceSyncService {
   final WorkspaceCollectionsDataSource dataSource;
   final Duration debounce;
   Timer? _timer;
+  String? _pendingRoot;
+  List<CollectionNodeEntity>? _pendingForest;
 
   final StreamController<String> _mirrored =
       StreamController<String>.broadcast();
@@ -38,7 +40,34 @@ class WorkspaceSyncService {
   /// write.
   void scheduleMirror(String root, List<CollectionNodeEntity> forest) {
     _timer?.cancel();
-    _timer = Timer(debounce, () => _mirror(root, forest));
+    _pendingRoot = root;
+    _pendingForest = forest;
+    _timer = Timer(debounce, () {
+      final r = _pendingRoot;
+      final f = _pendingForest;
+      _pendingRoot = null;
+      _pendingForest = null;
+      if (r == null || f == null) return;
+      unawaited(_mirror(r, f));
+    });
+  }
+
+  /// Runs any pending debounced write to completion, now.
+  ///
+  /// Callers that read the mirrored files through git (branch switch, pull,
+  /// push, stash) MUST await this first: otherwise a write scheduled moments
+  /// earlier has not landed, `git status` reports a clean tree, and the timer
+  /// fires *after* the checkout — writing the user's edit onto the branch
+  /// they switched to.
+  Future<void> flushPending() async {
+    _timer?.cancel();
+    _timer = null;
+    final root = _pendingRoot;
+    final forest = _pendingForest;
+    _pendingRoot = null;
+    _pendingForest = null;
+    if (root == null || forest == null) return;
+    await _mirror(root, forest);
   }
 
   Future<void> _mirror(String root, List<CollectionNodeEntity> forest) async {

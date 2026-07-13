@@ -126,4 +126,44 @@ void main() {
       expect(failures.length, 2);
     },
   );
+
+  test('flushPending writes a pending mirror immediately', () async {
+    final service = WorkspaceSyncService(
+      ds,
+      debounce: const Duration(seconds: 30), // would not fire on its own
+    );
+    addTearDown(service.dispose);
+
+    service.scheduleMirror('/ws', const []);
+    verifyNever(() => ds.write('/ws', any()));
+
+    await service.flushPending();
+
+    // The write must have landed *before* flushPending completes — this is
+    // what lets a branch switch trust `git status`.
+    verify(() => ds.write('/ws', any())).called(1);
+  });
+
+  test('flushPending is a no-op when nothing is pending', () async {
+    final service = WorkspaceSyncService(ds);
+    addTearDown(service.dispose);
+
+    await service.flushPending();
+
+    verifyNever(() => ds.write(any(), any()));
+  });
+
+  test('flushPending does not write twice when the timer also fires', () async {
+    final service = WorkspaceSyncService(
+      ds,
+      debounce: const Duration(milliseconds: 5),
+    );
+    addTearDown(service.dispose);
+
+    service.scheduleMirror('/ws', const []);
+    await service.flushPending();
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+
+    verify(() => ds.write('/ws', any())).called(1);
+  });
 }
