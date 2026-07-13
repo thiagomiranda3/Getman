@@ -48,9 +48,11 @@ class WorkspaceReviewService implements ReviewService {
   @override
   Future<void> init(String root) => _git.init(root);
   @override
-  Future<void> stage(String root, String path) => _git.stage(root, [path]);
+  Future<void> stage(String root, List<String> paths) =>
+      _git.stage(root, paths);
   @override
-  Future<void> unstage(String root, String path) => _git.unstage(root, [path]);
+  Future<void> unstage(String root, List<String> paths) =>
+      _git.unstage(root, paths);
   @override
   Future<void> commit(String root, String message) =>
       _git.commit(root, message);

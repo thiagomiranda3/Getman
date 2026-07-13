@@ -82,6 +82,58 @@ void main() {
     expect(commit.onPressed, isNull); // nothing staged yet
   });
 
+  testWidgets('the select-all header stages every entry', (tester) async {
+    await tester.pumpWidget(
+      host(
+        const ReviewState(
+          status: ReviewStatus.ready,
+          entries: [entry],
+          selectedPath: 'a.req.json',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('SELECT ALL'), findsOneWidget);
+    expect(find.text('0/1'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('review_select_all')));
+    await tester.pumpAndSettle();
+
+    verify(() => bloc.add(const StageAll('/ws'))).called(1);
+  });
+
+  testWidgets('with everything staged the header clears the selection', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(
+        const ReviewState(
+          status: ReviewStatus.ready,
+          entries: [
+            ReviewEntry(
+              path: 'a.req.json',
+              nodeKind: NodeKind.request,
+              changeType: ChangeType.modified,
+              displayName: 'Get User',
+              staged: true,
+              diff: SemanticDiff([]),
+            ),
+          ],
+          selectedPath: 'a.req.json',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('DESELECT ALL'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('review_select_all')));
+    await tester.pumpAndSettle();
+
+    verify(() => bloc.add(const UnstageAll('/ws'))).called(1);
+  });
+
   testWidgets('not a repo shows Initialize git', (tester) async {
     await tester.pumpWidget(
       host(const ReviewState(status: ReviewStatus.ready, repoExists: false)),

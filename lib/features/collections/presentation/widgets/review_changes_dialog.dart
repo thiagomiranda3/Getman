@@ -138,11 +138,22 @@ class _ReviewChangesBodyState extends State<ReviewChangesBody> {
             children: [
               SizedBox(
                 width: context.appLayout.dialogWidth * 0.6,
-                child: _NodeList(
-                  entries: state.entries,
-                  selectedPath: selected.path,
-                  root: widget.root,
-                  iconFor: _icon,
+                child: Column(
+                  children: [
+                    _SelectAllRow(
+                      root: widget.root,
+                      total: state.entries.length,
+                      staged: state.stagedCount,
+                    ),
+                    Expanded(
+                      child: _NodeList(
+                        entries: state.entries,
+                        selectedPath: selected.path,
+                        root: widget.root,
+                        iconFor: _icon,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               VerticalDivider(
@@ -209,6 +220,52 @@ class _ErrorBanner extends StatelessWidget {
           fontWeight: context.appTypography.bodyWeight,
         ),
       ),
+    );
+  }
+}
+
+/// Select-all header over the entry list. Tri-state: checked when every entry
+/// is staged, dashed when some are, empty when none — tapping stages all, or
+/// clears the selection when everything is already staged.
+class _SelectAllRow extends StatelessWidget {
+  const _SelectAllRow({
+    required this.root,
+    required this.total,
+    required this.staged,
+  });
+  final String root;
+  final int total;
+  final int staged;
+
+  @override
+  Widget build(BuildContext context) {
+    final all = staged == total;
+    final none = staged == 0;
+    return Row(
+      children: [
+        Checkbox(
+          key: const ValueKey('review_select_all'),
+          value: none ? false : (all ? true : null),
+          tristate: true,
+          onChanged: (_) => context.read<ReviewBloc>().add(
+            all ? UnstageAll(root) : StageAll(root),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            all ? 'DESELECT ALL' : 'SELECT ALL',
+            style: TextStyle(
+              fontSize: context.appLayout.fontSizeSmall,
+              fontWeight: context.appTypography.titleWeight,
+            ),
+          ),
+        ),
+        Text(
+          '$staged/$total',
+          style: TextStyle(fontSize: context.appLayout.fontSizeSmall),
+        ),
+        SizedBox(width: context.appLayout.inputPadding),
+      ],
     );
   }
 }

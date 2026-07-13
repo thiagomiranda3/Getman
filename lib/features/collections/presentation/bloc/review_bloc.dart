@@ -12,6 +12,8 @@ class ReviewBloc extends Bloc<ReviewEvent, ReviewState> {
     on<LoadReview>(_onLoad);
     on<StageNode>(_onStage);
     on<UnstageNode>(_onUnstage);
+    on<StageAll>(_onStageAll);
+    on<UnstageAll>(_onUnstageAll);
     on<SelectEntry>(_onSelect);
     on<Commit>(_onCommit);
     on<InitRepo>(_onInit);
@@ -48,7 +50,7 @@ class ReviewBloc extends Bloc<ReviewEvent, ReviewState> {
 
   Future<void> _onStage(StageNode event, Emitter<ReviewState> emit) async {
     try {
-      await _service.stage(event.root, event.path);
+      await _service.stage(event.root, [event.path]);
     } on Object catch (e) {
       log('stage failed: $e', name: 'ReviewBloc');
     }
@@ -57,9 +59,40 @@ class ReviewBloc extends Bloc<ReviewEvent, ReviewState> {
 
   Future<void> _onUnstage(UnstageNode event, Emitter<ReviewState> emit) async {
     try {
-      await _service.unstage(event.root, event.path);
+      await _service.unstage(event.root, [event.path]);
     } on Object catch (e) {
       log('unstage failed: $e', name: 'ReviewBloc');
+    }
+    add(LoadReview(event.root));
+  }
+
+  Future<void> _onStageAll(StageAll event, Emitter<ReviewState> emit) async {
+    final paths = state.entries
+        .where((e) => !e.staged)
+        .map((e) => e.path)
+        .toList();
+    if (paths.isEmpty) return;
+    try {
+      await _service.stage(event.root, paths);
+    } on Object catch (e) {
+      log('stage all failed: $e', name: 'ReviewBloc');
+    }
+    add(LoadReview(event.root));
+  }
+
+  Future<void> _onUnstageAll(
+    UnstageAll event,
+    Emitter<ReviewState> emit,
+  ) async {
+    final paths = state.entries
+        .where((e) => e.staged)
+        .map((e) => e.path)
+        .toList();
+    if (paths.isEmpty) return;
+    try {
+      await _service.unstage(event.root, paths);
+    } on Object catch (e) {
+      log('unstage all failed: $e', name: 'ReviewBloc');
     }
     add(LoadReview(event.root));
   }

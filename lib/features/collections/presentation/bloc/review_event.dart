@@ -29,6 +29,22 @@ class UnstageNode extends ReviewEvent {
   List<Object?> get props => [root, path];
 }
 
+/// Stages every currently-unstaged entry (the select-all action).
+class StageAll extends ReviewEvent {
+  const StageAll(this.root);
+  final String root;
+  @override
+  List<Object?> get props => [root];
+}
+
+/// Unstages every currently-staged entry (the clear-selection action).
+class UnstageAll extends ReviewEvent {
+  const UnstageAll(this.root);
+  final String root;
+  @override
+  List<Object?> get props => [root];
+}
+
 class SelectEntry extends ReviewEvent {
   const SelectEntry(this.path);
   final String path;

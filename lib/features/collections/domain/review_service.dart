@@ -4,8 +4,11 @@ import 'package:getman/features/collections/domain/entities/review_entry.dart';
 /// WorkspaceReviewService.
 abstract class ReviewService {
   Future<ReviewResult> review(String root);
-  Future<void> stage(String root, String path);
-  Future<void> unstage(String root, String path);
+
+  /// Stage/unstage takes a list so a select-all is a single git call rather
+  /// than one subprocess per entry.
+  Future<void> stage(String root, List<String> paths);
+  Future<void> unstage(String root, List<String> paths);
   Future<void> commit(String root, String message);
   Future<void> init(String root);
 }

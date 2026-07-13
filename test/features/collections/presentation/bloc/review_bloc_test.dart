@@ -28,17 +28,34 @@ void main() {
       ),
     ]),
   );
+  const staged = ReviewEntry(
+    path: 'b.req.json',
+    nodeKind: NodeKind.request,
+    changeType: ChangeType.added,
+    displayName: 'B',
+    staged: true,
+    diff: SemanticDiff([]),
+  );
   const result = ReviewResult(
     gitAvailable: true,
     repoExists: true,
     branch: 'main',
     entries: [entry],
   );
+  const mixed = ReviewResult(
+    gitAvailable: true,
+    repoExists: true,
+    branch: 'main',
+    entries: [entry, staged],
+  );
+
+  setUpAll(() => registerFallbackValue(<String>[]));
 
   setUp(() {
     service = _MockService();
     when(() => service.review(root)).thenAnswer((_) async => result);
     when(() => service.stage(root, any())).thenAnswer((_) async {});
+    when(() => service.unstage(root, any())).thenAnswer((_) async {});
     when(() => service.commit(root, any())).thenAnswer((_) async {});
   });
 
@@ -62,7 +79,50 @@ void main() {
       b.add(const StageNode(root, 'a.req.json'));
     },
     verify: (b) {
-      verify(() => service.stage(root, 'a.req.json')).called(1);
+      verify(() => service.stage(root, ['a.req.json'])).called(1);
+    },
+  );
+
+  blocTest<ReviewBloc, ReviewState>(
+    'StageAll stages every unstaged entry in one call',
+    build: () {
+      when(() => service.review(root)).thenAnswer((_) async => mixed);
+      return ReviewBloc(service: service);
+    },
+    act: (b) async {
+      b.add(const LoadReview(root));
+      await Future<void>.delayed(Duration.zero);
+      b.add(const StageAll(root));
+    },
+    verify: (b) {
+      // Only the unstaged one — b.req.json is already in the index.
+      verify(() => service.stage(root, ['a.req.json'])).called(1);
+    },
+  );
+
+  blocTest<ReviewBloc, ReviewState>(
+    'UnstageAll unstages every staged entry in one call',
+    build: () {
+      when(() => service.review(root)).thenAnswer((_) async => mixed);
+      return ReviewBloc(service: service);
+    },
+    act: (b) async {
+      b.add(const LoadReview(root));
+      await Future<void>.delayed(Duration.zero);
+      b.add(const UnstageAll(root));
+    },
+    verify: (b) {
+      verify(() => service.unstage(root, ['b.req.json'])).called(1);
+    },
+  );
+
+  blocTest<ReviewBloc, ReviewState>(
+    'StageAll with nothing to stage does not call the service',
+    build: () => ReviewBloc(service: service),
+    act: (b) => b.add(const StageAll(root)),
+    verify: (b) {
+      verifyNever(() => service.stage(root, any()));
+      verifyNever(() => service.review(root));
     },
   );
 
