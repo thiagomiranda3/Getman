@@ -51,6 +51,23 @@ void main() {
     expect(st.firstWhere((e) => e.path == 'a.req.json').isStaged, isTrue);
   });
 
+  test('status lists files inside a wholly untracked directory', () async {
+    if (!await gitPresent()) return;
+    // git collapses an untracked directory into a single `folder/` entry unless
+    // -uall is passed — which would hide every request in a new collection.
+    Directory('${tmp.path}/graphql_test').createSync();
+    File('${tmp.path}/graphql_test/.folder.json').writeAsStringSync('{}');
+    File(
+      '${tmp.path}/graphql_test/graphql_test.req.json',
+    ).writeAsStringSync('{}');
+
+    final paths = (await git.status(tmp.path)).map((e) => e.path).toSet();
+
+    expect(paths, contains('graphql_test/.folder.json'));
+    expect(paths, contains('graphql_test/graphql_test.req.json'));
+    expect(paths, isNot(contains('graphql_test/')));
+  });
+
   test('headContent returns committed content; commit clears status', () async {
     if (!await gitPresent()) return;
     File('${tmp.path}/a.req.json').writeAsStringSync('v1');

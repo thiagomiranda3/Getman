@@ -68,7 +68,10 @@ class _IoGitService implements GitService {
 
   @override
   Future<List<GitStatusEntry>> status(String root) async {
-    final r = await _run(root, ['status', '--porcelain=v1', '-z']);
+    // `-uall` lists every untracked *file*. Without it git collapses a wholly
+    // untracked directory into one `folder/` entry, so a brand-new collection
+    // folder would hide its .folder.json and every request inside it.
+    final r = await _run(root, ['status', '--porcelain=v1', '-z', '-uall']);
     return _parseStatusZ(r.stdout as String);
   }
 
