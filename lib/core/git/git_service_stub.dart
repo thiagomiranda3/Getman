@@ -34,4 +34,10 @@ class _StubGitService implements GitService {
   Future<bool> hasRemote(String root) async => false;
   @override
   Future<AheadBehind> aheadBehind(String root) async => AheadBehind.none;
+  @override
+  Future<bool> hasUpstream(String root) async => false;
+  @override
+  Future<void> pull(String root) async {}
+  @override
+  Future<void> push(String root, {required bool setUpstream}) async {}
 }

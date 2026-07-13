@@ -75,4 +75,16 @@ abstract class GitService {
 
   /// Ahead/behind counts vs the current branch's upstream.
   Future<AheadBehind> aheadBehind(String root);
+
+  /// Whether the current branch has an upstream configured.
+  Future<bool> hasUpstream(String root);
+
+  /// `git pull --rebase`. On conflict the rebase is **aborted** before
+  /// throwing, so a failed pull leaves the working tree exactly as it was —
+  /// Getman has no conflict-resolution UI yet (Spec D).
+  Future<void> pull(String root);
+
+  /// Pushes the current branch. Pass [setUpstream] for a branch that has
+  /// never been pushed (`git push -u origin <branch>`).
+  Future<void> push(String root, {required bool setUpstream});
 }

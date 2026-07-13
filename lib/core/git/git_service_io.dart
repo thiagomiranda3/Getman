@@ -168,6 +168,42 @@ class _IoGitService implements GitService {
     );
   }
 
+  @override
+  Future<bool> hasUpstream(String root) async {
+    final r = await _run(root, [
+      'rev-parse',
+      '--abbrev-ref',
+      '--symbolic-full-name',
+      '@{u}',
+    ], allowFailure: true);
+    return r.exitCode == 0;
+  }
+
+  @override
+  Future<void> pull(String root) async {
+    final r = await _run(root, ['pull', '--rebase'], allowFailure: true);
+    if (r.exitCode == 0) return;
+    // Leave no half-rebased tree behind: undo it, then report the failure.
+    await _run(root, ['rebase', '--abort'], allowFailure: true);
+    final err = (r.stderr as String).trim();
+    throw GitException(
+      err.isEmpty ? 'git pull failed' : err,
+      exitCode: r.exitCode,
+    );
+  }
+
+  @override
+  Future<void> push(String root, {required bool setUpstream}) async {
+    final branch = await currentBranch(root);
+    if (branch == null) throw GitException('no current branch to push');
+    await _run(root, [
+      'push',
+      if (setUpstream) '-u',
+      if (setUpstream) 'origin',
+      if (setUpstream) branch,
+    ]);
+  }
+
   /// Parses `git status --porcelain=v1 -z`. Records are NUL-terminated; a
   /// rename record (`R`/`C`) is followed by a second NUL-token holding the
   /// source path.
