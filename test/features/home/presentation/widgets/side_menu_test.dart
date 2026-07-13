@@ -6,10 +6,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/features/collections/data/datasources/workspace_collections_data_source.dart';
+import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
+import 'package:getman/features/collections/domain/review_service.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
 import 'package:getman/features/history/domain/repositories/history_repository.dart';
 import 'package:getman/features/history/domain/usecases/history_usecases.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
@@ -23,6 +27,11 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockCollectionsRepository extends Mock implements CollectionsRepository {}
+
+class MockWorkspaceDataSource extends Mock
+    implements WorkspaceCollectionsDataSource {}
+
+class MockReviewService extends Mock implements ReviewService {}
 
 class MockHistoryRepository extends Mock implements HistoryRepository {}
 
@@ -82,17 +91,23 @@ void main() {
     return MaterialApp(
       theme: brutalistTheme(Brightness.light),
       home: Scaffold(
-        body: MultiBlocProvider(
-          providers: [
-            BlocProvider.value(value: collectionsBloc),
-            BlocProvider.value(value: historyBloc),
-            BlocProvider.value(value: settingsBloc),
-            BlocProvider<TabsBloc>.value(value: tabsBloc),
-          ],
-          child: const SizedBox(
-            width: 320,
-            height: 600,
-            child: SideMenu(),
+        body: RepositoryProvider<WorkspaceSyncService>(
+          create: (_) => WorkspaceSyncService(MockWorkspaceDataSource()),
+          child: MultiBlocProvider(
+            providers: [
+              BlocProvider.value(value: collectionsBloc),
+              BlocProvider.value(value: historyBloc),
+              BlocProvider.value(value: settingsBloc),
+              BlocProvider<TabsBloc>.value(value: tabsBloc),
+              BlocProvider<ReviewBloc>(
+                create: (_) => ReviewBloc(service: MockReviewService()),
+              ),
+            ],
+            child: const SizedBox(
+              width: 320,
+              height: 600,
+              child: SideMenu(),
+            ),
           ),
         ),
       ),

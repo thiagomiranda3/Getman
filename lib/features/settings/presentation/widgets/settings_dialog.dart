@@ -23,15 +23,27 @@ import 'package:getman/features/updates/presentation/widgets/update_settings_sec
 /// Fixed width of the small numeric input boxes (history limit, timeouts, …).
 const double _numberFieldWidth = 96;
 
-class SettingsDialog extends StatefulWidget {
-  const SettingsDialog({super.key});
+/// The settings panes, in tab order. Callers deep-link a pane by passing one to
+/// [SettingsDialog.show] (e.g. the Review Changes button sends a user with no
+/// workspace connected straight to [SettingsTab.workspace]).
+enum SettingsTab { general, appearance, network, workspace, shortcuts }
 
-  static Future<void> show(BuildContext context) {
+class SettingsDialog extends StatefulWidget {
+  const SettingsDialog({this.initialTab = SettingsTab.general, super.key});
+
+  final SettingsTab initialTab;
+
+  static Future<void> show(
+    BuildContext context, {
+    SettingsTab initialTab = SettingsTab.general,
+  }) {
     final bloc = context.read<SettingsBloc>();
     return showResponsiveDialog<void>(
       context,
-      builder: (_) =>
-          BlocProvider.value(value: bloc, child: const SettingsDialog()),
+      builder: (_) => BlocProvider.value(
+        value: bloc,
+        child: SettingsDialog(initialTab: initialTab),
+      ),
     );
   }
 
@@ -41,6 +53,7 @@ class SettingsDialog extends StatefulWidget {
 
 class _SettingsDialogState extends State<SettingsDialog>
     with SingleTickerProviderStateMixin {
+  // Order must match SettingsTab (its index selects the tab + the pane).
   static const _tabLabels = <String>[
     'GENERAL',
     'APPEARANCE',
@@ -61,7 +74,11 @@ class _SettingsDialogState extends State<SettingsDialog>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _tabLabels.length, vsync: this);
+    _tabController = TabController(
+      length: _tabLabels.length,
+      initialIndex: widget.initialTab.index,
+      vsync: this,
+    );
     final s = context.read<SettingsBloc>().state.settings;
     _historyLimitController = TextEditingController(
       text: s.historyLimit.toString(),

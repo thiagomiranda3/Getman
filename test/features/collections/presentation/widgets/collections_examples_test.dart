@@ -7,12 +7,16 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/features/collections/data/datasources/workspace_collections_data_source.dart';
+import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
+import 'package:getman/features/collections/domain/review_service.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
 import 'package:getman/features/collections/presentation/widgets/collections_list.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
@@ -32,6 +36,11 @@ class MockTabsRepository extends Mock implements TabsRepository {}
 class MockSendRequestUseCase extends Mock implements SendRequestUseCase {}
 
 class MockSettingsBloc extends Mock implements SettingsBloc {}
+
+class MockWorkspaceDataSource extends Mock
+    implements WorkspaceCollectionsDataSource {}
+
+class MockReviewService extends Mock implements ReviewService {}
 
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 
@@ -134,13 +143,19 @@ void main() {
       MaterialApp(
         theme: brutalistTheme(Brightness.light),
         home: Scaffold(
-          body: MultiBlocProvider(
-            providers: [
-              BlocProvider.value(value: collectionsBloc),
-              BlocProvider.value(value: tabsBloc),
-              BlocProvider<SettingsBloc>.value(value: settingsBloc),
-            ],
-            child: const CollectionsList(),
+          body: RepositoryProvider<WorkspaceSyncService>(
+            create: (_) => WorkspaceSyncService(MockWorkspaceDataSource()),
+            child: MultiBlocProvider(
+              providers: [
+                BlocProvider.value(value: collectionsBloc),
+                BlocProvider.value(value: tabsBloc),
+                BlocProvider<SettingsBloc>.value(value: settingsBloc),
+                BlocProvider<ReviewBloc>(
+                  create: (_) => ReviewBloc(service: MockReviewService()),
+                ),
+              ],
+              child: const CollectionsList(),
+            ),
           ),
         ),
       ),

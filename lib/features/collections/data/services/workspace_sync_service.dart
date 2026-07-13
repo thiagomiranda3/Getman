@@ -19,6 +19,14 @@ class WorkspaceSyncService {
   final Duration debounce;
   Timer? _timer;
 
+  final StreamController<String> _mirrored =
+      StreamController<String>.broadcast();
+
+  /// Emits the workspace root after each successful Hive → disk mirror.
+  /// Consumers that read the mirrored files (e.g. the git review badge) listen
+  /// here instead of guessing when the debounced write has landed.
+  Stream<String> get mirrored => _mirrored.stream;
+
   /// Roots whose last write failed. Used to log a mirror failure only once per
   /// root per session instead of on every debounced mutation (e.g. a sandbox
   /// grant that has not been re-acquired would otherwise spam the console).
@@ -37,6 +45,7 @@ class WorkspaceSyncService {
     try {
       await dataSource.write(root, forest);
       _quietedRoots.remove(root); // recovered — allow logging again
+      if (!_mirrored.isClosed) _mirrored.add(root);
     } on Object catch (e) {
       // Best-effort: a failed mirror must never break the in-app session.
       // Log the first failure for a root, then stay quiet until it recovers.
@@ -49,5 +58,8 @@ class WorkspaceSyncService {
     }
   }
 
-  void dispose() => _timer?.cancel();
+  void dispose() {
+    _timer?.cancel();
+    unawaited(_mirrored.close());
+  }
 }

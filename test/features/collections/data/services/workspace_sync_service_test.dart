@@ -33,6 +33,37 @@ void main() {
     verify(() => ds.write('/ws', any())).called(1);
   });
 
+  test('mirrored emits the root after a successful write', () async {
+    final service = WorkspaceSyncService(
+      ds,
+      debounce: const Duration(milliseconds: 5),
+    );
+    addTearDown(service.dispose);
+
+    final emitted = service.mirrored.first;
+    service.scheduleMirror('/ws', const []);
+
+    await expectLater(emitted, completion('/ws'));
+  });
+
+  test('mirrored stays silent when the write fails', () async {
+    when(() => ds.write(any(), any())).thenThrow(Exception('disk full'));
+    final service = WorkspaceSyncService(
+      ds,
+      debounce: const Duration(milliseconds: 5),
+    );
+    addTearDown(service.dispose);
+
+    var emissions = 0;
+    final sub = service.mirrored.listen((_) => emissions++);
+    addTearDown(sub.cancel);
+
+    service.scheduleMirror('/ws', const []);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+
+    expect(emissions, 0);
+  });
+
   test('read delegates to the data source', () async {
     final service = WorkspaceSyncService(ds);
     addTearDown(service.dispose);
