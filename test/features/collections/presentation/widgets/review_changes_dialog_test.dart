@@ -134,6 +134,29 @@ void main() {
     verify(() => bloc.add(const UnstageAll('/ws'))).called(1);
   });
 
+  testWidgets('the entry path carries a tooltip with its full path', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(
+        const ReviewState(
+          status: ReviewStatus.ready,
+          entries: [entry],
+          selectedPath: 'a.req.json',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final tooltip = tester.widget<Tooltip>(
+      find.ancestor(
+        of: find.text('a.req.json'),
+        matching: find.byType(Tooltip),
+      ),
+    );
+    expect(tooltip.message, '/ws/a.req.json');
+  });
+
   testWidgets('not a repo shows Initialize git', (tester) async {
     await tester.pumpWidget(
       host(const ReviewState(status: ReviewStatus.ready, repoExists: false)),

@@ -300,7 +300,13 @@ class _NodeList extends StatelessWidget {
             ),
           ),
           title: Text(e.displayName, overflow: TextOverflow.ellipsis),
-          subtitle: Text(e.path, overflow: TextOverflow.ellipsis),
+          // The row is narrow, so the repo-relative path is ellipsized;
+          // hovering reveals where the file actually lives on disk.
+          subtitle: Tooltip(
+            message: '$root/${e.path}',
+            waitDuration: const Duration(milliseconds: 400),
+            child: Text(e.path, overflow: TextOverflow.ellipsis),
+          ),
           trailing: Icon(
             iconFor(e.changeType),
             size: context.appLayout.smallIconSize,
