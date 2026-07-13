@@ -120,6 +120,54 @@ class _IoGitService implements GitService {
     await _run(root, ['commit', '-m', message]);
   }
 
+  @override
+  Future<List<String>> branches(String root) async {
+    final r = await _run(root, [
+      'branch',
+      '--format=%(refname:short)',
+    ]);
+    return (r.stdout as String)
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+  }
+
+  @override
+  Future<void> createBranch(String root, String name) async {
+    await _run(root, ['switch', '-c', name]);
+  }
+
+  @override
+  Future<void> switchBranch(String root, String name) async {
+    await _run(root, ['switch', name]);
+  }
+
+  @override
+  Future<bool> hasRemote(String root) async {
+    final r = await _run(root, ['remote'], allowFailure: true);
+    return (r.stdout as String).trim().isNotEmpty;
+  }
+
+  @override
+  Future<AheadBehind> aheadBehind(String root) async {
+    // `@{u}...HEAD` prints "<behind>\t<ahead>". Exits non-zero when the
+    // branch has no upstream — that is a normal state, so report (0, 0).
+    final r = await _run(root, [
+      'rev-list',
+      '--left-right',
+      '--count',
+      '@{u}...HEAD',
+    ], allowFailure: true);
+    if (r.exitCode != 0) return AheadBehind.none;
+    final parts = (r.stdout as String).trim().split(RegExp(r'\s+'));
+    if (parts.length != 2) return AheadBehind.none;
+    return AheadBehind(
+      behind: int.tryParse(parts[0]) ?? 0,
+      ahead: int.tryParse(parts[1]) ?? 0,
+    );
+  }
+
   /// Parses `git status --porcelain=v1 -z`. Records are NUL-terminated; a
   /// rename record (`R`/`C`) is followed by a second NUL-token holding the
   /// source path.

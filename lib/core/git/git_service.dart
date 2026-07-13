@@ -30,6 +30,17 @@ class GitException implements Exception {
   String toString() => 'GitException($message)';
 }
 
+/// Commits the current branch is ahead of / behind its upstream. Both are 0
+/// when the branch has no upstream (a brand-new local branch is normal, not
+/// an error).
+class AheadBehind {
+  const AheadBehind({required this.ahead, required this.behind});
+  final int ahead;
+  final int behind;
+
+  static const none = AheadBehind(ahead: 0, behind: 0);
+}
+
 /// Drives the system `git` CLI over a workspace directory. The `_io`
 /// implementation is the sole `dart:io` importer; web gets the no-op stub.
 abstract class GitService {
@@ -48,4 +59,20 @@ abstract class GitService {
   Future<void> stage(String root, List<String> paths);
   Future<void> unstage(String root, List<String> paths);
   Future<void> commit(String root, String message);
+
+  /// Local branch names.
+  Future<List<String>> branches(String root);
+
+  /// Creates [name] and switches to it (`git switch -c`).
+  Future<void> createBranch(String root, String name);
+
+  /// Switches to an existing branch. Throws [GitException] when git refuses
+  /// (e.g. the checkout would clobber local changes).
+  Future<void> switchBranch(String root, String name);
+
+  /// Whether the repo has at least one remote configured.
+  Future<bool> hasRemote(String root);
+
+  /// Ahead/behind counts vs the current branch's upstream.
+  Future<AheadBehind> aheadBehind(String root);
 }

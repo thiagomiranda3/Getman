@@ -24,4 +24,14 @@ class _StubGitService implements GitService {
   Future<void> unstage(String root, List<String> paths) async {}
   @override
   Future<void> commit(String root, String message) async {}
+  @override
+  Future<List<String>> branches(String root) async => const [];
+  @override
+  Future<void> createBranch(String root, String name) async {}
+  @override
+  Future<void> switchBranch(String root, String name) async {}
+  @override
+  Future<bool> hasRemote(String root) async => false;
+  @override
+  Future<AheadBehind> aheadBehind(String root) async => AheadBehind.none;
 }

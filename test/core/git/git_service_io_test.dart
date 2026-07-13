@@ -94,4 +94,49 @@ void main() {
     if (!await gitPresent()) return;
     expect(await git.headContent(tmp.path, 'nope.json'), isNull);
   });
+
+  // Commits a file so the repo has a HEAD (a repo with no commits has no
+  // branch to branch from).
+  Future<void> seedCommit() async {
+    File('${tmp.path}/a.req.json').writeAsStringSync('{"x":1}');
+    await git.stage(tmp.path, ['a.req.json']);
+    await git.commit(tmp.path, 'seed');
+  }
+
+  test('branches lists local branches; createBranch switches to it', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+
+    await git.createBranch(tmp.path, 'feat/x');
+
+    expect(await git.currentBranch(tmp.path), 'feat/x');
+    expect(await git.branches(tmp.path), contains('feat/x'));
+  });
+
+  test('switchBranch moves between existing branches', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+    final initial = (await git.currentBranch(tmp.path))!;
+    await git.createBranch(tmp.path, 'feat/x');
+
+    await git.switchBranch(tmp.path, initial);
+
+    expect(await git.currentBranch(tmp.path), initial);
+  });
+
+  test('hasRemote is false without a remote', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+    expect(await git.hasRemote(tmp.path), isFalse);
+  });
+
+  test('aheadBehind is (0,0) when the branch has no upstream', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+
+    final ab = await git.aheadBehind(tmp.path);
+
+    expect(ab.ahead, 0);
+    expect(ab.behind, 0);
+  });
 }
