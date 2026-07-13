@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/features/collections/data/datasources/workspace_collections_data_source.dart';
@@ -128,6 +130,8 @@ void main() {
   );
 
   test('flushPending writes a pending mirror immediately', () async {
+    final completer = Completer<void>();
+    when(() => ds.write(any(), any())).thenAnswer((_) => completer.future);
     final service = WorkspaceSyncService(
       ds,
       debounce: const Duration(seconds: 30), // would not fire on its own
@@ -137,12 +141,56 @@ void main() {
     service.scheduleMirror('/ws', const []);
     verifyNever(() => ds.write('/ws', any()));
 
-    await service.flushPending();
+    var resolved = false;
+    final flush = service.flushPending();
+    unawaited(flush.then((_) => resolved = true));
+
+    // The write has been invoked (mocktail logs the call synchronously) but
+    // must not have completed yet — flushPending must actually await it,
+    // not just fire it off.
+    await pumpEventQueue();
+    expect(resolved, isFalse);
+    verify(() => ds.write('/ws', any())).called(1);
+
+    completer.complete();
+    await flush;
 
     // The write must have landed *before* flushPending completes — this is
     // what lets a branch switch trust `git status`.
-    verify(() => ds.write('/ws', any())).called(1);
+    expect(resolved, isTrue);
   });
+
+  test(
+    'flushPending awaits a write already in flight from the debounce '
+    'timer, not just a not-yet-started pending write',
+    () async {
+      final completer = Completer<void>();
+      when(() => ds.write(any(), any())).thenAnswer((_) => completer.future);
+      final service = WorkspaceSyncService(
+        ds,
+        debounce: const Duration(milliseconds: 5),
+      );
+      addTearDown(service.dispose);
+
+      service.scheduleMirror('/ws', const []);
+      // Let the debounce timer fire so the write moves from "pending" to
+      // "in flight" (started, not yet complete) before flushPending runs.
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      verify(() => ds.write('/ws', any())).called(1);
+
+      var resolved = false;
+      final flush = service.flushPending();
+      unawaited(flush.then((_) => resolved = true));
+
+      await pumpEventQueue();
+      expect(resolved, isFalse);
+
+      completer.complete();
+      await flush;
+
+      expect(resolved, isTrue);
+    },
+  );
 
   test('flushPending is a no-op when nothing is pending', () async {
     final service = WorkspaceSyncService(ds);

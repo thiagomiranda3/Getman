@@ -21,6 +21,12 @@ class WorkspaceSyncService {
   String? _pendingRoot;
   List<CollectionNodeEntity>? _pendingForest;
 
+  /// The currently-running `_mirror` write, if any. Set the instant a write
+  /// starts (from the debounce timer or [flushPending]) and cleared when it
+  /// completes — this is how [flushPending] can await a write that has
+  /// *already started* but not yet landed on disk.
+  Future<void>? _inFlight;
+
   final StreamController<String> _mirrored =
       StreamController<String>.broadcast();
 
@@ -43,31 +49,56 @@ class WorkspaceSyncService {
     _pendingRoot = root;
     _pendingForest = forest;
     _timer = Timer(debounce, () {
-      final r = _pendingRoot;
-      final f = _pendingForest;
-      _pendingRoot = null;
-      _pendingForest = null;
-      if (r == null || f == null) return;
-      unawaited(_mirror(r, f));
+      final pending = _takePending();
+      if (pending == null) return;
+      unawaited(_startMirror(pending.$1, pending.$2));
     });
   }
 
-  /// Runs any pending debounced write to completion, now.
+  /// Runs any pending or in-flight debounced write to completion, now.
   ///
   /// Callers that read the mirrored files through git (branch switch, pull,
   /// push, stash) MUST await this first: otherwise a write scheduled moments
   /// earlier has not landed, `git status` reports a clean tree, and the timer
   /// fires *after* the checkout — writing the user's edit onto the branch
-  /// they switched to.
+  /// they switched to. This also covers the narrower window where the
+  /// debounce timer has *already* fired and `dataSource.write` is mid-flight:
+  /// [_inFlight] tracks that write so it is awaited too, not just the
+  /// not-yet-started pending one.
   Future<void> flushPending() async {
     _timer?.cancel();
     _timer = null;
+    // Capture any already-running write before (possibly) starting a new
+    // one below, so both are awaited — starting the new write must never
+    // overwrite [_inFlight] before the older write has been captured.
+    final inFlightBefore = _inFlight;
+    final pending = _takePending();
+    final newWrite = pending == null
+        ? null
+        : _startMirror(pending.$1, pending.$2);
+    if (inFlightBefore != null) await inFlightBefore;
+    if (newWrite != null) await newWrite;
+  }
+
+  /// Reads and clears the pending write, if any.
+  (String, List<CollectionNodeEntity>)? _takePending() {
     final root = _pendingRoot;
     final forest = _pendingForest;
     _pendingRoot = null;
     _pendingForest = null;
-    if (root == null || forest == null) return;
-    await _mirror(root, forest);
+    if (root == null || forest == null) return null;
+    return (root, forest);
+  }
+
+  /// Starts a mirror write, tracking it in [_inFlight] until it completes.
+  Future<void> _startMirror(
+    String root,
+    List<CollectionNodeEntity> forest,
+  ) {
+    final future = _mirror(root, forest);
+    _inFlight = future;
+    unawaited(future.whenComplete(() => _inFlight = null));
+    return future;
   }
 
   Future<void> _mirror(String root, List<CollectionNodeEntity> forest) async {
