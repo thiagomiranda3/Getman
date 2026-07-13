@@ -139,4 +139,46 @@ void main() {
     expect(ab.ahead, 0);
     expect(ab.behind, 0);
   });
+
+  test('stashPush clears the working tree; pop restores it', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+    File('${tmp.path}/a.req.json').writeAsStringSync('{"x":2}');
+
+    await git.stashPush(tmp.path, 'wip');
+    expect(await git.status(tmp.path), isEmpty);
+    expect(File('${tmp.path}/a.req.json').readAsStringSync(), '{"x":1}');
+
+    final stashes = await git.stashList(tmp.path);
+    expect(stashes.single.index, 0);
+    expect(stashes.single.message, contains('wip'));
+
+    await git.stashPop(tmp.path, 0);
+    expect(File('${tmp.path}/a.req.json').readAsStringSync(), '{"x":2}');
+    expect(await git.stashList(tmp.path), isEmpty);
+  });
+
+  test('stashPush includes untracked files', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+    File('${tmp.path}/new.req.json').writeAsStringSync('{"n":1}');
+
+    await git.stashPush(tmp.path, 'wip');
+
+    // -u: an untracked new request must be stashed too, or a "stash and switch"
+    // would carry it onto the target branch.
+    expect(File('${tmp.path}/new.req.json').existsSync(), isFalse);
+  });
+
+  test('stashDrop removes a stash without restoring it', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+    File('${tmp.path}/a.req.json').writeAsStringSync('{"x":3}');
+    await git.stashPush(tmp.path, 'wip');
+
+    await git.stashDrop(tmp.path, 0);
+
+    expect(await git.stashList(tmp.path), isEmpty);
+    expect(File('${tmp.path}/a.req.json').readAsStringSync(), '{"x":1}');
+  });
 }

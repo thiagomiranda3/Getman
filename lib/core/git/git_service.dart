@@ -41,6 +41,13 @@ class AheadBehind {
   static const none = AheadBehind(ahead: 0, behind: 0);
 }
 
+/// One entry of `git stash list`. [index] is its position (`stash@{index}`).
+class StashEntry {
+  const StashEntry({required this.index, required this.message});
+  final int index;
+  final String message;
+}
+
 /// Drives the system `git` CLI over a workspace directory. The `_io`
 /// implementation is the sole `dart:io` importer; web gets the no-op stub.
 abstract class GitService {
@@ -87,4 +94,13 @@ abstract class GitService {
   /// Pushes the current branch. Pass [setUpstream] for a branch that has
   /// never been pushed (`git push -u origin <branch>`).
   Future<void> push(String root, {required bool setUpstream});
+
+  Future<List<StashEntry>> stashList(String root);
+
+  /// Stashes tracked *and* untracked changes (`git stash push -u`), so a
+  /// stash-then-switch does not carry a new request onto the target branch.
+  Future<void> stashPush(String root, String message);
+
+  Future<void> stashPop(String root, int index);
+  Future<void> stashDrop(String root, int index);
 }

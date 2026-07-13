@@ -40,4 +40,12 @@ class _StubGitService implements GitService {
   Future<void> pull(String root) async {}
   @override
   Future<void> push(String root, {required bool setUpstream}) async {}
+  @override
+  Future<List<StashEntry>> stashList(String root) async => const [];
+  @override
+  Future<void> stashPush(String root, String message) async {}
+  @override
+  Future<void> stashPop(String root, int index) async {}
+  @override
+  Future<void> stashDrop(String root, int index) async {}
 }

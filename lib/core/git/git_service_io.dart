@@ -204,6 +204,34 @@ class _IoGitService implements GitService {
     ]);
   }
 
+  @override
+  Future<List<StashEntry>> stashList(String root) async {
+    final r = await _run(root, ['stash', 'list', '--format=%gs']);
+    final lines = (r.stdout as String)
+        .split('\n')
+        .where((l) => l.trim().isNotEmpty)
+        .toList();
+    return [
+      for (var i = 0; i < lines.length; i++)
+        StashEntry(index: i, message: lines[i].trim()),
+    ];
+  }
+
+  @override
+  Future<void> stashPush(String root, String message) async {
+    await _run(root, ['stash', 'push', '-u', '-m', message]);
+  }
+
+  @override
+  Future<void> stashPop(String root, int index) async {
+    await _run(root, ['stash', 'pop', 'stash@{$index}']);
+  }
+
+  @override
+  Future<void> stashDrop(String root, int index) async {
+    await _run(root, ['stash', 'drop', 'stash@{$index}']);
+  }
+
   /// Parses `git status --porcelain=v1 -z`. Records are NUL-terminated; a
   /// rename record (`R`/`C`) is followed by a second NUL-token holding the
   /// source path.
