@@ -21,10 +21,11 @@ class WorkspaceSyncService {
   String? _pendingRoot;
   List<CollectionNodeEntity>? _pendingForest;
 
-  /// The currently-running `_mirror` write, if any. Set the instant a write
-  /// starts (from the debounce timer or [flushPending]) and cleared when it
-  /// completes — this is how [flushPending] can await a write that has
-  /// *already started* but not yet landed on disk.
+  /// Tail of the serialized chain of `_mirror` writes, or null when no write is
+  /// outstanding. Every write is chained after the previous one rather than
+  /// started alongside it, so two overlapping debounce cycles can never race
+  /// each other onto disk — and awaiting the tail awaits *all* outstanding
+  /// writes, which is what lets [flushPending] guarantee a quiet tree.
   Future<void>? _inFlight;
 
   final StreamController<String> _mirrored =
@@ -63,21 +64,17 @@ class WorkspaceSyncService {
   /// fires *after* the checkout — writing the user's edit onto the branch
   /// they switched to. This also covers the narrower window where the
   /// debounce timer has *already* fired and `dataSource.write` is mid-flight:
-  /// [_inFlight] tracks that write so it is awaited too, not just the
-  /// not-yet-started pending one.
+  /// awaiting [_inFlight] (the tail of the serialized write chain) awaits
+  /// every outstanding write, not just the not-yet-started pending one.
   Future<void> flushPending() async {
     _timer?.cancel();
     _timer = null;
-    // Capture any already-running write before (possibly) starting a new
-    // one below, so both are awaited — starting the new write must never
-    // overwrite [_inFlight] before the older write has been captured.
-    final inFlightBefore = _inFlight;
     final pending = _takePending();
-    final newWrite = pending == null
-        ? null
-        : _startMirror(pending.$1, pending.$2);
-    if (inFlightBefore != null) await inFlightBefore;
-    if (newWrite != null) await newWrite;
+    if (pending != null) unawaited(_startMirror(pending.$1, pending.$2));
+    // Read the tail *after* starting the pending write: it now sits at the end
+    // of the chain, so this single await covers both it and anything already
+    // writing ahead of it.
+    await _inFlight;
   }
 
   /// Reads and clears the pending write, if any.
@@ -90,14 +87,29 @@ class WorkspaceSyncService {
     return (root, forest);
   }
 
-  /// Starts a mirror write, tracking it in [_inFlight] until it completes.
+  /// Queues a mirror write behind any write still outstanding, and publishes
+  /// the new tail on [_inFlight].
+  ///
+  /// Chaining (rather than firing the write immediately) is what makes two
+  /// overlapping debounce cycles safe: the second write cannot start until the
+  /// first has landed, and the tail stays a valid handle on *all* outstanding
+  /// work. `_mirror` never throws, so the chain can never break.
   Future<void> _startMirror(
     String root,
     List<CollectionNodeEntity> forest,
   ) {
-    final future = _mirror(root, forest);
+    final previous = _inFlight;
+    final future = previous == null
+        ? _mirror(root, forest)
+        : previous.then((_) => _mirror(root, forest));
     _inFlight = future;
-    unawaited(future.whenComplete(() => _inFlight = null));
+    // Only the *current* tail may clear the field — an older write completing
+    // must not wipe the handle on a write queued after it.
+    unawaited(
+      future.whenComplete(() {
+        if (identical(_inFlight, future)) _inFlight = null;
+      }),
+    );
     return future;
   }
 

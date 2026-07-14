@@ -214,4 +214,94 @@ void main() {
 
     verify(() => ds.write('/ws', any())).called(1);
   });
+
+  test(
+    'flushPending awaits a write started by an overlapping debounce cycle, '
+    'even after the older write has already completed',
+    () async {
+      final completerA = Completer<void>();
+      final completerB = Completer<void>();
+      final completers = [completerA, completerB];
+      when(() => ds.write(any(), any())).thenAnswer(
+        (_) => completers.removeAt(0).future,
+      );
+      final service = WorkspaceSyncService(
+        ds,
+        debounce: const Duration(milliseconds: 5),
+      );
+      addTearDown(service.dispose);
+
+      // First debounce cycle: write A starts and stays in flight (its
+      // completer is not resolved yet).
+      service.scheduleMirror('/ws', const []);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      verify(() => ds.write('/ws', any())).called(1);
+
+      // Second debounce cycle fires while A is still writing — this is the
+      // overlap that used to drop the reference to A, then to B.
+      service.scheduleMirror('/ws', const []);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      // A finishes *before* flushPending is called. In the old buggy code
+      // this is exactly what wiped the reference to the still-writing B:
+      // A's completion unconditionally cleared the single `_inFlight`
+      // field, even though `_inFlight` had already moved on to B.
+      completerA.complete();
+      await pumpEventQueue();
+
+      var resolved = false;
+      final flush = service.flushPending();
+      unawaited(flush.then((_) => resolved = true));
+      await pumpEventQueue();
+
+      // B must still be outstanding, and flushPending must not have
+      // resolved while it is — a branch switch right here must not be
+      // allowed to proceed.
+      expect(resolved, isFalse);
+
+      completerB.complete();
+      await flush;
+
+      expect(resolved, isTrue);
+    },
+  );
+
+  test('overlapping writes are serialized, never run concurrently', () async {
+    final completerA = Completer<void>();
+    final callOrder = <String>[];
+    var callCount = 0;
+    when(() => ds.write(any(), any())).thenAnswer((_) {
+      callCount++;
+      if (callCount == 1) {
+        callOrder.add('a-start');
+        return completerA.future.then((_) => callOrder.add('a-done'));
+      }
+      callOrder.add('b-start');
+      return Future<void>.value();
+    });
+    final service = WorkspaceSyncService(
+      ds,
+      debounce: const Duration(milliseconds: 5),
+    );
+    addTearDown(service.dispose);
+
+    // First debounce cycle: write A starts and stays in flight.
+    service.scheduleMirror('/ws', const []);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(callCount, 1);
+
+    // Second debounce cycle fires while A is still writing. B must not
+    // start yet — its write is chained after A's, not run alongside it.
+    service.scheduleMirror('/ws', const []);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(callCount, 1, reason: "B started before A's write completed");
+
+    completerA.complete();
+    await pumpEventQueue();
+
+    expect(callCount, 2);
+    expect(callOrder, ['a-start', 'a-done', 'b-start']);
+
+    await service.flushPending();
+  });
 }
