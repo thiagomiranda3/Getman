@@ -58,7 +58,7 @@
 - Consumes: existing `GitService` (`isAvailable`, `isRepo`, `init`, `currentBranch`, `status`, `headContent`, `workingContent`, `stage`, `unstage`, `commit`), `GitException`.
 - Produces: `class AheadBehind { final int ahead; final int behind; }`; `GitService.branches(String root) → Future<List<String>>`, `createBranch(String root, String name)`, `switchBranch(String root, String name)`, `hasRemote(String root) → Future<bool>`, `aheadBehind(String root) → Future<AheadBehind>`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append inside `main()` in `test/core/git/git_service_io_test.dart` (the existing
 `setUp` already creates a temp repo and configures `user.email`/`user.name`;
@@ -111,12 +111,12 @@ Append inside `main()` in `test/core/git/git_service_io_test.dart` (the existing
   });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `fvm flutter test test/core/git/git_service_io_test.dart`
 Expected: FAIL — the methods `branches`/`createBranch`/`switchBranch`/`hasRemote`/`aheadBehind` are not defined on `GitService`.
 
-- [ ] **Step 3: Add the entity + abstract methods**
+- [x] **Step 3: Add the entity + abstract methods**
 
 In `lib/core/git/git_service.dart`, add above `abstract class GitService`:
 
@@ -153,7 +153,7 @@ and inside `abstract class GitService`:
   Future<AheadBehind> aheadBehind(String root);
 ```
 
-- [ ] **Step 4: Implement in the io service**
+- [x] **Step 4: Implement in the io service**
 
 In `lib/core/git/git_service_io.dart`, add to `_IoGitService`:
 
@@ -207,7 +207,7 @@ In `lib/core/git/git_service_io.dart`, add to `_IoGitService`:
   }
 ```
 
-- [ ] **Step 5: Implement in the web stub**
+- [x] **Step 5: Implement in the web stub**
 
 In `lib/core/git/git_service_stub.dart`, add to `_StubGitService`:
 
@@ -224,12 +224,12 @@ In `lib/core/git/git_service_stub.dart`, add to `_StubGitService`:
   Future<AheadBehind> aheadBehind(String root) async => AheadBehind.none;
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `fvm flutter test test/core/git/git_service_io_test.dart`
 Expected: PASS (all tests, including the pre-existing ones).
 
-- [ ] **Step 7: Verify + commit**
+- [x] **Step 7: Verify + commit**
 
 Run: `fvm dart format lib test && fvm flutter analyze && fvm dart run custom_lint`
 Expected: no issues from either pass.
@@ -256,7 +256,7 @@ git commit -m "feat(git): branch list/create/switch + ahead-behind in GitService
 
 A conflicting pull must **abort the rebase** so the working tree is left byte-identical to its prior state. This is the single most important behavior in this task.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `test/core/git/git_sync_io_test.dart`:
 
@@ -382,12 +382,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `fvm flutter test test/core/git/git_sync_io_test.dart`
 Expected: FAIL — `pull`, `push`, `hasUpstream` are not defined on `GitService`.
 
-- [ ] **Step 3: Add the abstract methods**
+- [x] **Step 3: Add the abstract methods**
 
 In `lib/core/git/git_service.dart`, inside `abstract class GitService`:
 
@@ -405,7 +405,7 @@ In `lib/core/git/git_service.dart`, inside `abstract class GitService`:
   Future<void> push(String root, {required bool setUpstream});
 ```
 
-- [ ] **Step 4: Implement in the io service**
+- [x] **Step 4: Implement in the io service**
 
 In `lib/core/git/git_service_io.dart`, add to `_IoGitService`:
 
@@ -447,7 +447,7 @@ In `lib/core/git/git_service_io.dart`, add to `_IoGitService`:
   }
 ```
 
-- [ ] **Step 5: Implement in the web stub**
+- [x] **Step 5: Implement in the web stub**
 
 In `lib/core/git/git_service_stub.dart`, add to `_StubGitService`:
 
@@ -460,12 +460,12 @@ In `lib/core/git/git_service_stub.dart`, add to `_StubGitService`:
   Future<void> push(String root, {required bool setUpstream}) async {}
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `fvm flutter test test/core/git`
 Expected: PASS — including `a conflicting pull aborts and leaves the tree untouched`.
 
-- [ ] **Step 7: Verify + commit**
+- [x] **Step 7: Verify + commit**
 
 Run: `fvm dart format lib test && fvm flutter analyze && fvm dart run custom_lint`
 
@@ -488,7 +488,7 @@ git commit -m "feat(git): pull --rebase (abort on conflict) + push with upstream
 - Consumes: Task 1's `GitService`.
 - Produces: `class StashEntry { final int index; final String message; }`; `GitService.stashList(String root) → Future<List<StashEntry>>`, `stashPush(String root, String message)`, `stashPop(String root, int index)`, `stashDrop(String root, int index)`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append inside `main()` in `test/core/git/git_service_io_test.dart` (reuse the
 `seedCommit()` helper added in Task 1):
@@ -537,12 +537,12 @@ Append inside `main()` in `test/core/git/git_service_io_test.dart` (reuse the
   });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `fvm flutter test test/core/git/git_service_io_test.dart`
 Expected: FAIL — `stashPush`/`stashList`/`stashPop`/`stashDrop` are not defined.
 
-- [ ] **Step 3: Add the entity + abstract methods**
+- [x] **Step 3: Add the entity + abstract methods**
 
 In `lib/core/git/git_service.dart`, add above `abstract class GitService`:
 
@@ -568,7 +568,7 @@ and inside `abstract class GitService`:
   Future<void> stashDrop(String root, int index);
 ```
 
-- [ ] **Step 4: Implement in the io service**
+- [x] **Step 4: Implement in the io service**
 
 In `lib/core/git/git_service_io.dart`, add to `_IoGitService`:
 
@@ -602,7 +602,7 @@ In `lib/core/git/git_service_io.dart`, add to `_IoGitService`:
   }
 ```
 
-- [ ] **Step 5: Implement in the web stub**
+- [x] **Step 5: Implement in the web stub**
 
 In `lib/core/git/git_service_stub.dart`, add to `_StubGitService`:
 
@@ -617,12 +617,12 @@ In `lib/core/git/git_service_stub.dart`, add to `_StubGitService`:
   Future<void> stashDrop(String root, int index) async {}
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `fvm flutter test test/core/git`
 Expected: PASS.
 
-- [ ] **Step 7: Verify + commit**
+- [x] **Step 7: Verify + commit**
 
 Run: `fvm dart format lib test && fvm flutter analyze && fvm dart run custom_lint`
 
@@ -645,7 +645,7 @@ git commit -m "feat(git): stash push/list/pop/drop in GitService"
 
 **Why:** the mirror is debounced by 1 second. Edit a request, click "switch branch" within that window, and `git status` sees a *clean* tree (the write has not landed) — we check out, and the timer then writes the edited request onto the **new branch**. Every mutating git action must flush first.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add inside `main()` in `test/features/collections/data/services/workspace_sync_service_test.dart` (`ds` is the existing `_MockDataSource`, already stubbed in `setUp`):
 
@@ -691,12 +691,12 @@ Add inside `main()` in `test/features/collections/data/services/workspace_sync_s
   });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `fvm flutter test test/features/collections/data/services/workspace_sync_service_test.dart`
 Expected: FAIL — `flushPending` is not defined.
 
-- [ ] **Step 3: Implement flushPending**
+- [x] **Step 3: Implement flushPending**
 
 In `lib/features/collections/data/services/workspace_sync_service.dart`, hold the
 pending write's arguments alongside the timer and expose the flush. Replace the
@@ -744,12 +744,12 @@ pending write's arguments alongside the timer and expose the flush. Replace the
 
 Keep `_mirror`, `mirrored`, `_quietedRoots`, and `dispose()` as they are.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `fvm flutter test test/features/collections/data/services/workspace_sync_service_test.dart`
 Expected: PASS (including the pre-existing debounce/mirrored tests).
 
-- [ ] **Step 5: Verify + commit**
+- [x] **Step 5: Verify + commit**
 
 Run: `fvm dart format lib test && fvm flutter analyze && fvm dart run custom_lint`
 
@@ -780,7 +780,7 @@ git commit -m "feat(collections): flushPending on WorkspaceSyncService"
 
 Note the domain layer must not import `dart:io`/`data/` (`domain_no_infrastructure_imports`). `core/git/git_service.dart` is pure Dart (its `dart:io` lives behind the conditional export), so importing it from `data/` is fine; the **domain** entity defines its own `StashInfo` rather than reusing `StashEntry`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `test/features/collections/data/services/git_branch_service_test.dart`:
 
@@ -914,12 +914,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `fvm flutter test test/features/collections/data/services/git_branch_service_test.dart`
 Expected: FAIL — `git_branch_service.dart` does not exist.
 
-- [ ] **Step 3: Write the domain entities**
+- [x] **Step 3: Write the domain entities**
 
 Create `lib/features/collections/domain/entities/branch_status.dart`:
 
@@ -975,7 +975,7 @@ class BranchStatus extends Equatable {
 }
 ```
 
-- [ ] **Step 4: Write the domain abstraction**
+- [x] **Step 4: Write the domain abstraction**
 
 Create `lib/features/collections/domain/branch_service.dart`:
 
@@ -1001,7 +1001,7 @@ abstract class BranchService {
 }
 ```
 
-- [ ] **Step 5: Write the implementation**
+- [x] **Step 5: Write the implementation**
 
 Create `lib/features/collections/data/services/git_branch_service.dart`:
 
@@ -1084,7 +1084,7 @@ class GitBranchService implements BranchService {
 }
 ```
 
-- [ ] **Step 6: Register in DI**
+- [x] **Step 6: Register in DI**
 
 In `lib/core/di/injection_container.dart`, add after the existing
 `registerLazySingleton<ReviewService>(...)` line:
@@ -1100,12 +1100,12 @@ import 'package:getman/features/collections/data/services/git_branch_service.dar
 import 'package:getman/features/collections/domain/branch_service.dart';
 ```
 
-- [ ] **Step 7: Run the tests to verify they pass**
+- [x] **Step 7: Run the tests to verify they pass**
 
 Run: `fvm flutter test test/features/collections/data/services/git_branch_service_test.dart`
 Expected: PASS (8 tests).
 
-- [ ] **Step 8: Verify + commit**
+- [x] **Step 8: Verify + commit**
 
 Run: `fvm dart format lib test && fvm flutter analyze && fvm dart run custom_lint`
 Expected: no issues. In particular `domain_no_infrastructure_imports` must not fire on the new domain files.
@@ -1139,7 +1139,7 @@ git commit -m "feat(git): BranchService abstraction + GitBranchService"
 
 Dirty guard: `SwitchBranch` checks `isDirty` first and, when dirty, emits `error` with the message `'You have uncommitted changes'` **without** touching git. The widget renders the commit/stash choice.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `test/features/collections/presentation/bloc/git_sync_bloc_test.dart`:
 
@@ -1268,12 +1268,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `fvm flutter test test/features/collections/presentation/bloc/git_sync_bloc_test.dart`
 Expected: FAIL — `git_sync_bloc.dart` does not exist.
 
-- [ ] **Step 3: Write the events**
+- [x] **Step 3: Write the events**
 
 Create `lib/features/collections/presentation/bloc/git_sync_event.dart`:
 
@@ -1348,7 +1348,7 @@ class DropStash extends GitSyncEvent {
 }
 ```
 
-- [ ] **Step 4: Write the state**
+- [x] **Step 4: Write the state**
 
 Create `lib/features/collections/presentation/bloc/git_sync_state.dart`:
 
@@ -1395,7 +1395,7 @@ class GitSyncState extends Equatable {
 }
 ```
 
-- [ ] **Step 5: Write the bloc**
+- [x] **Step 5: Write the bloc**
 
 Create `lib/features/collections/presentation/bloc/git_sync_bloc.dart`:
 
@@ -1555,7 +1555,7 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
 }
 ```
 
-- [ ] **Step 6: Register in DI**
+- [x] **Step 6: Register in DI**
 
 In `lib/core/di/injection_container.dart`, after the `ReviewBloc` registration:
 
@@ -1569,12 +1569,12 @@ with the import:
 import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart';
 ```
 
-- [ ] **Step 7: Run the tests to verify they pass**
+- [x] **Step 7: Run the tests to verify they pass**
 
 Run: `fvm flutter test test/features/collections/presentation/bloc/git_sync_bloc_test.dart`
 Expected: PASS (8 tests).
 
-- [ ] **Step 8: Verify + commit**
+- [x] **Step 8: Verify + commit**
 
 Run: `fvm dart format lib test && fvm flutter analyze && fvm dart run custom_lint && fvm dart run bloc_tools:bloc lint lib`
 Expected: no issues from any pass. `bloc_depends_on_abstractions` must not fire — the bloc imports only `domain/`.
@@ -1600,7 +1600,7 @@ git commit -m "feat(git): GitSyncBloc over the BranchService abstraction"
 
 This is the coordinator that keeps blocs decoupled: `GitSyncBloc` never imports `CollectionsBloc`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `test/features/collections/presentation/widgets/branch_sync_listener_test.dart`:
 
@@ -1734,12 +1734,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `fvm flutter test test/features/collections/presentation/widgets/branch_sync_listener_test.dart`
 Expected: FAIL — `branch_sync_listener.dart` does not exist.
 
-- [ ] **Step 3: Write the listener**
+- [x] **Step 3: Write the listener**
 
 Create `lib/features/collections/presentation/widgets/branch_sync_listener.dart`:
 
@@ -1787,7 +1787,7 @@ class BranchSyncListener extends StatelessWidget {
 }
 ```
 
-- [ ] **Step 4: Mount it in main.dart**
+- [x] **Step 4: Mount it in main.dart**
 
 In `lib/main.dart`, provide the bloc and wrap the tree. Add to the
 `MultiBlocProvider` providers list, after the `ReviewBloc` provider:
@@ -1817,12 +1817,12 @@ import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart
 import 'package:getman/features/collections/presentation/widgets/branch_sync_listener.dart';
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `fvm flutter test test/features/collections/presentation/widgets/branch_sync_listener_test.dart`
 Expected: PASS (2 tests).
 
-- [ ] **Step 6: Verify + commit**
+- [x] **Step 6: Verify + commit**
 
 Run: `fvm dart format lib test && fvm flutter analyze && fvm dart run custom_lint && fvm flutter test`
 Expected: everything green (main.dart is widely depended on — run the full suite here).
@@ -1849,7 +1849,7 @@ git commit -m "feat(git): reload collections from disk after branch switch/pull"
 
 Mirror `ReviewChangesButton`: hidden on web, and hidden when `workspacePath == null` (the Review button already routes an unconfigured user to the WORKSPACE settings pane, so the chip does not need to duplicate that). Also hidden when `state.branch.isRepo` is false — the Review dialog owns `git init`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `test/features/collections/presentation/widgets/branch_chip_test.dart`:
 
@@ -2031,12 +2031,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `fvm flutter test test/features/collections/presentation/widgets/branch_chip_test.dart`
 Expected: FAIL — `branch_chip.dart` does not exist.
 
-- [ ] **Step 3: Write the chip**
+- [x] **Step 3: Write the chip**
 
 Create `lib/features/collections/presentation/widgets/branch_chip.dart`:
 
@@ -2264,7 +2264,7 @@ class BranchChip extends StatelessWidget {
 Note: remove the unused `bloc` local in `_chip` if the analyzer flags it — the
 menu callbacks read the bloc from `context` in `_onSelected`.
 
-- [ ] **Step 4: Mount it in the collections header**
+- [x] **Step 4: Mount it in the collections header**
 
 In `lib/features/collections/presentation/widgets/collections_list.dart`, in the
 header `Row` that currently ends with `const ReviewChangesButton(),` (around
@@ -2291,12 +2291,12 @@ reusing exactly the pattern in
 (subscribe in `initState`, dispatch in a post-frame callback, cancel in
 `dispose`). Convert `BranchChip` to a `StatefulWidget` for this.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `fvm flutter test test/features/collections/presentation/widgets/branch_chip_test.dart`
 Expected: PASS (5 tests).
 
-- [ ] **Step 6: Run the collections suite (the header changed)**
+- [x] **Step 6: Run the collections suite (the header changed)**
 
 Run: `fvm flutter test test/features/collections test/features/home`
 Expected: PASS. The `collections_list` / `side_menu` widget tests now need a
@@ -2304,7 +2304,7 @@ Expected: PASS. The `collections_list` / `side_menu` widget tests now need a
 `WorkspaceSyncService`); add a `MockGitSyncBloc` to those hosts exactly as
 `ReviewBloc` was added.
 
-- [ ] **Step 7: Verify + commit**
+- [x] **Step 7: Verify + commit**
 
 Run: `fvm dart format lib test && fvm flutter analyze && fvm dart run custom_lint`
 
@@ -2328,7 +2328,7 @@ git commit -m "feat(git): branch chip with ahead/behind + branch & sync menu"
 
 **Build this before Task 8** (Task 8's menu imports it), or land both in either order and fix the import — but the file must exist for Task 8 to compile.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `test/features/collections/presentation/widgets/stash_list_dialog_test.dart`:
 
@@ -2410,12 +2410,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `fvm flutter test test/features/collections/presentation/widgets/stash_list_dialog_test.dart`
 Expected: FAIL — `stash_list_dialog.dart` does not exist.
 
-- [ ] **Step 3: Write the dialog**
+- [x] **Step 3: Write the dialog**
 
 Create `lib/features/collections/presentation/widgets/stash_list_dialog.dart`:
 
@@ -2523,12 +2523,12 @@ Check `ConfirmDialog.show`'s real signature in
 `Future` — if so, wrap the call in `unawaited(...)` to satisfy
 `discarded_futures`).
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `fvm flutter test test/features/collections/presentation/widgets/stash_list_dialog_test.dart`
 Expected: PASS (3 tests).
 
-- [ ] **Step 5: Verify + commit**
+- [x] **Step 5: Verify + commit**
 
 Run: `fvm dart format lib test && fvm flutter analyze && fvm dart run custom_lint`
 
@@ -2546,7 +2546,7 @@ git commit -m "feat(git): stash list dialog (pop/drop)"
 - Modify: `docs/superpowers/plans/2026-07-13-git-branch-sync.md` (tick the boxes)
 - External: the `Getman.wiki.git` repo — **Version Control** page
 
-- [ ] **Step 1: Run the complete verification bar**
+- [x] **Step 1: Run the complete verification bar**
 
 ```bash
 fvm dart format lib test tools
@@ -2561,7 +2561,7 @@ Expected: **0 issues from every analysis pass and 100% green tests.** These are
 separate processes — a clean `flutter analyze` does not imply custom_lint or
 bloc_lint are clean.
 
-- [ ] **Step 2: Update the wiki**
+- [x] **Step 2: Update the wiki**
 
 The **Version Control** page is owed from Spec A (deferred to its merge). Clone
 `https://github.com/thiagomiranda3/Getman.wiki.git`, and write/extend the page
@@ -2579,7 +2579,7 @@ to cover, with **verbatim UI labels**:
 
 Commit and push (default branch `master`).
 
-- [ ] **Step 3: Commit the ticked plan**
+- [x] **Step 3: Commit the ticked plan**
 
 ```bash
 git add docs/superpowers/plans/2026-07-13-git-branch-sync.md
