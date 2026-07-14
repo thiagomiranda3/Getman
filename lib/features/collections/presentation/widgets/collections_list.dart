@@ -15,6 +15,7 @@ import 'package:getman/features/collections/domain/logic/collections_tree_helper
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
+import 'package:getman/features/collections/presentation/widgets/branch_chip.dart';
 import 'package:getman/features/collections/presentation/widgets/collection_node_row.dart';
 import 'package:getman/features/collections/presentation/widgets/example_row.dart';
 import 'package:getman/features/collections/presentation/widgets/review_changes_button.dart';
@@ -381,6 +382,8 @@ class _CollectionsListState extends State<CollectionsList> {
                     ],
                   ),
                 ),
+                SizedBox(width: layout.tabSpacing),
+                const BranchChip(),
                 SizedBox(width: layout.tabSpacing),
                 const ReviewChangesButton(),
               ],
