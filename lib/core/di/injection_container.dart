@@ -31,6 +31,7 @@ import 'package:getman/features/collections/domain/repositories/collections_repo
 import 'package:getman/features/collections/domain/review_service.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
 import 'package:getman/features/cookies/data/hive_cookie_persistence.dart';
 import 'package:getman/features/cookies/data/models/stored_cookie_model.dart';
@@ -194,6 +195,7 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     ..registerLazySingleton<ReviewService>(() => WorkspaceReviewService(sl()))
     ..registerLazySingleton<BranchService>(() => GitBranchService(sl(), sl()))
     ..registerFactory(() => ReviewBloc(service: sl()))
+    ..registerFactory(() => GitSyncBloc(service: sl()))
     // Features - Chaining (no-code extraction + assertions)
     ..registerLazySingleton(
       () => RulesBloc(
