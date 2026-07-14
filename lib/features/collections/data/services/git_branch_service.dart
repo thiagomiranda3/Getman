@@ -50,12 +50,33 @@ class GitBranchService implements BranchService {
     return (await _git.status(root)).isNotEmpty;
   }
 
-  @override
-  Future<void> switchTo(String root, String branch) async {
+  /// Flushes the pending mirror, then runs [action] with mirroring **gated
+  /// off**. Order matters: the flush lands the write armed *before* the op (or
+  /// aborts), and the suspension drops any edit made *during* it — whose
+  /// debounce would otherwise fire after the checkout and mirror the old
+  /// branch's tree onto the new one. The suspension is lifted even if git
+  /// throws.
+  Future<void> _runOnTree(Future<void> Function() action) async {
     await _flushOrThrow();
-    await _git.switchBranch(root, branch);
+    await _sync.withMirroringSuspended(action);
   }
 
+  @override
+  Future<void> switchTo(String root, String branch) =>
+      _runOnTree(() => _git.switchBranch(root, branch));
+
+  // No suspension here: `git switch -c` creates the branch at HEAD, it never
+  // rewrites the working tree — an edit made mid-create belongs on disk (on
+  // the branch just created) and must still be mirrored. Suspending would
+  // *drop* it: suspension discards the pending forest, and no reload follows a
+  // create (nothing on disk changed), so the edit would live on in Hive while
+  // disk silently diverged — until the next switch reloaded over it.
+  // No suspension here: `git switch -c` creates the branch at HEAD, it never
+  // rewrites the working tree — an edit made mid-create belongs on disk (on
+  // the branch just created) and must still be mirrored. Suspending would
+  // *drop* it: suspension discards the pending forest, and no reload follows a
+  // create (nothing on disk changed), so the edit would live on in Hive while
+  // disk silently diverged — until the next switch reloaded over it.
   @override
   Future<void> create(String root, String branch) async {
     await _flushOrThrow();
@@ -63,11 +84,10 @@ class GitBranchService implements BranchService {
   }
 
   @override
-  Future<void> pull(String root) async {
-    await _flushOrThrow();
-    await _git.pull(root);
-  }
+  Future<void> pull(String root) => _runOnTree(() => _git.pull(root));
 
+  // No suspension here: `git push` reads the working tree, it never rewrites
+  // it — an edit made mid-push belongs on disk and must still be mirrored.
   @override
   Future<void> push(String root) async {
     await _flushOrThrow();
@@ -75,16 +95,12 @@ class GitBranchService implements BranchService {
   }
 
   @override
-  Future<void> stash(String root, String message) async {
-    await _flushOrThrow();
-    await _git.stashPush(root, message);
-  }
+  Future<void> stash(String root, String message) =>
+      _runOnTree(() => _git.stashPush(root, message));
 
   @override
-  Future<void> popStash(String root, int index) async {
-    await _flushOrThrow();
-    await _git.stashPop(root, index);
-  }
+  Future<void> popStash(String root, int index) =>
+      _runOnTree(() => _git.stashPop(root, index));
 
   // No flush here, deliberately: `git stash drop` only mutates the stash ref —
   // it never touches the working tree — so a pending mirror write cannot race

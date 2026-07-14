@@ -314,4 +314,96 @@ void main() {
       });
     },
   );
+
+  group('mirroring is suspended while git mutates the working tree', () {
+    // The flush closes the race from one side (a write armed *before* the op);
+    // the suspension closes it from the other (an edit made *during* the op,
+    // whose debounce would otherwise fire after the checkout and write the old
+    // branch's tree onto the new one).
+    final ops =
+        <String, (void Function(void Function()), Future<void> Function())>{
+          'switchTo': (
+            (onOp) => when(
+              () => git.switchBranch(root, any()),
+            ).thenAnswer((_) async => onOp()),
+            () => service.switchTo(root, 'feat/x'),
+          ),
+          'pull': (
+            (onOp) =>
+                when(() => git.pull(root)).thenAnswer((_) async => onOp()),
+            () => service.pull(root),
+          ),
+          'stash': (
+            (onOp) => when(
+              () => git.stashPush(root, any()),
+            ).thenAnswer((_) async => onOp()),
+            () => service.stash(root, 'wip'),
+          ),
+          'popStash': (
+            (onOp) => when(
+              () => git.stashPop(root, any()),
+            ).thenAnswer((_) async => onOp()),
+            () => service.popStash(root, 0),
+          ),
+        };
+
+    for (final entry in ops.entries) {
+      test('${entry.key}: an edit made mid-op is never mirrored', () async {
+        final (stubGitOp, invoke) = entry.value;
+        // The user edits a request while git is rewriting the tree.
+        stubGitOp(() => sync.scheduleMirror(root, const []));
+
+        await invoke();
+
+        // Nothing may be left armed: a later flush must find a quiet tree.
+        await sync.flushPending();
+        verifyNever(() => ds.write(any(), any()));
+      });
+    }
+
+    test('create: an edit made mid-op IS still mirrored', () async {
+      // The inverse of the cases above, and deliberately so: `git switch -c`
+      // creates a branch at HEAD without rewriting the working tree, so no
+      // reload follows a create. Suspending would DROP the edit from the
+      // mirror — it would survive in Hive while disk silently diverged, and
+      // the next switch would reload over it. So create must not suspend.
+      when(() => git.createBranch(root, any())).thenAnswer((_) async {
+        // The user edits a request while the branch is being created.
+        sync.scheduleMirror(root, const []);
+      });
+
+      await service.create(root, 'feat/y');
+
+      // Still armed: it survives to the next flush and reaches disk.
+      await sync.flushPending();
+      verify(() => ds.write(root, any())).called(1);
+    });
+
+    test(
+      'the pre-op flush still writes — suspension starts after it',
+      () async {
+        sync.scheduleMirror(root, const []);
+
+        await service.switchTo(root, 'feat/x');
+
+        verify(() => ds.write(root, any())).called(1);
+        verify(() => git.switchBranch(root, 'feat/x')).called(1);
+      },
+    );
+
+    test('a throwing op still resumes mirroring', () async {
+      when(
+        () => git.switchBranch(root, any()),
+      ).thenThrow(GitException('checkout failed'));
+
+      await expectLater(
+        service.switchTo(root, 'feat/x'),
+        throwsA(isA<GitException>()),
+      );
+
+      sync.scheduleMirror(root, const []);
+      await sync.flushPending();
+      verify(() => ds.write(root, any())).called(1);
+    });
+  });
 }

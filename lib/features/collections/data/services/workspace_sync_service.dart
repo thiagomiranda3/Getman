@@ -48,11 +48,72 @@ class WorkspaceSyncService {
   /// grant that has not been re-acquired would otherwise spam the console).
   final Set<String> _quietedRoots = {};
 
+  /// Depth of the current mirroring suspension. A counter rather than a flag as
+  /// defence-in-depth against nesting: today's wiring never nests (the git op
+  /// fully resumes before the reload listener suspends again, so this never
+  /// exceeds 1 in production), but if a future caller ever wraps one suspended
+  /// scope in another, an inner resume must not re-open the gate the outer
+  /// scope still holds.
+  int _suspendCount = 0;
+
+  /// Whether mirroring is currently gated off. See [suspendMirroring].
+  bool get isMirroringSuspended => _suspendCount > 0;
+
   Future<List<CollectionNodeEntity>> read(String root) => dataSource.read(root);
 
+  /// Turns [scheduleMirror] into a no-op (and drops anything already armed)
+  /// until the matching [resumeMirroring].
+  ///
+  /// Two callers need this, both for the same reason — Hive must not be
+  /// mirrored back onto a tree that something else owns right now:
+  ///
+  /// * git working-tree ops (switch/create/pull/stash/pop): an edit made *while*
+  ///   the checkout runs would fire its debounce afterwards and write the old
+  ///   branch's tree onto the new branch. ([flushPending] closes the same race
+  ///   from the other side — the write armed *before* the op — so the order is
+  ///   always flush, then suspend, then run git.)
+  /// * the disk → Hive reload that follows such an op: pushing the freshly-read
+  ///   forest into CollectionsBloc emits a state change, which the mirroring
+  ///   listener would happily mirror straight back to disk — a reload → mirror
+  ///   → reload loop over files git just checked out.
+  ///
+  /// Prefer [withMirroringSuspended], which cannot leak the gate on a throw.
+  void suspendMirroring() {
+    _suspendCount++;
+    _cancelPending();
+  }
+
+  /// Ends one [suspendMirroring] scope. Mirroring resumes when the last one
+  /// ends; the next mutation schedules a fresh (non-stale) mirror.
+  void resumeMirroring() {
+    assert(
+      _suspendCount > 0,
+      'resumeMirroring() without a matching suspendMirroring() — the gate is '
+      'mis-paired somewhere; prefer withMirroringSuspended().',
+    );
+    if (_suspendCount > 0) _suspendCount--;
+  }
+
+  /// Runs [action] with mirroring suspended, resuming it even if [action]
+  /// throws (a leaked gate would silently stop mirroring for the session).
+  Future<T> withMirroringSuspended<T>(Future<T> Function() action) async {
+    suspendMirroring();
+    try {
+      return await action();
+    } finally {
+      resumeMirroring();
+    }
+  }
+
   /// Debounced Hive → disk mirror. Coalesces bursts of mutations into one
-  /// write.
+  /// write. A no-op while mirroring is suspended — the forest it carries is
+  /// about to be (or has just been) invalidated by git, so it is dropped
+  /// rather than deferred.
   void scheduleMirror(String root, List<CollectionNodeEntity> forest) {
+    if (isMirroringSuspended) {
+      _cancelPending();
+      return;
+    }
     _timer?.cancel();
     _pendingRoot = root;
     _pendingForest = forest;
@@ -61,6 +122,13 @@ class WorkspaceSyncService {
       if (pending == null) return;
       unawaited(_startMirror(pending.$1, pending.$2));
     });
+  }
+
+  /// Disarms the debounce timer and drops the forest it was going to write.
+  void _cancelPending() {
+    _timer?.cancel();
+    _timer = null;
+    _takePending();
   }
 
   /// Runs any pending or in-flight debounced write to completion, now.

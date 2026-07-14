@@ -358,4 +358,104 @@ void main() {
 
     await service.flushPending();
   });
+
+  group('mirroring suspension', () {
+    WorkspaceSyncService build() {
+      final service = WorkspaceSyncService(
+        ds,
+        debounce: const Duration(milliseconds: 5),
+      );
+      addTearDown(service.dispose);
+      return service;
+    }
+
+    test('scheduleMirror during suspension never writes — not even after '
+        'resume (the forest it carried is stale by then)', () async {
+      final service = build()
+        ..suspendMirroring()
+        ..scheduleMirror('/ws', const []);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      verifyNever(() => ds.write(any(), any()));
+
+      service.resumeMirroring();
+      // The dropped forest must not resurface: a debounce armed before a
+      // branch switch would land on the *new* branch.
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      verifyNever(() => ds.write(any(), any()));
+    });
+
+    test('a mirror already armed before suspension is cancelled', () async {
+      final service = build()
+        ..scheduleMirror('/ws', const [])
+        ..suspendMirroring();
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      verifyNever(() => ds.write(any(), any()));
+
+      service.resumeMirroring();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      verifyNever(() => ds.write(any(), any()));
+    });
+
+    test('mirroring works again after resume', () async {
+      build()
+        ..suspendMirroring()
+        ..resumeMirroring()
+        ..scheduleMirror('/ws', const []);
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      verify(() => ds.write('/ws', any())).called(1);
+    });
+
+    test(
+      'withMirroringSuspended resumes even when the action throws',
+      () async {
+        final service = build();
+
+        await expectLater(
+          service.withMirroringSuspended<void>(
+            () async => throw StateError('boom'),
+          ),
+          throwsStateError,
+        );
+
+        service.scheduleMirror('/ws', const []);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        verify(() => ds.write('/ws', any())).called(1);
+      },
+    );
+
+    test(
+      'withMirroringSuspended suspends for the duration of the action',
+      () async {
+        final service = build();
+
+        final result = await service.withMirroringSuspended(() async {
+          service.scheduleMirror('/ws', const []);
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+          return 42;
+        });
+
+        expect(result, 42);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        verifyNever(() => ds.write(any(), any()));
+      },
+    );
+
+    test('suspension nests — the outer resume is what re-enables it', () async {
+      final service = build();
+
+      await service.withMirroringSuspended(() async {
+        await service.withMirroringSuspended(() async {});
+        // The inner scope resumed, but the outer one still holds the gate.
+        service.scheduleMirror('/ws', const []);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        verifyNever(() => ds.write(any(), any()));
+      });
+
+      service.scheduleMirror('/ws', const []);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      verify(() => ds.write('/ws', any())).called(1);
+    });
+  });
 }
