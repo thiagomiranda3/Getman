@@ -36,6 +36,13 @@ class WorkspaceSyncService {
   /// here instead of guessing when the debounced write has landed.
   Stream<String> get mirrored => _mirrored.stream;
 
+  /// Whether the most recent mirror write failed. Sticky: it stays `true`
+  /// until a later write succeeds, so a background failure that landed before
+  /// [flushPending] was ever called is still reported to the flushing caller
+  /// (its pending forest was consumed and dropped — the tree on disk is
+  /// stale). Cleared on the first successful write.
+  bool _lastMirrorFailed = false;
+
   /// Roots whose last write failed. Used to log a mirror failure only once per
   /// root per session instead of on every debounced mutation (e.g. a sandbox
   /// grant that has not been re-acquired would otherwise spam the console).
@@ -66,7 +73,13 @@ class WorkspaceSyncService {
   /// debounce timer has *already* fired and `dataSource.write` is mid-flight:
   /// awaiting [_inFlight] (the tail of the serialized write chain) awaits
   /// every outstanding write, not just the not-yet-started pending one.
-  Future<void> flushPending() async {
+  ///
+  /// Returns `false` when a mirror write failed and the tree on disk is
+  /// therefore stale (`_mirror` swallows the error — it must never break the
+  /// session — but the pending forest it consumed is gone, so the caller
+  /// cannot assume the disk matches Hive). Callers that are about to run git
+  /// over the workspace MUST abort on `false`.
+  Future<bool> flushPending() async {
     _timer?.cancel();
     _timer = null;
     final pending = _takePending();
@@ -75,6 +88,7 @@ class WorkspaceSyncService {
     // of the chain, so this single await covers both it and anything already
     // writing ahead of it.
     await _inFlight;
+    return !_lastMirrorFailed;
   }
 
   /// Reads and clears the pending write, if any.
@@ -116,10 +130,13 @@ class WorkspaceSyncService {
   Future<void> _mirror(String root, List<CollectionNodeEntity> forest) async {
     try {
       await dataSource.write(root, forest);
+      _lastMirrorFailed = false;
       _quietedRoots.remove(root); // recovered — allow logging again
       if (!_mirrored.isClosed) _mirrored.add(root);
     } on Object catch (e) {
-      // Best-effort: a failed mirror must never break the in-app session.
+      // Best-effort: a failed mirror must never break the in-app session — but
+      // it is recorded so [flushPending] can refuse to certify the tree.
+      _lastMirrorFailed = true;
       // Log the first failure for a root, then stay quiet until it recovers.
       if (_quietedRoots.add(root)) {
         debugPrint(

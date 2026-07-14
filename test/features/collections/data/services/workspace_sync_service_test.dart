@@ -129,6 +129,60 @@ void main() {
     },
   );
 
+  test('flushPending reports failure when the mirror write throws', () async {
+    when(() => ds.write(any(), any())).thenThrow(Exception('read-only fs'));
+    final service = WorkspaceSyncService(
+      ds,
+      debounce: const Duration(seconds: 30),
+    );
+    addTearDown(service.dispose);
+
+    service.scheduleMirror('/ws', const []);
+
+    // The pending forest was consumed and dropped — disk is now stale, and
+    // the caller must be told (git must not run over it).
+    expect(await service.flushPending(), isFalse);
+  });
+
+  test('flushPending reports failure for a write that already failed in the '
+      'background, before the flush was ever called', () async {
+    when(() => ds.write(any(), any())).thenThrow(Exception('read-only fs'));
+    final service = WorkspaceSyncService(
+      ds,
+      debounce: const Duration(milliseconds: 5),
+    );
+    addTearDown(service.dispose);
+
+    service.scheduleMirror('/ws', const []);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    expect(await service.flushPending(), isFalse);
+  });
+
+  test('flushPending reports success again after the write recovers', () async {
+    when(() => ds.write(any(), any())).thenThrow(Exception('read-only fs'));
+    final service = WorkspaceSyncService(
+      ds,
+      debounce: const Duration(seconds: 30),
+    );
+    addTearDown(service.dispose);
+
+    service.scheduleMirror('/ws', const []);
+    expect(await service.flushPending(), isFalse);
+
+    when(() => ds.write(any(), any())).thenAnswer((_) async {});
+    service.scheduleMirror('/ws', const []);
+
+    expect(await service.flushPending(), isTrue);
+  });
+
+  test('flushPending reports success when there is nothing to write', () async {
+    final service = WorkspaceSyncService(ds);
+    addTearDown(service.dispose);
+
+    expect(await service.flushPending(), isTrue);
+  });
+
   test('flushPending writes a pending mirror immediately', () async {
     final completer = Completer<void>();
     when(() => ds.write(any(), any())).thenAnswer((_) => completer.future);
