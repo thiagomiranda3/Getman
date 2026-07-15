@@ -34,10 +34,16 @@ class _IoGitService implements GitService {
   /// config. Empty when either half is missing/blank so git falls back to
   /// its own resolution (and a genuinely missing identity still surfaces as
   /// [GitException.isMissingIdentity]).
+  ///
+  /// The stored name is suffixed with [_viaGetman] only at commit time (the
+  /// setting stays clean), so history reads `name via Getman` while GitHub —
+  /// which attributes by email — still credits the user normally.
   List<String> _identityArgs(String? name, String? email) =>
       (name != null && name.isNotEmpty && email != null && email.isNotEmpty)
-      ? ['-c', 'user.name=$name', '-c', 'user.email=$email']
+      ? ['-c', 'user.name=$name$_viaGetman', '-c', 'user.email=$email']
       : const [];
+
+  static const String _viaGetman = ' via Getman';
 
   @override
   Future<bool> isAvailable() async {

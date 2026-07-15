@@ -50,9 +50,11 @@ void main() {
         '-1',
         '--format=%an <%ae>',
       ], workingDirectory: tmp.path);
+      // The name carries the " via Getman" attribution suffix (applied only at
+      // commit time); the email is verbatim so GitHub still credits the user.
       expect(
         (log.stdout as String).trim(),
-        'A Getman User <a.getman.user@example.com>',
+        'A Getman User via Getman <a.getman.user@example.com>',
       );
     },
   );
