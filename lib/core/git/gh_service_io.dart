@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:getman/core/git/gh_output_parser.dart';
 import 'package:getman/core/git/gh_service.dart';
 
 GhService createGhServiceImpl() => _GhService();
@@ -62,13 +63,30 @@ class _GhService implements GhService {
 
   @override
   Future<List<PullRequestInfo>> listPrs(String root) async {
-    // Filled in Task 2.
-    throw UnimplementedError();
+    final r = await _run(root, [
+      'pr',
+      'list',
+      '--state',
+      'open',
+      '--json',
+      'number,title,state,url,isDraft,statusCheckRollup',
+    ]);
+    return parsePrList(r.stdout as String);
   }
 
   @override
   Future<String?> defaultBranch(String root) async {
-    // Filled in Task 2.
-    throw UnimplementedError();
+    final r = await _run(root, [
+      'repo',
+      'view',
+      '--json',
+      'defaultBranchRef',
+    ], allowFailure: true);
+    if (r.exitCode != 0) return null;
+    final decoded = jsonDecode(r.stdout as String);
+    if (decoded is! Map) return null;
+    final ref = decoded['defaultBranchRef'];
+    if (ref is! Map) return null;
+    return ref['name'] as String?;
   }
 }
