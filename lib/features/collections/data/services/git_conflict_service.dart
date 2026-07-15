@@ -100,20 +100,36 @@ class GitConflictService implements ConflictService {
   @override
   Future<void> resolve(String root, List<FileResolution> resolutions) async {
     for (final res in resolutions) {
+      if (res.wholeFile != null) {
+        await _resolveWholeFile(root, res);
+        continue;
+      }
       final content = await _resolvedContent(root, res); // apply picks → JSON
       await _git.writeWorkingFile(root, res.path, content);
       await _git.add(root, res.path);
     }
   }
 
-  /// Coarse resolutions pick a whole merge-stage side verbatim. Field-level
-  /// resolutions re-derive the same 3-way merge [_classify] would produce,
-  /// then apply [FileResolution.fieldChoices] on top before serializing.
-  Future<String> _resolvedContent(String root, FileResolution res) async {
-    if (res.wholeFile != null) {
-      final stage = res.wholeFile == FileSide.incoming ? 2 : 3;
-      return await _git.showStage(root, res.path, stage) ?? '';
+  /// Coarse resolutions pick a whole merge-stage side verbatim. When the
+  /// chosen side is the deleting side of a delete/modify conflict, its stage
+  /// content is absent (`showStage` returns null) — keeping that side means
+  /// removing the file (`git rm`), never writing empty content (that would
+  /// resurrect it as unparseable JSON).
+  Future<void> _resolveWholeFile(String root, FileResolution res) async {
+    final stage = res.wholeFile == FileSide.incoming ? 2 : 3;
+    final content = await _git.showStage(root, res.path, stage);
+    if (content == null) {
+      await _git.removeFile(root, res.path);
+      return;
     }
+    await _git.writeWorkingFile(root, res.path, content);
+    await _git.add(root, res.path);
+  }
+
+  /// Field-level resolutions re-derive the same 3-way merge [_classify]
+  /// would produce, then apply [FileResolution.fieldChoices] on top before
+  /// serializing.
+  Future<String> _resolvedContent(String root, FileResolution res) async {
     return res.path.endsWith('.folder.json')
         ? _resolvedFolderContent(root, res)
         : _resolvedRequestContent(root, res);

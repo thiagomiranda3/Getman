@@ -131,6 +131,9 @@ abstract class GitService {
   /// Stages [path] (`git add`) — marks a conflict as resolved.
   Future<void> add(String root, String path);
 
+  /// Removes [path] from the working tree and stages the deletion (git rm).
+  Future<void> removeFile(String root, String path);
+
   /// `git rebase --continue`, non-interactively (no editor prompt).
   Future<void> rebaseContinue(String root);
 

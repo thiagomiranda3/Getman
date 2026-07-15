@@ -245,6 +245,58 @@ void main() {
       },
     );
 
+    test(
+      'coarse wholeFile: keeping the deleting side removes the file, not '
+      'an empty write',
+      () async {
+        // Delete/modify: incoming deleted the file (stage 2 absent), yours
+        // kept editing it (stage 3 present). The user picks "incoming"
+        // (i.e. keep the deletion).
+        when(
+          () => git.showStage(root, 'a.req.json', 2),
+        ).thenAnswer((_) async => null);
+        when(() => git.removeFile(root, 'a.req.json')).thenAnswer(
+          (
+            _,
+          ) async {},
+        );
+
+        await service.resolve(root, const [
+          FileResolution(path: 'a.req.json', wholeFile: FileSide.incoming),
+        ]);
+
+        verify(() => git.removeFile(root, 'a.req.json')).called(1);
+        verifyNever(() => git.writeWorkingFile(root, 'a.req.json', any()));
+        verifyNever(() => git.add(root, 'a.req.json'));
+      },
+    );
+
+    test(
+      'coarse wholeFile: keeping the modified side writes its content and '
+      'stages it',
+      () async {
+        // Same delete/modify conflict, but the user picks "yours" (the
+        // side that still has content) — content is written + staged.
+        when(
+          () => git.showStage(root, 'a.req.json', 3),
+        ).thenAnswer((_) async => 'YOURS CONTENT');
+        when(
+          () => git.writeWorkingFile(root, 'a.req.json', any()),
+        ).thenAnswer((_) async {});
+        when(() => git.add(root, 'a.req.json')).thenAnswer((_) async {});
+
+        await service.resolve(root, const [
+          FileResolution(path: 'a.req.json', wholeFile: FileSide.yours),
+        ]);
+
+        verify(
+          () => git.writeWorkingFile(root, 'a.req.json', 'YOURS CONTENT'),
+        ).called(1);
+        verify(() => git.add(root, 'a.req.json')).called(1);
+        verifyNever(() => git.removeFile(root, 'a.req.json'));
+      },
+    );
+
     test('coarse wholeFile: yours writes stage-3 content', () async {
       when(
         () => git.showStage(root, 'a.req.json', 3),
@@ -365,6 +417,43 @@ void main() {
       expect((decoded['variables'] as Map)['k'], 'picked-value');
       verify(() => git.add(root, 'x/.folder.json')).called(1);
     });
+
+    test(
+      'a folder "child order" pick round-trips the chosen side\'s order',
+      () async {
+        when(() => git.showStage(root, 'x/.folder.json', 1)).thenAnswer(
+          (_) async => _folderStage(_folder(), ['a']),
+        );
+        when(() => git.showStage(root, 'x/.folder.json', 2)).thenAnswer(
+          (_) async => _folderStage(_folder(), ['a', 'b']),
+        );
+        when(() => git.showStage(root, 'x/.folder.json', 3)).thenAnswer(
+          (_) async => _folderStage(_folder(), ['a', 'c']),
+        );
+        String? written;
+        when(
+          () => git.writeWorkingFile(root, 'x/.folder.json', any()),
+        ).thenAnswer((i) async {
+          written = i.positionalArguments[2] as String;
+        });
+        when(() => git.add(root, 'x/.folder.json')).thenAnswer((_) async {});
+
+        // The user picks yours' order, rendered by ThreeWayMerge as the
+        // comma-joined string "a, c".
+        await service.resolve(root, const [
+          FileResolution(
+            path: 'x/.folder.json',
+            fieldChoices: {'child order': 'a, c'},
+          ),
+        ]);
+
+        final decoded = jsonDecode(written!) as Map<String, dynamic>;
+        expect(
+          WorkspaceCollectionSerializer.childOrder(decoded),
+          ['a', 'c'],
+        );
+      },
+    );
   });
 
   group('continueRebase', () {

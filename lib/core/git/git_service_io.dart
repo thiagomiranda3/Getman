@@ -285,6 +285,10 @@ class _IoGitService implements GitService {
   Future<void> add(String root, String path) => _run(root, ['add', path]);
 
   @override
+  Future<void> removeFile(String root, String path) =>
+      _run(root, ['rm', '--', path]);
+
+  @override
   Future<void> rebaseContinue(String root) async {
     // GIT_EDITOR=true so a commit-message step never blocks on an editor.
     final r = await Process.run(

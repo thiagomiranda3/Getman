@@ -63,6 +63,8 @@ class _StubGitService implements GitService {
   @override
   Future<void> add(String root, String path) async {}
   @override
+  Future<void> removeFile(String root, String path) async {}
+  @override
   Future<void> rebaseContinue(String root) async {}
   @override
   Future<void> rebaseAbort(String root) async {}
