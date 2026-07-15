@@ -9,6 +9,7 @@ import 'package:getman/features/collections/data/services/workspace_sync_service
 import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_event.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_state.dart';
+import 'package:getman/features/collections/presentation/widgets/pull_requests_dialog.dart';
 import 'package:getman/features/collections/presentation/widgets/review_changes_dialog.dart';
 import 'package:getman/features/collections/presentation/widgets/stash_list_dialog.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
@@ -138,6 +139,10 @@ class _BranchChipState extends State<BranchChip> {
           value: 'stashes',
           child: Text('STASHES (${branch.stashCount})'),
         ),
+        const PopupMenuItem<String>(
+          value: 'prs',
+          child: Text('PULL REQUESTS…'),
+        ),
       ],
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: layout.tabSpacing),
@@ -207,6 +212,8 @@ class _BranchChipState extends State<BranchChip> {
         bloc.add(PushChanges(root));
       case 'stashes':
         unawaited(StashListDialog.show(context, root: root));
+      case 'prs':
+        unawaited(PullRequestsDialog.show(context, root: root));
     }
   }
 
