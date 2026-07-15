@@ -60,6 +60,11 @@ class _ConflictResolutionBodyState extends State<ConflictResolutionBody> {
   // path -> whole-file side. Coarse conflicts only.
   final Map<String, FileSide> _wholeFilePicks = {};
   int _picksForBatch = -1;
+  // Set by _cancel before dispatching AbortRebase: the abort also resolves
+  // to ConflictStatus.done, but _cancel already popped and the done-listener
+  // must not pop again or show the resolve-flow's "Conflicts resolved."
+  // snackbar.
+  bool _aborting = false;
 
   @override
   void initState() {
@@ -122,6 +127,7 @@ class _ConflictResolutionBodyState extends State<ConflictResolutionBody> {
   }
 
   void _cancel(BuildContext context) {
+    _aborting = true;
     context.read<ConflictBloc>().add(AbortRebase(widget.root));
     unawaited(Navigator.of(context).maybePop());
   }
@@ -156,6 +162,12 @@ class _ConflictResolutionBodyState extends State<ConflictResolutionBody> {
           (c.status == ConflictStatus.done && p.status != ConflictStatus.done),
       listener: (context, state) {
         if (state.status == ConflictStatus.done) {
+          if (_aborting) {
+            // _cancel already popped the dialog; the abort itself resolves
+            // to `done` too, but it must not also show the resolve-flow's
+            // snackbar or pop a second time.
+            return;
+          }
           // Capture before popping: the dialog's own context is about to be
           // deactivated, so the snackbar goes through the captured messenger.
           final messenger = ScaffoldMessenger.of(context);
@@ -221,6 +233,7 @@ class _ConflictResolutionBodyState extends State<ConflictResolutionBody> {
   Widget _fileTile(BuildContext context, FileConflict fc) {
     if (fc.node != null) {
       return _FieldLevelTile(
+        key: ValueKey(fc.path),
         conflict: fc,
         picks: _fieldPicks[fc.path] ?? const {},
         onPick: (field, pick) => _onFieldPick(fc.path, field, pick),
@@ -248,6 +261,7 @@ class _FieldLevelTile extends StatelessWidget {
     required this.conflict,
     required this.picks,
     required this.onPick,
+    super.key,
   });
   final FileConflict conflict;
   final Map<String, FieldPick> picks;
@@ -285,6 +299,7 @@ class _FieldLevelTile extends StatelessWidget {
               Padding(
                 padding: EdgeInsets.only(top: layout.tabSpacing),
                 child: _FieldConflictRow(
+                  key: ValueKey('${conflict.path}_${fieldConflict.field}'),
                   path: conflict.path,
                   fieldConflict: fieldConflict,
                   pick: picks[fieldConflict.field],
@@ -303,6 +318,7 @@ class _FieldConflictRow extends StatefulWidget {
     required this.fieldConflict,
     required this.pick,
     required this.onPick,
+    super.key,
   });
   final String path;
   final FieldConflict fieldConflict;

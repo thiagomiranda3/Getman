@@ -334,6 +334,101 @@ void main() {
     expect(find.byKey(const ValueKey('conflict_cancel')), findsNothing);
   });
 
+  testWidgets(
+    'CANCEL does not show the "Conflicts resolved." snackbar when the '
+    'abort resolves to done',
+    (tester) async {
+      final controller = StreamController<ConflictState>();
+      whenListen(
+        conflictBloc,
+        controller.stream,
+        initialState: const ConflictState(status: ConflictStatus.ready),
+      );
+
+      await openDialog(tester);
+      await tester.tap(find.byKey(const ValueKey('conflict_cancel')));
+      // Deliberately don't settle: the dialog's exit transition is still
+      // running (still mounted), mirroring the real race where AbortRebase
+      // resolves to `done` before the pop animation finishes.
+      controller.add(const ConflictState(status: ConflictStatus.done));
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      verify(() => conflictBloc.add(const AbortRebase(root))).called(1);
+      expect(find.text('Conflicts resolved.'), findsNothing);
+      verifyNever(() => gitBloc.add(const LoadBranchStatus(root)));
+      await controller.close();
+    },
+  );
+
+  testWidgets(
+    'reusing a row position across a batch transition (body conflict then '
+    'a non-body conflict) does not crash on TAKE INCOMING',
+    (tester) async {
+      const batch1 = [
+        FileConflict(
+          path: 'r1.req.json',
+          kind: ConflictKind.request,
+          node: NodeMergeResult(
+            merged: _node,
+            conflicts: [
+              FieldConflict(
+                field: 'body',
+                kind: FieldConflictKind.scalar,
+                incoming: '{"a":1}',
+                yours: '{"a":2}',
+              ),
+            ],
+          ),
+        ),
+      ];
+      const batch2 = [
+        FileConflict(
+          path: 'r1.req.json',
+          kind: ConflictKind.request,
+          node: NodeMergeResult(
+            merged: _node,
+            conflicts: [
+              FieldConflict(
+                field: 'url',
+                kind: FieldConflictKind.scalar,
+                incoming: 'https://a.example',
+                yours: 'https://b.example',
+              ),
+            ],
+          ),
+        ),
+      ];
+      final controller = StreamController<ConflictState>();
+      whenListen(
+        conflictBloc,
+        controller.stream,
+        initialState: const ConflictState(
+          status: ConflictStatus.ready,
+          conflicts: batch1,
+        ),
+      );
+
+      await openDialog(tester);
+      controller.add(
+        const ConflictState(
+          status: ConflictStatus.ready,
+          conflicts: batch2,
+          batch: 1,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey('take_incoming_r1.req.json_url')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      await controller.close();
+    },
+  );
+
   testWidgets('a done status closes the dialog and refreshes branch status', (
     tester,
   ) async {
