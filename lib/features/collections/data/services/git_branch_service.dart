@@ -113,4 +113,10 @@ class GitBranchService implements BranchService {
   // it. This omission is intentional; do not "fix" it by adding a flush.
   @override
   Future<void> dropStash(String root, int index) => _git.stashDrop(root, index);
+
+  // No flush/suspension here, deliberately: `git fetch` only updates
+  // remote-tracking refs — it never touches the working tree — so it cannot
+  // race a pending mirror write.
+  @override
+  Future<void> fetch(String root) => _git.fetch(root);
 }

@@ -16,4 +16,8 @@ abstract class BranchService {
   Future<void> stash(String root, String message);
   Future<void> popStash(String root, int index);
   Future<void> dropStash(String root, int index);
+
+  /// `git fetch` — updates remote-tracking refs without touching the working
+  /// tree (manual FETCH action + the auto-fetch background loop).
+  Future<void> fetch(String root);
 }

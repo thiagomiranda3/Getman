@@ -26,9 +26,11 @@ import 'package:getman/features/collections/data/models/saved_example_model.dart
 import 'package:getman/features/collections/data/repositories/collections_repository_impl.dart';
 import 'package:getman/features/collections/data/services/gh_pull_request_service.dart';
 import 'package:getman/features/collections/data/services/git_branch_service.dart';
+import 'package:getman/features/collections/data/services/git_conflict_service.dart';
 import 'package:getman/features/collections/data/services/workspace_review_service.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/branch_service.dart';
+import 'package:getman/features/collections/domain/conflict_service.dart';
 import 'package:getman/features/collections/domain/pull_request_service.dart';
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
 import 'package:getman/features/collections/domain/review_service.dart';
@@ -198,6 +200,7 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     ..registerLazySingleton<GitService>(createGitService)
     ..registerLazySingleton<ReviewService>(() => WorkspaceReviewService(sl()))
     ..registerLazySingleton<BranchService>(() => GitBranchService(sl(), sl()))
+    ..registerLazySingleton<ConflictService>(() => GitConflictService(sl()))
     ..registerLazySingleton<GhService>(createGhService)
     ..registerLazySingleton<PullRequestService>(
       () => GhPullRequestService(sl(), sl()),
