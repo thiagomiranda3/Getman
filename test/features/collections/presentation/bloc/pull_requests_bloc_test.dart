@@ -15,7 +15,12 @@ void main() {
   const root = '/ws';
   late _MockService service;
 
-  setUp(() => service = _MockService());
+  setUp(() {
+    service = _MockService();
+    // _onLoad resolves the default base on the available path; give every test
+    // a benign default (specific tests override it).
+    when(() => service.defaultBase(root)).thenAnswer((_) async => 'main');
+  });
 
   blocTest<PullRequestsBloc, PullRequestsState>(
     'LoadPullRequests: available → loads PRs',
@@ -180,6 +185,68 @@ void main() {
       isA<PullRequestsState>()
           .having((s) => s.status, 'status', PrStatus.error)
           .having((s) => s.errorMessage, 'errorMessage', isNotNull),
+    ],
+  );
+
+  blocTest<PullRequestsBloc, PullRequestsState>(
+    'LoadPullRequests resolves the default base for the create form',
+    build: () {
+      when(
+        () => service.availability(root),
+      ).thenAnswer((_) async => GhAvailability.available);
+      when(() => service.list(root)).thenAnswer((_) async => const []);
+      when(() => service.defaultBase(root)).thenAnswer((_) async => 'develop');
+      return PullRequestsBloc(service: service);
+    },
+    act: (b) => b.add(const LoadPullRequests(root)),
+    expect: () => [
+      isA<PullRequestsState>().having(
+        (s) => s.status,
+        'status',
+        PrStatus.loading,
+      ),
+      isA<PullRequestsState>()
+          .having((s) => s.status, 'status', PrStatus.ready)
+          .having((s) => s.defaultBase, 'defaultBase', 'develop'),
+    ],
+  );
+
+  blocTest<PullRequestsBloc, PullRequestsState>(
+    'a created PR is surfaced even when the list refresh fails',
+    build: () {
+      when(
+        () => service.create(
+          root,
+          base: any(named: 'base'),
+          title: any(named: 'title'),
+          body: any(named: 'body'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer(
+        (_) async => const PullRequestRef(number: 3, url: 'u/pull/3'),
+      );
+      when(() => service.list(root)).thenThrow(Exception('list boom'));
+      return PullRequestsBloc(service: service);
+    },
+    act: (b) => b.add(
+      const CreatePullRequest(
+        root,
+        base: 'main',
+        title: 't',
+        body: '',
+        draft: false,
+      ),
+    ),
+    // Refresh failed, but the PR exists → ready + lastCreated, NOT an error.
+    expect: () => [
+      isA<PullRequestsState>().having(
+        (s) => s.status,
+        'status',
+        PrStatus.creating,
+      ),
+      isA<PullRequestsState>()
+          .having((s) => s.status, 'status', PrStatus.ready)
+          .having((s) => s.lastCreated?.number, 'lastCreated', 3),
     ],
   );
 }

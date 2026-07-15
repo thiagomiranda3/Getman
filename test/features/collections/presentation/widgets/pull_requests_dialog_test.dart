@@ -201,6 +201,45 @@ void main() {
     ).called(1);
   });
 
+  testWidgets('the create form prefers state.defaultBase over the heuristic', (
+    tester,
+  ) async {
+    final bloc = _MockPrBloc();
+    final git = _MockGitBloc();
+    // Branches contain 'main' — the heuristic would pick it — but the repo's
+    // real default base is 'develop', which must win.
+    when(() => git.state).thenReturn(
+      const GitSyncState(
+        branch: BranchStatus(isRepo: true, current: 'x', branches: ['main']),
+      ),
+    );
+    when(() => bloc.state).thenReturn(
+      const PullRequestsState(status: PrStatus.ready, defaultBase: 'develop'),
+    );
+    await tester.pumpWidget(host(bloc, gitBloc: git));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('CREATE PULL REQUEST…'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const ValueKey('pr_form_title')), 't');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('pr_form_submit')));
+    await tester.pumpAndSettle();
+
+    verify(
+      () => bloc.add(
+        const CreatePullRequest(
+          root,
+          base: 'develop',
+          title: 't',
+          body: '',
+          draft: false,
+        ),
+      ),
+    ).called(1);
+  });
+
   testWidgets('the draft toggle sends draft:true with the body', (
     tester,
   ) async {

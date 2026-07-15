@@ -34,11 +34,14 @@ class PullRequestsBloc extends Bloc<PullRequestsEvent, PullRequestsState> {
         return;
       }
       final prs = await _service.list(event.root);
+      // Resolve the default base once (for the create form) — best-effort.
+      final base = state.defaultBase ?? await _service.defaultBase(event.root);
       emit(
         state.copyWith(
           status: PrStatus.ready,
           availability: availability,
           prs: prs,
+          defaultBase: base,
         ),
       );
     } on Object catch (e) {
@@ -52,25 +55,30 @@ class PullRequestsBloc extends Bloc<PullRequestsEvent, PullRequestsState> {
   ) async {
     if (_dropWhileBusy('CreatePullRequest')) return;
     emit(state.copyWith(status: PrStatus.creating));
+    final PullRequestRef ref;
     try {
-      final ref = await _service.create(
+      ref = await _service.create(
         event.root,
         base: event.base,
         title: event.title,
         body: event.body,
         draft: event.draft,
       );
-      final prs = await _service.list(event.root);
-      emit(
-        state.copyWith(
-          status: PrStatus.ready,
-          prs: prs,
-          lastCreated: ref,
-        ),
-      );
     } on Object catch (e) {
       _fail(emit, e);
+      return;
     }
+    // The PR now exists — surface it (lastCreated) even if the follow-up list
+    // refresh fails, so a transient list error can't hide a real PR behind a
+    // misleading GIT ERROR.
+    List<PullRequestEntity> prs;
+    try {
+      prs = await _service.list(event.root);
+    } on Object catch (e) {
+      log('created PR but list refresh failed: $e', name: 'PullRequestsBloc');
+      prs = state.prs;
+    }
+    emit(state.copyWith(status: PrStatus.ready, prs: prs, lastCreated: ref));
   }
 
   /// Drops a second op while one is running: a concurrent gh call could race

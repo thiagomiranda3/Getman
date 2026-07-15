@@ -249,14 +249,17 @@ class _AvailableView extends StatelessWidget {
   }
 
   void _openCreateForm(BuildContext context) {
-    // Prefill base with a likely default from the known branches.
-    final branches = context.read<GitSyncBloc>().state.branch.branches;
-    final base = branches.contains('main')
-        ? 'main'
-        : branches.contains('master')
-        ? 'master'
-        : (branches.isNotEmpty ? branches.first : '');
+    // Prefer the repo's real default branch (gh repo view); fall back to a
+    // main/master/first-branch heuristic only when it couldn't be resolved.
+    final base = state.defaultBase ?? _heuristicBase(context);
     unawaited(_CreatePrForm.show(context, root: root, initialBase: base));
+  }
+
+  String _heuristicBase(BuildContext context) {
+    final branches = context.read<GitSyncBloc>().state.branch.branches;
+    if (branches.contains('main')) return 'main';
+    if (branches.contains('master')) return 'master';
+    return branches.isNotEmpty ? branches.first : '';
   }
 }
 
@@ -387,6 +390,7 @@ class _CreatePrFormState extends State<_CreatePrForm> {
             TextField(
               key: const ValueKey('pr_form_base'),
               controller: _base,
+              onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(
                 labelText: 'BASE BRANCH',
                 hintText: 'main',

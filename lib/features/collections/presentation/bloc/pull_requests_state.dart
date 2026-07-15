@@ -12,6 +12,7 @@ class PullRequestsState extends Equatable {
     this.prs = const [],
     this.errorMessage,
     this.lastCreated,
+    this.defaultBase,
   });
 
   final PrStatus status;
@@ -19,6 +20,10 @@ class PullRequestsState extends Equatable {
   final List<PullRequestEntity> prs;
   final String? errorMessage;
   final PullRequestRef? lastCreated;
+
+  /// The repo's default branch (`gh repo view`), for the create form's base
+  /// prefill. Null until resolved / when it can't be determined.
+  final String? defaultBase;
 
   bool get isBusy => status == PrStatus.loading || status == PrStatus.creating;
 
@@ -28,6 +33,7 @@ class PullRequestsState extends Equatable {
     List<PullRequestEntity>? prs,
     String? errorMessage,
     PullRequestRef? lastCreated,
+    String? defaultBase,
   }) {
     final next = status ?? this.status;
     return PullRequestsState(
@@ -39,6 +45,7 @@ class PullRequestsState extends Equatable {
           ? (errorMessage ?? this.errorMessage)
           : null,
       lastCreated: lastCreated ?? this.lastCreated,
+      defaultBase: defaultBase ?? this.defaultBase,
     );
   }
 
@@ -49,5 +56,6 @@ class PullRequestsState extends Equatable {
     prs,
     errorMessage,
     lastCreated,
+    defaultBase,
   ];
 }
