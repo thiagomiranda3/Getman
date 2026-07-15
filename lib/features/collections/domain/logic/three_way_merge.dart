@@ -338,12 +338,7 @@ class ThreeWayMerge {
     if (_secretKeysEq.equals(incoming, base)) return yours;
     if (_secretKeysEq.equals(yours, base)) return incoming;
     conflicts.add(
-      FieldConflict(
-        field: 'secret keys',
-        kind: FieldConflictKind.list,
-        incoming: (incoming.toList()..sort()).join(', '),
-        yours: (yours.toList()..sort()).join(', '),
-      ),
+      const FieldConflict(field: 'secret keys', kind: FieldConflictKind.list),
     );
     return incoming;
   }

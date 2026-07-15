@@ -131,6 +131,33 @@ void main() {
       expect(r.conflicts.single.yours, '3');
       expect(r.merged.config!.headers['X'], '2');
     });
+
+    test(
+      'header deleted on incoming but unchanged on yours auto-merges to '
+      'deletion (no conflict)',
+      () {
+        final base = _leaf(headers: const {'X': '1'});
+        final incoming = _leaf(); // deleted X
+        final yours = _leaf(headers: const {'X': '1'}); // unchanged
+        final r = ThreeWayMerge.mergeRequest(base, incoming, yours);
+        expect(r.conflicts, isEmpty);
+        expect(r.merged.config!.headers.containsKey('X'), isFalse);
+      },
+    );
+
+    test(
+      'header deleted on incoming but edited on yours is a conflict',
+      () {
+        final base = _leaf(headers: const {'X': '1'});
+        final incoming = _leaf(); // deleted X
+        final yours = _leaf(headers: const {'X': '2'}); // edited X
+        final r = ThreeWayMerge.mergeRequest(base, incoming, yours);
+        expect(r.conflicts.map((c) => c.field), ["header 'X'"]);
+        expect(r.conflicts.single.kind, FieldConflictKind.mapEntry);
+        expect(r.conflicts.single.incoming, isNull);
+        expect(r.conflicts.single.yours, '2');
+      },
+    );
   });
 
   group('ThreeWayMerge.mergeRequest — opaque fields', () {
@@ -284,7 +311,7 @@ void main() {
       },
     );
 
-    test('secretKeys collision is reported', () {
+    test('secretKeys collision carries null values (whole-field)', () {
       final base = _folder();
       final incoming = _folder(secretKeys: const {'token'});
       final yours = _folder(secretKeys: const {'apiKey'});
@@ -296,7 +323,10 @@ void main() {
         yours,
         const [],
       );
-      expect(r.conflicts.any((c) => c.field == 'secret keys'), isTrue);
+      expect(r.conflicts.map((c) => c.field), ['secret keys']);
+      expect(r.conflicts.single.kind, FieldConflictKind.list);
+      expect(r.conflicts.single.incoming, isNull);
+      expect(r.conflicts.single.yours, isNull);
     });
   });
 }
