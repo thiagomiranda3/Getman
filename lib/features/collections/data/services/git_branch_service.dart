@@ -83,8 +83,14 @@ class GitBranchService implements BranchService {
     await _git.createBranch(root, branch);
   }
 
+  // `GitService.pull` now returns a `PullOutcome`; `BranchService.pull` is
+  // still `Future<void>` here — a later task (Spec D T4/T6) rewires callers
+  // to consume the outcome for conflict handling. Discard it for now so the
+  // tree keeps compiling.
   @override
-  Future<void> pull(String root) => _runOnTree(() => _git.pull(root));
+  Future<void> pull(String root) => _runOnTree(() async {
+    await _git.pull(root);
+  });
 
   // No suspension here: `git push` reads the working tree, it never rewrites
   // it — an edit made mid-push belongs on disk and must still be mirrored.

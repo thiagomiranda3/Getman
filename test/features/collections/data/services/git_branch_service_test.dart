@@ -46,7 +46,7 @@ void main() {
     when(() => git.stashPush(root, any())).thenAnswer((_) async {});
     when(() => git.stashPop(root, any())).thenAnswer((_) async {});
     when(() => git.stashDrop(root, any())).thenAnswer((_) async {});
-    when(() => git.pull(root)).thenAnswer((_) async {});
+    when(() => git.pull(root)).thenAnswer((_) async => PullOutcome.clean);
     when(
       () => git.push(root, setUpstream: any(named: 'setUpstream')),
     ).thenAnswer((_) async {});
@@ -199,7 +199,10 @@ void main() {
   test('pull waits for the pending mirror to land first', () {
     return expectGitWaitsForMirror(
       stubGitOp: (onGitOp) {
-        when(() => git.pull(root)).thenAnswer((_) async => onGitOp());
+        when(() => git.pull(root)).thenAnswer((_) async {
+          onGitOp();
+          return PullOutcome.clean;
+        });
       },
       invoke: () => service.pull(root),
     );
@@ -329,8 +332,10 @@ void main() {
             () => service.switchTo(root, 'feat/x'),
           ),
           'pull': (
-            (onOp) =>
-                when(() => git.pull(root)).thenAnswer((_) async => onOp()),
+            (onOp) => when(() => git.pull(root)).thenAnswer((_) async {
+              onOp();
+              return PullOutcome.clean;
+            }),
             () => service.pull(root),
           ),
           'stash': (

@@ -48,6 +48,10 @@ class StashEntry {
   final String message;
 }
 
+/// The result of a rebase-pull: it either fast-forwarded/rebased cleanly, or
+/// it stopped on conflicts that are now sitting in the index for resolution.
+enum PullOutcome { clean, conflicted }
+
 /// Drives the system `git` CLI over a workspace directory. The `_io`
 /// implementation is the sole `dart:io` importer; web gets the no-op stub.
 abstract class GitService {
@@ -86,10 +90,14 @@ abstract class GitService {
   /// Whether the current branch has an upstream configured.
   Future<bool> hasUpstream(String root);
 
-  /// `git pull --rebase`. On conflict the rebase is **aborted** before
-  /// throwing, so a failed pull leaves the working tree exactly as it was —
-  /// Getman has no conflict-resolution UI yet (Spec D).
-  Future<void> pull(String root);
+  /// `git pull --rebase`. On a true conflict, the rebase is left **paused**
+  /// (see [PullOutcome.conflicted]) so the caller can resolve it — see
+  /// [isRebaseInProgress] / [conflictedPaths] / [showStage] /
+  /// [writeWorkingFile] / [add] / [rebaseContinue] / [rebaseAbort]. Any other
+  /// failure (auth/network/local changes) aborts the rebase before throwing,
+  /// so a non-resolvable failed pull leaves the working tree exactly as it
+  /// was.
+  Future<PullOutcome> pull(String root);
 
   /// Pushes the current branch. Pass [setUpstream] for a branch that has
   /// never been pushed (`git push -u origin <branch>`).
@@ -103,4 +111,33 @@ abstract class GitService {
 
   Future<void> stashPop(String root, int index);
   Future<void> stashDrop(String root, int index);
+
+  /// Whether a rebase is currently paused (mid-conflict) on [root].
+  Future<bool> isRebaseInProgress(String root);
+
+  /// Paths with unresolved merge conflicts (`git diff --name-only
+  /// --diff-filter=U`).
+  Future<List<String>> conflictedPaths(String root);
+
+  /// Content of [path] at merge stage [stage] (1=base, 2=ours/incoming,
+  /// 3=theirs/yours), or null when that stage is absent (e.g. add/add has no
+  /// base).
+  Future<String?> showStage(String root, String path, int stage);
+
+  /// Overwrites the working-tree copy of [path] with [content] (creating
+  /// parent directories as needed). Used to write a resolved conflict.
+  Future<void> writeWorkingFile(String root, String path, String content);
+
+  /// Stages [path] (`git add`) — marks a conflict as resolved.
+  Future<void> add(String root, String path);
+
+  /// `git rebase --continue`, non-interactively (no editor prompt).
+  Future<void> rebaseContinue(String root);
+
+  /// `git rebase --abort` — restores the pre-rebase tree.
+  Future<void> rebaseAbort(String root);
+
+  /// `git fetch` — updates remote-tracking refs without touching the working
+  /// tree.
+  Future<void> fetch(String root);
 }

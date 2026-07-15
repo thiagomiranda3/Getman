@@ -180,10 +180,14 @@ class _IoGitService implements GitService {
   }
 
   @override
-  Future<void> pull(String root) async {
+  Future<PullOutcome> pull(String root) async {
     final r = await _run(root, ['pull', '--rebase'], allowFailure: true);
-    if (r.exitCode == 0) return;
-    // Leave no half-rebased tree behind: undo it, then report the failure.
+    if (r.exitCode == 0) return PullOutcome.clean;
+    if (await isRebaseInProgress(root) &&
+        (await conflictedPaths(root)).isNotEmpty) {
+      return PullOutcome.conflicted; // leave paused for the resolver
+    }
+    // Not a resolvable conflict (auth/network/local changes) — restore + throw.
     await _run(root, ['rebase', '--abort'], allowFailure: true);
     final err = (r.stderr as String).trim();
     throw GitException(
@@ -231,6 +235,80 @@ class _IoGitService implements GitService {
   Future<void> stashDrop(String root, int index) async {
     await _run(root, ['stash', 'drop', 'stash@{$index}']);
   }
+
+  @override
+  Future<bool> isRebaseInProgress(String root) async {
+    final r = await _run(root, [
+      'rev-parse',
+      '--git-path',
+      'rebase-merge',
+    ], allowFailure: true);
+    final merge = (r.stdout as String).trim();
+    if (merge.isNotEmpty && Directory('$root/$merge').existsSync()) return true;
+    final r2 = await _run(root, [
+      'rev-parse',
+      '--git-path',
+      'rebase-apply',
+    ], allowFailure: true);
+    final apply = (r2.stdout as String).trim();
+    return apply.isNotEmpty && Directory('$root/$apply').existsSync();
+  }
+
+  @override
+  Future<List<String>> conflictedPaths(String root) async {
+    final r = await _run(root, ['diff', '--name-only', '--diff-filter=U']);
+    return (r.stdout as String)
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+  }
+
+  @override
+  Future<String?> showStage(String root, String path, int stage) async {
+    final r = await _run(root, ['show', ':$stage:$path'], allowFailure: true);
+    return r.exitCode == 0 ? r.stdout as String : null;
+  }
+
+  @override
+  Future<void> writeWorkingFile(
+    String root,
+    String path,
+    String content,
+  ) async {
+    final file = File('$root/$path');
+    await file.parent.create(recursive: true);
+    await file.writeAsString(content);
+  }
+
+  @override
+  Future<void> add(String root, String path) => _run(root, ['add', path]);
+
+  @override
+  Future<void> rebaseContinue(String root) async {
+    // GIT_EDITOR=true so a commit-message step never blocks on an editor.
+    final r = await Process.run(
+      'git',
+      ['rebase', '--continue'],
+      workingDirectory: root,
+      stdoutEncoding: utf8,
+      stderrEncoding: utf8,
+      environment: {'GIT_EDITOR': 'true'},
+    );
+    if (r.exitCode != 0) {
+      final err = (r.stderr as String).trim();
+      throw GitException(
+        err.isEmpty ? 'git rebase --continue failed' : err,
+        exitCode: r.exitCode,
+      );
+    }
+  }
+
+  @override
+  Future<void> rebaseAbort(String root) => _run(root, ['rebase', '--abort']);
+
+  @override
+  Future<void> fetch(String root) => _run(root, ['fetch']);
 
   /// Parses `git status --porcelain=v1 -z`. Records are NUL-terminated; a
   /// rename record (`R`/`C`) is followed by a second NUL-token holding the
