@@ -137,6 +137,30 @@ void main() {
     verify(() => bloc.add(const PullChanges(root))).called(1);
   });
 
+  testWidgets('FETCH dispatches FetchRemote', (tester) async {
+    await tester.pumpWidget(
+      host(
+        const GitSyncState(
+          status: GitSyncStatus.ready,
+          branch: BranchStatus(
+            isRepo: true,
+            current: 'main',
+            branches: ['main'],
+            hasRemote: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('branch_chip')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('branch_menu_fetch')));
+    await tester.pumpAndSettle();
+
+    verify(() => bloc.add(const FetchRemote(root))).called(1);
+  });
+
   testWidgets('a dirty-switch error shows the commit/stash prompt', (
     tester,
   ) async {

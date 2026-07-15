@@ -9,6 +9,7 @@ class GitSyncState extends Equatable {
     this.branch = BranchStatus.none,
     this.errorMessage,
     this.reloadToken = 0,
+    this.conflictToken = 0,
   });
 
   final GitSyncStatus status;
@@ -20,6 +21,13 @@ class GitSyncState extends Equatable {
   /// tree when it changes — blocs never talk to each other directly.
   final int reloadToken;
 
+  /// Bumped when a pull halts on conflicts (rebase left paused). The
+  /// widget-layer BranchChip opens `ConflictResolutionDialog` when it changes
+  /// — blocs never talk to each other directly. Deliberately separate from
+  /// [reloadToken]: a conflicted pull does not reload the tree (the working
+  /// tree is mid-rebase; the reload happens once the conflicts are resolved).
+  final int conflictToken;
+
   bool get isBusy => status == GitSyncStatus.busy;
 
   GitSyncState copyWith({
@@ -27,6 +35,7 @@ class GitSyncState extends Equatable {
     BranchStatus? branch,
     String? errorMessage,
     int? reloadToken,
+    int? conflictToken,
   }) {
     final next = status ?? this.status;
     return GitSyncState(
@@ -40,9 +49,16 @@ class GitSyncState extends Equatable {
           ? (errorMessage ?? this.errorMessage)
           : null,
       reloadToken: reloadToken ?? this.reloadToken,
+      conflictToken: conflictToken ?? this.conflictToken,
     );
   }
 
   @override
-  List<Object?> get props => [status, branch, errorMessage, reloadToken];
+  List<Object?> get props => [
+    status,
+    branch,
+    errorMessage,
+    reloadToken,
+    conflictToken,
+  ];
 }

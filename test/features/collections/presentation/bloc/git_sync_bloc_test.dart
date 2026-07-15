@@ -15,7 +15,7 @@ class _MockService extends Mock implements BranchService {}
 void main() {
   const root = '/ws';
   late _MockService service;
-  late Completer<void> pullGate;
+  late Completer<PullOutcome> pullGate;
 
   const status = BranchStatus(
     isRepo: true,
@@ -39,11 +39,12 @@ void main() {
     when(() => service.isDirty(root)).thenAnswer((_) async => false);
     when(() => service.switchTo(root, any())).thenAnswer((_) async {});
     when(() => service.create(root, any())).thenAnswer((_) async {});
-    when(() => service.pull(root)).thenAnswer((_) async {});
+    when(() => service.pull(root)).thenAnswer((_) async => PullOutcome.clean);
     when(() => service.push(root)).thenAnswer((_) async {});
     when(() => service.stash(root, any())).thenAnswer((_) async {});
     when(() => service.popStash(root, any())).thenAnswer((_) async {});
     when(() => service.dropStash(root, any())).thenAnswer((_) async {});
+    when(() => service.fetch(root)).thenAnswer((_) async {});
   });
 
   blocTest<GitSyncBloc, GitSyncState>(
@@ -161,6 +162,61 @@ void main() {
     build: () => GitSyncBloc(service: service),
     act: (b) => b.add(const PullChanges(root)),
     verify: (b) => expect(b.state.reloadToken, 1),
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'PullChanges conflicted bumps conflictToken, not reloadToken, and still '
+    'lands on a terminal ready state',
+    build: () {
+      when(
+        () => service.pull(root),
+      ).thenAnswer((_) async => PullOutcome.conflicted);
+      return GitSyncBloc(service: service);
+    },
+    act: (b) => b.add(const PullChanges(root)),
+    verify: (b) {
+      expect(b.state.status, GitSyncStatus.ready);
+      expect(b.state.conflictToken, 1);
+      expect(b.state.reloadToken, 0);
+      expect(b.state.errorMessage, isNull);
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'FetchRemote(silent: true) swallows a failure — no error state',
+    build: () {
+      when(() => service.fetch(root)).thenThrow(Exception('offline'));
+      return GitSyncBloc(service: service);
+    },
+    act: (b) => b.add(const FetchRemote(root, silent: true)),
+    verify: (b) {
+      expect(b.state.status, GitSyncStatus.ready);
+      expect(b.state.errorMessage, isNull);
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'FetchRemote(silent: false) surfaces a failure as error',
+    build: () {
+      when(() => service.fetch(root)).thenThrow(Exception('auth required'));
+      return GitSyncBloc(service: service);
+    },
+    act: (b) => b.add(const FetchRemote(root)),
+    verify: (b) {
+      expect(b.state.status, GitSyncStatus.error);
+      expect(b.state.errorMessage, contains('auth required'));
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'FetchRemote success refreshes the branch status',
+    build: () => GitSyncBloc(service: service),
+    act: (b) => b.add(const FetchRemote(root)),
+    verify: (b) {
+      verify(() => service.fetch(root)).called(1);
+      expect(b.state.status, GitSyncStatus.ready);
+      expect(b.state.branch.current, 'main');
+    },
   );
 
   blocTest<GitSyncBloc, GitSyncState>(
@@ -340,7 +396,7 @@ void main() {
   blocTest<GitSyncBloc, GitSyncState>(
     'an event dispatched while an op is in flight is dropped',
     build: () {
-      pullGate = Completer<void>();
+      pullGate = Completer<PullOutcome>();
       when(() => service.pull(root)).thenAnswer((_) => pullGate.future);
       return GitSyncBloc(service: service);
     },
@@ -349,7 +405,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       b.add(const SwitchBranch(root, 'feat/x')); // dropped: bloc is busy
       await Future<void>.delayed(Duration.zero);
-      pullGate.complete();
+      pullGate.complete(PullOutcome.clean);
       await Future<void>.delayed(Duration.zero);
     },
     verify: (b) {

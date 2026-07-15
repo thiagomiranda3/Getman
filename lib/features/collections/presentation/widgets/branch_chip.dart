@@ -9,11 +9,19 @@ import 'package:getman/features/collections/data/services/workspace_sync_service
 import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_event.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_state.dart';
+import 'package:getman/features/collections/presentation/widgets/conflict_resolution_dialog.dart';
 import 'package:getman/features/collections/presentation/widgets/pull_requests_dialog.dart';
 import 'package:getman/features/collections/presentation/widgets/review_changes_dialog.dart';
 import 'package:getman/features/collections/presentation/widgets/stash_list_dialog.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
+
+/// How often the chip auto-fetches remote-tracking refs in the background, so
+/// ahead/behind counts stay fresh without the user remembering to pull.
+/// `@visibleForTesting` so a test can assert the interval without waiting for
+/// it to elapse for real.
+@visibleForTesting
+const Duration kAutoFetchInterval = Duration(minutes: 5);
 
 /// Collections-header chip: current branch + ahead/behind, opening the branch
 /// and sync menu. Hidden on web, without a workspace, or when the workspace is
@@ -31,6 +39,16 @@ class BranchChip extends StatefulWidget {
 
 class _BranchChipState extends State<BranchChip> {
   StreamSubscription<String>? _mirrorSub;
+  Timer? _fetchTimer;
+
+  // Tracked locally (not derived from `previous` inside the listener, which
+  // BlocConsumer doesn't expose) so the resolver opens exactly once per bump.
+  // Seeded from `state.conflictToken` on the first BlocConsumer build (not
+  // read from GitSyncBloc directly in initState — the workspace may not have
+  // a git repo yet, or GitSyncBloc may not even be provided above this chip
+  // in a screen that never renders it) so a BranchChip remount after an
+  // earlier, already-resolved conflict doesn't replay a stale open.
+  int? _lastConflictToken;
 
   @override
   void initState() {
@@ -42,19 +60,35 @@ class _BranchChipState extends State<BranchChip> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final root = context.read<SettingsBloc>().state.settings.workspacePath;
-      if (root != null && root.isNotEmpty) _refresh(root);
+      if (root != null && root.isNotEmpty) {
+        _refresh(root);
+        _fetchSilently(root);
+      }
+    });
+    // Keeps ahead/behind counts fresh without the user remembering to pull.
+    // Silent: a routine offline tick must never surface a GIT ERROR dialog.
+    _fetchTimer = Timer.periodic(kAutoFetchInterval, (_) {
+      if (!mounted) return;
+      final root = context.read<SettingsBloc>().state.settings.workspacePath;
+      if (root != null && root.isNotEmpty) _fetchSilently(root);
     });
   }
 
   @override
   void dispose() {
     unawaited(_mirrorSub?.cancel());
+    _fetchTimer?.cancel();
     super.dispose();
   }
 
   void _refresh(String root) {
     if (!mounted) return;
     context.read<GitSyncBloc>().add(LoadBranchStatus(root));
+  }
+
+  void _fetchSilently(String root) {
+    if (!mounted) return;
+    context.read<GitSyncBloc>().add(FetchRemote(root, silent: true));
   }
 
   @override
@@ -69,8 +103,20 @@ class _BranchChipState extends State<BranchChip> {
 
         return BlocConsumer<GitSyncBloc, GitSyncState>(
           listenWhen: (p, n) =>
-              p.errorMessage != n.errorMessage && n.errorMessage != null,
+              (p.errorMessage != n.errorMessage && n.errorMessage != null) ||
+              p.conflictToken != n.conflictToken,
           listener: (context, state) {
+            // A pull halted on conflicts — open the resolver. Checked first
+            // and separately from the error path below: a conflicted pull is
+            // NOT an error state (see GitSyncBloc._onPull), so this is the
+            // only signal for it. `_lastConflictToken` is always seeded by
+            // the builder below before the first stream event can arrive, so
+            // it is never null here.
+            if (state.conflictToken != _lastConflictToken) {
+              _lastConflictToken = state.conflictToken;
+              unawaited(ConflictResolutionDialog.show(context, root: root));
+              return;
+            }
             final message = state.errorMessage;
             if (message == null) return;
             if (message.contains('uncommitted changes')) {
@@ -80,6 +126,10 @@ class _BranchChipState extends State<BranchChip> {
             }
           },
           builder: (context, state) {
+            // Seed on the first build from `bloc.state` (not a separate
+            // `.read()` — this callback already has it) so a later real bump
+            // is the only thing that can ever pop the dialog.
+            _lastConflictToken ??= state.conflictToken;
             final branch = state.branch;
             if (!branch.isRepo || branch.current == null) {
               return const SizedBox.shrink();
@@ -142,6 +192,12 @@ class _BranchChipState extends State<BranchChip> {
         const PopupMenuItem<String>(
           value: 'prs',
           child: Text('PULL REQUESTS…'),
+        ),
+        PopupMenuItem<String>(
+          key: const ValueKey('branch_menu_fetch'),
+          value: 'fetch',
+          enabled: branch.hasRemote,
+          child: Text(branch.hasRemote ? 'FETCH' : 'FETCH — NO REMOTE'),
         ),
       ],
       child: Padding(
@@ -214,6 +270,8 @@ class _BranchChipState extends State<BranchChip> {
         unawaited(StashListDialog.show(context, root: root));
       case 'prs':
         unawaited(PullRequestsDialog.show(context, root: root));
+      case 'fetch':
+        bloc.add(FetchRemote(root));
     }
   }
 

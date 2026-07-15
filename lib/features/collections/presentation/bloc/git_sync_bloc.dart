@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/git/git_service.dart' show PullOutcome;
 import 'package:getman/features/collections/domain/branch_service.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_event.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_state.dart';
@@ -21,6 +22,7 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
     on<StashChanges>(_onStash);
     on<PopStash>(_onPop);
     on<DropStash>(_onDrop);
+    on<FetchRemote>(_onFetch);
   }
 
   final BranchService _service;
@@ -136,15 +138,55 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
     );
   }
 
+  /// Unlike the other mutating ops, `pull` doesn't go through the uniform
+  /// [_run] helper: it needs the [PullOutcome] to decide *which* token to
+  /// bump. A clean pull behaves like every other disk-changing op
+  /// (`reloadToken`); a conflicted pull leaves the tree mid-rebase — it must
+  /// NOT bump `reloadToken` (nothing to reload yet, the rebase is paused) and
+  /// instead bumps `conflictToken` so the widget layer opens the resolver.
+  /// Either way a terminal `ready` state is always emitted so the bloc is
+  /// never left stuck on `busy`.
   Future<void> _onPull(PullChanges event, Emitter<GitSyncState> emit) async {
     if (_dropWhileBusy('pull')) return;
-    await _run(
-      event.root,
-      emit,
-      'pull',
-      () => _service.pull(event.root),
-      changedDisk: true,
+    emit(state.copyWith(status: GitSyncStatus.busy));
+    final PullOutcome outcome;
+    try {
+      outcome = await _service.pull(event.root);
+    } on Object catch (e) {
+      _fail(e, emit, 'pull');
+      return;
+    }
+    emit(
+      state.copyWith(
+        status: GitSyncStatus.busy,
+        reloadToken: outcome == PullOutcome.clean
+            ? state.reloadToken + 1
+            : null,
+        conflictToken: outcome == PullOutcome.conflicted
+            ? state.conflictToken + 1
+            : null,
+      ),
     );
+    await _refresh(event.root, emit);
+  }
+
+  Future<void> _onFetch(FetchRemote event, Emitter<GitSyncState> emit) async {
+    if (_dropWhileBusy('fetch')) return;
+    emit(state.copyWith(status: GitSyncStatus.busy));
+    try {
+      await _service.fetch(event.root);
+    } on Object catch (e) {
+      if (event.silent) {
+        // Auto-fetch runs unattended every few minutes — being offline is
+        // normal, not an error. Log only and fall through to the refresh so
+        // the bloc still lands on a terminal `ready` state.
+        log('fetch (silent) failed: $e', name: 'GitSyncBloc');
+      } else {
+        _fail(e, emit, 'fetch');
+        return;
+      }
+    }
+    await _refresh(event.root, emit);
   }
 
   Future<void> _onPush(PushChanges event, Emitter<GitSyncState> emit) async {

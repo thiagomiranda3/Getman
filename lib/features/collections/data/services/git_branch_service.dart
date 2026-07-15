@@ -55,10 +55,11 @@ class GitBranchService implements BranchService {
   /// aborts), and the suspension drops any edit made *during* it — whose
   /// debounce would otherwise fire after the checkout and mirror the old
   /// branch's tree onto the new one. The suspension is lifted even if git
-  /// throws.
-  Future<void> _runOnTree(Future<void> Function() action) async {
+  /// throws. Generic so callers that need the action's result (e.g. `pull`'s
+  /// [PullOutcome]) don't need a second helper.
+  Future<T> _runOnTree<T>(Future<T> Function() action) async {
     await _flushOrThrow();
-    await _sync.withMirroringSuspended(action);
+    return _sync.withMirroringSuspended(action);
   }
 
   @override
@@ -83,14 +84,8 @@ class GitBranchService implements BranchService {
     await _git.createBranch(root, branch);
   }
 
-  // `GitService.pull` now returns a `PullOutcome`; `BranchService.pull` is
-  // still `Future<void>` here — a later task (Spec D T4/T6) rewires callers
-  // to consume the outcome for conflict handling. Discard it for now so the
-  // tree keeps compiling.
   @override
-  Future<void> pull(String root) => _runOnTree(() async {
-    await _git.pull(root);
-  });
+  Future<PullOutcome> pull(String root) => _runOnTree(() => _git.pull(root));
 
   // No suspension here: `git push` reads the working tree, it never rewrites
   // it — an edit made mid-push belongs on disk and must still be mirrored.
