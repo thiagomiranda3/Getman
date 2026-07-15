@@ -37,6 +37,20 @@ void main() {
     expect(rollupChecks(rollup), 'pending');
   });
 
+  test('rollupChecks: pending wins over failing in the same rollup', () {
+    // Guards the spec's headline precedence: an unfinished check alongside a
+    // completed failure must report `pending`, not `failing`.
+    final rollup = [
+      {'__typename': 'CheckRun', 'status': 'IN_PROGRESS'},
+      {
+        '__typename': 'CheckRun',
+        'status': 'COMPLETED',
+        'conclusion': 'FAILURE',
+      },
+    ];
+    expect(rollupChecks(rollup), 'pending');
+  });
+
   test('rollupChecks: a completed failure (all finished) is failing', () {
     final rollup = [
       {
@@ -57,9 +71,30 @@ void main() {
     expect(parsePrList(json).single.checks, 'none');
   });
 
-  test('parsePrUrl returns the PR url gh printed on the last line', () {
+  test('parsePrList tolerates wrong-typed fields instead of throwing', () {
+    // A malformed entry (number as string, isDraft as int) must degrade to
+    // defaults, not abort the whole parse with a CastError.
+    const json = '''
+    [{"number":"oops","title":42,"state":null,"url":true,"isDraft":1,
+      "statusCheckRollup":null}]''';
+    final pr = parsePrList(json).single;
+    expect(pr.number, 0);
+    expect(pr.title, '');
+    expect(pr.state, 'OPEN');
+    expect(pr.url, '');
+    expect(pr.isDraft, isFalse);
+    expect(pr.checks, 'none');
+  });
+
+  test('parsePrList degrades a non-list to empty', () {
+    expect(parsePrList('{"not":"a list"}'), isEmpty);
+  });
+
+  test('parsePrUrl returns the last url when gh prints more than one', () {
+    // gh may echo a remote/branch URL before the created PR URL; the PR URL is
+    // last. Guards the `match.last` selection against a `.first` regression.
     const out =
-        'Warning: 3 uncommitted changes\n'
+        'https://github.com/o/r/tree/my-branch\n'
         'https://github.com/o/r/pull/456\n';
     expect(parsePrUrl(out), 'https://github.com/o/r/pull/456');
   });

@@ -7,6 +7,11 @@ import 'package:getman/core/git/gh_service.dart';
 GhService createGhServiceImpl() => _GhService();
 
 class _GhService implements GhService {
+  // NOTE: `Process.run` closes the child's stdin (it gets EOF), so `gh` runs
+  // non-interactively and errors instead of prompting — this is what upholds
+  // the "throws, never hangs" contract. Two things must stay true: (1) never
+  // switch to `Process.start` with an open stdin, and (2) there is no timeout,
+  // so any gh call that could block on something *other* than stdin would hang.
   Future<ProcessResult> _run(
     String root,
     List<String> args, {
@@ -97,10 +102,15 @@ class _GhService implements GhService {
       'defaultBranchRef',
     ], allowFailure: true);
     if (r.exitCode != 0) return null;
-    final decoded = jsonDecode(r.stdout as String);
-    if (decoded is! Map) return null;
-    final ref = decoded['defaultBranchRef'];
-    if (ref is! Map) return null;
-    return ref['name'] as String?;
+    // Best-effort: a non-JSON / empty stdout must yield null, not throw.
+    try {
+      final decoded = jsonDecode(r.stdout as String);
+      if (decoded is! Map) return null;
+      final ref = decoded['defaultBranchRef'];
+      if (ref is! Map) return null;
+      return ref['name'] as String?;
+    } on FormatException {
+      return null;
+    }
   }
 }

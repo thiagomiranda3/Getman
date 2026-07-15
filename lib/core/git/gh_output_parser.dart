@@ -46,11 +46,13 @@ List<PullRequestInfo> parsePrList(String jsonText) {
     for (final raw in decoded)
       if (raw is Map)
         PullRequestInfo(
-          number: (raw['number'] as num?)?.toInt() ?? 0,
-          title: raw['title'] as String? ?? '',
-          state: raw['state'] as String? ?? 'OPEN',
-          url: raw['url'] as String? ?? '',
-          isDraft: raw['isDraft'] as bool? ?? false,
+          // Tolerate wrong-typed fields (a bad entry degrades, never aborts the
+          // whole parse) — `as num?` etc. would throw a CastError on a String.
+          number: raw['number'] is num ? (raw['number'] as num).toInt() : 0,
+          title: raw['title'] is String ? raw['title'] as String : '',
+          state: raw['state'] is String ? raw['state'] as String : 'OPEN',
+          url: raw['url'] is String ? raw['url'] as String : '',
+          isDraft: raw['isDraft'] == true,
           checks: rollupChecks(raw['statusCheckRollup']),
         ),
   ];
