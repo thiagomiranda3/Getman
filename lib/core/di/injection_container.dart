@@ -36,6 +36,7 @@ import 'package:getman/features/collections/domain/repositories/collections_repo
 import 'package:getman/features/collections/domain/review_service.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/conflict_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/pull_requests_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
@@ -208,6 +209,7 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     ..registerFactory(() => ReviewBloc(service: sl()))
     ..registerFactory(() => GitSyncBloc(service: sl()))
     ..registerFactory(() => PullRequestsBloc(service: sl()))
+    ..registerFactory(() => ConflictBloc(service: sl()))
     // Features - Chaining (no-code extraction + assertions)
     ..registerLazySingleton(
       () => RulesBloc(
