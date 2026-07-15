@@ -57,8 +57,22 @@ class _GhService implements GhService {
     required String body,
     required bool draft,
   }) async {
-    // Filled in Task 3.
-    throw UnimplementedError();
+    final r = await _run(root, [
+      'pr',
+      'create',
+      '--base',
+      base,
+      '--title',
+      title,
+      '--body',
+      body,
+      if (draft) '--draft',
+    ]);
+    final url = parsePrUrl(r.stdout as String);
+    if (url.isEmpty) {
+      throw GhException('gh pr create did not return a PR url');
+    }
+    return url;
   }
 
   @override

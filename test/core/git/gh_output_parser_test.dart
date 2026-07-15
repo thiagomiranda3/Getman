@@ -56,4 +56,15 @@ void main() {
     expect(parsePrList(json).single.isDraft, isTrue);
     expect(parsePrList(json).single.checks, 'none');
   });
+
+  test('parsePrUrl returns the PR url gh printed on the last line', () {
+    const out =
+        'Warning: 3 uncommitted changes\n'
+        'https://github.com/o/r/pull/456\n';
+    expect(parsePrUrl(out), 'https://github.com/o/r/pull/456');
+  });
+
+  test('parsePrUrl returns empty when no url is present', () {
+    expect(parsePrUrl('nothing here'), '');
+  });
 }

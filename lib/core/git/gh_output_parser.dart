@@ -55,3 +55,9 @@ List<PullRequestInfo> parsePrList(String jsonText) {
         ),
   ];
 }
+
+/// The last `https://…` token gh printed — that is the created PR's URL.
+String parsePrUrl(String stdout) {
+  final match = RegExp(r'https://\S+').allMatches(stdout).toList();
+  return match.isEmpty ? '' : match.last.group(0)!.trim();
+}
