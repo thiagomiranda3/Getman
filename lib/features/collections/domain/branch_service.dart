@@ -15,8 +15,15 @@ abstract class BranchService {
 
   /// `git pull --rebase`. Returns [PullOutcome.conflicted] when the rebase
   /// halted on a true conflict — the working tree is left mid-rebase for the
-  /// conflict-resolution flow, not rolled back.
-  Future<PullOutcome> pull(String root);
+  /// conflict-resolution flow, not rolled back. [authorName]/[authorEmail]
+  /// are the Getman-owned commit identity from Settings (see
+  /// `GitService.commit`) — threaded through so a rebase that needs to
+  /// create a commit still succeeds without a configured OS git identity.
+  Future<PullOutcome> pull(
+    String root, {
+    String? authorName,
+    String? authorEmail,
+  });
   Future<void> push(String root);
   Future<void> stash(String root, String message);
   Future<void> popStash(String root, int index);

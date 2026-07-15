@@ -152,7 +152,11 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
     emit(state.copyWith(status: GitSyncStatus.busy));
     final PullOutcome outcome;
     try {
-      outcome = await _service.pull(event.root);
+      outcome = await _service.pull(
+        event.root,
+        authorName: event.authorName,
+        authorEmail: event.authorEmail,
+      );
     } on Object catch (e) {
       _fail(e, emit, 'pull');
       return;

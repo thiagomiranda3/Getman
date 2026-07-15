@@ -263,7 +263,14 @@ class _BranchChipState extends State<BranchChip> {
           ),
         );
       case 'pull':
-        bloc.add(PullChanges(root));
+        final identity = context.read<SettingsBloc>().state.settings;
+        bloc.add(
+          PullChanges(
+            root,
+            authorName: identity.gitUserName,
+            authorEmail: identity.gitUserEmail,
+          ),
+        );
       case 'push':
         bloc.add(PushChanges(root));
       case 'stashes':

@@ -23,7 +23,12 @@ class _StubGitService implements GitService {
   @override
   Future<void> unstage(String root, List<String> paths) async {}
   @override
-  Future<void> commit(String root, String message) async {}
+  Future<void> commit(
+    String root,
+    String message, {
+    String? authorName,
+    String? authorEmail,
+  }) async {}
   @override
   Future<List<String>> branches(String root) async => const [];
   @override
@@ -37,7 +42,11 @@ class _StubGitService implements GitService {
   @override
   Future<bool> hasUpstream(String root) async => false;
   @override
-  Future<PullOutcome> pull(String root) async => PullOutcome.clean;
+  Future<PullOutcome> pull(
+    String root, {
+    String? authorName,
+    String? authorEmail,
+  }) async => PullOutcome.clean;
   @override
   Future<void> push(String root, {required bool setUpstream}) async {}
   @override
@@ -65,7 +74,11 @@ class _StubGitService implements GitService {
   @override
   Future<void> removeFile(String root, String path) async {}
   @override
-  Future<void> rebaseContinue(String root) async {}
+  Future<void> rebaseContinue(
+    String root, {
+    String? authorName,
+    String? authorEmail,
+  }) async {}
   @override
   Future<void> rebaseAbort(String root) async {}
   @override

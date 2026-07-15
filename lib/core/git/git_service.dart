@@ -28,6 +28,18 @@ class GitException implements Exception {
   final int? exitCode;
   @override
   String toString() => 'GitException($message)';
+
+  /// Whether [message] is git's "no commit identity configured" failure —
+  /// the signal the review/pull/rebase blocs use to prompt for a Getman-owned
+  /// commit identity instead of surfacing a raw git error. Matches git's own
+  /// wording (`Author identity unknown` / `Please tell me who you are`) plus
+  /// the newer `unable to auto-detect email address` variant, case-insensitive.
+  static bool isMissingIdentity(String message) {
+    final m = message.toLowerCase();
+    return m.contains('author identity unknown') ||
+        m.contains('please tell me who you are') ||
+        m.contains('unable to auto-detect email');
+  }
 }
 
 /// Commits the current branch is ahead of / behind its upstream. Both are 0
@@ -69,7 +81,20 @@ abstract class GitService {
 
   Future<void> stage(String root, List<String> paths);
   Future<void> unstage(String root, List<String> paths);
-  Future<void> commit(String root, String message);
+
+  /// Commits staged changes. [authorName]/[authorEmail], when both non-empty,
+  /// are passed inline as `-c user.name=… -c user.email=…` so a commit
+  /// succeeds even when the OS git has no configured identity — Getman's own
+  /// identity (from Settings) is used for this commit only, never written to
+  /// the user's git config. When omitted, falls back to whatever git resolves
+  /// on its own (global config, or a failure the caller detects via
+  /// [GitException.isMissingIdentity]).
+  Future<void> commit(
+    String root,
+    String message, {
+    String? authorName,
+    String? authorEmail,
+  });
 
   /// Local branch names.
   Future<List<String>> branches(String root);
@@ -97,7 +122,14 @@ abstract class GitService {
   /// failure (auth/network/local changes) aborts the rebase before throwing,
   /// so a non-resolvable failed pull leaves the working tree exactly as it
   /// was.
-  Future<PullOutcome> pull(String root);
+  /// [authorName]/[authorEmail] are passed inline to the rebase machinery the
+  /// same way as [commit] — a rebase that needs to create a commit (e.g.
+  /// autostash replay) must not fail on a missing identity either.
+  Future<PullOutcome> pull(
+    String root, {
+    String? authorName,
+    String? authorEmail,
+  });
 
   /// Pushes the current branch. Pass [setUpstream] for a branch that has
   /// never been pushed (`git push -u origin <branch>`).
@@ -135,7 +167,13 @@ abstract class GitService {
   Future<void> removeFile(String root, String path);
 
   /// `git rebase --continue`, non-interactively (no editor prompt).
-  Future<void> rebaseContinue(String root);
+  /// [authorName]/[authorEmail] are passed inline like [commit] — continuing a
+  /// rebase re-creates a commit, so it hits the same missing-identity failure.
+  Future<void> rebaseContinue(
+    String root, {
+    String? authorName,
+    String? authorEmail,
+  });
 
   /// `git rebase --abort` — restores the pre-rebase tree.
   Future<void> rebaseAbort(String root);

@@ -1,5 +1,6 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/git/git_service.dart' show GitException;
 import 'package:getman/features/collections/domain/entities/review_entry.dart';
 import 'package:getman/features/collections/domain/logic/semantic_diff.dart';
 import 'package:getman/features/collections/domain/review_service.dart';
@@ -56,7 +57,14 @@ void main() {
     when(() => service.review(root)).thenAnswer((_) async => result);
     when(() => service.stage(root, any())).thenAnswer((_) async {});
     when(() => service.unstage(root, any())).thenAnswer((_) async {});
-    when(() => service.commit(root, any())).thenAnswer((_) async {});
+    when(
+      () => service.commit(
+        root,
+        any(),
+        authorName: any(named: 'authorName'),
+        authorEmail: any(named: 'authorEmail'),
+      ),
+    ).thenAnswer((_) async {});
   });
 
   blocTest<ReviewBloc, ReviewState>(
@@ -135,8 +143,47 @@ void main() {
       b.add(const Commit(root, 'msg'));
     },
     verify: (b) {
-      verify(() => service.commit(root, 'msg')).called(1);
+      verify(
+        () => service.commit(
+          root,
+          'msg',
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).called(1);
     },
+  );
+
+  blocTest<ReviewBloc, ReviewState>(
+    'Commit failing with a missing-identity GitException → needsIdentity',
+    build: () {
+      when(
+        () => service.commit(
+          root,
+          any(),
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenThrow(
+        GitException(
+          '*** Please tell me who you are.\n\nRun git config...',
+        ),
+      );
+      return ReviewBloc(service: service);
+    },
+    act: (b) => b.add(const Commit(root, 'msg')),
+    expect: () => [
+      isA<ReviewState>().having(
+        (s) => s.status,
+        'status',
+        ReviewStatus.committing,
+      ),
+      isA<ReviewState>().having(
+        (s) => s.status,
+        'status',
+        ReviewStatus.needsIdentity,
+      ),
+    ],
   );
 
   blocTest<ReviewBloc, ReviewState>(

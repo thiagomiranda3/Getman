@@ -46,7 +46,13 @@ void main() {
     when(() => git.stashPush(root, any())).thenAnswer((_) async {});
     when(() => git.stashPop(root, any())).thenAnswer((_) async {});
     when(() => git.stashDrop(root, any())).thenAnswer((_) async {});
-    when(() => git.pull(root)).thenAnswer((_) async => PullOutcome.clean);
+    when(
+      () => git.pull(
+        root,
+        authorName: any(named: 'authorName'),
+        authorEmail: any(named: 'authorEmail'),
+      ),
+    ).thenAnswer((_) async => PullOutcome.clean);
     when(
       () => git.push(root, setUpstream: any(named: 'setUpstream')),
     ).thenAnswer((_) async {});
@@ -199,7 +205,13 @@ void main() {
   test('pull waits for the pending mirror to land first', () {
     return expectGitWaitsForMirror(
       stubGitOp: (onGitOp) {
-        when(() => git.pull(root)).thenAnswer((_) async {
+        when(
+          () => git.pull(
+            root,
+            authorName: any(named: 'authorName'),
+            authorEmail: any(named: 'authorEmail'),
+          ),
+        ).thenAnswer((_) async {
           onGitOp();
           return PullOutcome.clean;
         });
@@ -282,7 +294,13 @@ void main() {
         failTheMirrorWrite();
 
         await expectLater(service.pull(root), throwsA(isA<GitException>()));
-        verifyNever(() => git.pull(root));
+        verifyNever(
+          () => git.pull(
+            root,
+            authorName: any(named: 'authorName'),
+            authorEmail: any(named: 'authorEmail'),
+          ),
+        );
       });
 
       test('isDirty throws and never asks git', () async {
@@ -332,10 +350,17 @@ void main() {
             () => service.switchTo(root, 'feat/x'),
           ),
           'pull': (
-            (onOp) => when(() => git.pull(root)).thenAnswer((_) async {
-              onOp();
-              return PullOutcome.clean;
-            }),
+            (onOp) =>
+                when(
+                  () => git.pull(
+                    root,
+                    authorName: any(named: 'authorName'),
+                    authorEmail: any(named: 'authorEmail'),
+                  ),
+                ).thenAnswer((_) async {
+                  onOp();
+                  return PullOutcome.clean;
+                }),
             () => service.pull(root),
           ),
           'stash': (

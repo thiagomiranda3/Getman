@@ -9,6 +9,15 @@ abstract class ReviewService {
   /// than one subprocess per entry.
   Future<void> stage(String root, List<String> paths);
   Future<void> unstage(String root, List<String> paths);
-  Future<void> commit(String root, String message);
+
+  /// [authorName]/[authorEmail] are the Getman-owned commit identity from
+  /// Settings (see `GitService.commit`) — passed through so a commit
+  /// succeeds even without a configured OS git identity.
+  Future<void> commit(
+    String root,
+    String message, {
+    String? authorName,
+    String? authorEmail,
+  });
   Future<void> init(String root);
 }

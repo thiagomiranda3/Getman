@@ -18,7 +18,15 @@ abstract class ConflictService {
   Future<void> resolve(String root, List<FileResolution> resolutions);
 
   /// Continues an in-progress rebase after conflicts are staged.
-  Future<RebaseStep> continueRebase(String root);
+  /// [authorName]/[authorEmail] are the Getman-owned commit identity from
+  /// Settings (see `GitService.commit`) — threaded through so the commit
+  /// `rebase --continue` creates still succeeds without a configured OS git
+  /// identity.
+  Future<RebaseStep> continueRebase(
+    String root, {
+    String? authorName,
+    String? authorEmail,
+  });
 
   /// Aborts an in-progress rebase, restoring the pre-pull state.
   Future<void> abort(String root);

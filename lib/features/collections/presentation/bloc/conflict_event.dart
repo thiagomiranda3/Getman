@@ -19,12 +19,24 @@ class LoadConflicts extends ConflictEvent {
 
 /// Applies [resolutions], stages them, and continues the rebase.
 class ResolveAndContinue extends ConflictEvent {
-  const ResolveAndContinue(this.root, this.resolutions);
+  const ResolveAndContinue(
+    this.root,
+    this.resolutions, {
+    this.authorName,
+    this.authorEmail,
+  });
   final String root;
   final List<FileResolution> resolutions;
 
+  /// Getman-owned commit identity from Settings (see
+  /// `GitService.commit`) — threaded through so the commit
+  /// `rebase --continue` creates still succeeds without a configured OS git
+  /// identity.
+  final String? authorName;
+  final String? authorEmail;
+
   @override
-  List<Object?> get props => [root, resolutions];
+  List<Object?> get props => [root, resolutions, authorName, authorEmail];
 }
 
 /// Aborts the in-progress rebase, restoring the pre-pull state.

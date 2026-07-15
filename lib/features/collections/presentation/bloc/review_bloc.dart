@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/git/git_service.dart' show GitException;
 import 'package:getman/features/collections/domain/review_service.dart';
 import 'package:getman/features/collections/presentation/bloc/review_event.dart';
 import 'package:getman/features/collections/presentation/bloc/review_state.dart';
@@ -104,12 +105,24 @@ class ReviewBloc extends Bloc<ReviewEvent, ReviewState> {
   Future<void> _onCommit(Commit event, Emitter<ReviewState> emit) async {
     emit(state.copyWith(status: ReviewStatus.committing));
     try {
-      await _service.commit(event.root, event.message);
+      await _service.commit(
+        event.root,
+        event.message,
+        authorName: event.authorName,
+        authorEmail: event.authorEmail,
+      );
     } on Object catch (e) {
       log('commit failed: $e', name: 'ReviewBloc');
-      emit(
-        state.copyWith(status: ReviewStatus.error, errorMessage: e.toString()),
-      );
+      if (e is GitException && GitException.isMissingIdentity(e.message)) {
+        emit(state.copyWith(status: ReviewStatus.needsIdentity));
+      } else {
+        emit(
+          state.copyWith(
+            status: ReviewStatus.error,
+            errorMessage: e.toString(),
+          ),
+        );
+      }
       return;
     }
     add(LoadReview(event.root));

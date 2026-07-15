@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -9,13 +11,20 @@ import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/review_event.dart';
 import 'package:getman/features/collections/presentation/bloc/review_state.dart';
 import 'package:getman/features/collections/presentation/widgets/review_changes_dialog.dart';
+import 'package:getman/features/settings/domain/entities/settings_entity.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockReviewBloc extends MockBloc<ReviewEvent, ReviewState>
     implements ReviewBloc {}
 
+class _MockSettingsBloc extends Mock implements SettingsBloc {}
+
 void main() {
   late _MockReviewBloc bloc;
+  late _MockSettingsBloc settingsBloc;
 
   const entry = ReviewEntry(
     path: 'a.req.json',
@@ -33,14 +42,24 @@ void main() {
     ]),
   );
 
-  setUp(() => bloc = _MockReviewBloc());
+  setUp(() {
+    bloc = _MockReviewBloc();
+    settingsBloc = _MockSettingsBloc();
+    when(
+      () => settingsBloc.state,
+    ).thenReturn(const SettingsState(settings: SettingsEntity()));
+    when(() => settingsBloc.stream).thenAnswer((_) => const Stream.empty());
+  });
 
   Widget host(ReviewState state) {
     when(() => bloc.state).thenReturn(state);
     return MaterialApp(
       theme: resolveTheme('classic')(Brightness.light),
-      home: BlocProvider<ReviewBloc>.value(
-        value: bloc,
+      home: MultiBlocProvider(
+        providers: [
+          BlocProvider<ReviewBloc>.value(value: bloc),
+          BlocProvider<SettingsBloc>.value(value: settingsBloc),
+        ],
         child: const Scaffold(body: ReviewChangesBody(root: '/ws')),
       ),
     );
@@ -181,4 +200,68 @@ void main() {
     expect(find.text('boom'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'a commit failing with needsIdentity opens the identity prompt; SAVE '
+    'dispatches UpdateGitIdentity then re-dispatches Commit',
+    (tester) async {
+      final controller = StreamController<ReviewState>();
+      const readyState = ReviewState(
+        status: ReviewStatus.ready,
+        entries: [entry],
+        selectedPath: 'a.req.json',
+      );
+      whenListen(bloc, controller.stream, initialState: readyState);
+
+      await tester.pumpWidget(host(readyState));
+      await tester.pumpAndSettle();
+
+      // No prompt yet.
+      expect(find.byKey(const ValueKey('git_identity_dialog')), findsNothing);
+
+      controller.add(
+        const ReviewState(
+          status: ReviewStatus.needsIdentity,
+          entries: [entry],
+          selectedPath: 'a.req.json',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('git_identity_dialog')), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('git_identity_name_field')),
+        'Ada Lovelace',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('git_identity_email_field')),
+        'ada@example.com',
+      );
+      await tester.tap(find.byKey(const ValueKey('git_identity_save')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('git_identity_dialog')), findsNothing);
+      verify(
+        () => settingsBloc.add(
+          const UpdateGitIdentity(
+            name: 'Ada Lovelace',
+            email: 'ada@example.com',
+          ),
+        ),
+      ).called(1);
+      verify(
+        () => bloc.add(
+          const Commit(
+            '/ws',
+            '',
+            authorName: 'Ada Lovelace',
+            authorEmail: 'ada@example.com',
+          ),
+        ),
+      ).called(1);
+
+      await controller.close();
+    },
+  );
 }

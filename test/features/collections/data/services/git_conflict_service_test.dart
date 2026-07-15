@@ -536,15 +536,33 @@ void main() {
 
   group('continueRebase', () {
     test('maps a still-in-progress rebase to moreConflicts', () async {
-      when(() => git.rebaseContinue(root)).thenAnswer((_) async {});
+      when(
+        () => git.rebaseContinue(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenAnswer((_) async {});
       when(() => git.isRebaseInProgress(root)).thenAnswer((_) async => true);
 
       expect(await service.continueRebase(root), RebaseStep.moreConflicts);
-      verify(() => git.rebaseContinue(root)).called(1);
+      verify(
+        () => git.rebaseContinue(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).called(1);
     });
 
     test('maps a finished rebase to done', () async {
-      when(() => git.rebaseContinue(root)).thenAnswer((_) async {});
+      when(
+        () => git.rebaseContinue(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenAnswer((_) async {});
       when(() => git.isRebaseInProgress(root)).thenAnswer((_) async => false);
 
       expect(await service.continueRebase(root), RebaseStep.done);
@@ -554,7 +572,13 @@ void main() {
     test('holds mirroring suspended for its whole duration', () async {
       final sync = WorkspaceSyncService(_NoopWorkspaceDataSource());
       final svc = GitConflictService(git, sync);
-      when(() => git.rebaseContinue(root)).thenAnswer((_) async {
+      when(
+        () => git.rebaseContinue(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenAnswer((_) async {
         expect(sync.isMirroringSuspended, isTrue);
       });
       when(() => git.isRebaseInProgress(root)).thenAnswer((_) async => false);

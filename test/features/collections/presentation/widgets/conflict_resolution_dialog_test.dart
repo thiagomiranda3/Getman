@@ -15,6 +15,9 @@ import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart
 import 'package:getman/features/collections/presentation/bloc/git_sync_event.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_state.dart';
 import 'package:getman/features/collections/presentation/widgets/conflict_resolution_dialog.dart';
+import 'package:getman/features/settings/domain/entities/settings_entity.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockConflictBloc extends MockBloc<ConflictEvent, ConflictState>
@@ -22,6 +25,8 @@ class _MockConflictBloc extends MockBloc<ConflictEvent, ConflictState>
 
 class _MockGitSyncBloc extends MockBloc<GitSyncEvent, GitSyncState>
     implements GitSyncBloc {}
+
+class _MockSettingsBloc extends Mock implements SettingsBloc {}
 
 class _FakeConflictEvent extends Fake implements ConflictEvent {}
 
@@ -43,11 +48,17 @@ void main() {
 
   late _MockConflictBloc conflictBloc;
   late _MockGitSyncBloc gitBloc;
+  late _MockSettingsBloc settingsBloc;
 
   setUp(() {
     conflictBloc = _MockConflictBloc();
     gitBloc = _MockGitSyncBloc();
     when(() => gitBloc.state).thenReturn(const GitSyncState());
+    settingsBloc = _MockSettingsBloc();
+    when(
+      () => settingsBloc.state,
+    ).thenReturn(const SettingsState(settings: SettingsEntity()));
+    when(() => settingsBloc.stream).thenAnswer((_) => const Stream.empty());
   });
 
   Widget host() {
@@ -58,6 +69,7 @@ void main() {
           providers: [
             BlocProvider<ConflictBloc>.value(value: conflictBloc),
             BlocProvider<GitSyncBloc>.value(value: gitBloc),
+            BlocProvider<SettingsBloc>.value(value: settingsBloc),
           ],
           child: Builder(
             builder: (context) => TextButton(

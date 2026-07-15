@@ -85,7 +85,13 @@ class GitBranchService implements BranchService {
   }
 
   @override
-  Future<PullOutcome> pull(String root) => _runOnTree(() => _git.pull(root));
+  Future<PullOutcome> pull(
+    String root, {
+    String? authorName,
+    String? authorEmail,
+  }) => _runOnTree(
+    () => _git.pull(root, authorName: authorName, authorEmail: authorEmail),
+  );
 
   // No suspension here: `git push` reads the working tree, it never rewrites
   // it — an edit made mid-push belongs on disk and must still be mirrored.

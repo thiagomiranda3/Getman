@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -7,6 +9,8 @@ import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/review_event.dart';
 import 'package:getman/features/collections/presentation/bloc/review_state.dart';
 import 'package:getman/features/collections/presentation/widgets/semantic_diff_view.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 
 /// Opens the Review Changes dialog and dispatches the initial [LoadReview].
 class ReviewChangesDialog {
@@ -14,10 +18,18 @@ class ReviewChangesDialog {
 
   static Future<void> show(BuildContext context, {required String root}) {
     final reviewBloc = context.read<ReviewBloc>()..add(LoadReview(root));
+    // Captured + re-provided (not just read at dispatch time below): the
+    // fullscreen route path in showResponsiveDialog pushes onto the root
+    // Navigator, so the identity-prompt flow needs SettingsBloc reachable
+    // from that subtree the same way ReviewBloc already is.
+    final settingsBloc = context.read<SettingsBloc>();
     return showResponsiveDialog<void>(
       context,
-      builder: (dialogContext) => BlocProvider<ReviewBloc>.value(
-        value: reviewBloc,
+      builder: (dialogContext) => MultiBlocProvider(
+        providers: [
+          BlocProvider<ReviewBloc>.value(value: reviewBloc),
+          BlocProvider<SettingsBloc>.value(value: settingsBloc),
+        ],
         child: ReviewChangesBody(root: root),
       ),
     );
@@ -48,10 +60,54 @@ class _ReviewChangesBodyState extends State<ReviewChangesBody> {
     ChangeType.modified => Icons.edit,
   };
 
+  void _commit(BuildContext context) {
+    final identity = context.read<SettingsBloc>().state.settings;
+    context.read<ReviewBloc>().add(
+      Commit(
+        widget.root,
+        _message.text.trim(),
+        authorName: identity.gitUserName,
+        authorEmail: identity.gitUserEmail,
+      ),
+    );
+  }
+
+  /// A commit failed because neither Getman nor the OS git has a configured
+  /// commit identity — prompt for name/email, save it, and retry the same
+  /// commit message.
+  void _promptIdentity(BuildContext context) {
+    final settingsBloc = context.read<SettingsBloc>();
+    final reviewBloc = context.read<ReviewBloc>();
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (dialogContext) => _GitIdentityDialog(
+          initialName: settingsBloc.state.settings.gitUserName,
+          initialEmail: settingsBloc.state.settings.gitUserEmail,
+          onSave: (name, email) {
+            settingsBloc.add(UpdateGitIdentity(name: name, email: email));
+            reviewBloc.add(
+              Commit(
+                widget.root,
+                _message.text.trim(),
+                authorName: name,
+                authorEmail: email,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final layout = context.appLayout;
-    return BlocBuilder<ReviewBloc, ReviewState>(
+    return BlocConsumer<ReviewBloc, ReviewState>(
+      listenWhen: (p, c) =>
+          p.status != ReviewStatus.needsIdentity &&
+          c.status == ReviewStatus.needsIdentity,
+      listener: (context, state) => _promptIdentity(context),
       builder: (context, state) {
         return ResponsiveDialogScaffold(
           title: Text(
@@ -177,11 +233,7 @@ class _ReviewChangesBodyState extends State<ReviewChangesBody> {
             SizedBox(width: context.appLayout.inputPadding),
             ElevatedButton(
               key: const ValueKey('review_commit_button'),
-              onPressed: canCommit
-                  ? () => context.read<ReviewBloc>().add(
-                      Commit(widget.root, _message.text.trim()),
-                    )
-                  : null,
+              onPressed: canCommit ? () => _commit(context) : null,
               child: Text(
                 state.status == ReviewStatus.committing
                     ? 'COMMITTING…'
@@ -189,6 +241,91 @@ class _ReviewChangesBodyState extends State<ReviewChangesBody> {
               ),
             ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Just-in-time prompt for a Getman-owned commit identity, shown when a
+/// commit fails because neither Getman's stored identity nor the OS git
+/// config has one. Prefilled from the current Settings value (if any); SAVE
+/// hands the trimmed name/email back to the caller, which persists it and
+/// retries the commit.
+class _GitIdentityDialog extends StatefulWidget {
+  const _GitIdentityDialog({
+    required this.onSave,
+    this.initialName,
+    this.initialEmail,
+  });
+  final String? initialName;
+  final String? initialEmail;
+  final void Function(String name, String email) onSave;
+
+  @override
+  State<_GitIdentityDialog> createState() => _GitIdentityDialogState();
+}
+
+class _GitIdentityDialogState extends State<_GitIdentityDialog> {
+  late final TextEditingController _name;
+  late final TextEditingController _email;
+
+  @override
+  void initState() {
+    super.initState();
+    _name = TextEditingController(text: widget.initialName ?? '');
+    _email = TextEditingController(text: widget.initialEmail ?? '');
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _email.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    Navigator.of(context).pop();
+    widget.onSave(_name.text.trim(), _email.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final layout = context.appLayout;
+    return AlertDialog(
+      key: const ValueKey('git_identity_dialog'),
+      title: const Text('WHO ARE YOU?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Getman needs a name and email to author commits — this is '
+            'stored in Getman only, never written to your git config.',
+          ),
+          SizedBox(height: layout.inputPadding),
+          TextField(
+            key: const ValueKey('git_identity_name_field'),
+            controller: _name,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'Your name'),
+          ),
+          SizedBox(height: layout.inputPadding),
+          TextField(
+            key: const ValueKey('git_identity_email_field'),
+            controller: _email,
+            decoration: const InputDecoration(labelText: 'Your email'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('CANCEL'),
+        ),
+        FilledButton(
+          key: const ValueKey('git_identity_save'),
+          onPressed: _save,
+          child: const Text('SAVE'),
         ),
       ],
     );

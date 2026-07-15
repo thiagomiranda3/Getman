@@ -12,6 +12,7 @@ import 'package:getman/features/collections/presentation/bloc/conflict_event.dar
 import 'package:getman/features/collections/presentation/bloc/conflict_state.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_event.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart';
 import 'package:re_editor/re_editor.dart';
 
@@ -29,6 +30,11 @@ class ConflictResolutionDialog {
     // via GitSyncBloc (widget-layer coordination — no bloc→bloc coupling).
     final conflict = context.read<ConflictBloc>();
     final git = context.read<GitSyncBloc>();
+    // Also re-provided (mirroring conflict/git above): the fullscreen route
+    // path in showResponsiveDialog pushes onto the root Navigator, so the
+    // RESOLVE & CONTINUE identity read below needs SettingsBloc reachable
+    // from that subtree.
+    final settings = context.read<SettingsBloc>();
     return showResponsiveDialog<void>(
       context,
       barrierDismissible: false,
@@ -36,6 +42,7 @@ class ConflictResolutionDialog {
         providers: [
           BlocProvider<ConflictBloc>.value(value: conflict),
           BlocProvider<GitSyncBloc>.value(value: git),
+          BlocProvider<SettingsBloc>.value(value: settings),
         ],
         child: ConflictResolutionBody(root: root),
       ),
@@ -124,8 +131,14 @@ class _ConflictResolutionBodyState extends State<ConflictResolutionBody> {
         else
           FileResolution(path: fc.path, wholeFile: _wholeFilePicks[fc.path]),
     ];
+    final identity = context.read<SettingsBloc>().state.settings;
     context.read<ConflictBloc>().add(
-      ResolveAndContinue(widget.root, resolutions),
+      ResolveAndContinue(
+        widget.root,
+        resolutions,
+        authorName: identity.gitUserName,
+        authorEmail: identity.gitUserEmail,
+      ),
     );
   }
 

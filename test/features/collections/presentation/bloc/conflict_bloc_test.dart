@@ -84,7 +84,11 @@ void main() {
     build: () {
       when(() => service.resolve(root, any())).thenAnswer((_) async {});
       when(
-        () => service.continueRebase(root),
+        () => service.continueRebase(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
       ).thenAnswer((_) async => RebaseStep.done);
       return ConflictBloc(service: service);
     },
@@ -112,7 +116,11 @@ void main() {
     build: () {
       when(() => service.resolve(root, any())).thenAnswer((_) async {});
       when(
-        () => service.continueRebase(root),
+        () => service.continueRebase(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
       ).thenAnswer((_) async => RebaseStep.moreConflicts);
       when(
         () => service.currentConflicts(root),
@@ -138,7 +146,11 @@ void main() {
     build: () {
       when(() => service.resolve(root, any())).thenAnswer((_) async {});
       when(
-        () => service.continueRebase(root),
+        () => service.continueRebase(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
       ).thenAnswer((_) async => RebaseStep.moreConflicts);
       when(() => service.currentConflicts(root)).thenAnswer((_) async => []);
       return ConflictBloc(service: service);
@@ -169,7 +181,13 @@ void main() {
       // verifyNever below catches.
       final gate = Completer<RebaseStep>();
       when(() => service.resolve(root, any())).thenAnswer((_) async {});
-      when(() => service.continueRebase(root)).thenAnswer((_) => gate.future);
+      when(
+        () => service.continueRebase(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenAnswer((_) => gate.future);
       when(
         () => service.currentConflicts(root),
       ).thenAnswer((_) async => const [conflictB]);
@@ -253,7 +271,13 @@ void main() {
     ],
     verify: (_) {
       verifyNever(() => service.abort(root));
-      verifyNever(() => service.continueRebase(root));
+      verifyNever(
+        () => service.continueRebase(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      );
     },
   );
 

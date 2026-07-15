@@ -30,10 +30,16 @@ class CreateBranch extends GitSyncEvent {
 }
 
 class PullChanges extends GitSyncEvent {
-  const PullChanges(this.root);
+  const PullChanges(this.root, {this.authorName, this.authorEmail});
   final String root;
+
+  /// Getman-owned commit identity from Settings (see
+  /// `GitService.commit`) — threaded through so a rebase that needs to
+  /// create a commit still succeeds without a configured OS git identity.
+  final String? authorName;
+  final String? authorEmail;
   @override
-  List<Object?> get props => [root];
+  List<Object?> get props => [root, authorName, authorEmail];
 }
 
 class PushChanges extends GitSyncEvent {

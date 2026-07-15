@@ -26,13 +26,20 @@ class GitConflictService implements ConflictService {
   Future<PullOutcome> pullOrConflict(String root) => _git.pull(root);
 
   @override
-  Future<RebaseStep> continueRebase(String root) =>
-      _sync.withMirroringSuspended(() async {
-        await _git.rebaseContinue(root);
-        return await _git.isRebaseInProgress(root)
-            ? RebaseStep.moreConflicts
-            : RebaseStep.done;
-      });
+  Future<RebaseStep> continueRebase(
+    String root, {
+    String? authorName,
+    String? authorEmail,
+  }) => _sync.withMirroringSuspended(() async {
+    await _git.rebaseContinue(
+      root,
+      authorName: authorName,
+      authorEmail: authorEmail,
+    );
+    return await _git.isRebaseInProgress(root)
+        ? RebaseStep.moreConflicts
+        : RebaseStep.done;
+  });
 
   @override
   Future<void> abort(String root) => _git.rebaseAbort(root);

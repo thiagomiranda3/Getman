@@ -29,6 +29,16 @@ class _IoGitService implements GitService {
     return result;
   }
 
+  /// `-c user.name=… -c user.email=…`, prepended to the git args of any
+  /// commit-creating command — never written to the user's global git
+  /// config. Empty when either half is missing/blank so git falls back to
+  /// its own resolution (and a genuinely missing identity still surfaces as
+  /// [GitException.isMissingIdentity]).
+  List<String> _identityArgs(String? name, String? email) =>
+      (name != null && name.isNotEmpty && email != null && email.isNotEmpty)
+      ? ['-c', 'user.name=$name', '-c', 'user.email=$email']
+      : const [];
+
   @override
   Future<bool> isAvailable() async {
     try {
@@ -116,8 +126,18 @@ class _IoGitService implements GitService {
   }
 
   @override
-  Future<void> commit(String root, String message) async {
-    await _run(root, ['commit', '-m', message]);
+  Future<void> commit(
+    String root,
+    String message, {
+    String? authorName,
+    String? authorEmail,
+  }) async {
+    await _run(root, [
+      ..._identityArgs(authorName, authorEmail),
+      'commit',
+      '-m',
+      message,
+    ]);
   }
 
   @override
@@ -180,8 +200,16 @@ class _IoGitService implements GitService {
   }
 
   @override
-  Future<PullOutcome> pull(String root) async {
-    final r = await _run(root, ['pull', '--rebase'], allowFailure: true);
+  Future<PullOutcome> pull(
+    String root, {
+    String? authorName,
+    String? authorEmail,
+  }) async {
+    final r = await _run(root, [
+      ..._identityArgs(authorName, authorEmail),
+      'pull',
+      '--rebase',
+    ], allowFailure: true);
     if (r.exitCode == 0) return PullOutcome.clean;
     if (await isRebaseInProgress(root) &&
         (await conflictedPaths(root)).isNotEmpty) {
@@ -289,11 +317,15 @@ class _IoGitService implements GitService {
       _run(root, ['rm', '--', path]);
 
   @override
-  Future<void> rebaseContinue(String root) async {
+  Future<void> rebaseContinue(
+    String root, {
+    String? authorName,
+    String? authorEmail,
+  }) async {
     // GIT_EDITOR=true so a commit-message step never blocks on an editor.
     final r = await Process.run(
       'git',
-      ['rebase', '--continue'],
+      [..._identityArgs(authorName, authorEmail), 'rebase', '--continue'],
       workingDirectory: root,
       stdoutEncoding: utf8,
       stderrEncoding: utf8,

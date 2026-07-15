@@ -39,7 +39,13 @@ void main() {
     when(() => service.isDirty(root)).thenAnswer((_) async => false);
     when(() => service.switchTo(root, any())).thenAnswer((_) async {});
     when(() => service.create(root, any())).thenAnswer((_) async {});
-    when(() => service.pull(root)).thenAnswer((_) async => PullOutcome.clean);
+    when(
+      () => service.pull(
+        root,
+        authorName: any(named: 'authorName'),
+        authorEmail: any(named: 'authorEmail'),
+      ),
+    ).thenAnswer((_) async => PullOutcome.clean);
     when(() => service.push(root)).thenAnswer((_) async {});
     when(() => service.stash(root, any())).thenAnswer((_) async {});
     when(() => service.popStash(root, any())).thenAnswer((_) async {});
@@ -132,7 +138,13 @@ void main() {
   blocTest<GitSyncBloc, GitSyncState>(
     'PullChanges surfaces the git error and does not bump reloadToken',
     build: () {
-      when(() => service.pull(root)).thenThrow(Exception('CONFLICT in a.json'));
+      when(
+        () => service.pull(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenThrow(Exception('CONFLICT in a.json'));
       return GitSyncBloc(service: service);
     },
     act: (b) => b.add(const PullChanges(root)),
@@ -146,7 +158,13 @@ void main() {
   blocTest<GitSyncBloc, GitSyncState>(
     'PullChanges surfaces a failed mirror flush',
     build: () {
-      when(() => service.pull(root)).thenThrow(flushFailure());
+      when(
+        () => service.pull(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenThrow(flushFailure());
       return GitSyncBloc(service: service);
     },
     act: (b) => b.add(const PullChanges(root)),
@@ -169,7 +187,11 @@ void main() {
     'lands on a terminal ready state',
     build: () {
       when(
-        () => service.pull(root),
+        () => service.pull(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
       ).thenAnswer((_) async => PullOutcome.conflicted);
       return GitSyncBloc(service: service);
     },
@@ -237,7 +259,13 @@ void main() {
     'ConflictsResolved dispatched while busy is dropped',
     build: () {
       pullGate = Completer<PullOutcome>();
-      when(() => service.pull(root)).thenAnswer((_) => pullGate.future);
+      when(
+        () => service.pull(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenAnswer((_) => pullGate.future);
       return GitSyncBloc(service: service);
     },
     act: (b) async {
@@ -380,7 +408,13 @@ void main() {
   blocTest<GitSyncBloc, GitSyncState>(
     'a later success clears the stale error message',
     build: () {
-      when(() => service.pull(root)).thenThrow(GitException('boom'));
+      when(
+        () => service.pull(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenThrow(GitException('boom'));
       return GitSyncBloc(service: service);
     },
     act: (b) async {
@@ -432,7 +466,13 @@ void main() {
     'an event dispatched while an op is in flight is dropped',
     build: () {
       pullGate = Completer<PullOutcome>();
-      when(() => service.pull(root)).thenAnswer((_) => pullGate.future);
+      when(
+        () => service.pull(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenAnswer((_) => pullGate.future);
       return GitSyncBloc(service: service);
     },
     act: (b) async {

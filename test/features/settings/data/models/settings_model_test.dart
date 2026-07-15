@@ -239,4 +239,73 @@ void main() {
       expect(const SettingsEntity().skippedUpdateVersion, isNull);
     });
   });
+
+  group('SettingsModel gitUserName + gitUserEmail', () {
+    test('default is null', () {
+      expect(const SettingsEntity().gitUserName, isNull);
+      expect(const SettingsEntity().gitUserEmail, isNull);
+      expect(SettingsModel().gitUserName, isNull);
+      expect(SettingsModel().gitUserEmail, isNull);
+    });
+
+    test('json roundtrip preserves both fields', () {
+      final model = SettingsModel(
+        gitUserName: 'Ada Lovelace',
+        gitUserEmail: 'ada@example.com',
+      );
+      final back = SettingsModel.fromJson(model.toJson());
+      expect(back.gitUserName, 'Ada Lovelace');
+      expect(back.gitUserEmail, 'ada@example.com');
+    });
+
+    test('entity roundtrip preserves both fields', () {
+      const entity = SettingsEntity(
+        gitUserName: 'Ada Lovelace',
+        gitUserEmail: 'ada@example.com',
+      );
+      final back = SettingsModel.fromEntity(entity).toEntity();
+      expect(back.gitUserName, 'Ada Lovelace');
+      expect(back.gitUserEmail, 'ada@example.com');
+    });
+
+    test('legacy json without the fields defaults both to null', () {
+      final back = SettingsModel.fromJson({'historyLimit': 50});
+      expect(back.gitUserName, isNull);
+      expect(back.gitUserEmail, isNull);
+    });
+
+    test('SettingsEntity.copyWith can clear both to null explicitly', () {
+      const entity = SettingsEntity(
+        gitUserName: 'Ada Lovelace',
+        gitUserEmail: 'ada@example.com',
+      );
+      final cleared = entity.copyWith(gitUserName: null, gitUserEmail: null);
+      expect(cleared.gitUserName, isNull);
+      expect(cleared.gitUserEmail, isNull);
+    });
+
+    test('SettingsEntity.copyWith without arg preserves previous values', () {
+      const entity = SettingsEntity(
+        gitUserName: 'Ada Lovelace',
+        gitUserEmail: 'ada@example.com',
+      );
+      final preserved = entity.copyWith(themeId: 'other');
+      expect(preserved.gitUserName, 'Ada Lovelace');
+      expect(preserved.gitUserEmail, 'ada@example.com');
+    });
+
+    test('SettingsModel.copyWith can clear both via the sentinel', () {
+      final model = SettingsModel(
+        gitUserName: 'Ada Lovelace',
+        gitUserEmail: 'ada@example.com',
+      );
+      final cleared = model.copyWith(gitUserName: null, gitUserEmail: null);
+      expect(cleared.gitUserName, isNull);
+      expect(cleared.gitUserEmail, isNull);
+      // Omitting keeps them.
+      final kept = model.copyWith(historyLimit: 5);
+      expect(kept.gitUserName, 'Ada Lovelace');
+      expect(kept.gitUserEmail, 'ada@example.com');
+    });
+  });
 }

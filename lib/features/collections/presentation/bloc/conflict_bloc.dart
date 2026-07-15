@@ -50,7 +50,11 @@ class ConflictBloc extends Bloc<ConflictEvent, ConflictState> {
     emit(state.copyWith(status: ConflictStatus.resolving));
     try {
       await _service.resolve(event.root, event.resolutions);
-      final step = await _service.continueRebase(event.root);
+      final step = await _service.continueRebase(
+        event.root,
+        authorName: event.authorName,
+        authorEmail: event.authorEmail,
+      );
       if (step == RebaseStep.done) {
         emit(state.copyWith(status: ConflictStatus.done));
         return;
