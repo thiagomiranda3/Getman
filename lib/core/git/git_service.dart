@@ -109,6 +109,10 @@ abstract class GitService {
   /// Whether the repo has at least one remote configured.
   Future<bool> hasRemote(String root);
 
+  /// Adds a remote (`git remote add <name> <url>`) — e.g. `origin` when the
+  /// user supplies a URL to enable pull/push/fetch on a repo with none yet.
+  Future<void> addRemote(String root, String name, String url);
+
   /// Ahead/behind counts vs the current branch's upstream.
   Future<AheadBehind> aheadBehind(String root);
 

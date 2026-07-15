@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
+import 'package:getman/features/collections/domain/entities/branch_status.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_event.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_state.dart';
@@ -150,7 +151,7 @@ class _BranchChipState extends State<BranchChip> {
       key: const ValueKey('branch_chip'),
       tooltip: 'Branch & sync',
       enabled: !state.isBusy,
-      onSelected: (value) => _onSelected(context, root, value),
+      onSelected: (value) => _onSelected(context, root, branch, value),
       itemBuilder: (context) => [
         for (final b in branch.branches)
           PopupMenuItem<String>(
@@ -171,19 +172,15 @@ class _BranchChipState extends State<BranchChip> {
           value: 'new',
           child: Text('NEW BRANCH…'),
         ),
-        PopupMenuItem<String>(
-          key: const ValueKey('branch_menu_pull'),
+        const PopupMenuItem<String>(
+          key: ValueKey('branch_menu_pull'),
           value: 'pull',
-          enabled: branch.hasRemote,
-          child: Text(
-            branch.hasRemote ? 'PULL (REBASE)' : 'PULL — NO REMOTE',
-          ),
+          child: Text('PULL (REBASE)'),
         ),
-        PopupMenuItem<String>(
-          key: const ValueKey('branch_menu_push'),
+        const PopupMenuItem<String>(
+          key: ValueKey('branch_menu_push'),
           value: 'push',
-          enabled: branch.hasRemote,
-          child: Text(branch.hasRemote ? 'PUSH' : 'PUSH — NO REMOTE'),
+          child: Text('PUSH'),
         ),
         PopupMenuItem<String>(
           value: 'stashes',
@@ -193,11 +190,10 @@ class _BranchChipState extends State<BranchChip> {
           value: 'prs',
           child: Text('PULL REQUESTS…'),
         ),
-        PopupMenuItem<String>(
-          key: const ValueKey('branch_menu_fetch'),
+        const PopupMenuItem<String>(
+          key: ValueKey('branch_menu_fetch'),
           value: 'fetch',
-          enabled: branch.hasRemote,
-          child: Text(branch.hasRemote ? 'FETCH' : 'FETCH — NO REMOTE'),
+          child: Text('FETCH'),
         ),
       ],
       child: Padding(
@@ -245,7 +241,12 @@ class _BranchChipState extends State<BranchChip> {
     );
   }
 
-  void _onSelected(BuildContext context, String root, String value) {
+  void _onSelected(
+    BuildContext context,
+    String root,
+    BranchStatus branch,
+    String value,
+  ) {
     final bloc = context.read<GitSyncBloc>();
     if (value.startsWith('switch:')) {
       bloc.add(SwitchBranch(root, value.substring('switch:'.length)));
@@ -264,22 +265,80 @@ class _BranchChipState extends State<BranchChip> {
         );
       case 'pull':
         final identity = context.read<SettingsBloc>().state.settings;
-        bloc.add(
-          PullChanges(
-            root,
-            authorName: identity.gitUserName,
-            authorEmail: identity.gitUserEmail,
-          ),
-        );
+        if (branch.hasRemote) {
+          bloc.add(
+            PullChanges(
+              root,
+              authorName: identity.gitUserName,
+              authorEmail: identity.gitUserEmail,
+            ),
+          );
+        } else {
+          unawaited(
+            _promptAddRemote(
+              context,
+              root,
+              onUrl: (url) => bloc.add(
+                PullChanges(
+                  root,
+                  authorName: identity.gitUserName,
+                  authorEmail: identity.gitUserEmail,
+                  addRemoteUrl: url,
+                ),
+              ),
+            ),
+          );
+        }
       case 'push':
-        bloc.add(PushChanges(root));
+        if (branch.hasRemote) {
+          bloc.add(PushChanges(root));
+        } else {
+          unawaited(
+            _promptAddRemote(
+              context,
+              root,
+              onUrl: (url) => bloc.add(PushChanges(root, addRemoteUrl: url)),
+            ),
+          );
+        }
       case 'stashes':
         unawaited(StashListDialog.show(context, root: root));
       case 'prs':
         unawaited(PullRequestsDialog.show(context, root: root));
       case 'fetch':
-        bloc.add(FetchRemote(root));
+        if (branch.hasRemote) {
+          bloc.add(FetchRemote(root));
+        } else {
+          unawaited(
+            _promptAddRemote(
+              context,
+              root,
+              onUrl: (url) => bloc.add(FetchRemote(root, addRemoteUrl: url)),
+            ),
+          );
+        }
     }
+  }
+
+  /// Prompts for a remote URL (used when the repo has none yet) and, on
+  /// confirm, invokes [onUrl] with the trimmed value — the caller dispatches
+  /// the actual pull/push/fetch event carrying `addRemoteUrl` so the bloc
+  /// adds `origin` before performing the action.
+  Future<void> _promptAddRemote(
+    BuildContext context,
+    String root, {
+    required void Function(String url) onUrl,
+  }) {
+    return NamePromptDialog.show(
+      context,
+      title: 'ADD REMOTE',
+      hintText: 'https://github.com/you/repo.git',
+      confirmLabel: 'ADD REMOTE',
+      onConfirm: (url) {
+        if (url.trim().isEmpty) return;
+        onUrl(url.trim());
+      },
+    );
   }
 
   /// A switch was refused because the tree is dirty: offer the two ways out.

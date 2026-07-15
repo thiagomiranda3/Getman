@@ -57,6 +57,7 @@ void main() {
       () => git.push(root, setUpstream: any(named: 'setUpstream')),
     ).thenAnswer((_) async {});
     when(() => git.hasUpstream(root)).thenAnswer((_) async => true);
+    when(() => git.addRemote(root, any(), any())).thenAnswer((_) async {});
   });
 
   // NB: not `tearDown(sync.dispose)` — a tear-off would read the late `sync`
@@ -275,6 +276,22 @@ void main() {
 
     verifyNever(() => ds.write(any(), any()));
     verify(() => git.stashDrop(root, 1)).called(1);
+  });
+
+  test('addRemote delegates to git', () async {
+    await service.addRemote(root, 'origin', 'https://example.invalid/x.git');
+    verify(
+      () => git.addRemote(root, 'origin', 'https://example.invalid/x.git'),
+    ).called(1);
+  });
+
+  test('addRemote does not flush: it never touches the tree', () async {
+    sync.scheduleMirror(root, const []);
+
+    await service.addRemote(root, 'origin', 'https://example.invalid/x.git');
+
+    verifyNever(() => ds.write(any(), any()));
+    verify(() => git.addRemote(root, 'origin', any())).called(1);
   });
 
   group(

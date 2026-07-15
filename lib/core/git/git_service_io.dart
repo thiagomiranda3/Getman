@@ -188,6 +188,11 @@ class _IoGitService implements GitService {
   }
 
   @override
+  Future<void> addRemote(String root, String name, String url) async {
+    await _run(root, ['remote', 'add', name, url]);
+  }
+
+  @override
   Future<AheadBehind> aheadBehind(String root) async {
     // `@{u}...HEAD` prints "<behind>\t<ahead>". Exits non-zero when the
     // branch has no upstream — that is a normal state, so report (0, 0).

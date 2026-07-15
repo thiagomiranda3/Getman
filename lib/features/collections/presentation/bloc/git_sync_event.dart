@@ -30,7 +30,12 @@ class CreateBranch extends GitSyncEvent {
 }
 
 class PullChanges extends GitSyncEvent {
-  const PullChanges(this.root, {this.authorName, this.authorEmail});
+  const PullChanges(
+    this.root, {
+    this.authorName,
+    this.authorEmail,
+    this.addRemoteUrl,
+  });
   final String root;
 
   /// Getman-owned commit identity from Settings (see
@@ -38,15 +43,25 @@ class PullChanges extends GitSyncEvent {
   /// create a commit still succeeds without a configured OS git identity.
   final String? authorName;
   final String? authorEmail;
+
+  /// When non-null (and non-blank), the bloc adds this URL as the `origin`
+  /// remote before pulling — set from the add-remote prompt when the repo
+  /// had no remote configured yet.
+  final String? addRemoteUrl;
   @override
-  List<Object?> get props => [root, authorName, authorEmail];
+  List<Object?> get props => [root, authorName, authorEmail, addRemoteUrl];
 }
 
 class PushChanges extends GitSyncEvent {
-  const PushChanges(this.root);
+  const PushChanges(this.root, {this.addRemoteUrl});
   final String root;
+
+  /// When non-null (and non-blank), the bloc adds this URL as the `origin`
+  /// remote before pushing — set from the add-remote prompt when the repo
+  /// had no remote configured yet.
+  final String? addRemoteUrl;
   @override
-  List<Object?> get props => [root];
+  List<Object?> get props => [root, addRemoteUrl];
 }
 
 class StashChanges extends GitSyncEvent {
@@ -80,11 +95,16 @@ class DropStash extends GitSyncEvent {
 /// manual FETCH menu selection leaves it `false` so a real failure (e.g. auth)
 /// still shows the GIT ERROR dialog.
 class FetchRemote extends GitSyncEvent {
-  const FetchRemote(this.root, {this.silent = false});
+  const FetchRemote(this.root, {this.silent = false, this.addRemoteUrl});
   final String root;
   final bool silent;
+
+  /// When non-null (and non-blank), the bloc adds this URL as the `origin`
+  /// remote before fetching — set from the add-remote prompt when the repo
+  /// had no remote configured yet.
+  final String? addRemoteUrl;
   @override
-  List<Object?> get props => [root, silent];
+  List<Object?> get props => [root, silent, addRemoteUrl];
 }
 
 /// Dispatched by the conflict resolver after it finishes a rebase

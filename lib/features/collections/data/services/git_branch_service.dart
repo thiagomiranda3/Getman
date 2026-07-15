@@ -84,6 +84,13 @@ class GitBranchService implements BranchService {
     await _git.createBranch(root, branch);
   }
 
+  // No flush/suspension here, deliberately: adding a remote only writes to
+  // `.git/config` — it never touches the working tree — so it cannot race a
+  // pending mirror write (same rationale as `dropStash`/`fetch`).
+  @override
+  Future<void> addRemote(String root, String name, String url) =>
+      _git.addRemote(root, name, url);
+
   @override
   Future<PullOutcome> pull(
     String root, {

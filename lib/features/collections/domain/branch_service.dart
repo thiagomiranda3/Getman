@@ -13,6 +13,11 @@ abstract class BranchService {
   Future<void> switchTo(String root, String branch);
   Future<void> create(String root, String branch);
 
+  /// Adds a remote (`git remote add <name> <url>`) — used when the user
+  /// supplies a URL from the add-remote prompt to enable pull/push/fetch on a
+  /// repo that has none yet.
+  Future<void> addRemote(String root, String name, String url);
+
   /// `git pull --rebase`. Returns [PullOutcome.conflicted] when the rebase
   /// halted on a true conflict — the working tree is left mid-rebase for the
   /// conflict-resolution flow, not rolled back. [authorName]/[authorEmail]

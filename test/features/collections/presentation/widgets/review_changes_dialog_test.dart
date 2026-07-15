@@ -4,9 +4,13 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getman/core/theme/theme_registry.dart';
+import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/features/collections/domain/entities/branch_status.dart';
 import 'package:getman/features/collections/domain/entities/review_entry.dart';
 import 'package:getman/features/collections/domain/logic/semantic_diff.dart';
+import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/git_sync_event.dart';
+import 'package:getman/features/collections/presentation/bloc/git_sync_state.dart';
 import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/review_event.dart';
 import 'package:getman/features/collections/presentation/bloc/review_state.dart';
@@ -22,9 +26,13 @@ class _MockReviewBloc extends MockBloc<ReviewEvent, ReviewState>
 
 class _MockSettingsBloc extends Mock implements SettingsBloc {}
 
+class _MockGitSyncBloc extends MockBloc<GitSyncEvent, GitSyncState>
+    implements GitSyncBloc {}
+
 void main() {
   late _MockReviewBloc bloc;
   late _MockSettingsBloc settingsBloc;
+  late _MockGitSyncBloc gitSyncBloc;
 
   const entry = ReviewEntry(
     path: 'a.req.json',
@@ -45,20 +53,34 @@ void main() {
   setUp(() {
     bloc = _MockReviewBloc();
     settingsBloc = _MockSettingsBloc();
+    gitSyncBloc = _MockGitSyncBloc();
     when(
       () => settingsBloc.state,
     ).thenReturn(const SettingsState(settings: SettingsEntity()));
     when(() => settingsBloc.stream).thenAnswer((_) => const Stream.empty());
+    when(() => gitSyncBloc.state).thenReturn(
+      const GitSyncState(
+        status: GitSyncStatus.ready,
+        branch: BranchStatus(
+          isRepo: true,
+          current: 'main',
+          branches: ['main'],
+          hasRemote: true,
+        ),
+      ),
+    );
+    when(() => gitSyncBloc.stream).thenAnswer((_) => const Stream.empty());
   });
 
   Widget host(ReviewState state) {
     when(() => bloc.state).thenReturn(state);
     return MaterialApp(
-      theme: resolveTheme('classic')(Brightness.light),
+      theme: brutalistTheme(Brightness.light),
       home: MultiBlocProvider(
         providers: [
           BlocProvider<ReviewBloc>.value(value: bloc),
           BlocProvider<SettingsBloc>.value(value: settingsBloc),
+          BlocProvider<GitSyncBloc>.value(value: gitSyncBloc),
         ],
         child: const Scaffold(body: ReviewChangesBody(root: '/ws')),
       ),
@@ -182,6 +204,117 @@ void main() {
     );
     expect(find.textContaining('Initialize git'), findsOneWidget);
   });
+
+  testWidgets('the PUSH button is present when the workspace is a repo', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(const ReviewState(status: ReviewStatus.ready)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('review_push_button')), findsOneWidget);
+  });
+
+  // Pushed via a real route (unlike `host()`, which renders the body
+  // directly as `home:`) so `Navigator.of(context).maybePop()` inside the
+  // PUSH handler has something real to pop — mirrors how
+  // `ReviewChangesDialog.show` actually opens this body.
+  Widget hostAsRoute(ReviewState state) {
+    when(() => bloc.state).thenReturn(state);
+    // The providers wrap `MaterialApp` itself (not just `home:`), matching
+    // main.dart's root MultiBlocProvider — a route pushed via `Navigator.push`
+    // lands in the same Overlay as `home`, a *sibling* of it in the element
+    // tree, not a descendant, so providers scoped only to `home:` would not
+    // be reachable from the pushed route.
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<ReviewBloc>.value(value: bloc),
+        BlocProvider<SettingsBloc>.value(value: settingsBloc),
+        BlocProvider<GitSyncBloc>.value(value: gitSyncBloc),
+      ],
+      child: MaterialApp(
+        theme: brutalistTheme(Brightness.light),
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        const Scaffold(body: ReviewChangesBody(root: '/ws')),
+                  ),
+                ),
+                child: const Text('open review'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  testWidgets(
+    'pressing PUSH with a remote present dispatches PushChanges and pops',
+    (tester) async {
+      await tester.pumpWidget(
+        hostAsRoute(const ReviewState(status: ReviewStatus.ready)),
+      );
+      await tester.tap(find.text('open review'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('review_push_button')));
+      await tester.pumpAndSettle();
+
+      verify(() => gitSyncBloc.add(const PushChanges('/ws'))).called(1);
+      // The dialog route itself was popped.
+      expect(find.byKey(const ValueKey('review_push_button')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'pressing PUSH with no remote prompts for a URL before pushing',
+    (tester) async {
+      when(() => gitSyncBloc.state).thenReturn(
+        const GitSyncState(
+          status: GitSyncStatus.ready,
+          branch: BranchStatus(
+            isRepo: true,
+            current: 'main',
+            branches: ['main'],
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        host(const ReviewState(status: ReviewStatus.ready)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('review_push_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ADD REMOTE'), findsWidgets);
+      expect(find.byKey(const ValueKey('name_prompt_field')), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('name_prompt_field')),
+        'https://example.invalid/x/y.git',
+      );
+      await tester.pump();
+      await tester.tap(find.widgetWithText(TextButton, 'ADD REMOTE'));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => gitSyncBloc.add(
+          const PushChanges(
+            '/ws',
+            addRemoteUrl: 'https://example.invalid/x/y.git',
+          ),
+        ),
+      ).called(1);
+    },
+  );
 
   testWidgets('surfaces the error message after a failed commit', (
     tester,

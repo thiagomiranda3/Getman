@@ -68,6 +68,17 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
     }
   }
 
+  /// Adds [url] as the `origin` remote when non-null/non-blank — set from the
+  /// add-remote prompt when a pull/push/fetch was invoked on a repo with no
+  /// remote configured yet. Runs before the action it is paired with, inside
+  /// the same try/catch, so a failure here surfaces as the normal error state
+  /// instead of a distinct code path.
+  Future<void> _maybeAddRemote(String root, String? url) async {
+    final trimmed = url?.trim();
+    if (trimmed == null || trimmed.isEmpty) return;
+    await _service.addRemote(root, 'origin', trimmed);
+  }
+
   void _fail(Object e, Emitter<GitSyncState> emit, String op) {
     log('$op failed: $e', name: 'GitSyncBloc');
     emit(
@@ -161,6 +172,7 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
     emit(state.copyWith(status: GitSyncStatus.busy));
     final PullOutcome outcome;
     try {
+      await _maybeAddRemote(event.root, event.addRemoteUrl);
       outcome = await _service.pull(
         event.root,
         authorName: event.authorName,
@@ -200,6 +212,7 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
     if (_dropWhileBusy('fetch')) return;
     emit(state.copyWith(status: GitSyncStatus.busy));
     try {
+      await _maybeAddRemote(event.root, event.addRemoteUrl);
       await _service.fetch(event.root);
     } on Object catch (e) {
       if (event.silent) {
@@ -230,7 +243,10 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
 
   Future<void> _onPush(PushChanges event, Emitter<GitSyncState> emit) async {
     if (_dropWhileBusy('push')) return;
-    await _run(event.root, emit, 'push', () => _service.push(event.root));
+    await _run(event.root, emit, 'push', () async {
+      await _maybeAddRemote(event.root, event.addRemoteUrl);
+      await _service.push(event.root);
+    });
   }
 
   Future<void> _onStash(StashChanges event, Emitter<GitSyncState> emit) async {

@@ -3,8 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/ui/widgets/app_snack_bar.dart';
+import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 import 'package:getman/features/collections/domain/entities/review_entry.dart';
+import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/git_sync_event.dart';
 import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/review_event.dart';
 import 'package:getman/features/collections/presentation/bloc/review_state.dart';
@@ -21,14 +25,18 @@ class ReviewChangesDialog {
     // Captured + re-provided (not just read at dispatch time below): the
     // fullscreen route path in showResponsiveDialog pushes onto the root
     // Navigator, so the identity-prompt flow needs SettingsBloc reachable
-    // from that subtree the same way ReviewBloc already is.
+    // from that subtree the same way ReviewBloc already is. GitSyncBloc is
+    // captured the same way so the PUSH button can read `hasRemote` and
+    // dispatch — it's provided at the app root (main.dart), reachable here.
     final settingsBloc = context.read<SettingsBloc>();
+    final gitSyncBloc = context.read<GitSyncBloc>();
     return showResponsiveDialog<void>(
       context,
       builder: (dialogContext) => MultiBlocProvider(
         providers: [
           BlocProvider<ReviewBloc>.value(value: reviewBloc),
           BlocProvider<SettingsBloc>.value(value: settingsBloc),
+          BlocProvider<GitSyncBloc>.value(value: gitSyncBloc),
         ],
         child: ReviewChangesBody(root: root),
       ),
@@ -70,6 +78,40 @@ class _ReviewChangesBodyState extends State<ReviewChangesBody> {
         authorEmail: identity.gitUserEmail,
       ),
     );
+  }
+
+  /// PUSH from the review dialog. When the repo has a remote, pushes right
+  /// away; otherwise prompts for a URL first (the bloc adds it as `origin`
+  /// before pushing — see `GitSyncBloc._maybeAddRemote`). Either way, this
+  /// only *starts* the push: feedback (busy/error/updated ahead-count) surfaces
+  /// on the branch chip, not here — closing the dialog hands the user back to
+  /// it immediately.
+  void _push(BuildContext context) {
+    final gitSyncBloc = context.read<GitSyncBloc>();
+    if (gitSyncBloc.state.branch.hasRemote) {
+      gitSyncBloc.add(PushChanges(widget.root));
+      _afterPushDispatched(context);
+      return;
+    }
+    unawaited(
+      NamePromptDialog.show(
+        context,
+        title: 'ADD REMOTE',
+        hintText: 'https://github.com/you/repo.git',
+        confirmLabel: 'ADD REMOTE',
+        onConfirm: (url) {
+          final trimmed = url.trim();
+          if (trimmed.isEmpty) return;
+          gitSyncBloc.add(PushChanges(widget.root, addRemoteUrl: trimmed));
+          _afterPushDispatched(context);
+        },
+      ),
+    );
+  }
+
+  void _afterPushDispatched(BuildContext context) {
+    showAppSnackBar(context, 'Pushing to remote…');
+    unawaited(Navigator.of(context).maybePop());
   }
 
   /// A commit failed because neither Getman nor the OS git has a configured
@@ -121,6 +163,12 @@ class _ReviewChangesBodyState extends State<ReviewChangesBody> {
             child: _body(context, state),
           ),
           actions: [
+            if (state.repoExists)
+              TextButton(
+                key: const ValueKey('review_push_button'),
+                onPressed: () => _push(context),
+                child: const Text('PUSH'),
+              ),
             TextButton(
               onPressed: () => Navigator.of(context).maybePop(),
               child: const Text('CLOSE'),

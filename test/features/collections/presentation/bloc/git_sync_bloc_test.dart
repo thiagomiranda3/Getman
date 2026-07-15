@@ -51,6 +51,9 @@ void main() {
     when(() => service.popStash(root, any())).thenAnswer((_) async {});
     when(() => service.dropStash(root, any())).thenAnswer((_) async {});
     when(() => service.fetch(root)).thenAnswer((_) async {});
+    when(
+      () => service.addRemote(root, any(), any()),
+    ).thenAnswer((_) async {});
   });
 
   blocTest<GitSyncBloc, GitSyncState>(
@@ -290,6 +293,42 @@ void main() {
       verify(() => service.push(root)).called(1);
       expect(b.state.status, GitSyncStatus.ready);
       expect(b.state.reloadToken, 0);
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'PushChanges with addRemoteUrl adds origin before pushing',
+    build: () => GitSyncBloc(service: service),
+    act: (b) => b.add(const PushChanges(root, addRemoteUrl: 'u')),
+    verify: (b) {
+      verifyInOrder([
+        () => service.addRemote(root, 'origin', 'u'),
+        () => service.push(root),
+      ]);
+      expect(b.state.status, GitSyncStatus.ready);
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'PushChanges without addRemoteUrl never calls addRemote',
+    build: () => GitSyncBloc(service: service),
+    act: (b) => b.add(const PushChanges(root)),
+    verify: (b) {
+      verifyNever(() => service.addRemote(root, any(), any()));
+      verify(() => service.push(root)).called(1);
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'FetchRemote with addRemoteUrl adds origin before fetching',
+    build: () => GitSyncBloc(service: service),
+    act: (b) => b.add(const FetchRemote(root, addRemoteUrl: 'u')),
+    verify: (b) {
+      verifyInOrder([
+        () => service.addRemote(root, 'origin', 'u'),
+        () => service.fetch(root),
+      ]);
+      expect(b.state.status, GitSyncStatus.ready);
     },
   );
 

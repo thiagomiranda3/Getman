@@ -137,6 +137,77 @@ void main() {
     verify(() => bloc.add(const PullChanges(root))).called(1);
   });
 
+  testWidgets('PUSH dispatches PushChanges when a remote exists', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(
+        const GitSyncState(
+          status: GitSyncStatus.ready,
+          branch: BranchStatus(
+            isRepo: true,
+            current: 'main',
+            branches: ['main'],
+            hasRemote: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('branch_chip')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('branch_menu_push')));
+    await tester.pumpAndSettle();
+
+    verify(() => bloc.add(const PushChanges(root))).called(1);
+  });
+
+  testWidgets(
+    'PUSH with no remote opens the ADD REMOTE prompt; confirming dispatches '
+    'PushChanges with addRemoteUrl',
+    (tester) async {
+      await tester.pumpWidget(
+        host(
+          const GitSyncState(
+            status: GitSyncStatus.ready,
+            branch: BranchStatus(
+              isRepo: true,
+              current: 'main',
+              branches: ['main'],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('branch_chip')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('branch_menu_push')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ADD REMOTE'), findsWidgets);
+      expect(find.byKey(const ValueKey('name_prompt_field')), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('name_prompt_field')),
+        'https://example.invalid/x/y.git',
+      );
+      await tester.pump();
+      await tester.tap(find.widgetWithText(TextButton, 'ADD REMOTE'));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => bloc.add(
+          const PushChanges(
+            root,
+            addRemoteUrl: 'https://example.invalid/x/y.git',
+          ),
+        ),
+      ).called(1);
+    },
+  );
+
   testWidgets('FETCH dispatches FetchRemote', (tester) async {
     await tester.pumpWidget(
       host(
