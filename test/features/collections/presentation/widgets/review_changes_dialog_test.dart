@@ -238,6 +238,9 @@ void main() {
         find.byKey(const ValueKey('git_identity_email_field')),
         'ada@example.com',
       );
+      // SAVE is gated on both fields being non-empty (FIX 1) — pump so the
+      // rebuild from the second field's onChanged lands before the tap.
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('git_identity_save')));
       await tester.pumpAndSettle();
 
@@ -260,6 +263,67 @@ void main() {
           ),
         ),
       ).called(1);
+
+      await controller.close();
+    },
+  );
+
+  testWidgets(
+    'the identity prompt SAVE button is disabled while the email (or name) '
+    'field is blank',
+    (tester) async {
+      final controller = StreamController<ReviewState>();
+      const readyState = ReviewState(
+        status: ReviewStatus.ready,
+        entries: [entry],
+        selectedPath: 'a.req.json',
+      );
+      whenListen(bloc, controller.stream, initialState: readyState);
+
+      await tester.pumpWidget(host(readyState));
+      await tester.pumpAndSettle();
+
+      controller.add(
+        const ReviewState(
+          status: ReviewStatus.needsIdentity,
+          entries: [entry],
+          selectedPath: 'a.req.json',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('git_identity_dialog')), findsOneWidget);
+
+      FilledButton saveButton() => tester.widget<FilledButton>(
+        find.byKey(const ValueKey('git_identity_save')),
+      );
+
+      // Both fields blank → disabled.
+      expect(saveButton().onPressed, isNull);
+
+      // Name only → still disabled (email blank).
+      await tester.enterText(
+        find.byKey(const ValueKey('git_identity_name_field')),
+        'Ada Lovelace',
+      );
+      await tester.pump();
+      expect(saveButton().onPressed, isNull);
+
+      // Both filled → enabled.
+      await tester.enterText(
+        find.byKey(const ValueKey('git_identity_email_field')),
+        'ada@example.com',
+      );
+      await tester.pump();
+      expect(saveButton().onPressed, isNotNull);
+
+      // Email cleared back to blank (whitespace-only) → disabled again.
+      await tester.enterText(
+        find.byKey(const ValueKey('git_identity_email_field')),
+        '   ',
+      );
+      await tester.pump();
+      expect(saveButton().onPressed, isNull);
 
       await controller.close();
     },

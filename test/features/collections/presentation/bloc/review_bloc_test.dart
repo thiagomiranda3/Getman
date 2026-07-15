@@ -187,6 +187,34 @@ void main() {
   );
 
   blocTest<ReviewBloc, ReviewState>(
+    'Commit failing with a non-identity GitException → error, not '
+    'needsIdentity',
+    build: () {
+      when(
+        () => service.commit(
+          root,
+          any(),
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenThrow(GitException('some other git failure'));
+      return ReviewBloc(service: service);
+    },
+    act: (b) => b.add(const Commit(root, 'msg')),
+    expect: () => [
+      isA<ReviewState>().having(
+        (s) => s.status,
+        'status',
+        ReviewStatus.committing,
+      ),
+      isA<ReviewState>().having((s) => s.status, 'status', ReviewStatus.error),
+    ],
+    verify: (b) {
+      expect(b.state.errorMessage, contains('some other git failure'));
+    },
+  );
+
+  blocTest<ReviewBloc, ReviewState>(
     'review failure → error status',
     build: () {
       when(() => service.review(root)).thenThrow(Exception('boom'));

@@ -1,10 +1,19 @@
 import 'dart:developer';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:getman/core/git/git_service.dart' show PullOutcome;
+import 'package:getman/core/git/git_service.dart'
+    show GitException, PullOutcome;
 import 'package:getman/features/collections/domain/branch_service.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_event.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_state.dart';
+
+/// Friendly, actionable replacement for the raw git stderr surfaced when a
+/// pull/rebase hits a missing commit identity — the raw message tells the
+/// user to run `git config --global …`, which contradicts Getman's
+/// no-config-file approach (identity is stored in Getman only).
+const _missingIdentityMessage =
+    'Set your commit identity (your name and email) in Settings → '
+    'Workspace, then try again.';
 
 /// Drives branch + sync over [BranchService]. Errors are surfaced in state
 /// (never only logged) — a silent failure here looks like a no-op to the user.
@@ -158,7 +167,19 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
         authorEmail: event.authorEmail,
       );
     } on Object catch (e) {
-      _fail(e, emit, 'pull');
+      log('pull failed: $e', name: 'GitSyncBloc');
+      if (e is GitException && GitException.isMissingIdentity(e.message)) {
+        emit(
+          state.copyWith(
+            status: GitSyncStatus.error,
+            errorMessage: _missingIdentityMessage,
+          ),
+        );
+      } else {
+        emit(
+          state.copyWith(status: GitSyncStatus.error, errorMessage: '$e'),
+        );
+      }
       return;
     }
     emit(

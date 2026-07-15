@@ -79,4 +79,41 @@ void main() {
       );
     },
   );
+
+  test(
+    'commit with only a partial inline identity (name without email, or '
+    'vice versa) is treated as no identity and throws a GitException '
+    'detected as a missing identity',
+    () async {
+      if (!await gitPresent()) return; // skip when git missing
+      File('${tmp.path}/a.req.json').writeAsStringSync('{"x":1}');
+      await git.stage(tmp.path, ['a.req.json']);
+
+      // Name without email: _identityArgs must produce no -c args at all
+      // (not a garbage user.email=), so git falls back to its own
+      // resolution and fails the same way as with no identity.
+      await expectLater(
+        git.commit(tmp.path, 'seed', authorName: 'X'),
+        throwsA(
+          isA<GitException>().having(
+            (e) => GitException.isMissingIdentity(e.message),
+            'isMissingIdentity',
+            isTrue,
+          ),
+        ),
+      );
+
+      // Email without name: same expectation, reversed.
+      await expectLater(
+        git.commit(tmp.path, 'seed', authorEmail: 'x@example.com'),
+        throwsA(
+          isA<GitException>().having(
+            (e) => GitException.isMissingIdentity(e.message),
+            'isMissingIdentity',
+            isTrue,
+          ),
+        ),
+      );
+    },
+  );
 }

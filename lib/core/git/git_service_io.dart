@@ -38,10 +38,22 @@ class _IoGitService implements GitService {
   /// The stored name is suffixed with [_viaGetman] only at commit time (the
   /// setting stays clean), so history reads `name via Getman` while GitHub —
   /// which attributes by email — still credits the user normally.
-  List<String> _identityArgs(String? name, String? email) =>
-      (name != null && name.isNotEmpty && email != null && email.isNotEmpty)
-      ? ['-c', 'user.name=$name$_viaGetman', '-c', 'user.email=$email']
-      : const [];
+  List<String> _identityArgs(String? name, String? email) {
+    final trimmedName = name?.trim();
+    final trimmedEmail = email?.trim();
+    if (trimmedName == null ||
+        trimmedName.isEmpty ||
+        trimmedEmail == null ||
+        trimmedEmail.isEmpty) {
+      return const [];
+    }
+    return [
+      '-c',
+      'user.name=$trimmedName$_viaGetman',
+      '-c',
+      'user.email=$trimmedEmail',
+    ];
+  }
 
   static const String _viaGetman = ' via Getman';
 

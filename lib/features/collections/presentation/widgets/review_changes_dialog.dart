@@ -292,6 +292,8 @@ class _GitIdentityDialogState extends State<_GitIdentityDialog> {
   @override
   Widget build(BuildContext context) {
     final layout = context.appLayout;
+    final canSave =
+        _name.text.trim().isNotEmpty && _email.text.trim().isNotEmpty;
     return AlertDialog(
       key: const ValueKey('git_identity_dialog'),
       title: const Text('WHO ARE YOU?'),
@@ -307,12 +309,14 @@ class _GitIdentityDialogState extends State<_GitIdentityDialog> {
             key: const ValueKey('git_identity_name_field'),
             controller: _name,
             autofocus: true,
+            onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(labelText: 'Your name'),
           ),
           SizedBox(height: layout.inputPadding),
           TextField(
             key: const ValueKey('git_identity_email_field'),
             controller: _email,
+            onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(labelText: 'Your email'),
           ),
         ],
@@ -324,7 +328,7 @@ class _GitIdentityDialogState extends State<_GitIdentityDialog> {
         ),
         FilledButton(
           key: const ValueKey('git_identity_save'),
-          onPressed: _save,
+          onPressed: canSave ? _save : null,
           child: const Text('SAVE'),
         ),
       ],

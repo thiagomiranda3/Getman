@@ -1,10 +1,19 @@
 import 'dart:developer';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/git/git_service.dart' show GitException;
 import 'package:getman/features/collections/domain/conflict_service.dart';
 import 'package:getman/features/collections/domain/entities/file_conflict.dart';
 import 'package:getman/features/collections/presentation/bloc/conflict_event.dart';
 import 'package:getman/features/collections/presentation/bloc/conflict_state.dart';
+
+/// Friendly, actionable replacement for the raw git stderr surfaced when
+/// rebase-continue hits a missing commit identity — the raw message tells
+/// the user to run `git config --global …`, which contradicts Getman's
+/// no-config-file approach (identity is stored in Getman only).
+const _missingIdentityMessage =
+    'Set your commit identity (your name and email) in Settings → '
+    'Workspace, then try again.';
 
 /// Drives the resolve → continue loop over an in-progress rebase, one commit
 /// (batch) of conflicts at a time. Errors are surfaced in state and the
@@ -64,7 +73,19 @@ class ConflictBloc extends Bloc<ConflictEvent, ConflictState> {
     } on Object catch (e) {
       // Leave the repo paused mid-rebase — do NOT abort on a resolve failure,
       // the user's picks (and the in-progress rebase) must survive a retry.
-      _fail(e, emit, 'resolve');
+      log('resolve failed: $e', name: 'ConflictBloc');
+      if (e is GitException && GitException.isMissingIdentity(e.message)) {
+        emit(
+          state.copyWith(
+            status: ConflictStatus.error,
+            errorMessage: _missingIdentityMessage,
+          ),
+        );
+      } else {
+        emit(
+          state.copyWith(status: ConflictStatus.error, errorMessage: '$e'),
+        );
+      }
     }
   }
 
