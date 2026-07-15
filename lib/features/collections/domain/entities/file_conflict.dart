@@ -12,7 +12,12 @@ enum ConflictKind { request, folder, addAdd, deleteModify, structural }
 /// not value; only path + kind determine conflict identity/equality.
 // ignore: equatable_props_complete
 class FileConflict extends Equatable {
-  const FileConflict({required this.path, required this.kind, this.node});
+  const FileConflict({
+    required this.path,
+    required this.kind,
+    this.node,
+    this.deletedSide,
+  });
 
   final String path;
   final ConflictKind kind;
@@ -21,11 +26,17 @@ class FileConflict extends Equatable {
   /// null for coarse kinds.
   final NodeMergeResult? node;
 
+  /// For [ConflictKind.deleteModify] only: which side deleted the file (the
+  /// side whose merge stage is absent). Null for every other [kind]. Drives
+  /// the coarse tile's button orientation — "Accept the deletion" always maps
+  /// to this side, never hardcoded to incoming/yours.
+  final FileSide? deletedSide;
+
   bool get isFieldLevel => node != null;
 
   @override
   // node compared by identity is fine.
-  List<Object?> get props => [path, kind];
+  List<Object?> get props => [path, kind, deletedSide];
 }
 
 /// The side of a whole-file (coarse) conflict the user picked.

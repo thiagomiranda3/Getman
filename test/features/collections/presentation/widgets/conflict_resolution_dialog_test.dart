@@ -203,44 +203,87 @@ void main() {
     },
   );
 
-  testWidgets(
-    'a coarse deleteModify conflict shows the labelled choices and sets '
-    'wholeFile',
-    (tester) async {
-      const conflicts = [
-        FileConflict(
-          path: 'r2.req.json',
-          kind: ConflictKind.deleteModify,
-        ),
-      ];
-      when(() => conflictBloc.state).thenReturn(
-        const ConflictState(
-          status: ConflictStatus.ready,
-          conflicts: conflicts,
-        ),
-      );
+  // FIX C1: the coarse deleteModify tile used to hardcode "Accept the
+  // deletion" to the incoming button and "Keep your edited request" to the
+  // yours button — correct only when upstream deleted (Case A). When YOU
+  // deleted (Case B: stage 3 absent, deletedSide=yours), that hardcoding
+  // put "Accept the deletion" on the button that actually resolves to
+  // wholeFile: incoming (the PRESENT stage — writes the file back) and
+  // "Keep your edited request" on the button that resolves to wholeFile:
+  // yours (the ABSENT stage — deletes it): exactly inverted. These four
+  // cases (both labels x both orientations) pin the fix by tapping on the
+  // button *text*, not a positional key, so a regression back to hardcoded
+  // labels fails loudly.
+  for (final side in [FileSide.incoming, FileSide.yours]) {
+    final otherSide = side == FileSide.incoming
+        ? FileSide.yours
+        : FileSide.incoming;
+    final orientation = side == FileSide.incoming
+        ? 'Case A (upstream deleted)'
+        : 'Case B (you deleted)';
 
-      await openDialog(tester);
+    testWidgets(
+      '$orientation: tapping "Accept the deletion" resolves to the '
+      'deleting side ($side)',
+      (tester) async {
+        final conflicts = [
+          FileConflict(
+            path: 'r2.req.json',
+            kind: ConflictKind.deleteModify,
+            deletedSide: side,
+          ),
+        ];
+        when(() => conflictBloc.state).thenReturn(
+          ConflictState(status: ConflictStatus.ready, conflicts: conflicts),
+        );
 
-      expect(find.text('Accept the deletion'), findsOneWidget);
-      expect(find.text('Keep your edited request'), findsOneWidget);
+        await openDialog(tester);
+        await tester.tap(find.text('Accept the deletion'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('conflict_resolve')));
+        await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.byKey(const ValueKey('keep_yours_r2.req.json')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('conflict_resolve')));
-      await tester.pumpAndSettle();
+        verify(
+          () => conflictBloc.add(
+            ResolveAndContinue(root, [
+              FileResolution(path: 'r2.req.json', wholeFile: side),
+            ]),
+          ),
+        ).called(1);
+      },
+    );
 
-      verify(
-        () => conflictBloc.add(
-          const ResolveAndContinue(root, [
-            FileResolution(path: 'r2.req.json', wholeFile: FileSide.yours),
-          ]),
-        ),
-      ).called(1);
-    },
-  );
+    testWidgets(
+      '$orientation: tapping "Keep the edited request" resolves to the '
+      'surviving side ($otherSide)',
+      (tester) async {
+        final conflicts = [
+          FileConflict(
+            path: 'r2.req.json',
+            kind: ConflictKind.deleteModify,
+            deletedSide: side,
+          ),
+        ];
+        when(() => conflictBloc.state).thenReturn(
+          ConflictState(status: ConflictStatus.ready, conflicts: conflicts),
+        );
+
+        await openDialog(tester);
+        await tester.tap(find.text('Keep the edited request'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('conflict_resolve')));
+        await tester.pumpAndSettle();
+
+        verify(
+          () => conflictBloc.add(
+            ResolveAndContinue(root, [
+              FileResolution(path: 'r2.req.json', wholeFile: otherSide),
+            ]),
+          ),
+        ).called(1);
+      },
+    );
+  }
 
   testWidgets('RESOLVE is disabled until every conflict has a pick', (
     tester,
@@ -319,24 +362,14 @@ void main() {
     ).called(1);
   });
 
-  testWidgets('CANCEL dispatches AbortRebase and closes the dialog', (
-    tester,
-  ) async {
-    when(
-      () => conflictBloc.state,
-    ).thenReturn(const ConflictState(status: ConflictStatus.ready));
-
-    await openDialog(tester);
-    await tester.tap(find.byKey(const ValueKey('conflict_cancel')));
-    await tester.pumpAndSettle();
-
-    verify(() => conflictBloc.add(const AbortRebase(root))).called(1);
-    expect(find.byKey(const ValueKey('conflict_cancel')), findsNothing);
-  });
-
+  // FIX M1: CANCEL used to pop immediately, so an AbortRebase failure would
+  // surface on a dead (deactivated) context with the rebase still in
+  // progress and no UI to retry from. Now _cancel dispatches AbortRebase and
+  // waits — the dialog only pops once the abort actually resolves to `done`,
+  // and stays open (with the GIT ERROR dialog on top) if the abort fails.
   testWidgets(
-    'CANCEL does not show the "Conflicts resolved." snackbar when the '
-    'abort resolves to done',
+    'CANCEL dispatches AbortRebase but keeps the dialog open until the '
+    'abort resolves',
     (tester) async {
       final controller = StreamController<ConflictState>();
       whenListen(
@@ -347,16 +380,76 @@ void main() {
 
       await openDialog(tester);
       await tester.tap(find.byKey(const ValueKey('conflict_cancel')));
-      // Deliberately don't settle: the dialog's exit transition is still
-      // running (still mounted), mirroring the real race where AbortRebase
-      // resolves to `done` before the pop animation finishes.
+      await tester.pump();
+
+      verify(() => conflictBloc.add(const AbortRebase(root))).called(1);
+      // Still open: the abort hasn't resolved yet.
+      expect(find.byKey(const ValueKey('conflict_cancel')), findsOneWidget);
+
+      controller.add(const ConflictState(status: ConflictStatus.done));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('conflict_cancel')), findsNothing);
+      await controller.close();
+    },
+  );
+
+  testWidgets(
+    'CANCEL does not show the "Conflicts resolved." snackbar or reload the '
+    'tree when the abort resolves to done',
+    (tester) async {
+      final controller = StreamController<ConflictState>();
+      whenListen(
+        conflictBloc,
+        controller.stream,
+        initialState: const ConflictState(status: ConflictStatus.ready),
+      );
+
+      await openDialog(tester);
+      await tester.tap(find.byKey(const ValueKey('conflict_cancel')));
+      await tester.pump();
       controller.add(const ConflictState(status: ConflictStatus.done));
       await tester.pump();
       await tester.pumpAndSettle();
 
       verify(() => conflictBloc.add(const AbortRebase(root))).called(1);
       expect(find.text('Conflicts resolved.'), findsNothing);
+      verifyNever(() => gitBloc.add(const ConflictsResolved(root)));
       verifyNever(() => gitBloc.add(const LoadBranchStatus(root)));
+      await controller.close();
+    },
+  );
+
+  testWidgets(
+    'an AbortRebase failure surfaces the GIT ERROR dialog and leaves the '
+    'resolver open for a retry',
+    (tester) async {
+      final controller = StreamController<ConflictState>();
+      whenListen(
+        conflictBloc,
+        controller.stream,
+        initialState: const ConflictState(status: ConflictStatus.ready),
+      );
+
+      await openDialog(tester);
+      await tester.tap(find.byKey(const ValueKey('conflict_cancel')));
+      await tester.pump();
+      controller.add(
+        const ConflictState(
+          status: ConflictStatus.error,
+          errorMessage: 'abort failed',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('conflict_error_dialog')),
+        findsOneWidget,
+      );
+      // The resolver itself is still mounted underneath — the user can
+      // dismiss the error and retry CANCEL (or resolve normally) instead of
+      // being left with a wedged rebase and no UI.
+      expect(find.byKey(const ValueKey('conflict_cancel')), findsOneWidget);
       await controller.close();
     },
   );
@@ -429,24 +522,29 @@ void main() {
     },
   );
 
-  testWidgets('a done status closes the dialog and refreshes branch status', (
-    tester,
-  ) async {
-    final controller = StreamController<ConflictState>();
-    whenListen(
-      conflictBloc,
-      controller.stream,
-      initialState: const ConflictState(status: ConflictStatus.ready),
-    );
+  testWidgets(
+    'a done status (non-abort) closes the dialog, shows the resolved '
+    'snackbar, and dispatches ConflictsResolved — FIX C2: this must reload '
+    'the tree, not just refresh branch status',
+    (tester) async {
+      final controller = StreamController<ConflictState>();
+      whenListen(
+        conflictBloc,
+        controller.stream,
+        initialState: const ConflictState(status: ConflictStatus.ready),
+      );
 
-    await openDialog(tester);
-    controller.add(const ConflictState(status: ConflictStatus.done));
-    await tester.pumpAndSettle();
+      await openDialog(tester);
+      controller.add(const ConflictState(status: ConflictStatus.done));
+      await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('conflict_cancel')), findsNothing);
-    verify(() => gitBloc.add(const LoadBranchStatus(root))).called(1);
-    await controller.close();
-  });
+      expect(find.byKey(const ValueKey('conflict_cancel')), findsNothing);
+      expect(find.text('Conflicts resolved.'), findsOneWidget);
+      verify(() => gitBloc.add(const ConflictsResolved(root))).called(1);
+      verifyNever(() => gitBloc.add(const LoadBranchStatus(root)));
+      await controller.close();
+    },
+  );
 
   testWidgets('an error status surfaces the GIT ERROR dialog', (
     tester,

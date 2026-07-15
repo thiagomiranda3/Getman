@@ -23,6 +23,7 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
     on<PopStash>(_onPop);
     on<DropStash>(_onDrop);
     on<FetchRemote>(_onFetch);
+    on<ConflictsResolved>(_onResolved);
   }
 
   final BranchService _service;
@@ -187,6 +188,19 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
       }
     }
     await _refresh(event.root, emit);
+  }
+
+  /// The conflict resolver finished a rebase (RESOLVE & CONTINUE reached
+  /// `RebaseStep.done`). Nothing here touches git directly — the resolved
+  /// files are already on disk — this only needs to bump `reloadToken` so
+  /// `BranchSyncListener` reloads the merged tree, using the same
+  /// `changedDisk: true` pattern as every other disk-changing op.
+  Future<void> _onResolved(
+    ConflictsResolved event,
+    Emitter<GitSyncState> emit,
+  ) async {
+    if (_dropWhileBusy('resolved')) return;
+    await _run(event.root, emit, 'resolved', () async {}, changedDisk: true);
   }
 
   Future<void> _onPush(PushChanges event, Emitter<GitSyncState> emit) async {

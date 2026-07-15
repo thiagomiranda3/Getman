@@ -4,12 +4,26 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/git/git_service.dart';
 import 'package:getman/core/utils/workspace/workspace_collection_serializer.dart';
+import 'package:getman/features/collections/data/datasources/workspace_collections_data_source.dart';
 import 'package:getman/features/collections/data/services/git_conflict_service.dart';
+import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/entities/file_conflict.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockGit extends Mock implements GitService {}
+
+/// A real [WorkspaceSyncService] over a no-op data source: `resolve` and
+/// `continueRebase` wrap their bodies in `withMirroringSuspended` (FIX I1),
+/// whose real implementation just runs the action — no need to mock it, and
+/// this exercises the actual suspend/resume pairing instead of stubbing it
+/// away.
+class _NoopWorkspaceDataSource implements WorkspaceCollectionsDataSource {
+  @override
+  Future<List<CollectionNodeEntity>> read(String root) async => const [];
+  @override
+  Future<void> write(String root, List<CollectionNodeEntity> forest) async {}
+}
 
 CollectionNodeEntity _leaf({
   String id = 'r1',
@@ -62,7 +76,10 @@ void main() {
 
   setUp(() {
     git = _MockGit();
-    service = GitConflictService(git);
+    service = GitConflictService(
+      git,
+      WorkspaceSyncService(_NoopWorkspaceDataSource()),
+    );
   });
 
   group('currentConflicts / classify', () {
@@ -92,48 +109,84 @@ void main() {
       expect(c.node!.conflicts.map((f) => f.field), contains('url'));
     });
 
-    test('a .req.json missing the incoming stage is deleteModify', () async {
-      when(() => git.conflictedPaths(root)).thenAnswer(
-        (_) async => [
-          'a.req.json',
-        ],
-      );
-      when(
-        () => git.showStage(root, 'a.req.json', 1),
-      ).thenAnswer((_) async => _reqStage(_leaf()));
-      when(
-        () => git.showStage(root, 'a.req.json', 2),
-      ).thenAnswer((_) async => null);
-      when(
-        () => git.showStage(root, 'a.req.json', 3),
-      ).thenAnswer((_) async => _reqStage(_leaf()));
+    test(
+      'a .req.json missing the incoming stage is deleteModify with '
+      'deletedSide=incoming (upstream deleted)',
+      () async {
+        when(() => git.conflictedPaths(root)).thenAnswer(
+          (_) async => [
+            'a.req.json',
+          ],
+        );
+        when(
+          () => git.showStage(root, 'a.req.json', 1),
+        ).thenAnswer((_) async => _reqStage(_leaf()));
+        when(
+          () => git.showStage(root, 'a.req.json', 2),
+        ).thenAnswer((_) async => null);
+        when(
+          () => git.showStage(root, 'a.req.json', 3),
+        ).thenAnswer((_) async => _reqStage(_leaf()));
 
-      final conflicts = await service.currentConflicts(root);
+        final conflicts = await service.currentConflicts(root);
 
-      expect(conflicts.single.kind, ConflictKind.deleteModify);
-      expect(conflicts.single.node, isNull);
-    });
+        expect(conflicts.single.kind, ConflictKind.deleteModify);
+        expect(conflicts.single.node, isNull);
+        expect(conflicts.single.deletedSide, FileSide.incoming);
+      },
+    );
 
-    test('a .req.json missing the yours stage is deleteModify', () async {
-      when(() => git.conflictedPaths(root)).thenAnswer(
-        (_) async => [
-          'a.req.json',
-        ],
-      );
-      when(
-        () => git.showStage(root, 'a.req.json', 1),
-      ).thenAnswer((_) async => _reqStage(_leaf()));
-      when(
-        () => git.showStage(root, 'a.req.json', 2),
-      ).thenAnswer((_) async => _reqStage(_leaf()));
-      when(
-        () => git.showStage(root, 'a.req.json', 3),
-      ).thenAnswer((_) async => null);
+    test(
+      'a .req.json missing the yours stage is deleteModify with '
+      'deletedSide=yours (you deleted it)',
+      () async {
+        when(() => git.conflictedPaths(root)).thenAnswer(
+          (_) async => [
+            'a.req.json',
+          ],
+        );
+        when(
+          () => git.showStage(root, 'a.req.json', 1),
+        ).thenAnswer((_) async => _reqStage(_leaf()));
+        when(
+          () => git.showStage(root, 'a.req.json', 2),
+        ).thenAnswer((_) async => _reqStage(_leaf()));
+        when(
+          () => git.showStage(root, 'a.req.json', 3),
+        ).thenAnswer((_) async => null);
 
-      final conflicts = await service.currentConflicts(root);
+        final conflicts = await service.currentConflicts(root);
 
-      expect(conflicts.single.kind, ConflictKind.deleteModify);
-    });
+        expect(conflicts.single.kind, ConflictKind.deleteModify);
+        expect(conflicts.single.deletedSide, FileSide.yours);
+      },
+    );
+
+    test(
+      'a .folder.json missing the yours stage is deleteModify with '
+      'deletedSide=yours (you deleted the folder)',
+      () async {
+        when(() => git.conflictedPaths(root)).thenAnswer(
+          (_) async => [
+            'x/.folder.json',
+          ],
+        );
+        when(
+          () => git.showStage(root, 'x/.folder.json', 1),
+        ).thenAnswer((_) async => _folderStage(_folder(), ['a']));
+        when(
+          () => git.showStage(root, 'x/.folder.json', 2),
+        ).thenAnswer((_) async => _folderStage(_folder(), ['a']));
+        when(
+          () => git.showStage(root, 'x/.folder.json', 3),
+        ).thenAnswer((_) async => null);
+
+        final conflicts = await service.currentConflicts(root);
+
+        expect(conflicts.single.kind, ConflictKind.deleteModify);
+        expect(conflicts.single.deletedSide, FileSide.yours);
+      },
+    );
 
     test('a .req.json with no base stage (add/add) is addAdd', () async {
       when(() => git.conflictedPaths(root)).thenAnswer(
@@ -454,6 +507,31 @@ void main() {
         );
       },
     );
+
+    // FIX I1: the mirror-suspension gate must be held while resolve() writes
+    // to the working tree, so a debounced Hive→disk mirror can't fire mid-way
+    // and clobber the resolution.
+    test('holds mirroring suspended for its whole duration', () async {
+      final sync = WorkspaceSyncService(_NoopWorkspaceDataSource());
+      final svc = GitConflictService(git, sync);
+      when(
+        () => git.showStage(root, 'a.req.json', 2),
+      ).thenAnswer((_) async => 'INCOMING CONTENT');
+      when(
+        () => git.writeWorkingFile(root, 'a.req.json', any()),
+      ).thenAnswer((_) async {
+        expect(sync.isMirroringSuspended, isTrue);
+      });
+      when(() => git.add(root, 'a.req.json')).thenAnswer((_) async {
+        expect(sync.isMirroringSuspended, isTrue);
+      });
+
+      expect(sync.isMirroringSuspended, isFalse);
+      await svc.resolve(root, const [
+        FileResolution(path: 'a.req.json', wholeFile: FileSide.incoming),
+      ]);
+      expect(sync.isMirroringSuspended, isFalse);
+    });
   });
 
   group('continueRebase', () {
@@ -470,6 +548,20 @@ void main() {
       when(() => git.isRebaseInProgress(root)).thenAnswer((_) async => false);
 
       expect(await service.continueRebase(root), RebaseStep.done);
+    });
+
+    // FIX I1: same gate must be held across `rebase --continue`.
+    test('holds mirroring suspended for its whole duration', () async {
+      final sync = WorkspaceSyncService(_NoopWorkspaceDataSource());
+      final svc = GitConflictService(git, sync);
+      when(() => git.rebaseContinue(root)).thenAnswer((_) async {
+        expect(sync.isMirroringSuspended, isTrue);
+      });
+      when(() => git.isRebaseInProgress(root)).thenAnswer((_) async => false);
+
+      expect(sync.isMirroringSuspended, isFalse);
+      await svc.continueRebase(root);
+      expect(sync.isMirroringSuspended, isFalse);
     });
   });
 

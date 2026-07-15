@@ -60,10 +60,13 @@ class _ConflictResolutionBodyState extends State<ConflictResolutionBody> {
   // path -> whole-file side. Coarse conflicts only.
   final Map<String, FileSide> _wholeFilePicks = {};
   int _picksForBatch = -1;
-  // Set by _cancel before dispatching AbortRebase: the abort also resolves
-  // to ConflictStatus.done, but _cancel already popped and the done-listener
-  // must not pop again or show the resolve-flow's "Conflicts resolved."
-  // snackbar.
+  // Set by _cancel before dispatching AbortRebase. _cancel itself does NOT
+  // pop — if the abort fails (rare), the dialog must stay open (with the GIT
+  // ERROR dialog on top) so the user can retry rather than being left with a
+  // wedged rebase and no UI. The done-listener pops once the abort actually
+  // resolves to ConflictStatus.done, and — because this was an abort, not a
+  // resolve — skips the resolve-flow's "Conflicts resolved." snackbar and the
+  // tree-reload dispatch (pre-pull state already matches Hive).
   bool _aborting = false;
 
   @override
@@ -129,7 +132,9 @@ class _ConflictResolutionBodyState extends State<ConflictResolutionBody> {
   void _cancel(BuildContext context) {
     _aborting = true;
     context.read<ConflictBloc>().add(AbortRebase(widget.root));
-    unawaited(Navigator.of(context).maybePop());
+    // Does NOT pop here — see the _aborting doc comment. The done-listener
+    // pops once the abort actually completes; if it fails instead, the
+    // dialog stays open and the GIT ERROR dialog surfaces on top of it.
   }
 
   void _showError(BuildContext context, String message) {
@@ -163,9 +168,12 @@ class _ConflictResolutionBodyState extends State<ConflictResolutionBody> {
       listener: (context, state) {
         if (state.status == ConflictStatus.done) {
           if (_aborting) {
-            // _cancel already popped the dialog; the abort itself resolves
-            // to `done` too, but it must not also show the resolve-flow's
-            // snackbar or pop a second time.
+            // The abort itself resolved to `done`: pop now (CANCEL no
+            // longer pops synchronously — see _cancel), without the
+            // resolve-flow's "Conflicts resolved." snackbar or a tree
+            // reload — pre-pull state already matches Hive, there is
+            // nothing to reload.
+            unawaited(Navigator.of(context).maybePop());
             return;
           }
           // Capture before popping: the dialog's own context is about to be
@@ -174,7 +182,12 @@ class _ConflictResolutionBodyState extends State<ConflictResolutionBody> {
           final gitBloc = context.read<GitSyncBloc>();
           unawaited(Navigator.of(context).maybePop());
           showAppSnackBarVia(messenger, 'Conflicts resolved.');
-          gitBloc.add(LoadBranchStatus(widget.root));
+          // ConflictsResolved (not LoadBranchStatus) both refreshes branch
+          // status AND bumps reloadToken so BranchSyncListener reloads the
+          // merged tree — otherwise the resolved files sit on disk while
+          // Hive still holds the pre-pull tree, and the next edit's mirror
+          // silently reverts the merge.
+          gitBloc.add(ConflictsResolved(widget.root));
         } else if (state.status == ConflictStatus.error) {
           _showError(context, state.errorMessage!);
         }
@@ -467,15 +480,23 @@ class _CoarseTile extends StatelessWidget {
 
   bool get _isDeleteModify => conflict.kind == ConflictKind.deleteModify;
 
+  /// For a delete/modify conflict, labels by orientation instead of a
+  /// hardcoded side: the side that actually deleted the file
+  /// ([FileConflict.deletedSide]) always reads "Accept the deletion"; the
+  /// other side always reads "Keep the edited request" — whichever of
+  /// incoming/yours that happens to be. Hardcoding these to
+  /// incoming/yours inverted the buttons whenever *you* were the deleting
+  /// side (FIX C1).
+  String _label(FileSide side, String defaultLabel) {
+    if (!_isDeleteModify) return defaultLabel;
+    return side == conflict.deletedSide
+        ? 'Accept the deletion'
+        : 'Keep the edited request';
+  }
+
   @override
   Widget build(BuildContext context) {
     final layout = context.appLayout;
-    final incomingLabel = _isDeleteModify
-        ? 'Accept the deletion'
-        : 'TAKE INCOMING';
-    final yoursLabel = _isDeleteModify
-        ? 'Keep your edited request'
-        : 'KEEP YOURS';
     return Container(
       key: ValueKey('conflict_file_${conflict.path}'),
       padding: EdgeInsets.all(layout.tabSpacing),
@@ -496,7 +517,7 @@ class _CoarseTile extends StatelessWidget {
               Expanded(
                 child: _SideButton(
                   key: ValueKey('take_incoming_${conflict.path}'),
-                  label: incomingLabel,
+                  label: _label(FileSide.incoming, 'TAKE INCOMING'),
                   selected: picked == FileSide.incoming,
                   onTap: () => onPick(FileSide.incoming),
                 ),
@@ -505,7 +526,7 @@ class _CoarseTile extends StatelessWidget {
               Expanded(
                 child: _SideButton(
                   key: ValueKey('keep_yours_${conflict.path}'),
-                  label: yoursLabel,
+                  label: _label(FileSide.yours, 'KEEP YOURS'),
                   selected: picked == FileSide.yours,
                   onTap: () => onPick(FileSide.yours),
                 ),

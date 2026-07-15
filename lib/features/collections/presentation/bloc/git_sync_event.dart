@@ -80,3 +80,15 @@ class FetchRemote extends GitSyncEvent {
   @override
   List<Object?> get props => [root, silent];
 }
+
+/// Dispatched by the conflict resolver after it finishes a rebase
+/// (RESOLVE & CONTINUE reaches `RebaseStep.done`). Bumps `reloadToken` so
+/// `BranchSyncListener` reloads the merged tree from disk — without this the
+/// resolved files sit on disk while the app's Hive tree stays pre-pull, and
+/// the next edit's debounced mirror silently reverts the merge.
+class ConflictsResolved extends GitSyncEvent {
+  const ConflictsResolved(this.root);
+  final String root;
+  @override
+  List<Object?> get props => [root];
+}

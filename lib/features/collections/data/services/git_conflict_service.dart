@@ -4,6 +4,7 @@ import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/git/git_service.dart';
 import 'package:getman/core/utils/workspace/workspace_collection_serializer.dart';
+import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/conflict_service.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/entities/file_conflict.dart';
@@ -15,8 +16,9 @@ import 'package:getman/features/collections/domain/logic/three_way_merge.dart';
 /// picks back to the working tree ([resolve]). Pure orchestration over
 /// [GitService] — no `dart:io` here.
 class GitConflictService implements ConflictService {
-  GitConflictService(this._git);
+  GitConflictService(this._git, this._sync);
   final GitService _git;
+  final WorkspaceSyncService _sync;
 
   static const JsonEncoder _enc = JsonEncoder.withIndent('  ');
 
@@ -24,12 +26,13 @@ class GitConflictService implements ConflictService {
   Future<PullOutcome> pullOrConflict(String root) => _git.pull(root);
 
   @override
-  Future<RebaseStep> continueRebase(String root) async {
-    await _git.rebaseContinue(root);
-    return await _git.isRebaseInProgress(root)
-        ? RebaseStep.moreConflicts
-        : RebaseStep.done;
-  }
+  Future<RebaseStep> continueRebase(String root) =>
+      _sync.withMirroringSuspended(() async {
+        await _git.rebaseContinue(root);
+        return await _git.isRebaseInProgress(root)
+            ? RebaseStep.moreConflicts
+            : RebaseStep.done;
+      });
 
   @override
   Future<void> abort(String root) => _git.rebaseAbort(root);
@@ -50,9 +53,14 @@ class GitConflictService implements ConflictService {
       final s1 = await _git.showStage(root, path, 1);
       final s2 = await _git.showStage(root, path, 2); // incoming
       final s3 = await _git.showStage(root, path, 3); // yours
-      // delete/modify: one side stage missing.
+      // delete/modify: one side stage missing. The side whose stage is
+      // ABSENT is the one that deleted the file.
       if (s2 == null || s3 == null) {
-        return FileConflict(path: path, kind: ConflictKind.deleteModify);
+        return FileConflict(
+          path: path,
+          kind: ConflictKind.deleteModify,
+          deletedSide: s2 == null ? FileSide.incoming : FileSide.yours,
+        );
       }
       final base = _leafOrNull(s1);
       final inc = _leafOrNull(s2);
@@ -72,7 +80,11 @@ class GitConflictService implements ConflictService {
       final s2 = await _git.showStage(root, path, 2); // incoming
       final s3 = await _git.showStage(root, path, 3); // yours
       if (s2 == null || s3 == null) {
-        return FileConflict(path: path, kind: ConflictKind.deleteModify);
+        return FileConflict(
+          path: path,
+          kind: ConflictKind.deleteModify,
+          deletedSide: s2 == null ? FileSide.incoming : FileSide.yours,
+        );
       }
       final base = _folderOrNull(s1);
       final inc = _folderOrNull(s2);
@@ -98,17 +110,19 @@ class GitConflictService implements ConflictService {
   }
 
   @override
-  Future<void> resolve(String root, List<FileResolution> resolutions) async {
-    for (final res in resolutions) {
-      if (res.wholeFile != null) {
-        await _resolveWholeFile(root, res);
-        continue;
-      }
-      final content = await _resolvedContent(root, res); // apply picks → JSON
-      await _git.writeWorkingFile(root, res.path, content);
-      await _git.add(root, res.path);
-    }
-  }
+  Future<void> resolve(String root, List<FileResolution> resolutions) =>
+      _sync.withMirroringSuspended(() async {
+        for (final res in resolutions) {
+          if (res.wholeFile != null) {
+            await _resolveWholeFile(root, res);
+            continue;
+          }
+          // apply picks → JSON
+          final content = await _resolvedContent(root, res);
+          await _git.writeWorkingFile(root, res.path, content);
+          await _git.add(root, res.path);
+        }
+      });
 
   /// Coarse resolutions pick a whole merge-stage side verbatim. When the
   /// chosen side is the deleting side of a delete/modify conflict, its stage

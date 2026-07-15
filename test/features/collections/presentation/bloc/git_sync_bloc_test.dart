@@ -219,6 +219,41 @@ void main() {
     },
   );
 
+  // FIX C2: a conflicted pull only bumps conflictToken, never reloadToken —
+  // BranchSyncListener reloads solely on reloadToken, so without this event
+  // the resolved files sit on disk while the app's Hive tree stays pre-pull.
+  blocTest<GitSyncBloc, GitSyncState>(
+    'ConflictsResolved bumps reloadToken and reaches a terminal ready state',
+    build: () => GitSyncBloc(service: service),
+    act: (b) => b.add(const ConflictsResolved(root)),
+    verify: (b) {
+      expect(b.state.status, GitSyncStatus.ready);
+      expect(b.state.reloadToken, 1);
+      expect(b.state.branch.current, 'main');
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'ConflictsResolved dispatched while busy is dropped',
+    build: () {
+      pullGate = Completer<PullOutcome>();
+      when(() => service.pull(root)).thenAnswer((_) => pullGate.future);
+      return GitSyncBloc(service: service);
+    },
+    act: (b) async {
+      b.add(const PullChanges(root));
+      await Future<void>.delayed(Duration.zero);
+      b.add(const ConflictsResolved(root)); // dropped: bloc is busy
+      pullGate.complete(PullOutcome.conflicted);
+      await Future<void>.delayed(Duration.zero);
+    },
+    verify: (b) {
+      expect(b.state.status, GitSyncStatus.ready);
+      expect(b.state.conflictToken, 1);
+      expect(b.state.reloadToken, 0); // the dropped event never bumped it
+    },
+  );
+
   blocTest<GitSyncBloc, GitSyncState>(
     'PushChanges does not bump reloadToken (disk is unchanged)',
     build: () => GitSyncBloc(service: service),
