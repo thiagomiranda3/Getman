@@ -83,4 +83,52 @@ void main() {
     ], response);
     expect(results.single.matched, isFalse);
   });
+
+  test(
+    'regex alternation captures the participating group, not just group 1',
+    () {
+      const body = HttpResponseEntity(
+        statusCode: 200,
+        body: 'token: abc',
+        headers: {},
+        durationMs: 1,
+      );
+      final results = ExtractionEngine.run(const [
+        ExtractionRule(
+          id: '1',
+          kind: ExtractionKind.regex,
+          expression: r'sessionId=(\w+)|token: (\w+)',
+          targetVariable: 'x',
+        ),
+      ], body);
+      expect(results.single.matched, isTrue);
+      expect(
+        results.single.value,
+        'abc',
+        reason: 'group 1 did not participate — group 2 holds the capture',
+      );
+    },
+  );
+
+  test('a JSON null leaf extracts as the string "null", not a miss', () {
+    const body = HttpResponseEntity(
+      statusCode: 200,
+      body: '{"user":{"middleName":null}}',
+      headers: {},
+      durationMs: 1,
+    );
+    final results = ExtractionEngine.run(const [
+      ExtractionRule(
+        id: '1',
+        expression: 'user.middleName',
+        targetVariable: 'x',
+      ),
+    ], body);
+    expect(
+      results.single.matched,
+      isTrue,
+      reason: 'the TREE view offers Extract on this exact node',
+    );
+    expect(results.single.value, 'null');
+  });
 }
