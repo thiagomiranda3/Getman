@@ -53,11 +53,17 @@ class SelectEntry extends ReviewEvent {
 }
 
 class Commit extends ReviewEvent {
-  const Commit(this.root, this.message);
+  const Commit(this.root, this.message, {this.authorName, this.authorEmail});
   final String root;
   final String message;
+
+  /// Getman-owned commit identity from Settings (see
+  /// `GitService.commit`) — threaded through so a commit succeeds even
+  /// without a configured OS git identity.
+  final String? authorName;
+  final String? authorEmail;
   @override
-  List<Object?> get props => [root, message];
+  List<Object?> get props => [root, message, authorName, authorEmail];
 }
 
 class InitRepo extends ReviewEvent {

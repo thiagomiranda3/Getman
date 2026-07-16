@@ -54,8 +54,17 @@ class WorkspaceReviewService implements ReviewService {
   Future<void> unstage(String root, List<String> paths) =>
       _git.unstage(root, paths);
   @override
-  Future<void> commit(String root, String message) =>
-      _git.commit(root, message);
+  Future<void> commit(
+    String root,
+    String message, {
+    String? authorName,
+    String? authorEmail,
+  }) => _git.commit(
+    root,
+    message,
+    authorName: authorName,
+    authorEmail: authorEmail,
+  );
 
   Future<ReviewEntry?> _entryFor(String root, GitStatusEntry s) async {
     final path = s.path;

@@ -29,6 +29,34 @@ class _IoGitService implements GitService {
     return result;
   }
 
+  /// `-c user.name=… -c user.email=…`, prepended to the git args of any
+  /// commit-creating command — never written to the user's global git
+  /// config. Empty when either half is missing/blank so git falls back to
+  /// its own resolution (and a genuinely missing identity still surfaces as
+  /// [GitException.isMissingIdentity]).
+  ///
+  /// The stored name is suffixed with [_viaGetman] only at commit time (the
+  /// setting stays clean), so history reads `name via Getman` while GitHub —
+  /// which attributes by email — still credits the user normally.
+  List<String> _identityArgs(String? name, String? email) {
+    final trimmedName = name?.trim();
+    final trimmedEmail = email?.trim();
+    if (trimmedName == null ||
+        trimmedName.isEmpty ||
+        trimmedEmail == null ||
+        trimmedEmail.isEmpty) {
+      return const [];
+    }
+    return [
+      '-c',
+      'user.name=$trimmedName$_viaGetman',
+      '-c',
+      'user.email=$trimmedEmail',
+    ];
+  }
+
+  static const String _viaGetman = ' via Getman';
+
   @override
   Future<bool> isAvailable() async {
     try {
@@ -116,9 +144,249 @@ class _IoGitService implements GitService {
   }
 
   @override
-  Future<void> commit(String root, String message) async {
-    await _run(root, ['commit', '-m', message]);
+  Future<void> commit(
+    String root,
+    String message, {
+    String? authorName,
+    String? authorEmail,
+  }) async {
+    await _run(root, [
+      ..._identityArgs(authorName, authorEmail),
+      'commit',
+      '-m',
+      message,
+    ]);
   }
+
+  @override
+  Future<List<String>> branches(String root) async {
+    final r = await _run(root, [
+      'branch',
+      '--format=%(refname:short)',
+    ]);
+    return (r.stdout as String)
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+  }
+
+  @override
+  Future<void> createBranch(String root, String name) async {
+    await _run(root, ['switch', '-c', name]);
+  }
+
+  @override
+  Future<void> switchBranch(String root, String name) async {
+    await _run(root, ['switch', name]);
+  }
+
+  @override
+  Future<bool> hasRemote(String root) async {
+    final r = await _run(root, ['remote'], allowFailure: true);
+    return (r.stdout as String).trim().isNotEmpty;
+  }
+
+  @override
+  Future<void> addRemote(String root, String name, String url) async {
+    // Idempotent: a retry after a failed paired push/pull/fetch (bad
+    // URL/auth/host) must not dead-end on `fatal: remote <name> already
+    // exists` — there is no remove-remote UI. `remote add` fails when the
+    // remote is already there; fall back to `remote set-url` so a retry
+    // with the same or corrected URL always re-points it and proceeds.
+    final added = await _run(root, [
+      'remote',
+      'add',
+      name,
+      url,
+    ], allowFailure: true);
+    if (added.exitCode == 0) return;
+    await _run(root, ['remote', 'set-url', name, url]);
+  }
+
+  @override
+  Future<AheadBehind> aheadBehind(String root) async {
+    // `@{u}...HEAD` prints "<behind>\t<ahead>". Exits non-zero when the
+    // branch has no upstream — that is a normal state, so report (0, 0).
+    final r = await _run(root, [
+      'rev-list',
+      '--left-right',
+      '--count',
+      '@{u}...HEAD',
+    ], allowFailure: true);
+    if (r.exitCode != 0) return AheadBehind.none;
+    final parts = (r.stdout as String).trim().split(RegExp(r'\s+'));
+    if (parts.length != 2) return AheadBehind.none;
+    return AheadBehind(
+      behind: int.tryParse(parts[0]) ?? 0,
+      ahead: int.tryParse(parts[1]) ?? 0,
+    );
+  }
+
+  @override
+  Future<bool> hasUpstream(String root) async {
+    final r = await _run(root, [
+      'rev-parse',
+      '--abbrev-ref',
+      '--symbolic-full-name',
+      '@{u}',
+    ], allowFailure: true);
+    return r.exitCode == 0;
+  }
+
+  @override
+  Future<PullOutcome> pull(
+    String root, {
+    String? authorName,
+    String? authorEmail,
+  }) async {
+    final r = await _run(root, [
+      ..._identityArgs(authorName, authorEmail),
+      'pull',
+      '--rebase',
+      // Getman mirrors in-app edits to disk as uncommitted changes, so the
+      // tree is routinely dirty at pull time. --autostash stashes those edits,
+      // rebases, then reapplies them on top (the manual "stash, pull, pop"
+      // done for you) instead of git refusing with "you have unstaged
+      // changes". A rebase conflict still surfaces to the resolver as usual;
+      // the autostash pops when the rebase finishes (incl. via --continue).
+      '--autostash',
+    ], allowFailure: true);
+    if (r.exitCode == 0) return PullOutcome.clean;
+    if (await isRebaseInProgress(root) &&
+        (await conflictedPaths(root)).isNotEmpty) {
+      return PullOutcome.conflicted; // leave paused for the resolver
+    }
+    // Not a resolvable conflict (auth/network/local changes) — restore + throw.
+    await _run(root, ['rebase', '--abort'], allowFailure: true);
+    final err = (r.stderr as String).trim();
+    throw GitException(
+      err.isEmpty ? 'git pull failed' : err,
+      exitCode: r.exitCode,
+    );
+  }
+
+  @override
+  Future<void> push(String root, {required bool setUpstream}) async {
+    final branch = await currentBranch(root);
+    if (branch == null) throw GitException('no current branch to push');
+    await _run(root, [
+      'push',
+      if (setUpstream) '-u',
+      if (setUpstream) 'origin',
+      if (setUpstream) branch,
+    ]);
+  }
+
+  @override
+  Future<List<StashEntry>> stashList(String root) async {
+    final r = await _run(root, ['stash', 'list', '--format=%gs']);
+    final lines = (r.stdout as String)
+        .split('\n')
+        .where((l) => l.trim().isNotEmpty)
+        .toList();
+    return [
+      for (var i = 0; i < lines.length; i++)
+        StashEntry(index: i, message: lines[i].trim()),
+    ];
+  }
+
+  @override
+  Future<void> stashPush(String root, String message) async {
+    await _run(root, ['stash', 'push', '-u', '-m', message]);
+  }
+
+  @override
+  Future<void> stashPop(String root, int index) async {
+    await _run(root, ['stash', 'pop', 'stash@{$index}']);
+  }
+
+  @override
+  Future<void> stashDrop(String root, int index) async {
+    await _run(root, ['stash', 'drop', 'stash@{$index}']);
+  }
+
+  @override
+  Future<bool> isRebaseInProgress(String root) async {
+    final r = await _run(root, [
+      'rev-parse',
+      '--git-path',
+      'rebase-merge',
+    ], allowFailure: true);
+    final merge = (r.stdout as String).trim();
+    if (merge.isNotEmpty && Directory('$root/$merge').existsSync()) return true;
+    final r2 = await _run(root, [
+      'rev-parse',
+      '--git-path',
+      'rebase-apply',
+    ], allowFailure: true);
+    final apply = (r2.stdout as String).trim();
+    return apply.isNotEmpty && Directory('$root/$apply').existsSync();
+  }
+
+  @override
+  Future<List<String>> conflictedPaths(String root) async {
+    final r = await _run(root, ['diff', '--name-only', '--diff-filter=U']);
+    return (r.stdout as String)
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+  }
+
+  @override
+  Future<String?> showStage(String root, String path, int stage) async {
+    final r = await _run(root, ['show', ':$stage:$path'], allowFailure: true);
+    return r.exitCode == 0 ? r.stdout as String : null;
+  }
+
+  @override
+  Future<void> writeWorkingFile(
+    String root,
+    String path,
+    String content,
+  ) async {
+    final file = File('$root/$path');
+    await file.parent.create(recursive: true);
+    await file.writeAsString(content);
+  }
+
+  @override
+  Future<void> add(String root, String path) => _run(root, ['add', path]);
+
+  @override
+  Future<void> removeFile(String root, String path) =>
+      _run(root, ['rm', '--', path]);
+
+  @override
+  Future<void> rebaseContinue(
+    String root, {
+    String? authorName,
+    String? authorEmail,
+  }) async {
+    // GIT_EDITOR=true so a commit-message step never blocks on an editor.
+    final r = await Process.run(
+      'git',
+      [..._identityArgs(authorName, authorEmail), 'rebase', '--continue'],
+      workingDirectory: root,
+      stdoutEncoding: utf8,
+      stderrEncoding: utf8,
+      environment: {'GIT_EDITOR': 'true'},
+    );
+    if (r.exitCode != 0) {
+      final err = (r.stderr as String).trim();
+      throw GitException(
+        err.isEmpty ? 'git rebase --continue failed' : err,
+        exitCode: r.exitCode,
+      );
+    }
+  }
+
+  @override
+  Future<void> rebaseAbort(String root) => _run(root, ['rebase', '--abort']);
+
+  @override
+  Future<void> fetch(String root) => _run(root, ['fetch']);
 
   /// Parses `git status --porcelain=v1 -z`. Records are NUL-terminated; a
   /// rename record (`R`/`C`) is followed by a second NUL-token holding the

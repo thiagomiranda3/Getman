@@ -1,7 +1,18 @@
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/collections/domain/entities/review_entry.dart';
 
-enum ReviewStatus { initial, loading, ready, committing, error }
+enum ReviewStatus {
+  initial,
+  loading,
+  ready,
+  committing,
+  error,
+
+  /// A commit failed because neither Getman's stored identity nor the OS
+  /// git config has a commit author — the widget layer prompts for a
+  /// name/email, saves it to Settings, and re-dispatches `Commit`.
+  needsIdentity,
+}
 
 class ReviewState extends Equatable {
   const ReviewState({

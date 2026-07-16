@@ -94,4 +94,105 @@ void main() {
     if (!await gitPresent()) return;
     expect(await git.headContent(tmp.path, 'nope.json'), isNull);
   });
+
+  // Commits a file so the repo has a HEAD (a repo with no commits has no
+  // branch to branch from).
+  Future<void> seedCommit() async {
+    File('${tmp.path}/a.req.json').writeAsStringSync('{"x":1}');
+    await git.stage(tmp.path, ['a.req.json']);
+    await git.commit(tmp.path, 'seed');
+  }
+
+  test('branches lists local branches; createBranch switches to it', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+
+    await git.createBranch(tmp.path, 'feat/x');
+
+    expect(await git.currentBranch(tmp.path), 'feat/x');
+    expect(await git.branches(tmp.path), contains('feat/x'));
+  });
+
+  test('switchBranch moves between existing branches', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+    final initial = (await git.currentBranch(tmp.path))!;
+    await git.createBranch(tmp.path, 'feat/x');
+
+    await git.switchBranch(tmp.path, initial);
+
+    expect(await git.currentBranch(tmp.path), initial);
+  });
+
+  test('hasRemote is false without a remote', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+    expect(await git.hasRemote(tmp.path), isFalse);
+  });
+
+  test('addRemote adds a remote and hasRemote becomes true', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+    expect(await git.hasRemote(tmp.path), isFalse);
+
+    await git.addRemote(
+      tmp.path,
+      'origin',
+      'https://example.invalid/x/y.git',
+    );
+
+    expect(await git.hasRemote(tmp.path), isTrue);
+  });
+
+  test('aheadBehind is (0,0) when the branch has no upstream', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+
+    final ab = await git.aheadBehind(tmp.path);
+
+    expect(ab.ahead, 0);
+    expect(ab.behind, 0);
+  });
+
+  test('stashPush clears the working tree; pop restores it', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+    File('${tmp.path}/a.req.json').writeAsStringSync('{"x":2}');
+
+    await git.stashPush(tmp.path, 'wip');
+    expect(await git.status(tmp.path), isEmpty);
+    expect(File('${tmp.path}/a.req.json').readAsStringSync(), '{"x":1}');
+
+    final stashes = await git.stashList(tmp.path);
+    expect(stashes.single.index, 0);
+    expect(stashes.single.message, contains('wip'));
+
+    await git.stashPop(tmp.path, 0);
+    expect(File('${tmp.path}/a.req.json').readAsStringSync(), '{"x":2}');
+    expect(await git.stashList(tmp.path), isEmpty);
+  });
+
+  test('stashPush includes untracked files', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+    File('${tmp.path}/new.req.json').writeAsStringSync('{"n":1}');
+
+    await git.stashPush(tmp.path, 'wip');
+
+    // -u: an untracked new request must be stashed too, or a "stash and switch"
+    // would carry it onto the target branch.
+    expect(File('${tmp.path}/new.req.json').existsSync(), isFalse);
+  });
+
+  test('stashDrop removes a stash without restoring it', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+    File('${tmp.path}/a.req.json').writeAsStringSync('{"x":3}');
+    await git.stashPush(tmp.path, 'wip');
+
+    await git.stashDrop(tmp.path, 0);
+
+    expect(await git.stashList(tmp.path), isEmpty);
+    expect(File('${tmp.path}/a.req.json').readAsStringSync(), '{"x":1}');
+  });
 }

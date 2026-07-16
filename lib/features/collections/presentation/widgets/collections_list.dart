@@ -15,6 +15,7 @@ import 'package:getman/features/collections/domain/logic/collections_tree_helper
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
+import 'package:getman/features/collections/presentation/widgets/branch_chip.dart';
 import 'package:getman/features/collections/presentation/widgets/collection_node_row.dart';
 import 'package:getman/features/collections/presentation/widgets/example_row.dart';
 import 'package:getman/features/collections/presentation/widgets/review_changes_button.dart';
@@ -289,100 +290,105 @@ class _CollectionsListState extends State<CollectionsList> {
         children: [
           Padding(
             padding: const EdgeInsets.all(8),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'SEARCH COLLECTIONS...',
-                      hintStyle: TextStyle(
-                        fontSize: layout.fontSizeSmall,
-                        fontWeight: context.appTypography.displayWeight,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.5,
-                        ),
+                TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'SEARCH COLLECTIONS...',
+                    hintStyle: TextStyle(
+                      fontSize: layout.fontSizeSmall,
+                      fontWeight: context.appTypography.displayWeight,
+                      color: theme.colorScheme.onSurface.withValues(
+                        alpha: 0.5,
                       ),
-                      prefixIcon: Icon(
-                        Icons.search,
-                        size: layout.iconSize,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          context.appShape.panelRadius,
-                        ),
-                        borderSide: BorderSide(
-                          color: theme.dividerColor,
-                          width: layout.borderThin,
-                        ),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      isDense: true,
                     ),
-                    style: TextStyle(
-                      fontSize: layout.fontSizeNormal,
-                      fontWeight: context.appTypography.titleWeight,
-                    ),
-                  ),
-                ),
-                SizedBox(width: layout.tabSpacing),
-                context.appDecoration.wrapInteractive(
-                  child: PopupMenuButton<String>(
-                    icon: Icon(
-                      Icons.file_upload,
+                    prefixIcon: Icon(
+                      Icons.search,
                       size: layout.iconSize,
                       color: theme.colorScheme.onSurface,
                     ),
-                    tooltip: 'IMPORT',
-                    color: theme.colorScheme.surface,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
+                    border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(
                         context.appShape.panelRadius,
                       ),
-                      side: BorderSide(
+                      borderSide: BorderSide(
                         color: theme.dividerColor,
-                        width: layout.borderThick,
+                        width: layout.borderThin,
                       ),
                     ),
-                    onSelected: (val) {
-                      switch (val) {
-                        case 'postman':
-                          unawaited(_importCollections(context));
-                        case 'openapi':
-                          _importSpec(context);
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'postman',
-                        child: Text(
-                          'FROM POSTMAN',
-                          style: TextStyle(
-                            fontSize: layout.fontSizeSmall,
-                            fontWeight: context.appTypography.titleWeight,
-                          ),
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'openapi',
-                        child: Text(
-                          'FROM OPENAPI / SWAGGER',
-                          style: TextStyle(
-                            fontSize: layout.fontSizeSmall,
-                            fontWeight: context.appTypography.titleWeight,
-                          ),
-                        ),
-                      ),
-                    ],
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    isDense: true,
+                  ),
+                  style: TextStyle(
+                    fontSize: layout.fontSizeNormal,
+                    fontWeight: context.appTypography.titleWeight,
                   ),
                 ),
-                SizedBox(width: layout.tabSpacing),
-                const ReviewChangesButton(),
+                SizedBox(height: layout.tabSpacing),
+                Row(
+                  children: [
+                    const BranchChip(),
+                    const Spacer(),
+                    context.appDecoration.wrapInteractive(
+                      child: PopupMenuButton<String>(
+                        icon: Icon(
+                          Icons.file_upload,
+                          size: layout.iconSize,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                        tooltip: 'IMPORT',
+                        color: theme.colorScheme.surface,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            context.appShape.panelRadius,
+                          ),
+                          side: BorderSide(
+                            color: theme.dividerColor,
+                            width: layout.borderThick,
+                          ),
+                        ),
+                        onSelected: (val) {
+                          switch (val) {
+                            case 'postman':
+                              unawaited(_importCollections(context));
+                            case 'openapi':
+                              _importSpec(context);
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          PopupMenuItem(
+                            value: 'postman',
+                            child: Text(
+                              'FROM POSTMAN',
+                              style: TextStyle(
+                                fontSize: layout.fontSizeSmall,
+                                fontWeight: context.appTypography.titleWeight,
+                              ),
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'openapi',
+                            child: Text(
+                              'FROM OPENAPI / SWAGGER',
+                              style: TextStyle(
+                                fontSize: layout.fontSizeSmall,
+                                fontWeight: context.appTypography.titleWeight,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: layout.tabSpacing),
+                    const ReviewChangesButton(),
+                  ],
+                ),
               ],
             ),
           ),
