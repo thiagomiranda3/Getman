@@ -1,32 +1,99 @@
 name: PR Agent
 
 # Qodo PR-Agent — AI-assisted PR review, backed by Google Gemini (not OpenAI).
-# On a new/updated PR it posts an automatic review; description and improve are
-# left OFF by default and stay available on demand via PR comments:
-#   /review   /describe   /improve   /ask <question>
+#
+# Gated: the auto-review runs ONLY once every other check on the PR head commit
+# has finished AND all of them are green (CI, CodeQL, GitGuardian, etc.). The
+# job triggers on the PR event, then polls the Checks API + legacy commit
+# statuses until nothing is pending, and skips the review if anything failed.
+# This avoids spending a Gemini review on a PR that is still red.
+#
+# Note: this posts an analysis *comment* only — it does NOT submit an approving
+# ("+1") GitHub review, and cannot satisfy a required-reviewer branch rule.
 #
 # Setup (one-time): add a repository secret GEMINI_API_KEY from
 # https://aistudio.google.com/  — no OpenAI key is required.
 on:
   pull_request:
     types: [opened, reopened, ready_for_review]
-  issue_comment:
-    types: [created]
 
 permissions:
   contents: read
+  checks: read
+  statuses: read
   pull-requests: write
   issues: write
 
+# A newer event for the same PR supersedes an in-flight wait.
+concurrency:
+  group: pr-agent-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
-  pr_agent:
-    # Skip Dependabot PRs (its token can't read the secret) and draft PRs.
+  pr-agent:
+    name: PR Agent (auto-review)
+    # Skip Dependabot PRs (its token can't read the secret) and drafts.
     if: >-
       github.actor != 'dependabot[bot]' &&
-      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+      github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
+      - name: Wait for all other checks to pass
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          # This job's own check-run name — excluded so we never wait on ourselves.
+          SELF_CHECK: PR Agent (auto-review)
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 1800 ))    # wait up to 30 min for slow checks
+          warmup_until=$(( $(date +%s) + 120 ))  # tolerate "no checks yet" only briefly
+
+          while :; do
+            now=$(date +%s)
+
+            runs=$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
+              --jq '[.check_runs[] | select(.name != env.SELF_CHECK)]')
+            statuses=$(gh api "repos/$REPO/commits/$SHA/status?per_page=100" \
+              --jq '[.statuses[] | select(.context != env.SELF_CHECK)]')
+
+            total=$(( $(jq 'length' <<<"$runs") + $(jq 'length' <<<"$statuses") ))
+            pending=$(( \
+              $(jq '[.[] | select(.status != "completed")] | length' <<<"$runs") + \
+              $(jq '[.[] | select(.state == "pending")] | length' <<<"$statuses") ))
+            failed=$(( \
+              $(jq '[.[] | select(.status == "completed" and (.conclusion | IN("success","neutral","skipped") | not))] | length' <<<"$runs") + \
+              $(jq '[.[] | select(.state == "failure" or .state == "error")] | length' <<<"$statuses") ))
+
+            if [ "$total" -eq 0 ]; then
+              if [ "$now" -lt "$warmup_until" ]; then
+                echo "No checks reported yet — warming up…"; sleep 15; continue
+              fi
+              echo "No other checks on $SHA — nothing to gate on; proceeding."
+              echo "passed=true" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+
+            if [ "$pending" -gt 0 ]; then
+              if [ "$now" -ge "$deadline" ]; then
+                echo "Timed out after 30 min with $pending check(s) still pending — skipping review."
+                echo "passed=false" >> "$GITHUB_OUTPUT"; exit 0
+              fi
+              echo "$pending check(s) still running — waiting…"; sleep 20; continue
+            fi
+
+            if [ "$failed" -gt 0 ]; then
+              echo "$failed check(s) failed — skipping PR-Agent review."
+              echo "passed=false" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+
+            echo "All $total check(s) passed — running PR-Agent."
+            echo "passed=true" >> "$GITHUB_OUTPUT"; exit 0
+          done
+
       - name: PR Agent
+        if: steps.gate.outputs.passed == 'true'
         uses: qodo-ai/pr-agent@8e4d32e5497defd43c023a404f73560c62728961 # v0.39.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
