@@ -70,7 +70,7 @@ class _UpdateGateState extends State<UpdateGate> {
       openOnDownload: false,
       getLatestVersion: () => _getLatestVersion(controller),
       getChangelog: (latestVer, appVer) async =>
-          controller.cachedRelease?.changelog,
+          controller.cachedRelease?.changelog ?? '',
       // Required by UpdatWidget but never invoked: we hand the download to the
       // browser rather than calling updat's in-process `startUpdate()`.
       getBinaryUrl: (_) async => controller.cachedRelease?.assetUrl ?? '',
@@ -121,7 +121,16 @@ class _UpdateGateState extends State<UpdateGate> {
   }
 
   /// Gates the network: skip the call entirely when auto-check is off and this
-  /// isn't a manual check. Returns the version string `updat` compares.
+  /// isn't a manual check (a deliberate no-op — `updat` never calls `.then` in
+  /// this case, so it's fine that this returns null rather than throwing).
+  /// Returns the version string `updat` compares.
+  ///
+  /// A real check whose fetch fails (`fetchLatestRelease` returns null) MUST
+  /// throw rather than return null: `updat`'s `updateValues` only acts inside
+  /// `.then((latestVersion) { if (latestVersion != null...) ... })` — a null
+  /// result is silently swallowed and `status` never becomes `error`. Throwing
+  /// routes it through `updat`'s `.catchError`, which does set
+  /// `status = UpdatStatus.error`, so `_onStatus` can surface the failure.
   Future<String?> _getLatestVersion(UpdateController controller) async {
     final settingsBloc = context.read<SettingsBloc>();
     final settings = settingsBloc.state.settings;
@@ -129,7 +138,10 @@ class _UpdateGateState extends State<UpdateGate> {
       return null;
     }
     final release = await controller.fetchLatestRelease(_platform);
-    return release?.version;
+    if (release == null) {
+      throw StateError('Failed to fetch the latest release.');
+    }
+    return release.version;
   }
 
   /// Opens the release download in the user's default browser instead of
