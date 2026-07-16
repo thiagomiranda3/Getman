@@ -1,14 +1,15 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/network/network_service.dart';
+import 'package:getman/core/network/realtime_service.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 
-/// Pushes network-related settings into the live [NetworkService] whenever they
-/// change. Keeps [SettingsBloc] free of any dependency on the network service
-/// (the coordinating widget holds both, per the project's bloc-coupling rule).
-/// `listenWhen` is gated to the network fields so unrelated settings keystrokes
-/// never touch Dio.
+/// Pushes network-related settings into the live [NetworkService] and
+/// [RealtimeService] (SSE) whenever they change. Keeps [SettingsBloc] free of
+/// any dependency on either network service (the coordinating widget holds
+/// both, per the project's bloc-coupling rule). `listenWhen` is gated to the
+/// network fields so unrelated settings keystrokes never touch Dio.
 class NetworkSettingsListener extends StatelessWidget {
   const NetworkSettingsListener({required this.child, super.key});
   final Widget child;
@@ -30,9 +31,11 @@ class NetworkSettingsListener extends StatelessWidget {
             a.clientKeyPath != b.clientKeyPath ||
             a.clientCertPassphrase != b.clientCertPassphrase;
       },
-      listener: (context, state) => context.read<NetworkService>().applyConfig(
-        state.settings.toNetworkConfig(),
-      ),
+      listener: (context, state) {
+        final config = state.settings.toNetworkConfig();
+        context.read<NetworkService>().applyConfig(config);
+        context.read<RealtimeService>().applyConfig(config);
+      },
       child: child,
     );
   }

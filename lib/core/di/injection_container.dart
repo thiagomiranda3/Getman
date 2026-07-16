@@ -272,8 +272,9 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
       ),
     )
     ..registerLazySingleton<TabsLocalDataSource>(TabsLocalDataSourceImpl.new)
-    // Features - Realtime (WebSocket / SSE)
-    ..registerLazySingleton(RealtimeService.new)
+    // Features - Realtime (WebSocket / SSE). RealtimeService itself is
+    // registered below, alongside NetworkService, once the cookie store and
+    // initial NetworkConfig it needs (H2) are available.
     ..registerLazySingleton(() => RealtimeBloc(service: sl()))
     // Features - MCP (Model Context Protocol client over Streamable HTTP)
     ..registerLazySingleton(McpService.new)
@@ -305,6 +306,17 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     ..registerLazySingleton(
       () => NetworkService(
         dio: NetworkService.buildDio(
+          initialSettings.toNetworkConfig(),
+          CookieInterceptor(cookieStore),
+        ),
+      ),
+    )
+    // Wired like NetworkService: the same NetworkConfig (SSL verify/proxy/
+    // mTLS) and cookie jar, so SSE respects network settings and sends
+    // session cookies (H2) instead of a bare, unconfigured Dio.
+    ..registerLazySingleton(
+      () => RealtimeService(
+        dio: RealtimeService.buildSseDio(
           initialSettings.toNetworkConfig(),
           CookieInterceptor(cookieStore),
         ),
