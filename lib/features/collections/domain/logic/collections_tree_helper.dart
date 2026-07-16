@@ -203,6 +203,62 @@ class CollectionsTreeHelper {
     ),
   );
 
+  /// Re-applies data that exists only in the app — never mirrored to disk —
+  /// onto a freshly-read workspace forest [onDisk]: a leaf's saved examples,
+  /// and the values of secret collection variables (the mirror masks them to
+  /// `''` so secrets never land in git). Matching is by node id; nodes new on
+  /// disk pass through untouched. Call before `ReplaceCollections` on any
+  /// disk reload (branch switch, pull, stash, RELOAD FROM DISK), or every git
+  /// operation silently destroys them.
+  static List<CollectionNodeEntity> overlayLocalOnly(
+    List<CollectionNodeEntity> onDisk,
+    List<CollectionNodeEntity> inMemory,
+  ) {
+    final localById = <String, CollectionNodeEntity>{};
+    void index(List<CollectionNodeEntity> nodes) {
+      for (final n in nodes) {
+        localById[n.id] = n;
+        index(n.children);
+      }
+    }
+
+    index(inMemory);
+
+    List<CollectionNodeEntity> walk(List<CollectionNodeEntity> nodes) {
+      return nodes.map((node) {
+        var merged = node;
+        final local = localById[node.id];
+        if (local != null) {
+          if (!node.isFolder && local.examples.isNotEmpty) {
+            merged = merged.copyWith(examples: local.examples);
+          }
+          if (node.isFolder && node.secretKeys.isNotEmpty) {
+            final vars = Map<String, String>.of(node.variables);
+            var changed = false;
+            for (final key in node.secretKeys) {
+              final localValue = local.variables[key];
+              // Only fill in a masked (empty) disk value — a non-empty disk
+              // value is a deliberate upstream change and wins.
+              if (vars[key] == '' &&
+                  localValue != null &&
+                  localValue.isNotEmpty) {
+                vars[key] = localValue;
+                changed = true;
+              }
+            }
+            if (changed) merged = merged.copyWith(variables: vars);
+          }
+        }
+        if (merged.children.isNotEmpty) {
+          merged = merged.copyWith(children: walk(merged.children));
+        }
+        return merged;
+      }).toList();
+    }
+
+    return walk(onDisk);
+  }
+
   static CollectionNodeEntity? findNode(
     List<CollectionNodeEntity> nodes,
     String id,

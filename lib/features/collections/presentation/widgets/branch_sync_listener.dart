@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart';
@@ -58,7 +59,17 @@ class BranchSyncListener extends StatelessWidget {
           } on Object catch (_) {
             return; // best-effort: a failed read must not break the session
           }
-          collections.add(ReplaceCollections(onDisk));
+          // Secret variable values (masked to '' on disk) and saved examples
+          // exist only in the app — carry them over or every git op wipes
+          // them.
+          collections.add(
+            ReplaceCollections(
+              CollectionsTreeHelper.overlayLocalOnly(
+                onDisk,
+                collections.state.collections,
+              ),
+            ),
+          );
           // Yield one event-loop turn: the bloc delivers the event, runs the
           // handler and notifies its state listeners over microtasks, so they
           // have all run by the time a zero-duration timer fires. This relies
