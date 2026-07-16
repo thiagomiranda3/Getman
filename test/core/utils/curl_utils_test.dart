@@ -358,6 +358,38 @@ curl --location 'http://test.com/dynamics/websocket-metric' \
       final config = CurlUtils.parse('   curl   https://api.dev   ', id: 'a');
       expect(config!.url, 'https://api.dev');
     });
+
+    test('accepts glued short options (-XPOST, -Hk: v, -dbody)', () {
+      final del = CurlUtils.parse(
+        'curl -XDELETE https://api.dev/items/1',
+        id: 'a',
+      )!;
+      expect(del.method, 'DELETE');
+      expect(del.url, 'https://api.dev/items/1');
+
+      final post = CurlUtils.parse(
+        "curl -XPOST 'https://api.dev' '-HContent-Type: application/json' "
+        "-d'{\"a\":1}'",
+        id: 'b',
+      )!;
+      expect(post.method, 'POST');
+      expect(post.headers['Content-Type'], 'application/json');
+      expect(post.body, '{"a":1}');
+    });
+
+    test('a glued skip-flag value is not mistaken for the URL', () {
+      final config = CurlUtils.parse(
+        'curl -ohttps://not-the-url.txt https://api.dev',
+        id: 'a',
+      )!;
+      expect(config.url, 'https://api.dev');
+    });
+
+    test('boolean bundles like -sS are still ignored, not split', () {
+      final config = CurlUtils.parse('curl -sS https://api.dev', id: 'a')!;
+      expect(config.url, 'https://api.dev');
+      expect(config.method, 'GET');
+    });
   });
 
   group('CurlUtils.generate', () {

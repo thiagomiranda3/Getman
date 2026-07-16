@@ -32,6 +32,44 @@ class CurlUtils {
     '--tlsv1',
   };
 
+  /// Splits an argument into (flag, inlineValue): a long flag's `=value`
+  /// (`--header=X: y`), or a short flag's glued value (`-XPOST`,
+  /// `-HAccept: json`, `-dbody`) — only for value-taking short flags, so
+  /// boolean bundles like `-sS` stay untouched. Plain tokens pass through
+  /// with a null inline value.
+  static (String, String?) _splitFlag(String raw) {
+    if (raw.startsWith('--') && raw.contains('=')) {
+      final eq = raw.indexOf('=');
+      return (raw.substring(0, eq), raw.substring(eq + 1));
+    }
+    if (raw.length > 2 &&
+        raw.startsWith('-') &&
+        !raw.startsWith('--') &&
+        _gluedShortFlags.contains(raw[1])) {
+      return (raw.substring(0, 2), raw.substring(2));
+    }
+    return (raw, null);
+  }
+
+  /// Single-letter value-taking flags that curl accepts with a glued argument
+  /// (`-XPOST`). Letters of modeled flags plus `o`/`x`/`m`/`w` (skip-flags) so
+  /// `-omyfile` doesn't leak its value into URL detection.
+  static const _gluedShortFlags = {
+    'X',
+    'H',
+    'd',
+    'A',
+    'e',
+    'b',
+    'u',
+    'F',
+    'T',
+    'o',
+    'x',
+    'm',
+    'w',
+  };
+
   static final RegExp _domainish = RegExp(r'^[\w.-]+\.[\w.-]+');
   static final RegExp _hostPort = RegExp(r'^[\w.-]+:\d+');
 
@@ -81,13 +119,7 @@ class CurlUtils {
 
       // Split a long flag's inline value: `--header=X: y` ->
       // (`--header`, `X: y`).
-      var flag = raw;
-      String? inlineValue;
-      if (raw.startsWith('--') && raw.contains('=')) {
-        final eq = raw.indexOf('=');
-        flag = raw.substring(0, eq);
-        inlineValue = raw.substring(eq + 1);
-      }
+      final (flag, inlineValue) = _splitFlag(raw);
 
       // Reads the value for a value-taking flag: the inline `=value` if
       // present, else the next token. Returns null if neither exists.
