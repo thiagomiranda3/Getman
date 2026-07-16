@@ -185,7 +185,11 @@ class _ConflictResolutionBodyState extends State<ConflictResolutionBody> {
             // longer pops synchronously — see _cancel), without the
             // resolve-flow's "Conflicts resolved." snackbar or a tree
             // reload — pre-pull state already matches Hive, there is
-            // nothing to reload.
+            // nothing to reload. Branch status DOES need a refresh: the
+            // post-conflict status was read mid-rebase (detached HEAD,
+            // current == null), which hides the branch chip until some
+            // unrelated refresh happens.
+            context.read<GitSyncBloc>().add(LoadBranchStatus(widget.root));
             unawaited(Navigator.of(context).maybePop());
             return;
           }
@@ -415,11 +419,17 @@ class _FieldConflictRowState extends State<_FieldConflictRow> {
   void _pickSide(FileSide side) {
     final fc = widget.fieldConflict;
     if (_editable) {
-      final value = side == FileSide.incoming
-          ? (fc.incoming ?? '')
-          : (fc.yours ?? '');
+      final raw = side == FileSide.incoming ? fc.incoming : fc.yours;
       _controllerSide = side;
-      _setControllerText(value);
+      _setControllerText(raw ?? '');
+      // A null side on a mapEntry conflict means that side DELETED the
+      // header/variable — carry the delete marker so the resolved file drops
+      // the key (an empty string would resurrect it empty). This onPick runs
+      // AFTER the controller-set above, so it wins over the listener's echo;
+      // typing afterwards turns the pick back into a normal value edit.
+      final value =
+          raw ??
+          (fc.kind == FieldConflictKind.mapEntry ? kFieldDeletedMarker : '');
       widget.onPick(FieldPick(side: side, value: value));
     } else {
       final value = side == FileSide.incoming ? 'incoming' : 'yours';

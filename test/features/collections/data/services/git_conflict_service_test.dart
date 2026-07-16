@@ -9,6 +9,7 @@ import 'package:getman/features/collections/data/services/git_conflict_service.d
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/entities/file_conflict.dart';
+import 'package:getman/features/collections/domain/logic/three_way_merge.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockGit extends Mock implements GitService {}
@@ -504,6 +505,129 @@ void main() {
         expect(
           WorkspaceCollectionSerializer.childOrder(decoded),
           ['a', 'c'],
+        );
+      },
+    );
+
+    test(
+      'picking the deleting side of a header removes the key '
+      '(no empty-value resurrection)',
+      () async {
+        when(() => git.showStage(root, 'a.req.json', 1)).thenAnswer(
+          (_) async => _reqStage(_leaf(headers: const {'X-Api': '1'})),
+        );
+        // Incoming DELETED the header; yours changed it.
+        when(() => git.showStage(root, 'a.req.json', 2)).thenAnswer(
+          (_) async => _reqStage(_leaf()),
+        );
+        when(() => git.showStage(root, 'a.req.json', 3)).thenAnswer(
+          (_) async => _reqStage(_leaf(headers: const {'X-Api': '2'})),
+        );
+        String? written;
+        when(() => git.writeWorkingFile(root, 'a.req.json', any())).thenAnswer(
+          (i) async {
+            written = i.positionalArguments[2] as String;
+          },
+        );
+        when(() => git.add(root, 'a.req.json')).thenAnswer((_) async {});
+
+        await service.resolve(root, const [
+          FileResolution(
+            path: 'a.req.json',
+            fieldChoices: {"header 'X-Api'": kFieldDeletedMarker},
+          ),
+        ]);
+
+        final node = WorkspaceCollectionSerializer.requestFromJson(
+          jsonDecode(written!) as Map<String, dynamic>,
+        );
+        expect(
+          node.config!.headers.containsKey('X-Api'),
+          isFalse,
+          reason: 'accepting the deletion must not resurrect the key empty',
+        );
+      },
+    );
+
+    test(
+      'picking the deleting side of a folder variable removes it '
+      'and prunes its secret flag',
+      () async {
+        when(() => git.showStage(root, 'x/.folder.json', 1)).thenAnswer(
+          (_) async => _folderStage(
+            _folder(variables: {'token': 'a'}, secretKeys: {'token'}),
+            ['a'],
+          ),
+        );
+        when(() => git.showStage(root, 'x/.folder.json', 2)).thenAnswer(
+          (_) async => _folderStage(_folder(), ['a']),
+        );
+        when(() => git.showStage(root, 'x/.folder.json', 3)).thenAnswer(
+          (_) async => _folderStage(
+            _folder(variables: {'token': 'b'}, secretKeys: {'token'}),
+            ['a'],
+          ),
+        );
+        String? written;
+        when(
+          () => git.writeWorkingFile(root, 'x/.folder.json', any()),
+        ).thenAnswer((i) async {
+          written = i.positionalArguments[2] as String;
+        });
+        when(() => git.add(root, 'x/.folder.json')).thenAnswer((_) async {});
+
+        await service.resolve(root, const [
+          FileResolution(
+            path: 'x/.folder.json',
+            fieldChoices: {"variable 'token'": kFieldDeletedMarker},
+          ),
+        ]);
+
+        final decoded = jsonDecode(written!) as Map<String, dynamic>;
+        expect(
+          (decoded['variables'] as Map?) ?? const {},
+          isNot(contains('token')),
+        );
+        expect((decoded['secretKeys'] as List?) ?? const [], isEmpty);
+      },
+    );
+
+    test(
+      'an auto-merged child order keeps YOUR committed reorder when only '
+      'another field conflicted (incoming left the order at base)',
+      () async {
+        when(() => git.showStage(root, 'x/.folder.json', 1)).thenAnswer(
+          (_) async => _folderStage(_folder(name: 'Base'), ['a', 'b']),
+        );
+        // Incoming renamed the folder but left the order at base.
+        when(() => git.showStage(root, 'x/.folder.json', 2)).thenAnswer(
+          (_) async => _folderStage(_folder(name: 'Incoming'), ['a', 'b']),
+        );
+        // Yours reordered the children (and renamed differently → conflict).
+        when(() => git.showStage(root, 'x/.folder.json', 3)).thenAnswer(
+          (_) async => _folderStage(_folder(name: 'Yours'), ['b', 'a']),
+        );
+        String? written;
+        when(
+          () => git.writeWorkingFile(root, 'x/.folder.json', any()),
+        ).thenAnswer((i) async {
+          written = i.positionalArguments[2] as String;
+        });
+        when(() => git.add(root, 'x/.folder.json')).thenAnswer((_) async {});
+
+        // Only the name was explicitly chosen — order auto-resolves.
+        await service.resolve(root, const [
+          FileResolution(
+            path: 'x/.folder.json',
+            fieldChoices: {'name': 'Incoming'},
+          ),
+        ]);
+
+        final decoded = jsonDecode(written!) as Map<String, dynamic>;
+        expect(
+          WorkspaceCollectionSerializer.childOrder(decoded),
+          ['b', 'a'],
+          reason: 'incoming did not touch the order — the reorder is yours',
         );
       },
     );

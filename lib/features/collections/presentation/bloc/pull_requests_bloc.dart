@@ -15,6 +15,9 @@ class PullRequestsBloc extends Bloc<PullRequestsEvent, PullRequestsState> {
 
   final PullRequestService _service;
 
+  /// The workspace root [PullRequestsState.defaultBase] was resolved for.
+  String? _defaultBaseRoot;
+
   Future<void> _onLoad(
     LoadPullRequests event,
     Emitter<PullRequestsState> emit,
@@ -34,8 +37,16 @@ class PullRequestsBloc extends Bloc<PullRequestsEvent, PullRequestsState> {
         return;
       }
       final prs = await _service.list(event.root);
-      // Resolve the default base once (for the create form) — best-effort.
-      final base = state.defaultBase ?? await _service.defaultBase(event.root);
+      // Resolve the default base once per workspace (for the create form) —
+      // the bloc is app-scoped, so a cache not keyed by root would pre-fill
+      // the previous repo's default branch after a workspace switch.
+      final String? base;
+      if (_defaultBaseRoot == event.root && state.defaultBase != null) {
+        base = state.defaultBase;
+      } else {
+        base = await _service.defaultBase(event.root);
+        _defaultBaseRoot = event.root;
+      }
       emit(
         state.copyWith(
           status: PrStatus.ready,

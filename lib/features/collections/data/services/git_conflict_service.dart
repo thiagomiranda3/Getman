@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:collection/collection.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/git/git_service.dart';
@@ -204,11 +205,21 @@ class GitConflictService implements ConflictService {
     // `childOrder` is structural (see ThreeWayMerge.mergeFolder), so it isn't
     // reconstructed from an entity field: `_pick` renders it as a
     // comma-joined string for display, and if the user's choice round-trips
-    // that same joining, split it back; otherwise keep the incoming order.
+    // that same joining, split it back. With no explicit choice the order
+    // was AUTO-resolved — re-derive it with the same 3-way rule instead of
+    // unconditionally taking incoming, which silently reverted a committed
+    // reorder of yours whenever another field conflicted on the folder.
+    final baseOrder = _folderOrderOrEmpty(s1);
+    final yourOrder = _folderOrderOrEmpty(s3);
     final orderChoice = res.fieldChoices['child order'];
-    final order = orderChoice != null && orderChoice.isNotEmpty
-        ? orderChoice.split(', ')
-        : incOrder;
+    final List<String> order;
+    if (orderChoice != null && orderChoice.isNotEmpty) {
+      order = orderChoice.split(', ');
+    } else if (const ListEquality<String>().equals(incOrder, baseOrder)) {
+      order = yourOrder; // incoming didn't touch it — yours wins
+    } else {
+      order = incOrder; // incoming changed it (yours didn't, or both equal)
+    }
     return _enc.convert(
       WorkspaceCollectionSerializer.folderToJson(resolved, order),
     );
@@ -259,7 +270,12 @@ class GitConflictService implements ConflictService {
         );
       } else if (headerKey != null) {
         final headers = Map<String, String>.from(config?.headers ?? const {});
-        headers[headerKey] = value;
+        if (value == kFieldDeletedMarker) {
+          // The user accepted the side that deleted this header.
+          headers.remove(headerKey);
+        } else {
+          headers[headerKey] = value;
+        }
         config = config?.copyWith(headers: headers);
       }
     }
@@ -291,7 +307,14 @@ class GitConflictService implements ConflictService {
         secretKeys =
             (value == 'yours' ? yours : incoming)?.secretKeys ?? const {};
       } else if (variableKey != null) {
-        variables[variableKey] = value;
+        if (value == kFieldDeletedMarker) {
+          // The user accepted the side that deleted this variable; prune the
+          // stale secret flag with it.
+          variables.remove(variableKey);
+          secretKeys = {...secretKeys}..remove(variableKey);
+        } else {
+          variables[variableKey] = value;
+        }
       }
     }
     return node.copyWith(variables: variables, secretKeys: secretKeys);

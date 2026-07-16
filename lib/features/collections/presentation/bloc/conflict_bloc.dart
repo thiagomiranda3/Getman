@@ -45,7 +45,10 @@ class ConflictBloc extends Bloc<ConflictEvent, ConflictState> {
     emit(state.copyWith(status: ConflictStatus.loading));
     try {
       final conflicts = await _service.currentConflicts(event.root);
-      _emitBatch(emit, conflicts, state.batch);
+      // Batch 0: LoadConflicts starts a NEW rebase session. The bloc is
+      // app-scoped, so reusing state.batch carried the previous session's
+      // final count into the next dialog's "commit N" header.
+      _emitBatch(emit, conflicts, 0);
     } on Object catch (e) {
       _fail(e, emit, 'load');
     }

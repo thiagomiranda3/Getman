@@ -200,7 +200,9 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
       () => WorkspaceSyncService(createWorkspaceDataSource()),
     )
     ..registerLazySingleton<GitService>(createGitService)
-    ..registerLazySingleton<ReviewService>(() => WorkspaceReviewService(sl()))
+    ..registerLazySingleton<ReviewService>(
+      () => WorkspaceReviewService(sl(), sl()),
+    )
     ..registerLazySingleton<BranchService>(() => GitBranchService(sl(), sl()))
     ..registerLazySingleton<ConflictService>(
       () => GitConflictService(sl(), sl()),

@@ -62,7 +62,16 @@ class StashEntry {
 
 /// The result of a rebase-pull: it either fast-forwarded/rebased cleanly, or
 /// it stopped on conflicts that are now sitting in the index for resolution.
-enum PullOutcome { clean, conflicted }
+enum PullOutcome {
+  clean,
+  conflicted,
+
+  /// The rebase itself succeeded, but re-applying the user's uncommitted
+  /// edits (the `--autostash`) conflicted. The working tree was restored to
+  /// the clean pulled state and the edits are preserved in `stash@{0}` —
+  /// callers should reload AND tell the user where their edits went.
+  cleanEditsStashed,
+}
 
 /// Drives the system `git` CLI over a workspace directory. The `_io`
 /// implementation is the sole `dart:io` importer; web gets the no-op stub.
