@@ -539,9 +539,11 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   /// Sets [response] as the tab's displayed response and prepends it to the
   /// time-travel history (newest-first), trimmed to [limit]. A [limit] of 0
   /// disables history (clears any accumulated entries). When [saveLarge] is
-  /// false, a history entry whose body exceeds the large-viewer threshold is
-  /// stored as a placeholder (the displayed [response] still keeps the full
-  /// body); on-disk capping at 1 MiB happens at the persistence boundary.
+  /// false, a *superseded* entry whose body exceeds the large-viewer threshold
+  /// is downgraded to the metadata-only placeholder; the newest entry always
+  /// keeps its full body — it is what "Latest" in the timeline restores after
+  /// time-travelling, so a placeholder there would lose the displayed body.
+  /// On-disk capping at 1 MiB happens at the persistence boundary.
   HttpRequestTabEntity _recordResponse(
     HttpRequestTabEntity live,
     HttpResponseEntity response,
@@ -555,16 +557,24 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         responseHistory: const [],
       );
     }
-    final stored =
-        !saveLarge && response.body.length > kLargeResponseViewerChars
-        ? response.copyWithBody(kResponseBodyTooLargePlaceholder)
-        : response;
     final entry = ResponseHistoryEntry(
       id: _uuid.v4(),
-      response: stored,
+      response: response,
       capturedAt: DateTime.now().millisecondsSinceEpoch,
     );
-    final history = [entry, ...live.responseHistory];
+    Iterable<ResponseHistoryEntry> older = live.responseHistory;
+    if (!saveLarge) {
+      older = older.map(
+        (e) => e.response.body.length > kLargeResponseViewerChars
+            ? e.copyWith(
+                response: e.response.copyWithBody(
+                  kResponseBodyTooLargePlaceholder,
+                ),
+              )
+            : e,
+      );
+    }
+    final history = [entry, ...older];
     return live.copyWith(
       isSending: false,
       response: response,

@@ -791,28 +791,72 @@ void main() {
     );
 
     test(
-      'saveLargeResponsesInHistory false stores large entries as placeholder',
+      'saveLargeResponsesInHistory false keeps the newest entry full and '
+      'downgrades superseded large entries to the placeholder',
       () async {
         await loadWith([tab('a')]);
         final big = 'x' * (kLargeResponseViewerChars + 1);
-        stubSend(() async => resp(200, big));
+        var n = 0;
+        stubSend(() async => n++ == 0 ? resp(200, big) : resp(200, 'small'));
 
         bloc.add(
           const SendRequest(tabId: 'a', saveLargeResponsesInHistory: false),
         );
-        await expectLater(
-          bloc.stream,
-          emitsThrough(
-            predicate<TabsState>((s) {
-              final t = s.tabs.single;
-              return !t.isSending &&
-                  // Displayed response keeps the full body...
-                  t.response?.body == big &&
-                  // ...but the history entry is metadata-only.
-                  t.responseHistory.single.response.body ==
-                      kResponseBodyTooLargePlaceholder;
-            }),
-          ),
+        await pumpEventQueue();
+        // The newest entry keeps the full body — it is what "Latest" in the
+        // timeline restores.
+        expect(
+          bloc.state.tabs.single.responseHistory.single.response.body,
+          big,
+        );
+
+        bloc.add(
+          const SendRequest(tabId: 'a', saveLargeResponsesInHistory: false),
+        );
+        await pumpEventQueue();
+
+        final t = bloc.state.tabs.single;
+        expect(t.responseHistory, hasLength(2));
+        expect(t.responseHistory.first.response.body, 'small');
+        // Once superseded, the large entry is metadata-only.
+        expect(
+          t.responseHistory.last.response.body,
+          kResponseBodyTooLargePlaceholder,
+        );
+      },
+    );
+
+    test(
+      'with saveLargeResponsesInHistory false, viewing an older entry and '
+      'returning to Latest restores the full large body',
+      () async {
+        await loadWith([tab('a')]);
+        final big = 'y' * (kLargeResponseViewerChars + 1);
+        var n = 0;
+        stubSend(() async => n++ == 0 ? resp(200, 'first') : resp(200, big));
+
+        bloc.add(
+          const SendRequest(tabId: 'a', saveLargeResponsesInHistory: false),
+        );
+        await pumpEventQueue();
+        bloc.add(
+          const SendRequest(tabId: 'a', saveLargeResponsesInHistory: false),
+        );
+        await pumpEventQueue();
+
+        final hist = bloc.state.tabs.single.responseHistory; // [big, first]
+        expect(bloc.state.tabs.single.response?.body, big);
+
+        bloc.add(ViewResponseHistoryEntry(tabId: 'a', entryId: hist[1].id));
+        await pumpEventQueue();
+        expect(bloc.state.tabs.single.response?.body, 'first');
+
+        bloc.add(ViewResponseHistoryEntry(tabId: 'a', entryId: hist[0].id));
+        await pumpEventQueue();
+        expect(
+          bloc.state.tabs.single.response?.body,
+          big,
+          reason: 'returning to Latest must not display the placeholder',
         );
       },
     );
