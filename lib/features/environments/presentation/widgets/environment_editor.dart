@@ -19,17 +19,38 @@ class EnvironmentEditor extends StatefulWidget {
 
 class _EnvironmentEditorState extends State<EnvironmentEditor> {
   late final TextEditingController _nameController;
+  late final FocusNode _nameFocus;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.environment.name);
+    _nameFocus = FocusNode()..addListener(_onNameFocusChange);
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _nameFocus.dispose();
     super.dispose();
+  }
+
+  // Creation forbids empty names (via NamePromptDialog) — renaming to blank
+  // must not persist a blank row either, so a purely-whitespace value is
+  // never dispatched.
+  void _onNameChanged(String value) {
+    if (value.trim().isEmpty) return;
+    _emit();
+  }
+
+  // Since an empty name is never dispatched, `widget.environment.name` is
+  // always the last real persisted name — reverting to it on blur is exactly
+  // "undo this abandoned edit", no extra state needed.
+  void _onNameFocusChange() {
+    if (_nameFocus.hasFocus) return;
+    if (_nameController.text.trim().isEmpty) {
+      _nameController.text = widget.environment.name;
+    }
   }
 
   void _emit({Map<String, String>? variables, Set<String>? secretKeys}) {
@@ -54,12 +75,13 @@ class _EnvironmentEditorState extends State<EnvironmentEditor> {
         TextField(
           key: const ValueKey('env_name_field'),
           controller: _nameController,
+          focusNode: _nameFocus,
           decoration: const InputDecoration(labelText: 'NAME'),
           style: TextStyle(
             fontSize: layout.fontSizeTitle,
             fontWeight: context.appTypography.titleWeight,
           ),
-          onChanged: (_) => _emit(),
+          onChanged: _onNameChanged,
         ),
         SizedBox(height: layout.sectionSpacing),
         Text(

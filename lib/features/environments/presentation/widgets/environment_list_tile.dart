@@ -36,7 +36,7 @@ class EnvironmentListTile extends StatelessWidget {
           onTap: onTap,
           child: Container(
             color: isSelected
-                ? theme.primaryColor.withValues(alpha: 0.3)
+                ? theme.colorScheme.primary.withValues(alpha: 0.3)
                 : null,
             padding: EdgeInsets.symmetric(
               horizontal: layout.inputPadding,

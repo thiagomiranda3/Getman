@@ -93,6 +93,28 @@ void main() {
       },
     );
 
+    test('highlights a widened-grammar token (space in the name)', () {
+      const resolved = Color(0xFF00FF00);
+      const unresolved = Color(0xFFFF0000);
+      final c = VariableHighlightController(
+        text: '{{api key}}',
+        variables: {'api key': 'shh'},
+      )..updateColors(resolved: resolved, unresolved: unresolved);
+
+      Color? tokenColor(InlineSpan span) {
+        Color? found;
+        span.visitChildren((child) {
+          if (child is TextSpan && child.text == '{{api key}}') {
+            found = child.style?.color;
+          }
+          return true;
+        });
+        return found;
+      }
+
+      expect(tokenColor(buildSpan(c)), resolved);
+    });
+
     test('updateVariables with an equal map does not notify', () {
       final c = VariableHighlightController(variables: {'a': '1'});
       var notifies = 0;

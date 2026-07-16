@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/theme/themes/auris/auris_theme.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 import 'package:getman/features/environments/presentation/widgets/environment_list_tile.dart';
@@ -32,11 +33,12 @@ Future<void> _pump(
   required VoidCallback onDelete,
   required VoidCallback onExport,
   String? activeEnvId,
+  ThemeData? theme,
 }) async {
   final settingsBloc = _makeSettingsBloc(activeEnvId: activeEnvId);
   await tester.pumpWidget(
     MaterialApp(
-      theme: brutalistTheme(Brightness.light),
+      theme: theme ?? brutalistTheme(Brightness.light),
       home: Scaffold(
         body: BlocProvider.value(
           value: settingsBloc,
@@ -147,6 +149,41 @@ void main() {
     expect(find.byIcon(Icons.check_circle), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'selected highlight uses colorScheme.primary, not the near-black '
+    'primaryColor under AURIS dark',
+    (tester) async {
+      // Regression: theme.primaryColor is near-black under AURIS/Glass dark —
+      // a known project trap. The highlight must key off colorScheme.primary,
+      // matching quick_env_switcher.dart's selection highlight.
+      final theme = aurisTheme(Brightness.dark);
+      await _pump(
+        tester,
+        environment: env,
+        isSelected: true,
+        onTap: () {},
+        onDelete: () {},
+        onExport: () {},
+        theme: theme,
+      );
+
+      final container = tester.widget<Container>(
+        find.descendant(
+          of: find.byType(EnvironmentListTile),
+          matching: find.byType(Container),
+        ),
+      );
+      expect(
+        container.color,
+        theme.colorScheme.primary.withValues(alpha: 0.3),
+      );
+      expect(
+        container.color,
+        isNot(theme.primaryColor.withValues(alpha: 0.3)),
+      );
+    },
+  );
 
   testWidgets('does not show check_circle when env is not active', (
     tester,

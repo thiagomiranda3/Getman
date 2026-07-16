@@ -56,6 +56,42 @@ void main() {
       );
     });
 
+    // The env editor, Postman import, and the `{{` autocomplete all accept
+    // names with spaces/@/:/unicode — the resolution grammar must accept the
+    // same names or the app can insert a variable it can never resolve.
+    test('resolves a variable name containing a space', () {
+      expect(
+        EnvironmentResolver.resolve('{{api key}}', {'api key': 'shh'}),
+        'shh',
+      );
+    });
+
+    test('resolves a variable name containing @ and other punctuation', () {
+      expect(
+        EnvironmentResolver.resolve('{{token@prod}}', {'token@prod': 'x'}),
+        'x',
+      );
+    });
+
+    test('an unresolved widened-grammar name stays verbatim', () {
+      expect(
+        EnvironmentResolver.resolve('{{api key}}', const {}),
+        '{{api key}}',
+      );
+    });
+
+    test('trims surrounding whitespace around a widened name', () {
+      expect(
+        EnvironmentResolver.resolve('{{ api key }}', {'api key': 'shh'}),
+        'shh',
+      );
+    });
+
+    test('dynamics still resolve under the widened grammar', () {
+      final out = EnvironmentResolver.resolve(r'{{$guid}}', const {});
+      expect(out, isNot(r'{{$guid}}'));
+    });
+
     test('leaves unbalanced braces untouched', () {
       expect(
         EnvironmentResolver.resolve('{{baseUrl', {'baseUrl': 'x'}),
@@ -193,6 +229,39 @@ void main() {
       ).toList();
       expect(matches, hasLength(1));
       expect(matches.first.name, 'baseUrl');
+    });
+
+    test('finds a widened-grammar name containing a space', () {
+      final matches = EnvironmentResolver.findVariables('{{api key}}').toList();
+      expect(matches, hasLength(1));
+      expect(matches.first.name, 'api key');
+    });
+  });
+
+  group('widened-grammar hardening', () {
+    test('padding around a spaced name trims to the same variable', () {
+      const vars = {'api key': 'K'};
+      expect(EnvironmentResolver.resolve('{{api key}}', vars), 'K');
+      expect(EnvironmentResolver.resolve('{{  api key  }}', vars), 'K');
+    });
+
+    test('an all-whitespace token stays verbatim', () {
+      // No environment can define an empty-name variable from the UI, so a
+      // `{{   }}` token has nothing to resolve to and is left as-is.
+      expect(EnvironmentResolver.resolve('{{   }}', {'a': 'x'}), '{{   }}');
+    });
+
+    test('an unclosed {{ before a large tail resolves in linear time', () {
+      // The old `\s*(\$?[^{}]+?)\s*` shape backtracked quadratically here —
+      // resolve() runs on the send path, so a large body with a stray `{{`
+      // froze the UI. Post-fix this completes in milliseconds; a regression
+      // hangs the test long past its timeout.
+      final body = '{"note": "start {{ ${'x ' * 150000}"}';
+      final sw = Stopwatch()..start();
+      final resolved = EnvironmentResolver.resolve(body, const {'a': 'b'});
+      sw.stop();
+      expect(resolved, body);
+      expect(sw.elapsedMilliseconds, lessThan(2000));
     });
   });
 }

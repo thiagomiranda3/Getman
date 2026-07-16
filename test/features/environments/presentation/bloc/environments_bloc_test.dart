@@ -59,6 +59,25 @@ void main() {
       verify(() => mockRepository.putEnvironment(env)).called(1);
       verifyNever(() => mockRepository.saveEnvironments(any()));
     });
+
+    test(
+      'keeps the in-session list sorted case-insensitively by name so a '
+      'newly added environment lands where it will sit after restart',
+      () async {
+        bloc.add(AddEnvironment(EnvironmentEntity(id: 'c', name: 'Charlie')));
+        await untilCalled(() => mockRepository.putEnvironment(any()));
+        bloc.add(AddEnvironment(EnvironmentEntity(id: 'a', name: 'alice')));
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(AddEnvironment(EnvironmentEntity(id: 'b', name: 'Bob')));
+        await Future<void>.delayed(Duration.zero);
+
+        expect(bloc.state.environments.map((e) => e.name).toList(), [
+          'alice',
+          'Bob',
+          'Charlie',
+        ]);
+      },
+    );
   });
 
   group('UpdateEnvironment', () {
@@ -86,6 +105,28 @@ void main() {
       expect(bloc.state.environments, isEmpty);
       verifyNever(() => mockRepository.putEnvironment(any()));
     });
+
+    test(
+      'renaming an environment re-sorts it into its new alphabetical '
+      'position',
+      () async {
+        final a = EnvironmentEntity(id: 'a', name: 'Alpha');
+        final b = EnvironmentEntity(id: 'b', name: 'Beta');
+        bloc.add(AddEnvironment(a));
+        await untilCalled(() => mockRepository.putEnvironment(a));
+        bloc.add(AddEnvironment(b));
+        await untilCalled(() => mockRepository.putEnvironment(b));
+
+        final renamed = a.copyWith(name: 'Zeta');
+        bloc.add(UpdateEnvironment(renamed));
+        await untilCalled(() => mockRepository.putEnvironment(renamed));
+
+        expect(bloc.state.environments.map((e) => e.name).toList(), [
+          'Beta',
+          'Zeta',
+        ]);
+      },
+    );
   });
 
   group('MergeEnvironmentVariables', () {
@@ -146,6 +187,26 @@ void main() {
       expect(bloc.state.environments, [a, b]);
       verify(() => mockRepository.saveEnvironments([a, b])).called(1);
     });
+
+    test(
+      'keeps the merged list sorted case-insensitively by name',
+      () async {
+        final existing = EnvironmentEntity(id: 'e', name: 'Echo');
+        bloc.add(AddEnvironment(existing));
+        await untilCalled(() => mockRepository.putEnvironment(existing));
+
+        final imported1 = EnvironmentEntity(id: 'a', name: 'alpha');
+        final imported2 = EnvironmentEntity(id: 'd', name: 'Delta');
+        bloc.add(ImportEnvironments([imported1, imported2]));
+        await untilCalled(() => mockRepository.saveEnvironments(any()));
+
+        expect(bloc.state.environments.map((e) => e.name).toList(), [
+          'alpha',
+          'Delta',
+          'Echo',
+        ]);
+      },
+    );
   });
 
   group('LoadEnvironments', () {
