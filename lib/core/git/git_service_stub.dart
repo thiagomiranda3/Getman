@@ -1,6 +1,9 @@
 import 'package:getman/core/git/git_service.dart';
 
-GitService createGitService() => _StubGitService();
+// Signature parity with the io variant: [environmentOverrides] is the io
+// implementation's test seam; the stub has no processes to apply it to.
+GitService createGitService({Map<String, String>? environmentOverrides}) =>
+    _StubGitService();
 
 /// Web build: git is unavailable; every op is a no-op / reports unavailable.
 class _StubGitService implements GitService {

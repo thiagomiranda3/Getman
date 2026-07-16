@@ -3,9 +3,18 @@ import 'dart:io';
 
 import 'package:getman/core/git/git_service.dart';
 
-GitService createGitService() => _IoGitService();
+/// [environmentOverrides] is a test seam: extra environment entries merged
+/// over the inherited environment of every spawned git process (e.g.
+/// `GIT_CONFIG_GLOBAL`/`GIT_CONFIG_NOSYSTEM` so identity tests are isolated
+/// from the developer machine's real git config). Production passes none.
+GitService createGitService({Map<String, String>? environmentOverrides}) =>
+    _IoGitService(environmentOverrides);
 
 class _IoGitService implements GitService {
+  _IoGitService(this._environmentOverrides);
+
+  final Map<String, String>? _environmentOverrides;
+
   Future<ProcessResult> _run(
     String root,
     List<String> args, {
@@ -17,6 +26,7 @@ class _IoGitService implements GitService {
       workingDirectory: root,
       stdoutEncoding: utf8,
       stderrEncoding: utf8,
+      environment: _environmentOverrides,
     );
     if (!allowFailure && result.exitCode != 0) {
       throw GitException(
@@ -371,7 +381,7 @@ class _IoGitService implements GitService {
       workingDirectory: root,
       stdoutEncoding: utf8,
       stderrEncoding: utf8,
-      environment: {'GIT_EDITOR': 'true'},
+      environment: {'GIT_EDITOR': 'true', ...?_environmentOverrides},
     );
     if (r.exitCode != 0) {
       final err = (r.stderr as String).trim();
