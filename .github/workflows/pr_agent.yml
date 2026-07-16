@@ -57,10 +57,18 @@ jobs:
           while :; do
             now=$(date +%s)
 
-            runs=$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
-              --jq '[.check_runs[] | select(.name != env.SELF_CHECK)]')
-            statuses=$(gh api "repos/$REPO/commits/$SHA/status?per_page=100" \
-              --jq '[.statuses[] | select(.context != env.SELF_CHECK)]')
+            # A transient API error (rate limit / HTML 5xx page instead of
+            # JSON) must not fail the gate — retry like a pending check.
+            if ! runs=$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
+                  --jq '[.check_runs[] | select(.name != env.SELF_CHECK)]') \
+            || ! statuses=$(gh api "repos/$REPO/commits/$SHA/status?per_page=100" \
+                  --jq '[.statuses[] | select(.context != env.SELF_CHECK)]'); then
+              if [ "$now" -ge "$deadline" ]; then
+                echo "GitHub API still erroring at the 30-min deadline — skipping review."
+                echo "passed=false" >> "$GITHUB_OUTPUT"; exit 0
+              fi
+              echo "GitHub API error — retrying…"; sleep 15; continue
+            fi
 
             total=$(( $(jq 'length' <<<"$runs") + $(jq 'length' <<<"$statuses") ))
             pending=$(( \
