@@ -1,6 +1,7 @@
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 
 /// Pure JSON shaping for the on-disk workspace format. The directory layout and
@@ -23,10 +24,13 @@ class WorkspaceCollectionSerializer {
 
   static Map<String, dynamic> requestToJson(CollectionNodeEntity leaf) {
     final c = leaf.config ?? HttpRequestConfigEntity(id: leaf.id);
+    final description = leaf.description;
     return {
       'id': leaf.id,
       'name': leaf.name,
       'isFavorite': leaf.isFavorite,
+      if (description != null && description.isNotEmpty)
+        'description': description,
       'request': _configToJson(c),
     };
   }
@@ -39,6 +43,7 @@ class WorkspaceCollectionSerializer {
       name: (json['name'] as String?) ?? 'Request',
       isFolder: false,
       isFavorite: json['isFavorite'] == true,
+      description: json['description'] as String?,
       config: _configFromJson(request),
     );
   }
@@ -49,10 +54,13 @@ class WorkspaceCollectionSerializer {
     CollectionNodeEntity folder,
     List<String> childOrder,
   ) {
+    final description = folder.description;
     final json = <String, dynamic>{
       'id': folder.id,
       'name': folder.name,
       'isFavorite': folder.isFavorite,
+      if (description != null && description.isNotEmpty)
+        'description': description,
       'childOrder': childOrder,
     };
     if (folder.variables.isNotEmpty) {
@@ -83,6 +91,7 @@ class WorkspaceCollectionSerializer {
       id: (json['id'] as String?) ?? '',
       name: (json['name'] as String?) ?? 'Folder',
       isFavorite: json['isFavorite'] == true,
+      description: json['description'] as String?,
       children: children,
       variables: variables,
       secretKeys: secretKeys,
@@ -108,6 +117,8 @@ class WorkspaceCollectionSerializer {
     'id': c.id,
     'method': c.method,
     'url': c.url,
+    // Human-readable name (not the int wire value) — this file lives in git.
+    if (c.kind != RequestKind.http) 'kind': c.kind.name,
     'headers': c.headers,
     'body': c.body,
     'bodyType': c.bodyType.wire,
@@ -132,6 +143,10 @@ class WorkspaceCollectionSerializer {
       id: (json['id'] as String?) ?? '',
       method: (json['method'] as String?) ?? 'GET',
       url: (json['url'] as String?) ?? '',
+      kind: RequestKind.values.firstWhere(
+        (k) => k.name == json['kind'],
+        orElse: () => RequestKind.http,
+      ),
       headers: ((json['headers'] as Map?) ?? const {}).cast<String, String>(),
       body: (json['body'] as String?) ?? '',
       bodyType: BodyType.fromWire(json['bodyType'] as String?),

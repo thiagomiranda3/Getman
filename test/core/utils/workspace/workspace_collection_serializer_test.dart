@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/utils/workspace/workspace_collection_serializer.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
@@ -28,6 +29,36 @@ void main() {
         durationMs: 42,
       ),
     );
+
+    test('round-trips the request kind and node description', () {
+      const wsLeaf = CollectionNodeEntity(
+        id: 'node-ws',
+        name: 'Live Feed',
+        isFolder: false,
+        description: 'Streams ticker updates.',
+        config: HttpRequestConfigEntity(
+          id: 'cfg-ws',
+          url: 'wss://api.dev/feed',
+          kind: RequestKind.webSocket,
+        ),
+      );
+      final back = WorkspaceCollectionSerializer.requestFromJson(
+        WorkspaceCollectionSerializer.requestToJson(wsLeaf),
+      );
+      expect(
+        back.config!.kind,
+        RequestKind.webSocket,
+        reason: 'a WS request must not come back from a reload as HTTP',
+      );
+      expect(back.description, 'Streams ticker updates.');
+
+      // Default kind stays implicit (no churny key on every HTTP request).
+      final httpJson = WorkspaceCollectionSerializer.requestToJson(leaf);
+      expect(
+        (httpJson['request'] as Map<String, dynamic>).containsKey('kind'),
+        isFalse,
+      );
+    });
 
     test('omits response cache fields', () {
       final json = WorkspaceCollectionSerializer.requestToJson(leaf);
@@ -101,6 +132,19 @@ void main() {
       expect(back.name, 'Auth');
       expect(back.isFolder, isTrue);
       expect(back.isFavorite, isTrue);
+    });
+
+    test('folder round-trips its description', () {
+      const folder = CollectionNodeEntity(
+        id: 'f2',
+        name: 'Users',
+        description: 'Everything under /users.',
+      );
+      final back = WorkspaceCollectionSerializer.folderFromJson(
+        WorkspaceCollectionSerializer.folderToJson(folder, const []),
+        const [],
+      );
+      expect(back.description, 'Everything under /users.');
     });
 
     test('manifest round-trips rootOrder', () {
