@@ -2,11 +2,12 @@ name: PR Agent
 
 # Qodo PR-Agent — AI-assisted PR review, backed by Google Gemini (not OpenAI).
 #
-# Gated: the auto-review runs ONLY once every other check on the PR head commit
-# has finished AND all of them are green (CI, CodeQL, GitGuardian, etc.). The
-# job triggers on the PR event, then polls the Checks API + legacy commit
-# statuses until nothing is pending, and skips the review if anything failed.
-# This avoids spending a Gemini review on a PR that is still red.
+# Two ways it runs:
+#   1. Automatic review when a PR is opened/reopened/marked ready — but GATED:
+#      it waits until every other check on the head commit has finished and all
+#      are green (CI, CodeQL, GitGuardian, …), and skips if anything failed.
+#   2. On demand: comment  /review  (also /describe, /improve, /ask <q>) on a
+#      PR. Manual commands are NOT gated — an explicit request runs immediately.
 #
 # Note: this posts an analysis *comment* only — it does NOT submit an approving
 # ("+1") GitHub review, and cannot satisfy a required-reviewer branch rule.
@@ -16,6 +17,8 @@ name: PR Agent
 on:
   pull_request:
     types: [opened, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
@@ -24,19 +27,19 @@ permissions:
   pull-requests: write
   issues: write
 
-# A newer event for the same PR supersedes an in-flight wait.
-concurrency:
-  group: pr-agent-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
 jobs:
-  pr-agent:
+  # ── Automatic review on PR open, gated on all other checks being green ──────
+  auto-review:
     name: PR Agent (auto-review)
-    # Skip Dependabot PRs (its token can't read the secret) and drafts.
     if: >-
+      github.event_name == 'pull_request' &&
       github.actor != 'dependabot[bot]' &&
       github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    # A newer PR event supersedes an in-flight wait for the same PR.
+    concurrency:
+      group: pr-agent-auto-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     steps:
       - name: Wait for all other checks to pass
         id: gate
@@ -104,3 +107,29 @@ jobs:
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "false"
           github_action_config.auto_improve: "false"
+
+  # ── On-demand commands (/review, /describe, /improve, /ask) — NOT gated ─────
+  command:
+    name: PR Agent (command)
+    # Only PR comments that start with a PR-Agent command, from a human.
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      github.event.comment.user.type != 'Bot' &&
+      (startsWith(github.event.comment.body, '/review') ||
+       startsWith(github.event.comment.body, '/describe') ||
+       startsWith(github.event.comment.body, '/improve') ||
+       startsWith(github.event.comment.body, '/ask'))
+    runs-on: ubuntu-latest
+    # Serialize repeated commands on the same PR; don't cancel one mid-run.
+    concurrency:
+      group: pr-agent-cmd-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    steps:
+      - name: PR Agent
+        uses: qodo-ai/pr-agent@8e4d32e5497defd43c023a404f73560c62728961 # v0.39.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GOOGLE_AI_STUDIO.GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          config.model: "gemini/gemini-2.5-flash"
+          config.fallback_models: '["gemini/gemini-2.0-flash"]'
