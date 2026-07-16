@@ -61,13 +61,20 @@ class RequestKindMethodSelector extends StatelessWidget {
                 DropdownMenuItem(value: RequestKind.mcp, child: Text('MCP')),
               ],
               onChanged: (k) {
-                if (k != null && tab.config.kind != k) {
-                  context.read<TabsBloc>().add(
-                    UpdateTab(
-                      tab.copyWith(config: tab.config.copyWith(kind: k)),
+                if (k == null) return;
+                // `tab` comes from the URL bar's builder, whose buildWhen
+                // excludes url/body edits — re-read the live tab so this
+                // dispatch can't revert them.
+                final bloc = context.read<TabsBloc>();
+                final current = bloc.state.tabs.byId(tab.tabId);
+                if (current == null || current.config.kind == k) return;
+                bloc.add(
+                  UpdateTab(
+                    current.copyWith(
+                      config: current.config.copyWith(kind: k),
                     ),
-                  );
-                }
+                  ),
+                );
               },
             ),
           ),
@@ -116,13 +123,18 @@ class RequestKindMethodSelector extends StatelessWidget {
                     )
                     .toList(),
                 onChanged: (val) {
-                  if (val != null && tab.config.method != val) {
-                    context.read<TabsBloc>().add(
-                      UpdateTab(
-                        tab.copyWith(config: tab.config.copyWith(method: val)),
+                  if (val == null) return;
+                  // Same live-read guard as the kind dropdown above.
+                  final bloc = context.read<TabsBloc>();
+                  final current = bloc.state.tabs.byId(tab.tabId);
+                  if (current == null || current.config.method == val) return;
+                  bloc.add(
+                    UpdateTab(
+                      current.copyWith(
+                        config: current.config.copyWith(method: val),
                       ),
-                    );
-                  }
+                    ),
+                  );
                 },
               ),
             ),

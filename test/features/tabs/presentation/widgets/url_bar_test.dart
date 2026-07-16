@@ -243,6 +243,85 @@ void main() {
     },
   );
 
+  testWidgets(
+    'typing in the URL field must not revert a body edited since the last '
+    'URL-bar rebuild',
+    (tester) async {
+      // UrlBar's buildWhen deliberately excludes config.body/url edits, so
+      // its builder snapshot goes stale — the dispatch must re-read the
+      // live tab or it wipes the newer body (regression).
+      const tab = HttpRequestTabEntity(
+        tabId: 'u8',
+        config: HttpRequestConfigEntity(id: 'u8', url: 'https://a.dev'),
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      await _pump(tester, bloc, 'u8');
+
+      // The body editor updates the config (UrlBar does not rebuild).
+      final live = bloc.state.tabs.byId('u8')!;
+      bloc.add(
+        UpdateTab(
+          live.copyWith(config: live.config.copyWith(body: '{"x":1}')),
+        ),
+      );
+      await tester.pump();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('url_field')),
+        'https://a.dev/v2',
+      );
+      await tester.pump();
+
+      final updated = bloc.state.tabs.byId('u8')!.config;
+      expect(updated.url, 'https://a.dev/v2');
+      expect(
+        updated.body,
+        '{"x":1}',
+        reason: 'a URL edit must not clobber the newer body edit',
+      );
+
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
+
+  testWidgets(
+    'changing the method must not revert a URL typed since the last '
+    'URL-bar rebuild',
+    (tester) async {
+      const tab = HttpRequestTabEntity(
+        tabId: 'u9',
+        config: HttpRequestConfigEntity(id: 'u9'),
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      await _pump(tester, bloc, 'u9');
+
+      await tester.enterText(
+        find.byKey(const ValueKey('url_field')),
+        'https://typed.dev',
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('method_selector')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('POST').last);
+      await tester.pumpAndSettle();
+
+      final updated = bloc.state.tabs.byId('u9')!.config;
+      expect(updated.method, 'POST');
+      expect(
+        updated.url,
+        'https://typed.dev',
+        reason: 'a method change must not clobber the newer URL edit',
+      );
+
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
+
   testWidgets('tapping SEND button marks tab isSending=true', (tester) async {
     const tab = HttpRequestTabEntity(
       tabId: 'u3',

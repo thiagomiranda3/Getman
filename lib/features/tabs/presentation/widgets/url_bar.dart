@@ -528,22 +528,27 @@ class _UrlBarState extends State<UrlBar> {
     HttpRequestTabEntity tab,
     String val,
   ) {
-    if (tab.config.url == val) return;
     final tabsBloc = context.read<TabsBloc>();
+    // `tab` is the builder's snapshot, and the builder's buildWhen excludes
+    // url/body/header/params edits — dispatching from the snapshot would
+    // revert any of those made since the last rebuild. Re-read the live tab
+    // (same guard as the code-export button above).
+    final current = tabsBloc.state.tabs.byId(tab.tabId);
+    if (current == null || current.config.url == val) return;
 
     if (val.trim().toLowerCase().startsWith('curl ')) {
-      final parsedConfig = CurlUtils.parse(val, id: tab.config.id);
+      final parsedConfig = CurlUtils.parse(val, id: current.config.id);
       if (parsedConfig != null) {
-        tabsBloc.add(UpdateTab(tab.copyWith(config: parsedConfig)));
+        tabsBloc.add(UpdateTab(current.copyWith(config: parsedConfig)));
         unawaited(
-          _prettifyAndUpdateBody(tabsBloc, tab.tabId, parsedConfig.body),
+          _prettifyAndUpdateBody(tabsBloc, current.tabId, parsedConfig.body),
         );
         return;
       }
     }
 
     tabsBloc.add(
-      UpdateTab(tab.copyWith(config: tab.config.copyWith(url: val))),
+      UpdateTab(current.copyWith(config: current.config.copyWith(url: val))),
     );
   }
 
