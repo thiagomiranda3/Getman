@@ -67,6 +67,7 @@ NormalizedApi normalizeOpenApiV3(Map<String, dynamic> spec) {
             method: method.toUpperCase(),
             path: path,
             op: Map<String, dynamic>.from(op),
+            sharedParameters: pathItem['parameters'],
             refs: refs,
             schemes: schemes,
             globalSecurity: globalSecurity,
@@ -83,6 +84,7 @@ NormalizedOperation _operation({
   required String method,
   required String path,
   required Map<String, dynamic> op,
+  required dynamic sharedParameters,
   required RefResolver refs,
   required Map<String, NormalizedSecurityScheme> schemes,
   required String? globalSecurity,
@@ -97,21 +99,21 @@ NormalizedOperation _operation({
 
   final query = <NormalizedParam>[];
   final headers = <NormalizedParam>[];
-  final rawParams = op['parameters'];
-  if (rawParams is List) {
-    for (final p in rawParams.whereType<Map<String, dynamic>>()) {
-      final resolved = refs.resolve(Map<String, dynamic>.from(p));
-      final location = resolved['in'] as String?;
-      final pName = resolved['name'] as String?;
-      if (pName == null) continue;
-      final value = _paramExample(resolved, refs);
-      if (location == 'query') {
-        query.add(NormalizedParam(name: pName, value: value));
-      } else if (location == 'header') {
-        headers.add(NormalizedParam(name: pName, value: value));
-      }
-      // 'path' params stay templated in the path; 'cookie' ignored.
+  for (final resolved in mergedParameters(
+    sharedParameters,
+    op['parameters'],
+    refs,
+  )) {
+    final location = resolved['in'] as String?;
+    final pName = resolved['name'] as String?;
+    if (pName == null) continue;
+    final value = _paramExample(resolved, refs);
+    if (location == 'query') {
+      query.add(NormalizedParam(name: pName, value: value));
+    } else if (location == 'header') {
+      headers.add(NormalizedParam(name: pName, value: value));
     }
+    // 'path' params stay templated in the path; 'cookie' ignored.
   }
 
   NormalizedBody? body;

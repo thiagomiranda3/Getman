@@ -104,4 +104,54 @@ void main() {
     expect(post.body!.contentType, 'application/json');
     expect(post.body!.raw, contains('"name"'));
   });
+
+  test(
+    'path-item-level shared parameters apply to every operation, '
+    'op-level winning on the same name+in',
+    () {
+      final spec = {
+        'openapi': '3.0.0',
+        'info': {'title': 'T'},
+        'paths': {
+          '/things': {
+            'parameters': [
+              {
+                'name': 'tenant',
+                'in': 'query',
+                'schema': {'default': 'acme'},
+              },
+              {
+                'name': 'verbose',
+                'in': 'query',
+                'schema': {'default': 'false'},
+              },
+            ],
+            'get': {
+              'parameters': [
+                {
+                  'name': 'verbose',
+                  'in': 'query',
+                  'schema': {'default': 'true'},
+                },
+              ],
+            },
+            'delete': <String, dynamic>{},
+          },
+        },
+      };
+      final api = normalizeOpenApiV3(spec);
+      final get = api.operations.firstWhere((o) => o.method == 'GET');
+      expect(
+        {for (final p in get.queryParams) p.name: p.value},
+        {'tenant': 'acme', 'verbose': 'true'},
+        reason: 'shared param inherited; op-level override wins',
+      );
+      final del = api.operations.firstWhere((o) => o.method == 'DELETE');
+      expect(
+        {for (final p in del.queryParams) p.name: p.value},
+        {'tenant': 'acme', 'verbose': 'false'},
+        reason: 'ops with no own list still inherit shared params',
+      );
+    },
+  );
 }

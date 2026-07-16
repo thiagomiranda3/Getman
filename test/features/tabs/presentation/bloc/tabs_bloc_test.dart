@@ -885,7 +885,7 @@ void main() {
         // Once superseded, the large entry is metadata-only.
         expect(
           t.responseHistory.last.response.body,
-          kResponseBodyTooLargePlaceholder,
+          kHistoryBodyNotKeptPlaceholder,
         );
       },
     );

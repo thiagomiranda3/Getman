@@ -231,7 +231,7 @@ class ResponseBodyControls extends StatelessWidget {
     for (final entry in tab.responseHistory) {
       final r = entry.response;
       if (r == current) continue;
-      if (r.body == kResponseBodyTooLargePlaceholder) continue;
+      if (isResponseBodyPlaceholder(r.body)) continue;
       out.add(
         CompareTarget(
           id: entry.id,

@@ -577,7 +577,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         (e) => e.response.body.length > kLargeResponseViewerChars
             ? e.copyWith(
                 response: e.response.copyWithBody(
-                  kResponseBodyTooLargePlaceholder,
+                  kHistoryBodyNotKeptPlaceholder,
                 ),
               )
             : e,

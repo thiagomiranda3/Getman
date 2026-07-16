@@ -12,6 +12,20 @@ const int kMaxPersistedResponseBodyChars = 1 << 20; // 1 MiB
 const String kResponseBodyTooLargePlaceholder =
     '[response body over 1 MB was not persisted — re-send the request]';
 
+/// Placeholder stored in a superseded time-travel entry when the user turned
+/// "save large responses in history" off — distinct from
+/// [kResponseBodyTooLargePlaceholder] because the cause (a setting) and the
+/// threshold (the large-viewer size, not the 1 MiB persistence cap) differ.
+const String kHistoryBodyNotKeptPlaceholder =
+    '[large response body not kept in history — re-send the request]';
+
+/// Whether [body] is one of the metadata-only body sentinels. Viewers use
+/// this to render the sentinel as plain text (never prettified/highlighted)
+/// and to exclude it from compare targets.
+bool isResponseBodyPlaceholder(String? body) =>
+    body == kResponseBodyTooLargePlaceholder ||
+    body == kHistoryBodyNotKeptPlaceholder;
+
 /// Bodies larger than this are rendered as plain text (no prettify, no
 /// syntax highlighting) unless the user opts in — re_editor re-chunks and
 /// highlights the whole document synchronously on the UI thread.
