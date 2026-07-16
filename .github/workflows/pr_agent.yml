@@ -103,6 +103,9 @@ jobs:
           GOOGLE_AI_STUDIO.GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           config.model: "gemini/gemini-2.5-flash"
           config.fallback_models: '["gemini/gemini-2.0-flash"]'
+          # Gemini 2.5 has a ~1M-token context; lift PR-Agent's 32k default so a
+          # large PR diff is reviewed in full instead of pruned to a few files.
+          config.max_model_tokens: "500000"
           # Auto-run review only; describe/improve stay on-demand via comments.
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "false"
@@ -133,3 +136,6 @@ jobs:
           GOOGLE_AI_STUDIO.GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           config.model: "gemini/gemini-2.5-flash"
           config.fallback_models: '["gemini/gemini-2.0-flash"]'
+          # Gemini 2.5 has a ~1M-token context; lift PR-Agent's 32k default so a
+          # large PR diff is reviewed in full instead of pruned to a few files.
+          config.max_model_tokens: "500000"
