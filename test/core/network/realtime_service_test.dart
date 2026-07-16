@@ -23,6 +23,40 @@ void main() {
 
   group('SSE', () {
     test(
+      'the open frame reaches a listener that subscribes after construction',
+      () async {
+        final body = StreamController<Uint8List>();
+        final dio = _MockDio();
+        when(
+          () => dio.get<ResponseBody>(
+            any(),
+            options: any(named: 'options'),
+            cancelToken: any(named: 'cancelToken'),
+          ),
+        ).thenAnswer(
+          (_) async => Response<ResponseBody>(
+            data: ResponseBody(body.stream, 200),
+            requestOptions: RequestOptions(path: '/'),
+          ),
+        );
+
+        // The bloc subscribes right AFTER connectSse returns — the open frame
+        // must not be lost to the unbuffered broadcast controller.
+        final conn = RealtimeService(
+          dio: dio,
+        ).connectSse('https://api.dev/events');
+        final frames = <RealtimeFrame>[];
+        conn.frames.listen(frames.add);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(frames, isNotEmpty);
+        expect(frames.first.direction, RealtimeDirection.open);
+        expect(frames.first.text, contains('https://api.dev/events'));
+        await body.close();
+      },
+    );
+
+    test(
       'emits an incoming frame per event and a close frame on done',
       () async {
         final body = StreamController<Uint8List>();
@@ -119,5 +153,29 @@ void main() {
       verify(sink.close).called(1);
       await incoming.close();
     });
+
+    test(
+      'the open frame reaches a listener that subscribes after construction',
+      () async {
+        final incoming = StreamController<dynamic>();
+        final sink = _MockWsSink();
+        final channel = _MockWsChannel();
+        when(() => channel.stream).thenAnswer((_) => incoming.stream);
+        when(() => channel.sink).thenReturn(sink);
+        when(sink.close).thenAnswer((_) async {});
+
+        final conn = RealtimeService(
+          webSocketFactory: (_) => channel,
+        ).connectWebSocket('wss://api.dev/socket');
+        final frames = <RealtimeFrame>[];
+        conn.frames.listen(frames.add);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(frames, isNotEmpty);
+        expect(frames.first.direction, RealtimeDirection.open);
+        await conn.close();
+        await incoming.close();
+      },
+    );
   });
 }

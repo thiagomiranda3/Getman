@@ -50,7 +50,10 @@ class RealtimeService {
 
 class _WebSocketConnection implements RealtimeConnection {
   _WebSocketConnection(this._channel, String url) {
-    _emit(RealtimeFrame.open('Connecting to $url'));
+    // Deferred: inside the constructor the broadcast controller has no
+    // listener yet (the bloc subscribes right after this returns) and
+    // broadcast streams don't buffer — a synchronous emit is silently lost.
+    scheduleMicrotask(() => _emit(RealtimeFrame.open('Connecting to $url')));
     _sub = _channel.stream.listen(
       (msg) => _emit(RealtimeFrame.incoming(msg.toString())),
       onError: (Object e) => _emit(RealtimeFrame.error(e.toString())),
@@ -84,7 +87,8 @@ class _WebSocketConnection implements RealtimeConnection {
 
 class _SseConnection implements RealtimeConnection {
   _SseConnection(Dio dio, String url, Map<String, String> headers) {
-    _emit(RealtimeFrame.open('Streaming $url'));
+    // Deferred for the same reason as _WebSocketConnection's open frame.
+    scheduleMicrotask(() => _emit(RealtimeFrame.open('Streaming $url')));
     unawaited(
       dio
           .get<ResponseBody>(
