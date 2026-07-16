@@ -10,13 +10,20 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/features/collections/data/datasources/workspace_collections_data_source.dart';
+import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
+import 'package:getman/features/collections/domain/review_service.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
 import 'package:getman/features/collections/presentation/widgets/collection_node_row.dart';
 import 'package:getman/features/collections/presentation/widgets/collections_list.dart';
+import 'package:getman/features/settings/domain/entities/settings_entity.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
@@ -25,7 +32,14 @@ import 'package:mocktail/mocktail.dart';
 
 class MockCollectionsRepository extends Mock implements CollectionsRepository {}
 
+class MockWorkspaceDataSource extends Mock
+    implements WorkspaceCollectionsDataSource {}
+
+class MockReviewService extends Mock implements ReviewService {}
+
 class MockTabsBloc extends MockBloc<TabsEvent, TabsState> implements TabsBloc {}
+
+class MockSettingsBloc extends Mock implements SettingsBloc {}
 
 class _FakeTabsEvent extends Fake implements TabsEvent {}
 
@@ -74,15 +88,27 @@ void main() {
       Stream<TabsState>.fromIterable(tabsStates),
       initialState: tabsInitial,
     );
+    final settings = MockSettingsBloc();
+    when(() => settings.state).thenReturn(
+      const SettingsState(settings: SettingsEntity()),
+    );
+    when(() => settings.stream).thenAnswer((_) => const Stream.empty());
     return MaterialApp(
       theme: brutalistTheme(Brightness.light),
       home: Scaffold(
-        body: MultiBlocProvider(
-          providers: [
-            BlocProvider<CollectionsBloc>.value(value: collections),
-            BlocProvider<TabsBloc>.value(value: tabs),
-          ],
-          child: const CollectionsList(),
+        body: RepositoryProvider<WorkspaceSyncService>(
+          create: (_) => WorkspaceSyncService(MockWorkspaceDataSource()),
+          child: MultiBlocProvider(
+            providers: [
+              BlocProvider<CollectionsBloc>.value(value: collections),
+              BlocProvider<TabsBloc>.value(value: tabs),
+              BlocProvider<SettingsBloc>.value(value: settings),
+              BlocProvider<ReviewBloc>(
+                create: (_) => ReviewBloc(service: MockReviewService()),
+              ),
+            ],
+            child: const CollectionsList(),
+          ),
         ),
       ),
     );

@@ -1,4 +1,6 @@
 import 'package:get_it/get_it.dart';
+import 'package:getman/core/git/gh_service.dart';
+import 'package:getman/core/git/git_service.dart';
 import 'package:getman/core/navigation/app_router.dart';
 import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/cookie_interceptor.dart';
@@ -22,10 +24,22 @@ import 'package:getman/features/collections/data/datasources/workspace_data_sour
 import 'package:getman/features/collections/data/models/collection_node_model.dart';
 import 'package:getman/features/collections/data/models/saved_example_model.dart';
 import 'package:getman/features/collections/data/repositories/collections_repository_impl.dart';
+import 'package:getman/features/collections/data/services/gh_pull_request_service.dart';
+import 'package:getman/features/collections/data/services/git_branch_service.dart';
+import 'package:getman/features/collections/data/services/git_conflict_service.dart';
+import 'package:getman/features/collections/data/services/workspace_review_service.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
+import 'package:getman/features/collections/domain/branch_service.dart';
+import 'package:getman/features/collections/domain/conflict_service.dart';
+import 'package:getman/features/collections/domain/pull_request_service.dart';
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
+import 'package:getman/features/collections/domain/review_service.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/conflict_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/pull_requests_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
 import 'package:getman/features/cookies/data/hive_cookie_persistence.dart';
 import 'package:getman/features/cookies/data/models/stored_cookie_model.dart';
 import 'package:getman/features/environments/data/datasources/environments_local_data_source.dart';
@@ -184,6 +198,20 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     ..registerLazySingleton(
       () => WorkspaceSyncService(createWorkspaceDataSource()),
     )
+    ..registerLazySingleton<GitService>(createGitService)
+    ..registerLazySingleton<ReviewService>(() => WorkspaceReviewService(sl()))
+    ..registerLazySingleton<BranchService>(() => GitBranchService(sl(), sl()))
+    ..registerLazySingleton<ConflictService>(
+      () => GitConflictService(sl(), sl()),
+    )
+    ..registerLazySingleton<GhService>(createGhService)
+    ..registerLazySingleton<PullRequestService>(
+      () => GhPullRequestService(sl(), sl()),
+    )
+    ..registerFactory(() => ReviewBloc(service: sl()))
+    ..registerFactory(() => GitSyncBloc(service: sl()))
+    ..registerFactory(() => PullRequestsBloc(service: sl()))
+    ..registerFactory(() => ConflictBloc(service: sl()))
     // Features - Chaining (no-code extraction + assertions)
     ..registerLazySingleton(
       () => RulesBloc(

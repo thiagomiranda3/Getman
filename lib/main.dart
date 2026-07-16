@@ -17,6 +17,11 @@ import 'package:getman/features/chaining/presentation/bloc/rules_bloc.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/collections/presentation/bloc/conflict_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/pull_requests_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
+import 'package:getman/features/collections/presentation/widgets/branch_sync_listener.dart';
 import 'package:getman/features/collections/presentation/widgets/workspace_sync_listener.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
@@ -197,75 +202,81 @@ class MyApp extends StatelessWidget {
           BlocProvider(create: (_) => di.sl<RulesBloc>()),
           BlocProvider(create: (_) => di.sl<RealtimeBloc>()),
           BlocProvider(create: (_) => di.sl<McpBloc>()),
+          BlocProvider(create: (_) => di.sl<ReviewBloc>()),
+          BlocProvider(create: (_) => di.sl<GitSyncBloc>()),
+          BlocProvider(create: (_) => di.sl<PullRequestsBloc>()),
+          BlocProvider(create: (_) => di.sl<ConflictBloc>()),
         ],
         child: NetworkSettingsListener(
           child: WorkspaceSyncListener(
-            child: BlocBuilder<SettingsBloc, SettingsState>(
-              // Rebuilding here re-runs the theme builder and rebuilds the
-              // entire MaterialApp — gate it to the three settings that
-              // actually feed it.
-              buildWhen: (prev, next) =>
-                  prev.settings.themeId != next.settings.themeId ||
-                  prev.settings.isDarkMode != next.settings.isDarkMode ||
-                  prev.settings.isCompactMode != next.settings.isCompactMode,
-              builder: (context, state) {
-                final settings = state.settings;
-                return Shortcuts(
-                  shortcuts: appShortcuts,
-                  child: Actions(
-                    actions: <Type, Action<Intent>>{
-                      NewTabIntent: CallbackAction<NewTabIntent>(
-                        onInvoke: (intent) =>
-                            context.read<TabsBloc>().add(const AddTab()),
-                      ),
-                      // CommandPaletteIntent / SwitchEnvironmentIntent are
-                      // wired in MainScreen, not here. Their actions open a
-                      // dialog via showDialog, which needs a context *below*
-                      // MaterialApp (for MaterialLocalizations) and below the
-                      // router's Navigator. This Actions sits above
-                      // MaterialApp, so a dialog launched from here would throw
-                      // "No MaterialLocalizations found". NewTabIntent stays —
-                      // it only reads a bloc.
-                    },
-                    child: MaterialApp.router(
-                      title: 'GETMAN',
-                      debugShowCheckedModeBanner: false,
-                      // Lerping ThemeData triggers ~12 full-tree rebuilds per
-                      // theme change. The app's widget tree is too heavy for
-                      // that; a single instant rebuild is both faster and
-                      // visually cleaner.
-                      themeAnimationDuration: Duration.zero,
-                      theme: resolveThemeData(
-                        settings.themeId,
-                        Brightness.light,
-                        isCompact: settings.isCompactMode,
-                      ),
-                      darkTheme: resolveThemeData(
-                        settings.themeId,
-                        Brightness.dark,
-                        isCompact: settings.isCompactMode,
-                      ),
-                      themeMode: settings.isDarkMode
-                          ? ThemeMode.dark
-                          : ThemeMode.light,
-                      routerConfig: di.sl<AppRouter>().router,
-                      builder: (context, child) {
-                        return Focus(
-                          autofocus: true,
-                          child: ThemeSwitchTransition(
-                            themeId: settings.themeId,
-                            reduceEffects: false,
-                            child: context.appDecoration.scaffoldBackground(
-                              context,
-                              child: child ?? const SizedBox.shrink(),
-                            ),
-                          ),
-                        );
+            child: BranchSyncListener(
+              child: BlocBuilder<SettingsBloc, SettingsState>(
+                // Rebuilding here re-runs the theme builder and rebuilds the
+                // entire MaterialApp — gate it to the three settings that
+                // actually feed it.
+                buildWhen: (prev, next) =>
+                    prev.settings.themeId != next.settings.themeId ||
+                    prev.settings.isDarkMode != next.settings.isDarkMode ||
+                    prev.settings.isCompactMode != next.settings.isCompactMode,
+                builder: (context, state) {
+                  final settings = state.settings;
+                  return Shortcuts(
+                    shortcuts: appShortcuts,
+                    child: Actions(
+                      actions: <Type, Action<Intent>>{
+                        NewTabIntent: CallbackAction<NewTabIntent>(
+                          onInvoke: (intent) =>
+                              context.read<TabsBloc>().add(const AddTab()),
+                        ),
+                        // CommandPaletteIntent / SwitchEnvironmentIntent are
+                        // wired in MainScreen, not here. Their actions open a
+                        // dialog via showDialog, which needs a context *below*
+                        // MaterialApp (for MaterialLocalizations) and below the
+                        // router's Navigator. This Actions sits above
+                        // MaterialApp, so a dialog launched from here would
+                        // throw "No MaterialLocalizations found". NewTabIntent
+                        // stays — it only reads a bloc.
                       },
+                      child: MaterialApp.router(
+                        title: 'GETMAN',
+                        debugShowCheckedModeBanner: false,
+                        // Lerping ThemeData triggers ~12 full-tree rebuilds per
+                        // theme change. The app's widget tree is too heavy for
+                        // that; a single instant rebuild is both faster and
+                        // visually cleaner.
+                        themeAnimationDuration: Duration.zero,
+                        theme: resolveThemeData(
+                          settings.themeId,
+                          Brightness.light,
+                          isCompact: settings.isCompactMode,
+                        ),
+                        darkTheme: resolveThemeData(
+                          settings.themeId,
+                          Brightness.dark,
+                          isCompact: settings.isCompactMode,
+                        ),
+                        themeMode: settings.isDarkMode
+                            ? ThemeMode.dark
+                            : ThemeMode.light,
+                        routerConfig: di.sl<AppRouter>().router,
+                        builder: (context, child) {
+                          return Focus(
+                            autofocus: true,
+                            child: ThemeSwitchTransition(
+                              themeId: settings.themeId,
+                              reduceEffects: false,
+                              child: context.appDecoration.scaffoldBackground(
+                                context,
+                                child: child ?? const SizedBox.shrink(),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
         ),
