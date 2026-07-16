@@ -24,13 +24,14 @@ class StoredCookieModelAdapter extends TypeAdapter<StoredCookieModel> {
       secure: fields[4] == null ? false : fields[4] as bool,
       httpOnly: fields[5] == null ? false : fields[5] as bool,
       expiresEpochMs: (fields[6] as num?)?.toInt(),
+      hostOnly: fields[7] == null ? false : fields[7] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, StoredCookieModel obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.name)
       ..writeByte(1)
@@ -44,7 +45,9 @@ class StoredCookieModelAdapter extends TypeAdapter<StoredCookieModel> {
       ..writeByte(5)
       ..write(obj.httpOnly)
       ..writeByte(6)
-      ..write(obj.expiresEpochMs);
+      ..write(obj.expiresEpochMs)
+      ..writeByte(7)
+      ..write(obj.hostOnly);
   }
 
   @override

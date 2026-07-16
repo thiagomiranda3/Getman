@@ -22,4 +22,16 @@ void main() {
     expect(back.expiresEpochMs, isNull);
     expect(back, cookie);
   });
+
+  test('round-trips the hostOnly flag', () {
+    const cookie = NetworkCookie(
+      name: 'a',
+      value: '1',
+      domain: 'example.com',
+      hostOnly: true,
+    );
+    final model = StoredCookieModel.fromCookie(cookie);
+    expect(model.hostOnly, isTrue);
+    expect(model.toCookie(), cookie);
+  });
 }

@@ -60,7 +60,10 @@ class InMemoryCookieStore implements CookieStore {
   }
 
   @override
-  List<NetworkCookie> all() => List.unmodifiable(_cookies);
+  List<NetworkCookie> all() {
+    _pruneExpired();
+    return List.unmodifiable(_cookies);
+  }
 
   @override
   Future<void> remove(NetworkCookie cookie) async {
@@ -74,8 +77,19 @@ class InMemoryCookieStore implements CookieStore {
     await persistence.clearAll();
   }
 
+  /// Drops expired cookies from memory **and** durable storage. Called from
+  /// [hydrate] and [all] so a cookie that lapses while stored disappears from
+  /// the manager list and the Hive box, not just from outgoing requests.
+  /// Best-effort persistence removal — never blocks on the write.
   void _pruneExpired() {
     final n = now();
+    final expired = _cookies
+        .where((c) => c.isExpired(n))
+        .toList(growable: false);
+    if (expired.isEmpty) return;
     _cookies.removeWhere((c) => c.isExpired(n));
+    for (final c in expired) {
+      unawaited(persistence.remove(c.key));
+    }
   }
 }

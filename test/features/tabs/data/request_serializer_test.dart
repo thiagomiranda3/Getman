@@ -196,8 +196,34 @@ void main() {
         ),
         env: {'x': '2'},
       );
-      expect(data, {'a': '1', 'b': '2'});
+      // Values ride as single-element lists so ListFormat.multi round-trips
+      // them and duplicate keys survive (see the next test).
+      expect(data, {
+        'a': ['1'],
+        'b': ['2'],
+      });
       expect(headers['Content-Type'], 'application/x-www-form-urlencoded');
+    });
+
+    test('urlencoded keeps duplicate field names as repeated pairs', () async {
+      final data = await build(
+        cfg(
+          bodyType: BodyType.urlencoded,
+          formFields: const [
+            MultipartFieldEntity(name: 'tag', value: 'a'),
+            MultipartFieldEntity(name: 'tag', value: 'b'),
+          ],
+        ),
+      );
+      expect(data, {
+        'tag': ['a', 'b'],
+      });
+      // Proves both values reach the wire under the default ListFormat.multi
+      // (which is also what NetworkService's Dio is configured with).
+      expect(
+        Transformer.urlEncodeMap(data as Map<String, dynamic>),
+        'tag=a&tag=b',
+      );
     });
 
     test(
