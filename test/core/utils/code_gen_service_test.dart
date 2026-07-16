@@ -189,6 +189,27 @@ void main() {
       final out = CodeGenService.generate(config, CodeGenTarget.curl);
       expect(out, contains(r"X-Note: it'\''s fine"));
     });
+
+    test('escapes a single quote in a header KEY with the POSIX idiom', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        url: 'https://api.dev/x',
+        headers: {"X-It's-Fine": 'v'},
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.curl);
+      expect(out, contains(r"--header 'X-It'\''s-Fine: v'"));
+    });
+
+    test('escapes a single quote in a binary body file path', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        url: 'https://api.dev/x',
+        bodyType: BodyType.binary,
+        bodyFilePath: "/tmp/a's file.png",
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.curl);
+      expect(out, contains(r"--data-binary '@/tmp/a'\''s file.png'"));
+    });
   });
 
   group('JavaScript fetch', () {
@@ -198,6 +219,16 @@ void main() {
       expect(out, contains("method: 'POST'"));
       expect(out, contains("'Authorization': 'Bearer {{token}}'"));
       expect(out, contains('body:'));
+    });
+
+    test('escapes a single quote in a header KEY', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        url: 'https://api.dev/x',
+        headers: {"X-It's-Fine": 'v'},
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.jsFetch);
+      expect(out, contains(r"'X-It\'s-Fine': 'v'"));
     });
 
     test(
@@ -243,6 +274,35 @@ void main() {
       expect(out, contains('data='));
     });
 
+    test('escapes a single quote in a header KEY', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        url: 'https://api.dev/x',
+        headers: {"X-It's-Fine": 'v'},
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.pythonRequests);
+      expect(out, contains(r"'X-It\'s-Fine': 'v'"));
+    });
+
+    test(
+      r'a Windows binary file path never becomes an invalid \U unicode '
+      'escape (backslashes are escaped like the multipart branch already '
+      'does)',
+      () {
+        const config = HttpRequestConfigEntity(
+          id: 'c',
+          url: 'https://api.dev/x',
+          bodyType: BodyType.binary,
+          bodyFilePath: r'C:\Users\me\file.bin',
+        );
+        final out = CodeGenService.generate(
+          config,
+          CodeGenTarget.pythonRequests,
+        );
+        expect(out, contains(r"open('C:\\Users\\me\\file.bin', 'rb')"));
+      },
+    );
+
     test(
       'multiline body is a double-quoted literal, not triple-single-quoted',
       () {
@@ -275,6 +335,16 @@ void main() {
       expect(out, contains("'Authorization': 'Bearer {{token}}'"));
       expect(out, contains('data:'));
       expect(out, contains('axios.request(options)'));
+    });
+
+    test('escapes a single quote in a header KEY', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        url: 'https://api.dev/x',
+        headers: {"X-It's-Fine": 'v'},
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.nodeAxios);
+      expect(out, contains(r"'X-It\'s-Fine': 'v'"));
     });
 
     test('multipart spreads form.getHeaders and appends fields', () {

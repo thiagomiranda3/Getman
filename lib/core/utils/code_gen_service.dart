@@ -133,7 +133,7 @@ class CodeGenService {
     final b = StringBuffer('curl --request ${e.method} \\\n')
       ..write("  --url '${_shellSq(e.url)}'");
     e.headers.forEach((k, v) {
-      b.write(" \\\n  --header '$k: ${_shellSq(v)}'");
+      b.write(" \\\n  --header '${_shellSq(k)}: ${_shellSq(v)}'");
     });
     switch (e.bodyType) {
       case BodyType.none:
@@ -152,7 +152,7 @@ class CodeGenService {
           b.write(" \\\n  --form '${_shellSq('${f.name}=$v')}'");
         }
       case BodyType.binary:
-        b.write(" \\\n  --data-binary '@${e.binaryPath ?? ''}'");
+        b.write(" \\\n  --data-binary '@${_shellSq(e.binaryPath ?? '')}'");
     }
     return b.toString();
   }
@@ -242,7 +242,7 @@ class CodeGenService {
         b.write('}\n');
         extra.add('files=files');
       case BodyType.binary:
-        b.write("data = open('${e.binaryPath ?? ''}', 'rb')\n");
+        b.write("data = open('${_sq(e.binaryPath ?? '')}', 'rb')\n");
         extra.add('data=data');
     }
 
@@ -482,7 +482,9 @@ class CodeGenService {
     Map<String, String> headers,
     String indent,
   ) {
-    headers.forEach((k, v) => buffer.write("$indent'$k': '${_sq(v)}',\n"));
+    headers.forEach(
+      (k, v) => buffer.write("$indent'${_sq(k)}': '${_sq(v)}',\n"),
+    );
   }
 
   static String _contentTypeOf(Map<String, String> headers, String fallback) {
