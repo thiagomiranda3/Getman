@@ -235,7 +235,13 @@ class _FormDataEditorState extends State<FormDataEditor> {
           onPressed: () {
             setState(() {
               _rows.removeAt(index).dispose();
-              if (_rows.isEmpty) _rows.add(_RowState.empty());
+              // Re-add a blank row whenever the list is now empty OR the new
+              // last row already has a name — otherwise deleting a trailing
+              // blank row would strand the editor with no row left to add a
+              // new field into.
+              if (_rows.isEmpty || _rows.last.nameController.text.isNotEmpty) {
+                _rows.add(_RowState.empty());
+              }
             });
             _emit();
           },

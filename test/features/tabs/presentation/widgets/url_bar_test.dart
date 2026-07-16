@@ -14,6 +14,8 @@ import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/core/ui/widgets/variable_highlight_controller.dart';
+import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
@@ -422,6 +424,70 @@ void main() {
 
     await tester.pump(const Duration(seconds: 11));
   });
+
+  testWidgets(
+    "URL bar re-syncs {{var}} highlighting when the tab's collectionNodeId "
+    'changes — regression guard (A8)',
+    (tester) async {
+      const tab = HttpRequestTabEntity(
+        tabId: 'u10',
+        config: HttpRequestConfigEntity(
+          id: 'u10',
+          url: 'https://{{base}}/path',
+        ),
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      const folder = CollectionNodeEntity(
+        id: 'folder1',
+        name: 'Folder',
+        variables: {'base': 'collection.example.com'},
+        children: [
+          CollectionNodeEntity(id: 'req1', name: 'Req', isFolder: false),
+        ],
+      );
+      final collectionsBloc = MockCollectionsBloc();
+      when(
+        () => collectionsBloc.state,
+      ).thenReturn(CollectionsState(collections: const [folder]));
+      when(
+        () => collectionsBloc.stream,
+      ).thenAnswer((_) => const Stream.empty());
+
+      await _pump(tester, bloc, 'u10', collectionsBloc: collectionsBloc);
+
+      VariableHighlightController urlController() =>
+          tester
+                  .widget<TextField>(find.byKey(const ValueKey('url_field')))
+                  .controller!
+              as VariableHighlightController;
+
+      expect(
+        urlController().variables.containsKey('base'),
+        isFalse,
+        reason: 'not linked to the collection yet — base must be unresolved',
+      );
+
+      // Simulate save-to-collection: link the tab to the leaf node WITHOUT
+      // changing the URL (no EnvironmentsBloc/SettingsBloc/CollectionsBloc
+      // change accompanies it).
+      final live = bloc.state.tabs.byId('u10')!;
+      bloc.add(UpdateTab(live.copyWith(collectionNodeId: 'req1')));
+      await tester.pump();
+
+      expect(
+        urlController().variables['base'],
+        'collection.example.com',
+        reason:
+            "linking the tab must re-sync highlighting so a folder's "
+            '{{var}} resolves without an unrelated env/settings/collections '
+            'change',
+      );
+
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
 
   testWidgets('no overflow', (tester) async {
     const tab = HttpRequestTabEntity(

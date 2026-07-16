@@ -217,12 +217,17 @@ class _UrlBarState extends State<UrlBar> {
         listenWhen: (prev, next) {
           final p = prev.tabs.byId(widget.tabId);
           final n = next.tabs.byId(widget.tabId);
-          return p?.config.url != n?.config.url;
+          return p?.config.url != n?.config.url ||
+              p?.collectionNodeId != n?.collectionNodeId;
         },
         listener: (context, state) {
           final tab = state.tabs.byId(widget.tabId);
           if (tab == null) return;
           _setControllerPreservingEnd(_urlController, tab.config.url);
+          // Save-to-collection links the tab AFTER CollectionsBloc emits, so
+          // a folder-defined {{var}} would otherwise stay colored unresolved
+          // until an unrelated env/settings/collections change re-syncs it.
+          _syncHighlight(context);
         },
         buildWhen: (prev, next) {
           final p = prev.tabs.byId(widget.tabId);
@@ -434,14 +439,17 @@ class _UrlBarState extends State<UrlBar> {
                               tabId: tab.tabId,
                               config: tab.config,
                               isNarrow: isNarrow,
-                              activeVars: _activeVariables(context),
+                              // Provider, not a snapshot: this builder doesn't
+                              // rebuild on environment changes, so the buttons
+                              // must re-read the active vars at press time.
+                              activeVars: () => _activeVariables(context),
                             )
                           else
                             RealtimeButton(
                               tabId: tab.tabId,
                               config: tab.config,
                               isNarrow: isNarrow,
-                              activeVars: _activeVariables(context),
+                              activeVars: () => _activeVariables(context),
                             ),
                           if (isNarrow) ...[
                             SizedBox(width: smallGap),

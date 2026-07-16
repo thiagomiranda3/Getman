@@ -228,6 +228,44 @@ void main() {
   );
 
   testWidgets(
+    'deleting the trailing blank row (with a non-empty row remaining) '
+    'still leaves an "add new row" affordance',
+    (tester) async {
+      // Repro (A2): rows [param=<blank name>, <blank>] where the first row
+      // already has a name. Deleting the trailing blank row must not strand
+      // the editor with zero blank rows to add a new field into.
+      const tab = HttpRequestTabEntity(
+        tabId: 't',
+        config: HttpRequestConfigEntity(
+          id: 't',
+          formFields: [MultipartFieldEntity(name: 'param')],
+        ),
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      await pumpEditor(tester, bloc);
+
+      final nameFields = fieldByHint('KEY');
+      expect(nameFields, findsNWidgets(2));
+
+      // Delete the trailing (blank) row.
+      await tester.tap(find.byIcon(Icons.delete_outline).last);
+      await tester.pump();
+
+      expect(
+        fieldByHint('KEY'),
+        findsNWidgets(2),
+        reason:
+            'a blank trailing row must survive so the user can still '
+            'add a new field',
+      );
+
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
+
+  testWidgets(
     'name (KEY) field does not show variable autocomplete overlay',
     (tester) async {
       const tab = HttpRequestTabEntity(

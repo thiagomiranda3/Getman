@@ -102,6 +102,35 @@ void main() {
   });
 
   testWidgets(
+    'deleting the trailing blank row (with a non-empty row remaining) '
+    'still leaves an "add new row" affordance',
+    (tester) async {
+      // Repro (A2): rows [a=1, <blank>]; deleting the blank row must not
+      // strand the editor with zero blank rows to type a new one into.
+      await pump(tester, const _EchoHarness(initial: {'a': '1'}));
+
+      // Two rows: 'a' and the trailing blank.
+      expect(find.widgetWithText(TextField, 'KEY'), findsNWidgets(2));
+
+      // Delete the trailing (blank) row — it's the last one, index 1.
+      await tester.tap(find.byIcon(Icons.delete_outline).last);
+      await tester.pump();
+
+      // The remaining 'a' row's key is non-empty, so a fresh blank row must
+      // have been re-added — the count should still be 2 (a + new blank),
+      // not 1.
+      expect(
+        find.widgetWithText(TextField, 'KEY'),
+        findsNWidgets(2),
+        reason:
+            'a blank trailing row must survive so the user can still '
+            'add a new entry',
+      );
+      expect(find.text('a'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'echoes of its own emission do not rebuild the text controllers',
     (tester) async {
       await pump(tester, const _EchoHarness(initial: {}));

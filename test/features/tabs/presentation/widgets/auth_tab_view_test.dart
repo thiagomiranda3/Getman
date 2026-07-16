@@ -273,6 +273,75 @@ void main() {
   });
 
   testWidgets(
+    'a later external change equal to a stale past emission is not wrongly '
+    'suppressed — regression guard (A7)',
+    (tester) async {
+      final bloc = await _loadedBloc(
+        repository,
+        sendRequestUseCase,
+        tabWithAuth('t', const {'type': 'bearer', 'token': ''}),
+      );
+      addTearDown(bloc.close);
+
+      await _pump(tester, bloc, 't');
+
+      // 1. The widget emits token='X' itself (sets internal _lastEmitted).
+      await tester.enterText(
+        find.byKey(const ValueKey('auth_field_TOKEN')),
+        'X',
+      );
+      await tester.pump();
+      expect(bloc.state.tabs.byId('t')!.config.auth['token'], 'X');
+
+      // 2. A genuinely external change to token='Y' arrives (e.g. collection
+      // link resolved, or another widget updated the tab). The listener
+      // applies it (Y != stale _lastEmitted 'X').
+      final afterX = bloc.state.tabs.byId('t')!;
+      bloc.add(
+        UpdateTab(
+          afterX.copyWith(
+            config: afterX.config.copyWith(
+              auth: const {'type': 'bearer', 'token': 'Y'},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(
+        find.widgetWithText(TextField, 'Y'),
+        findsOneWidget,
+        reason: 'the genuinely external Y change must be reflected',
+      );
+
+      // 3. A further external change reverts token back to 'X' — the SAME
+      // value as the widget's old (stale) emission. This must still be
+      // applied, not suppressed as if it were an echo of step 1.
+      final afterY = bloc.state.tabs.byId('t')!;
+      bloc.add(
+        UpdateTab(
+          afterY.copyWith(
+            config: afterY.config.copyWith(
+              auth: const {'type': 'bearer', 'token': 'X'},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.widgetWithText(TextField, 'X'),
+        findsOneWidget,
+        reason:
+            '_lastEmitted must be cleared after applying the external Y '
+            'change, or this later external X change is wrongly suppressed '
+            'as a stale echo',
+      );
+
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
+
+  testWidgets(
     'TOKEN field shows {{var}} autocomplete overlay and accepts suggestion',
     (tester) async {
       final env = EnvironmentEntity(

@@ -76,6 +76,7 @@ Future<void> _pump(
   required _MockMcpBloc mcpBloc,
   required String tabId,
   required HttpRequestConfigEntity config,
+  Map<String, String> Function()? activeVars,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -90,7 +91,7 @@ Future<void> _pump(
             tabId: tabId,
             config: config,
             isNarrow: false,
-            activeVars: const {},
+            activeVars: activeVars ?? () => const {},
           ),
         ),
       ),
@@ -192,4 +193,56 @@ void main() {
     expect(find.text('DISCONNECT'), findsOneWidget);
     expect(find.text('CONNECT'), findsNothing);
   });
+
+  testWidgets(
+    'CONNECT resolves activeVars at press time, not widget-build time — '
+    'regression guard for stale-environment CONNECT (A1)',
+    (tester) async {
+      const tabId = 'mc3';
+      const config = HttpRequestConfigEntity(
+        id: tabId,
+        url: 'https://{{host}}',
+        kind: RequestKind.mcp,
+      );
+      const tab = HttpRequestTabEntity(tabId: tabId, config: config);
+      final tabsBloc = await _loadedTabsBloc(
+        repository,
+        sendRequestUseCase,
+        tab,
+      );
+      addTearDown(tabsBloc.close);
+
+      final mcpBloc = _buildMcpBloc(tabId: tabId);
+
+      // Simulates the active environment at build time.
+      var currentVars = <String, String>{'host': 'old.example.com'};
+
+      await _pump(
+        tester,
+        tabsBloc: tabsBloc,
+        mcpBloc: mcpBloc,
+        tabId: tabId,
+        config: config,
+        activeVars: () => currentVars,
+      );
+
+      // The active environment changes AFTER the button was built (no
+      // rebuild of McpConnectButton follows — mirrors the URL bar's
+      // buildWhen not firing on environment changes).
+      currentVars = {'host': 'new.example.com'};
+
+      await tester.tap(find.byKey(const ValueKey('mcp_connect_button')));
+      await tester.pump();
+
+      final captured = verify(() => mcpBloc.add(captureAny())).captured;
+      final connectEvent = captured.whereType<McpConnectRequested>().first;
+      expect(
+        connectEvent.url,
+        'https://new.example.com',
+        reason:
+            'CONNECT must resolve against the environment active at '
+            'press time, not the one active when the button was built',
+      );
+    },
+  );
 }

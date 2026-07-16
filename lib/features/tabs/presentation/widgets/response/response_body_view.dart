@@ -45,8 +45,12 @@ class ResponseBodyView extends StatelessWidget {
       buildWhen: (prev, next) {
         final p = prev.tabs.byId(tabId)?.response;
         final n = next.tabs.byId(tabId)?.response;
+        // Identity, not length: for media, `body` is a placeholder derived
+        // from content-type + size, so a re-sent response with different
+        // bytes of the same length would otherwise never rebuild. Every send
+        // produces a fresh Uint8List.
         return p?.body != n?.body ||
-            p?.bodyBytes?.length != n?.bodyBytes?.length ||
+            !identical(p?.bodyBytes, n?.bodyBytes) ||
             contentTypeOf(p?.headers ?? const {}) !=
                 contentTypeOf(n?.headers ?? const {});
       },

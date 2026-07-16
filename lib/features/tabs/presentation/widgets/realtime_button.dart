@@ -22,7 +22,11 @@ class RealtimeButton extends StatelessWidget {
   final String tabId;
   final HttpRequestConfigEntity config;
   final bool isNarrow;
-  final Map<String, String> activeVars;
+  // A provider, not a snapshot: the URL bar's buildWhen never fires on
+  // environment changes, so a captured Map would resolve against whatever
+  // environment was active at the last rebuild, not the one active at press
+  // time. Call this inside onPressed only.
+  final Map<String, String> Function() activeVars;
 
   @override
   Widget build(BuildContext context) {
@@ -49,14 +53,15 @@ class RealtimeButton extends StatelessWidget {
               final current =
                   context.read<TabsBloc>().state.tabs.byId(tabId)?.config ??
                   config;
+              final vars = activeVars();
               bloc.add(
                 Connect(
                   tabId: tabId,
                   kind: current.kind,
-                  url: EnvironmentResolver.resolve(current.url, activeVars),
+                  url: EnvironmentResolver.resolve(current.url, vars),
                   headers: EnvironmentResolver.resolveMap(
                     current.headers,
-                    activeVars,
+                    vars,
                   ),
                 ),
               );

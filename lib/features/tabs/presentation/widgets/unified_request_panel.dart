@@ -91,11 +91,15 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel>
       listenWhen: (prev, next) {
         final p = prev.tabs.byId(widget.tabId);
         final n = next.tabs.byId(widget.tabId);
-        // Send completed: isSending flipped true → false AND we have a
-        // response.
+        // Send completed: isSending flipped true → false, we have a
+        // response, AND it's a NEW response instance — a cancelled request
+        // also flips isSending false but leaves the same response in place
+        // (tabs_bloc only clears isSending on cancel), which must not steal
+        // focus to RESPONSE.
         return p?.isSending == true &&
             n?.isSending == false &&
-            n?.response != null;
+            n?.response != null &&
+            !identical(p?.response, n?.response);
       },
       listener: (context, state) {
         if (_tabController.index != _responseTabIndex) {

@@ -28,6 +28,8 @@ import 'package:re_editor/re_editor.dart';
 // context.read<...>() / BlocBuilder and never dispatches events here.
 class _FakeTabsBloc extends Bloc<TabsEvent, TabsState> implements TabsBloc {
   _FakeTabsBloc(super.initialState);
+
+  void push(TabsState next) => emit(next);
 }
 
 class _FakeCollectionsBloc extends Bloc<CollectionsEvent, CollectionsState>
@@ -59,18 +61,19 @@ void main() {
     );
   }
 
-  Future<void> pump(
+  /// Like [pump], but takes a caller-owned [_FakeTabsBloc] so the test can
+  /// push further states (e.g. simulate a re-send) after the initial pump.
+  Future<_FakeTabsBloc> pumpBloc(
     WidgetTester tester, {
-    required HttpRequestTabEntity tab,
+    required _FakeTabsBloc tabsBloc,
   }) async {
+    addTearDown(tabsBloc.close);
     final controller = CodeLineEditingController();
     addTearDown(controller.dispose);
     await tester.pumpWidget(
       MultiBlocProvider(
         providers: [
-          BlocProvider<TabsBloc>(
-            create: (_) => _FakeTabsBloc(TabsState(tabs: [tab])),
-          ),
+          BlocProvider<TabsBloc>.value(value: tabsBloc),
           BlocProvider<CollectionsBloc>(
             create: (_) => _FakeCollectionsBloc(CollectionsState()),
           ),
@@ -98,6 +101,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    return tabsBloc;
+  }
+
+  Future<void> pump(
+    WidgetTester tester, {
+    required HttpRequestTabEntity tab,
+  }) async {
+    await pumpBloc(tester, tabsBloc: _FakeTabsBloc(TabsState(tabs: [tab])));
   }
 
   testWidgets('image response routes to image preview', (tester) async {
@@ -207,4 +218,67 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    're-sent media response with identical byte length shows the NEW '
+    'payload — regression guard (A5)',
+    (tester) async {
+      // Same length, different content, different Uint8List instances — each
+      // send produces a fresh Uint8List even when the length happens to
+      // match the previous response.
+      final bytesA = Uint8List.fromList(const [1, 2, 3, 4, 5, 6, 7, 8]);
+      final bytesB = Uint8List.fromList(const [8, 7, 6, 5, 4, 3, 2, 1]);
+
+      final tabsBloc = await pumpBloc(
+        tester,
+        tabsBloc: _FakeTabsBloc(
+          TabsState(
+            tabs: [
+              tabWith(
+                response: HttpResponseEntity(
+                  statusCode: 200,
+                  body: '',
+                  headers: const {'content-type': 'image/png'},
+                  durationMs: 5,
+                  bodyBytes: bytesA,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      final imageBefore = tester.widget<Image>(find.byType(Image));
+      expect((imageBefore.image as MemoryImage).bytes, same(bytesA));
+
+      // Re-send: identical length + body + content-type, but a FRESH bytes
+      // instance — the old gate (comparing bodyBytes?.length) treats this as
+      // "no change" and keeps showing the stale payload.
+      tabsBloc.push(
+        TabsState(
+          tabs: [
+            tabWith(
+              response: HttpResponseEntity(
+                statusCode: 200,
+                body: '',
+                headers: const {'content-type': 'image/png'},
+                durationMs: 5,
+                bodyBytes: bytesB,
+              ),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final imageAfter = tester.widget<Image>(find.byType(Image));
+      expect(
+        (imageAfter.image as MemoryImage).bytes,
+        same(bytesB),
+        reason:
+            'a re-sent response with different bytes of the same length '
+            'must replace the previous payload, not keep showing it',
+      );
+    },
+  );
 }

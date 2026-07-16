@@ -125,6 +125,43 @@ void main() {
     expect(find.text('baseUrl'), findsOneWidget);
   });
 
+  testWidgets(
+    'Ctrl+Space notifies onAccepted with the inserted {{}} token — '
+    'regression guard (A3): the programmatic insert must reach the owner',
+    (tester) async {
+      String? accepted;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: brutalistTheme(Brightness.light),
+          home: Scaffold(
+            body: VariableAutocomplete(
+              controller: controller,
+              focusNode: focusNode,
+              suggestionsFor: _suggest,
+              onAccepted: (value) => accepted = value,
+              child: TextField(controller: controller, focusNode: focusNode),
+            ),
+          ),
+        ),
+      );
+      focusNode.requestFocus();
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+
+      expect(
+        accepted,
+        '{{}}',
+        reason:
+            'onAccepted must fire with the controller text after the '
+            'shortcut inserts the {{}} token, or the visible text never '
+            'reaches the bloc',
+      );
+    },
+  );
+
   testWidgets('Tab accepts the first suggestion, same as Enter', (
     tester,
   ) async {

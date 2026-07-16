@@ -37,7 +37,11 @@ class _ResponseMediaPanelState extends State<ResponseMediaPanel> {
       buildWhen: (p, n) {
         final pr = p.tabs.byId(widget.tabId)?.response;
         final nr = n.tabs.byId(widget.tabId)?.response;
-        return pr?.bodyBytes?.length != nr?.bodyBytes?.length ||
+        // Identity, not length: for media, `body` is a placeholder derived
+        // from content-type + size, so a re-sent response with different
+        // bytes of the same length would otherwise never rebuild. Every send
+        // produces a fresh Uint8List.
+        return !identical(pr?.bodyBytes, nr?.bodyBytes) ||
             pr?.body != nr?.body ||
             contentTypeOf(pr?.headers ?? const {}) !=
                 contentTypeOf(nr?.headers ?? const {});
