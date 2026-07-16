@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
+import 'package:getman/core/ui/widgets/confirm_dialog.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
@@ -13,6 +14,7 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
+import 'package:getman/features/tabs/presentation/widgets/tab_drag_data.dart';
 
 /// Delay before the hover tooltip appears, so a quick pass across the tab
 /// strip doesn't flash it. Durations aren't part of the theme extensions; this
@@ -170,8 +172,11 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
               alignment: Alignment.topLeft,
               child: ReorderableDragStartListener(
                 index: widget.index,
-                child: LongPressDraggable<String>(
-                  data: widget.tabId,
+                // Typed to TabDragData (not a bare String) so a dragged
+                // collection-tree NODE neither highlights nor gets accepted by
+                // targets meant for tabs, e.g. the panel selector (D4).
+                child: LongPressDraggable<TabDragData>(
+                  data: TabDragData(widget.tabId),
                   feedback: _TabDragFeedback(title: displayTitle),
                   childWhenDragging: Opacity(
                     opacity: 0.4,
@@ -395,6 +400,76 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
     );
   }
 
+  /// The tabs a bulk-close action would remove, mirroring the exact bloc
+  /// semantics in `TabsBloc._onCloseOtherTabs` / `_onCloseTabsToTheRight` /
+  /// `_onCloseTabsToTheLeft` — used only to decide whether to gate the
+  /// dispatch behind an unsaved-changes confirm (D6).
+  List<HttpRequestTabEntity> _bulkCloseTargets(
+    List<HttpRequestTabEntity> tabs,
+    String tabId,
+    _BulkCloseKind kind,
+  ) {
+    final index = tabs.indexWhere((t) => t.tabId == tabId);
+    if (index == -1) return const [];
+    switch (kind) {
+      case _BulkCloseKind.others:
+        if (tabs.length <= 1) return const [];
+        return [
+          for (final t in tabs)
+            if (t.tabId != tabId) t,
+        ];
+      case _BulkCloseKind.toTheRight:
+        if (index >= tabs.length - 1) return const [];
+        return tabs.sublist(index + 1);
+      case _BulkCloseKind.toTheLeft:
+        if (index <= 0) return const [];
+        return tabs.sublist(0, index);
+    }
+  }
+
+  /// Dispatches a bulk-close event, gated behind an unsaved-changes confirm
+  /// when any affected tab is dirty — mirrors the single-tab close confirm in
+  /// `MainScreen._requestCloseConfirmation` and the panel-close confirm in
+  /// `closePanelWithSavePrompt` (D6): bulk closes must not silently destroy
+  /// unsaved work just because they weren't the single-tab path.
+  void _bulkClose(
+    BuildContext context,
+    String tabId,
+    _BulkCloseKind kind,
+    TabsEvent Function() buildEvent,
+  ) {
+    final tabsBloc = context.read<TabsBloc>();
+    final collectionsBloc = context.read<CollectionsBloc>();
+    final dirtyChecker = context.read<TabDirtyChecker>();
+    final targets = _bulkCloseTargets(tabsBloc.state.tabs, tabId, kind);
+    final savedConfigs = collectionsBloc.state.configById;
+    final dirtyCount = targets
+        .where((t) => dirtyChecker(tab: t, savedConfigs: savedConfigs))
+        .length;
+    if (dirtyCount == 0) {
+      tabsBloc.add(buildEvent());
+      return;
+    }
+    // showMenu closes this menu's route before onTap returns; defer to the
+    // next frame so the dialog opens after the menu route is fully dismissed
+    // (same pattern as the MOVE TO PANEL submenu below).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(
+        ConfirmDialog.show(
+          context,
+          title: 'UNSAVED CHANGES',
+          message: dirtyCount == 1
+              ? '1 TAB HAS UNSAVED CHANGES. ARE YOU SURE YOU WANT TO CLOSE IT?'
+              : '$dirtyCount TABS HAVE UNSAVED CHANGES. ARE YOU SURE YOU '
+                    'WANT TO CLOSE THEM?',
+          confirmLabel: 'CLOSE ANYWAY',
+          onConfirm: () => tabsBloc.add(buildEvent()),
+        ),
+      );
+    });
+  }
+
   void _showContextMenu(
     BuildContext context,
     Offset position,
@@ -429,7 +504,12 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
             child: _buildMenuItem(context, Icons.close, 'CLOSE'),
           ),
           PopupMenuItem(
-            onTap: () => tabsBloc.add(CloseOtherTabs(tab.tabId)),
+            onTap: () => _bulkClose(
+              context,
+              tab.tabId,
+              _BulkCloseKind.others,
+              () => CloseOtherTabs(tab.tabId),
+            ),
             child: _buildMenuItem(
               context,
               Icons.tab_unselected,
@@ -437,7 +517,12 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
             ),
           ),
           PopupMenuItem(
-            onTap: () => tabsBloc.add(CloseTabsToTheLeft(tab.tabId)),
+            onTap: () => _bulkClose(
+              context,
+              tab.tabId,
+              _BulkCloseKind.toTheLeft,
+              () => CloseTabsToTheLeft(tab.tabId),
+            ),
             child: _buildMenuItem(
               context,
               Icons.keyboard_double_arrow_left,
@@ -445,7 +530,12 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
             ),
           ),
           PopupMenuItem(
-            onTap: () => tabsBloc.add(CloseTabsToTheRight(tab.tabId)),
+            onTap: () => _bulkClose(
+              context,
+              tab.tabId,
+              _BulkCloseKind.toTheRight,
+              () => CloseTabsToTheRight(tab.tabId),
+            ),
             child: _buildMenuItem(
               context,
               Icons.keyboard_double_arrow_right,
@@ -660,3 +750,7 @@ class _TabTooltipCard extends StatelessWidget {
     );
   }
 }
+
+/// Which bulk tab-close context-menu action is being confirmed — drives how
+/// [_TabWidgetState._bulkCloseTargets] computes the affected tab set.
+enum _BulkCloseKind { others, toTheLeft, toTheRight }

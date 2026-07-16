@@ -469,4 +469,147 @@ void main() {
       );
     },
   );
+
+  group('D6: bulk close confirms unsaved changes', () {
+    // _linkedTab() is DIRTY by construction here: it links to collection node
+    // 'node1', but collectionsRepo returns no saved collections in setUp, so
+    // TabDirtyChecker treats the missing saved config as dirty. _emptyTab()
+    // is clean (matches the pristine default config for an unlinked tab).
+    Future<(TabsBloc, CollectionsBloc)> pumpTwoTabs(
+      WidgetTester tester,
+      HttpRequestTabEntity dirty,
+      HttpRequestTabEntity clean,
+    ) async {
+      when(() => tabsRepo.getPanels()).thenAnswer(
+        (_) async => [
+          PanelEntity(
+            id: 'p1',
+            name: 'Panel 1',
+            tabs: [dirty, clean],
+            activeTabId: clean.tabId,
+          ),
+        ],
+      );
+      when(() => tabsRepo.getActivePanelId()).thenAnswer((_) async => 'p1');
+
+      final tabsBloc = TabsBloc(
+        repository: tabsRepo,
+        sendRequestUseCase: sendUseCase,
+      )..add(const LoadTabs());
+      await tabsBloc.stream.firstWhere(
+        (s) => !s.isLoading && s.tabs.length == 2,
+      );
+
+      final collectionsBloc = CollectionsBloc(
+        getCollectionsUseCase: GetCollectionsUseCase(collectionsRepo),
+        saveCollectionsUseCase: SaveCollectionsUseCase(collectionsRepo),
+        saveDebounce: const Duration(milliseconds: 5),
+      )..add(const ReplaceCollections([]));
+      await collectionsBloc.stream.first;
+
+      addTearDown(tabsBloc.close);
+      addTearDown(collectionsBloc.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: brutalistTheme(Brightness.light),
+          home: Scaffold(
+            body: MultiBlocProvider(
+              providers: [
+                BlocProvider.value(value: tabsBloc),
+                BlocProvider.value(value: collectionsBloc),
+              ],
+              child: RepositoryProvider<TabDirtyChecker>.value(
+                value: const TabDirtyChecker(),
+                child: Center(
+                  child: TabWidget(
+                    tabId: clean.tabId,
+                    index: 1,
+                    isActive: true,
+                    onTap: () {},
+                    onClose: () async => true,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return (tabsBloc, collectionsBloc);
+    }
+
+    testWidgets(
+      'CLOSE OTHERS with a dirty affected tab shows a confirm dialog; '
+      'CANCEL does not dispatch',
+      (tester) async {
+        final dirty = _linkedTab();
+        final clean = _emptyTab();
+        final (tabsBloc, _) = await pumpTwoTabs(tester, dirty, clean);
+
+        final titlePos = tester.getCenter(find.text('NEW REQUEST'));
+        await tester.tapAt(titlePos, buttons: kSecondaryMouseButton);
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('CLOSE OTHERS'));
+        // The confirm dialog is opened via a post-frame callback (deferred
+        // until the popup menu route is fully dismissed).
+        await tester.pumpAndSettle();
+
+        expect(find.text('UNSAVED CHANGES'), findsOneWidget);
+
+        await tester.tap(find.text('CANCEL'));
+        await tester.pumpAndSettle();
+
+        expect(tabsBloc.state.tabs.length, 2, reason: 'nothing was closed');
+      },
+    );
+
+    testWidgets(
+      'CLOSE OTHERS with a dirty affected tab: CLOSE ANYWAY dispatches '
+      'CloseOtherTabs',
+      (tester) async {
+        final dirty = _linkedTab();
+        final clean = _emptyTab();
+        final (tabsBloc, _) = await pumpTwoTabs(tester, dirty, clean);
+
+        final titlePos = tester.getCenter(find.text('NEW REQUEST'));
+        await tester.tapAt(titlePos, buttons: kSecondaryMouseButton);
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('CLOSE OTHERS'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('CLOSE ANYWAY'));
+        await tester.pumpAndSettle();
+
+        expect(tabsBloc.state.tabs.length, 1);
+        expect(tabsBloc.state.tabs.single.tabId, clean.tabId);
+      },
+    );
+
+    testWidgets(
+      'CLOSE OTHERS with no dirty affected tabs dispatches immediately — no '
+      'confirm dialog',
+      (tester) async {
+        final clean = _emptyTab();
+        const otherClean = HttpRequestTabEntity(
+          tabId: 'tab3',
+          config: HttpRequestConfigEntity(id: 'tab3'),
+        );
+        final (tabsBloc, _) = await pumpTwoTabs(tester, otherClean, clean);
+
+        final titlePos = tester.getCenter(find.text('NEW REQUEST'));
+        await tester.tapAt(titlePos, buttons: kSecondaryMouseButton);
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('CLOSE OTHERS'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('UNSAVED CHANGES'), findsNothing);
+        expect(tabsBloc.state.tabs.length, 1);
+        expect(tabsBloc.state.tabs.single.tabId, clean.tabId);
+      },
+    );
+  });
 }

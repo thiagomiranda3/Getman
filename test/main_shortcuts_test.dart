@@ -1,5 +1,5 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/navigation/intents.dart';
 import 'package:getman/main.dart';
@@ -212,4 +212,121 @@ void main() {
     expect(appShortcuts, isNotEmpty);
     expect(appShortcuts.length, 31);
   });
+
+  group(
+    'D8: an Actions handler above the Navigator leaks into every dialog; one '
+    'below it does not',
+    () {
+      // This is the architectural bug NewTabIntent used to hit: a root
+      // Actions mounted ABOVE MaterialApp/the Navigator (as main.dart's used
+      // to be) is an ANCESTOR of a dialog's focused field (showDialog pushes
+      // onto that same root Navigator), so Actions.invoke from inside the
+      // dialog finds it — Cmd/Ctrl+N fired from inside any modal. MainScreen's
+      // Actions sits BELOW the router instead, a sibling of the dialog's
+      // route rather than an ancestor of it, so it is correctly unreachable.
+      // These two widget tests pin that general Flutter behavior directly
+      // (no DI needed) — the rationale documented on both main.dart and
+      // main_screen.dart.
+      testWidgets(
+        'an Actions ABOVE the Navigator IS reachable from a dialog pushed on '
+        'it (the bug NewTabIntent used to hit)',
+        (tester) async {
+          var invoked = 0;
+          await tester.pumpWidget(
+            Actions(
+              actions: <Type, Action<Intent>>{
+                NewTabIntent: CallbackAction<NewTabIntent>(
+                  onInvoke: (_) {
+                    invoked++;
+                    return null;
+                  },
+                ),
+              },
+              child: MaterialApp(
+                home: Builder(
+                  builder: (context) => ElevatedButton(
+                    onPressed: () => showDialog<void>(
+                      context: context,
+                      builder: (_) => const AlertDialog(
+                        content: Focus(
+                          autofocus: true,
+                          child: TextField(
+                            key: ValueKey('dialog_field'),
+                          ),
+                        ),
+                      ),
+                    ),
+                    child: const Text('open'),
+                  ),
+                ),
+              ),
+            ),
+          );
+
+          await tester.tap(find.text('open'));
+          await tester.pumpAndSettle();
+
+          Actions.invoke(
+            tester.element(find.byKey(const ValueKey('dialog_field'))),
+            const NewTabIntent(),
+          );
+
+          expect(
+            invoked,
+            1,
+            reason: 'a root Actions leaks into every dialog',
+          );
+        },
+      );
+
+      testWidgets(
+        'an Actions on the routed page (below the Navigator, like '
+        'MainScreen) is NOT reachable from a dialog pushed on it',
+        (tester) async {
+          var invoked = 0;
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Actions(
+                actions: <Type, Action<Intent>>{
+                  NewTabIntent: CallbackAction<NewTabIntent>(
+                    onInvoke: (_) {
+                      invoked++;
+                      return null;
+                    },
+                  ),
+                },
+                child: Builder(
+                  builder: (context) => ElevatedButton(
+                    onPressed: () => showDialog<void>(
+                      context: context,
+                      builder: (_) => const AlertDialog(
+                        content: Focus(
+                          autofocus: true,
+                          child: TextField(
+                            key: ValueKey('dialog_field'),
+                          ),
+                        ),
+                      ),
+                    ),
+                    child: const Text('open'),
+                  ),
+                ),
+              ),
+            ),
+          );
+
+          await tester.tap(find.text('open'));
+          await tester.pumpAndSettle();
+
+          final result = Actions.maybeInvoke(
+            tester.element(find.byKey(const ValueKey('dialog_field'))),
+            const NewTabIntent(),
+          );
+
+          expect(invoked, 0);
+          expect(result, isNull);
+        },
+      );
+    },
+  );
 }

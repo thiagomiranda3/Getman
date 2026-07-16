@@ -18,6 +18,7 @@ import 'package:getman/features/collections/presentation/bloc/collections_state.
 import 'package:getman/features/collections/presentation/widgets/branch_chip.dart';
 import 'package:getman/features/collections/presentation/widgets/collection_node_row.dart';
 import 'package:getman/features/collections/presentation/widgets/example_row.dart';
+import 'package:getman/features/collections/presentation/widgets/node_drag_data.dart';
 import 'package:getman/features/collections/presentation/widgets/review_changes_button.dart';
 import 'package:getman/features/collections/presentation/widgets/spec_import_dialog.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
@@ -478,10 +479,13 @@ class _CollectionsListState extends State<CollectionsList> {
                       },
                     );
                     if (context.isPhone) return tree;
-                    return DragTarget<String>(
+                    // Typed to NodeDragData (not a bare String) so a dragged
+                    // TAB neither highlights nor gets accepted by the
+                    // root-of-tree drop target (D4).
+                    return DragTarget<NodeDragData>(
                       onAcceptWithDetails: (details) => context
                           .read<CollectionsBloc>()
-                          .add(MoveNode(details.data, null)),
+                          .add(MoveNode(details.data.nodeId, null)),
                       builder: (context, candidateData, rejectedData) => tree,
                     );
                   },

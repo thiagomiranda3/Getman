@@ -23,6 +23,11 @@ class Splitter extends StatelessWidget {
         onUpdate(isVertical ? details.delta.dy : details.delta.dx);
       },
       onPanEnd: (_) => onEnd?.call(),
+      // A PointerCancelEvent while the drag is still contested resolves to
+      // onPanCancel (not onPanEnd). Commit here too, otherwise the caller's
+      // local drag override (e.g. _localSplitRatio) shadows the persisted
+      // value for the rest of the session.
+      onPanCancel: () => onEnd?.call(),
       child: MouseRegion(
         cursor: isVertical
             ? SystemMouseCursors.resizeUpDown

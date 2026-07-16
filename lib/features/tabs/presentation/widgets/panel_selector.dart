@@ -11,6 +11,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/panel_close_coordinator.dart';
+import 'package:getman/features/tabs/presentation/widgets/tab_drag_data.dart';
 
 /// Max width of the active-panel label in the tab strip before it ellipsizes.
 /// Mirrors the environment selector's 120 cap so the two selectors line up; the
@@ -49,6 +50,13 @@ class _PanelSelectorState extends State<PanelSelector> {
   /// the deferred tap never resolves under widget-test `pumpAndSettle`.
   DateTime? _lastTapAt;
 
+  /// The button's global-coordinate rect, captured when the menu opens. Once
+  /// the menu is open its full-screen dismiss barrier physically covers the
+  /// button, so a genuine second tap of a double-tap lands on the barrier, not
+  /// the button's own `GestureDetector` — this rect lets the barrier's tap
+  /// handler recognize that case (D1).
+  Rect? _buttonRect;
+
   @override
   void dispose() {
     _removeMenu();
@@ -57,6 +65,11 @@ class _PanelSelectorState extends State<PanelSelector> {
 
   /// Single tap toggles the menu; a second tap within [kDoubleTapTimeout]
   /// reinterprets the gesture as a double-tap and renames the active panel.
+  ///
+  /// This only fires when BOTH taps land on the button itself (e.g. no
+  /// overlay barrier has been laid out yet to intercept the second one) — the
+  /// common case, where the menu's barrier already covers the button, is
+  /// handled by [_handleBarrierTapUp] instead.
   void _handleTap(BuildContext context, PanelEntity active) {
     final now = DateTime.now();
     final last = _lastTapAt;
@@ -71,10 +84,37 @@ class _PanelSelectorState extends State<PanelSelector> {
     _toggleMenu(context);
   }
 
+  /// The menu's full-screen dismiss barrier receives every tap once the menu
+  /// is open — including the second tap of a real double-tap on the button,
+  /// which the barrier now physically covers. Reinterpret it as a double-tap
+  /// (dismiss + rename) when it lands inside [_buttonRect] within
+  /// [kDoubleTapTimeout] of the tap that opened the menu; otherwise this is a
+  /// plain dismiss. Either way [_lastTapAt] is cleared so a later single tap
+  /// on the button is never mistaken for the second half of this gesture (a
+  /// fast triple-tap must not open rename).
+  void _handleBarrierTapUp(Offset globalPosition) {
+    if (!mounted) return;
+    final last = _lastTapAt;
+    final rect = _buttonRect;
+    final isDoubleTapOnButton =
+        last != null &&
+        rect != null &&
+        DateTime.now().difference(last) < kDoubleTapTimeout &&
+        rect.contains(globalPosition);
+    final bloc = context.read<TabsBloc>();
+    final active = bloc.state.activePanel;
+    _removeMenu();
+    _lastTapAt = null;
+    if (isDoubleTapOnButton && active != null) {
+      _renameActivePanel(context, active);
+    }
+  }
+
   void _removeMenu() {
     _menuEntry?.remove();
     _menuEntry?.dispose();
     _menuEntry = null;
+    _buttonRect = null;
   }
 
   void _toggleMenu(BuildContext context) {
@@ -86,6 +126,10 @@ class _PanelSelectorState extends State<PanelSelector> {
   }
 
   void _openMenu(BuildContext context, {String? droppedTabId}) {
+    // Guard against an already-open menu: overwriting `_menuEntry` without
+    // removing the old one would orphan its opaque barrier — a permanent
+    // input soft-lock (D2).
+    _removeMenu();
     final overlay = Overlay.of(context);
     final overlayBox = overlay.context.findRenderObject() as RenderBox?;
     final buttonBox = context.findRenderObject() as RenderBox?;
@@ -105,6 +149,10 @@ class _PanelSelectorState extends State<PanelSelector> {
     final left = desiredLeft.clamp(0.0, maxLeft);
     final top = buttonTopLeft.dy + buttonBox.size.height + _menuGap;
 
+    // True (device) global coordinates — compared against the barrier tap's
+    // own `globalPosition` in `_handleBarrierTapUp`.
+    _buttonRect = buttonBox.localToGlobal(Offset.zero) & buttonBox.size;
+
     // The button's BuildContext owns the TabsBloc; expose it to the overlay,
     // which lives under the root Navigator (outside this subtree).
     final tabsBloc = context.read<TabsBloc>();
@@ -117,6 +165,7 @@ class _PanelSelectorState extends State<PanelSelector> {
         tabsBloc: tabsBloc,
         appTheme: Theme.of(context),
         onDismiss: _removeMenu,
+        onBarrierTapUp: _handleBarrierTapUp,
         droppedTabId: droppedTabId,
       ),
     );
@@ -177,8 +226,10 @@ class _SelectorButton extends StatelessWidget {
     final layout = context.appLayout;
     final compact = context.layoutMode == LayoutMode.phone;
 
-    return DragTarget<String>(
-      onAcceptWithDetails: (details) => onTabDropped(details.data),
+    // Typed to TabDragData (not a bare String) so a collection-node drag
+    // (NodeDragData) neither highlights this target nor gets accepted (D4).
+    return DragTarget<TabDragData>(
+      onAcceptWithDetails: (details) => onTabDropped(details.data.tabId),
       builder: (context, candidate, rejected) {
         final hovering = candidate.isNotEmpty;
         return GestureDetector(
@@ -254,6 +305,7 @@ class _PanelMenu extends StatelessWidget {
     required this.tabsBloc,
     required this.appTheme,
     required this.onDismiss,
+    required this.onBarrierTapUp,
     this.droppedTabId,
   });
 
@@ -263,6 +315,11 @@ class _PanelMenu extends StatelessWidget {
   final TabsBloc tabsBloc;
   final ThemeData appTheme;
   final VoidCallback onDismiss;
+
+  /// Called with the tap's global position when the full-screen dismiss
+  /// barrier is tapped — lets the selector tell a genuine double-tap-on-button
+  /// (barrier now covers it) apart from a plain tap-outside-to-dismiss (D1).
+  final ValueChanged<Offset> onBarrierTapUp;
 
   /// When non-null, every panel row tapping dispatches [MoveTabToPanel] instead
   /// of [SetActivePanel], and the add-footer dispatches [MoveTabToNewPanel].
@@ -278,11 +335,14 @@ class _PanelMenu extends StatelessWidget {
         value: tabsBloc,
         child: Stack(
           children: [
-            // Full-screen tap barrier so a click outside closes the menu.
+            // Full-screen tap barrier so a click outside closes the menu. Also
+            // the landing spot for the second tap of a real double-tap on the
+            // button (the barrier now covers it) — routed through
+            // `onBarrierTapUp` so the selector can recognize that case (D1).
             Positioned.fill(
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: onDismiss,
+                onTapUp: (details) => onBarrierTapUp(details.globalPosition),
               ),
             ),
             Positioned(
