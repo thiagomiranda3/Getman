@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/failures.dart';
+import 'package:getman/core/network/cancel_handle.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/features/chaining/domain/entities/assertion.dart';
 import 'package:getman/features/chaining/domain/entities/extraction_rule.dart';
@@ -463,6 +466,67 @@ void main() {
         expect(copy.config.url, 'https://a.dev');
         expect(copy.collectionNodeId, isNull);
         expect(bloc.state.activeIndex, 1);
+      },
+    );
+
+    test(
+      'DuplicateTab mints a fresh config id — chaining rules are keyed by '
+      'config id and must not be aliased between copy and original',
+      () async {
+        await loadWith([tab('a')]);
+        bloc.add(const DuplicateTab('a'));
+        await Future<void>.delayed(Duration.zero);
+
+        expect(bloc.state.tabs, hasLength(2));
+        final copy = bloc.state.tabs[1];
+        expect(copy.config.id, isNot(bloc.state.tabs.first.config.id));
+        expect(copy.config.url, bloc.state.tabs.first.config.url);
+      },
+    );
+
+    test(
+      "CloseOtherTabs / CloseTabsToTheRight cancel the removed tabs' "
+      'in-flight requests',
+      () async {
+        await loadWith([tab('a'), tab('b'), tab('c')]);
+        final handles = <String, NetworkCancelHandle>{};
+        when(
+          () => sendRequestUseCase.call(
+            config: any(named: 'config'),
+            envVars: any(named: 'envVars'),
+            cancelHandle: any(named: 'cancelHandle'),
+          ),
+        ).thenAnswer((inv) {
+          final config =
+              inv.namedArguments[#config]! as HttpRequestConfigEntity;
+          handles[config.id] =
+              inv.namedArguments[#cancelHandle]! as NetworkCancelHandle;
+          // Stays in flight forever — the tab is mid-send when closed.
+          return Completer<HttpResponseEntity>().future;
+        });
+
+        bloc
+          ..add(const SendRequest(tabId: 'a'))
+          ..add(const SendRequest(tabId: 'c'));
+        await Future<void>.delayed(Duration.zero);
+        expect(handles['a']!.isCancelled, isFalse);
+
+        bloc.add(const CloseTabsToTheRight('b'));
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          handles['c']!.isCancelled,
+          isTrue,
+          reason: "CLOSE TO THE RIGHT must cancel the closed tab's request",
+        );
+        expect(handles['a']!.isCancelled, isFalse);
+
+        bloc.add(const CloseOtherTabs('b'));
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          handles['a']!.isCancelled,
+          isTrue,
+          reason: "CLOSE OTHERS must cancel the closed tab's request",
+        );
       },
     );
 

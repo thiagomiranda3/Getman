@@ -187,19 +187,36 @@ Future<bool> _saveTab(
 }) async {
   final tabsBloc = context.read<TabsBloc>();
 
-  final nodeId = tab.collectionNodeId;
+  // [tab] was snapshotted when the review sequence started — responses can
+  // land (and dialogs sit open) in between, so every dispatch re-reads the
+  // live tab or it would revert those changes wholesale. The closing panel
+  // is not necessarily the active one, so search across all panels.
+  HttpRequestTabEntity? liveTab() {
+    for (final panel in tabsBloc.state.panels) {
+      final found = panel.tabs.byId(tab.tabId);
+      if (found != null) return found;
+    }
+    return null;
+  }
+
+  final current = liveTab();
+  if (current == null) return true; // tab gone — nothing left to save
+
+  final nodeId = current.collectionNodeId;
   if (nodeId != null) {
     final savedNode = CollectionsTreeHelper.findNode(
       collectionsBloc.state.collections,
       nodeId,
     );
     if (savedNode != null) {
-      collectionsBloc.add(UpdateNodeRequest(nodeId, tab.config.copyWith()));
+      collectionsBloc.add(UpdateNodeRequest(nodeId, current.config.copyWith()));
       return true;
     }
     // Node was deleted while the tab was open — drop the stale link.
     tabsBloc.add(
-      UpdateTab(tab.copyWith(collectionNodeId: null, collectionName: null)),
+      UpdateTab(
+        current.copyWith(collectionNodeId: null, collectionName: null),
+      ),
     );
   }
 
@@ -213,13 +230,22 @@ Future<bool> _saveTab(
     hintText: 'REQUEST NAME',
     onConfirm: (name) {
       saved = true;
+      final confirmed = liveTab();
+      if (confirmed == null) return; // closed while the prompt was open
       final newNodeId = const Uuid().v4();
       collectionsBloc.add(
-        SaveRequestToCollection(name, tab.config.copyWith(), id: newNodeId),
+        SaveRequestToCollection(
+          name,
+          confirmed.config.copyWith(),
+          id: newNodeId,
+        ),
       );
       tabsBloc.add(
         UpdateTab(
-          tab.copyWith(collectionName: name, collectionNodeId: newNodeId),
+          confirmed.copyWith(
+            collectionName: name,
+            collectionNodeId: newNodeId,
+          ),
         ),
       );
     },

@@ -377,10 +377,12 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     if (active.tabs.length <= 1) return;
     final keep = active.tabs.byId(event.tabId);
     if (keep == null) return;
-    final removedIds = active.tabs
-        .where((t) => t.tabId != event.tabId)
-        .map((t) => t.tabId)
-        .toList(growable: false);
+    final removedIds =
+        active.tabs
+            .where((t) => t.tabId != event.tabId)
+            .map((t) => t.tabId)
+            .toList(growable: false)
+          ..forEach(_requests.cancelAndFinish);
     final updated = active.copyWith(tabs: [keep], activeTabId: keep.tabId);
     emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     _dirtyTabIds.removeAll(removedIds);
@@ -397,10 +399,12 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final index = active.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index == -1 || index >= active.tabs.length - 1) return;
     final kept = active.tabs.sublist(0, index + 1);
-    final removedIds = active.tabs
-        .sublist(index + 1)
-        .map((t) => t.tabId)
-        .toList(growable: false);
+    final removedIds =
+        active.tabs
+            .sublist(index + 1)
+            .map((t) => t.tabId)
+            .toList(growable: false)
+          ..forEach(_requests.cancelAndFinish);
     final activeKept = kept.any((t) => t.tabId == active.activeTabId);
     final updated = active.copyWith(
       tabs: kept,
@@ -421,10 +425,12 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final index = active.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index <= 0) return;
     final kept = active.tabs.sublist(index);
-    final removedIds = active.tabs
-        .sublist(0, index)
-        .map((t) => t.tabId)
-        .toList(growable: false);
+    final removedIds =
+        active.tabs
+            .sublist(0, index)
+            .map((t) => t.tabId)
+            .toList(growable: false)
+          ..forEach(_requests.cancelAndFinish);
     final activeKept = kept.any((t) => t.tabId == active.activeTabId);
     final updated = active.copyWith(
       tabs: kept,
@@ -444,9 +450,12 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final active = _activePanel;
     final index = active.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index == -1) return;
+    // A fresh config id too: chaining rules are keyed by config id, so a
+    // duplicate sharing the original's id would silently alias its rules
+    // (editing/deleting one would affect both).
     final dup = HttpRequestTabEntity(
       tabId: _uuid.v4(),
-      config: active.tabs[index].config.copyWith(),
+      config: active.tabs[index].config.withId(_uuid.v4()),
     );
     final tabs = [...active.tabs]..insert(index + 1, dup);
     final updated = active.copyWith(tabs: tabs, activeTabId: dup.tabId);
@@ -792,13 +801,22 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     if (detached == null) return;
     final updatedTarget = target.copyWith(
       tabs: [...target.tabs, detached.tab],
+      // A previously-empty target has activeTabId '' — the arriving tab
+      // becomes its active one (invariant: non-empty panels name an active
+      // tab).
+      activeTabId: target.tabs.isEmpty
+          ? detached.tab.tabId
+          : target.activeTabId,
     );
 
     var panels = _replacePanel(state.panels, detached.source);
     panels = _replacePanel(panels, updatedTarget);
     emit(_derive(panels, state.activePanelId)); // stay on current panel
-    await _persistPanel(detached.source);
+    // Target first: if the app dies between the two writes, the tab shows up
+    // in both panels (a visible but recoverable duplicate) instead of in
+    // neither (orphaned in the tabs box, never rendered again).
     await _persistPanel(updatedTarget);
+    await _persistPanel(detached.source);
   }
 
   Future<void> _onMoveTabToNewPanel(
@@ -815,8 +833,9 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     );
     final panels = [..._replacePanel(state.panels, detached.source), newPanel];
     emit(_derive(panels, state.activePanelId)); // stay on current panel
-    await _persistPanel(detached.source);
+    // New panel first — same crash-ordering rationale as _onMoveTabToPanel.
     await _persistPanel(newPanel);
+    await _persistPanel(detached.source);
     await _persistPanelMeta();
   }
 }

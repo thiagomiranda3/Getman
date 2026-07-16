@@ -71,11 +71,21 @@ class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
     super.dispose();
   }
 
+  bool _closeRequestInFlight = false;
+
   Future<void> _handleClose() async {
-    if (_isClosing) return;
-    final confirmed = await widget.onClose();
-    if (!confirmed || !mounted) return;
-    setState(() => _isClosing = true);
+    // Set synchronously: _isClosing only flips after the (possibly dialog-
+    // showing) onClose await, so a double-click would otherwise pass the
+    // guard twice and stack two confirm dialogs.
+    if (_isClosing || _closeRequestInFlight) return;
+    _closeRequestInFlight = true;
+    try {
+      final confirmed = await widget.onClose();
+      if (!confirmed || !mounted) return;
+      setState(() => _isClosing = true);
+    } finally {
+      _closeRequestInFlight = false;
+    }
     await _sizeController.reverse();
     if (!mounted) return;
     context.read<TabsBloc>().add(RemoveTab(widget.tabId));

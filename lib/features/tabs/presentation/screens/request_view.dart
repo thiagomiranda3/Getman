@@ -394,12 +394,21 @@ class _RequestViewState extends State<RequestView> {
           // the new node immediately (otherwise it stays unlinked: shows dirty,
           // the Save button never flips to "Update", and re-saving duplicates).
           final nodeId = const Uuid().v4();
+          // Re-read the live tab: an in-flight response can land while the
+          // dialog is open — dispatching the pre-dialog snapshot would revert
+          // it and flip isSending back on with no cancellable request left.
+          final current = tabsBloc.state.tabs.byId(tab.tabId);
+          if (current == null) return; // tab closed while the dialog was open
           collectionsBloc.add(
-            SaveRequestToCollection(name, tab.config.copyWith(), id: nodeId),
+            SaveRequestToCollection(
+              name,
+              current.config.copyWith(),
+              id: nodeId,
+            ),
           );
           tabsBloc.add(
             UpdateTab(
-              tab.copyWith(collectionName: name, collectionNodeId: nodeId),
+              current.copyWith(collectionName: name, collectionNodeId: nodeId),
             ),
           );
         },

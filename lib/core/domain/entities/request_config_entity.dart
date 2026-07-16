@@ -121,6 +121,28 @@ class HttpRequestConfigEntity extends Equatable {
     );
   }
 
+  /// An identical config under a different [id]. Used when duplicating a tab:
+  /// per-request state (chaining rules, saved collection nodes) is keyed by
+  /// config id, so a duplicate must not silently share the original's id —
+  /// [copyWith] deliberately pins it.
+  HttpRequestConfigEntity withId(String id) => HttpRequestConfigEntity(
+    id: id,
+    method: method,
+    url: url,
+    headers: Map.from(headers),
+    body: body,
+    auth: Map.from(auth),
+    bodyType: bodyType,
+    formFields: formFields,
+    bodyFilePath: bodyFilePath,
+    graphqlVariables: graphqlVariables,
+    kind: kind,
+    responseBody: responseBody,
+    responseHeaders: responseHeaders,
+    statusCode: statusCode,
+    durationMs: durationMs,
+  );
+
   @override
   List<Object?> get props => [
     id,

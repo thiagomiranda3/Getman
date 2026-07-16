@@ -325,6 +325,28 @@ void main() {
         expect(bloc.state.panels.byId(p1)!.activeTabId, '');
       },
     );
+
+    test(
+      "moving a tab into an empty panel makes it that panel's active tab "
+      "(a non-empty panel must never keep activeTabId of '')",
+      () async {
+        final bloc = await buildLoadedBloc();
+        addTearDown(bloc.close);
+
+        final p1 = bloc.state.panels.single.id;
+        bloc.add(const AddPanel()); // empty, activeTabId ''
+        await bloc.stream.firstWhere((s) => s.panels.length == 2);
+        final p2 = bloc.state.panels[1].id;
+
+        final movingId = bloc.state.panels.byId(p1)!.tabs.first.tabId;
+        bloc.add(MoveTabToPanel(movingId, p2));
+        await bloc.stream.firstWhere(
+          (s) => s.panels.byId(p2)!.tabs.length == 1,
+        );
+
+        expect(bloc.state.panels.byId(p2)!.activeTabId, movingId);
+      },
+    );
   });
 
   group('MoveTabToNewPanel', () {
