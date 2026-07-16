@@ -28,7 +28,24 @@ class _PdfResponseViewState extends State<PdfResponseView> {
     unawaited(_loadDocument());
   }
 
+  @override
+  void didUpdateWidget(PdfResponseView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A re-send reuses this element (the panel keys viewers by kind, not by
+    // response) — without a reload the previous PDF stays on screen.
+    if (!identical(oldWidget.bytes, widget.bytes)) {
+      _controller?.dispose();
+      setState(() {
+        _controller = null;
+        _error = null;
+      });
+      unawaited(_loadDocument());
+    }
+  }
+
   Future<void> _loadDocument() async {
+    // Guards a stale load finishing after a newer response replaced it.
+    final bytes = widget.bytes;
     try {
       // pdfx's PdfDocument.openData calls assertHasPdfSupport() WITHOUT
       // awaiting it, so on a platform with no pdfium binding (e.g. the headless
@@ -39,8 +56,8 @@ class _PdfResponseViewState extends State<PdfResponseView> {
         if (mounted) setState(() => _error = PlatformNotSupportedException());
         return;
       }
-      final doc = await PdfDocument.openData(widget.bytes);
-      if (!mounted) {
+      final doc = await PdfDocument.openData(bytes);
+      if (!mounted || !identical(bytes, widget.bytes)) {
         await doc.close();
         return;
       }
@@ -48,7 +65,9 @@ class _PdfResponseViewState extends State<PdfResponseView> {
         () => _controller = PdfControllerPinch(document: Future.value(doc)),
       );
     } on Object catch (e) {
-      if (mounted) setState(() => _error = e);
+      if (mounted && identical(bytes, widget.bytes)) {
+        setState(() => _error = e);
+      }
     }
   }
 

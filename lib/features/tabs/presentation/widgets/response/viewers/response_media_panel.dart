@@ -152,6 +152,13 @@ class _ResponseMediaPanelState extends State<ResponseMediaPanel> {
     Widget seg(String label, _MediaTab t) {
       final active = _tab == t;
       final bg = context.appPalette.selectorActive;
+      final activeIsDark =
+          ThemeData.estimateBrightnessForColor(bg) == Brightness.dark;
+      // Deliberate contrast against the theme-derived active background
+      // (same rationale as _BodyModeToggle) — onSurface was near-invisible
+      // on a dark accent in light themes.
+      // ignore: avoid_hardcoded_brand_colors
+      final onActive = activeIsDark ? Colors.white : Colors.black;
       return GestureDetector(
         onTap: () => setState(() => _tab = t),
         child: Container(
@@ -174,7 +181,9 @@ class _ResponseMediaPanelState extends State<ResponseMediaPanel> {
             style: TextStyle(
               fontSize: layout.fontSizeSmall,
               fontWeight: context.appTypography.displayWeight,
-              color: Theme.of(context).colorScheme.onSurface,
+              color: active
+                  ? onActive
+                  : Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ),

@@ -56,18 +56,21 @@ class ResponseLargeBodyView extends StatelessWidget {
           horizontal: layout.pagePadding,
           vertical: layout.pagePadding / 2,
         ),
-        child: Row(
+        // Wrap, not Row: the buttons + controls cluster is ~400px of fixed
+        // width, which overflows when the splitter narrows the response pane
+        // (the small-mode banner made the same switch for the same reason).
+        child: Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Expanded(
-              child: Text(
-                highlightingOptedIn
-                    ? 'LARGE RESPONSE ($sizeLabel) — HIGHLIGHTING ENABLED'
-                    : 'LARGE RESPONSE ($sizeLabel) — HIGHLIGHTING DISABLED',
-                style: TextStyle(
-                  fontSize: layout.fontSizeSmall,
-                  fontWeight: typography.titleWeight,
-                  color: theme.colorScheme.onSurface,
-                ),
+            Text(
+              highlightingOptedIn
+                  ? 'LARGE RESPONSE ($sizeLabel) — HIGHLIGHTING ENABLED'
+                  : 'LARGE RESPONSE ($sizeLabel) — HIGHLIGHTING DISABLED',
+              style: TextStyle(
+                fontSize: layout.fontSizeSmall,
+                fontWeight: typography.titleWeight,
+                color: theme.colorScheme.onSurface,
               ),
             ),
             if (!highlightingOptedIn) ...[

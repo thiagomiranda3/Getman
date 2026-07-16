@@ -150,6 +150,8 @@ class _ParamsTabViewState extends State<ParamsTabView> {
                       initialText: BulkKvCodec.serialize(
                         decode(tab.config.params),
                       ),
+                      canonicalize: (raw) =>
+                          BulkKvCodec.serialize(BulkKvCodec.parse(raw)),
                       onChanged: (text) =>
                           emit(encode(BulkKvCodec.parse(text))),
                     )
@@ -232,6 +234,8 @@ class _HeadersTabViewState extends State<HeadersTabView> {
                       initialText: BulkKvCodec.serialize(
                         decode(tab.config.headers),
                       ),
+                      canonicalize: (raw) =>
+                          BulkKvCodec.serialize(BulkKvCodec.parse(raw)),
                       onChanged: (text) =>
                           emit(encode(BulkKvCodec.parse(text))),
                     )
@@ -490,6 +494,10 @@ class _RawBodyEditorState extends State<_RawBodyEditor> {
                 final messenger = ScaffoldMessenger.of(context);
                 final original = widget.controller.text;
                 final prettified = await JsonUtils.prettify(original);
+                // prettify runs in an isolate: the tab may have closed
+                // (disposed controller) or the user may have kept typing
+                // (their newer text must win) while it ran.
+                if (!mounted || widget.controller.text != original) return;
                 if (prettified != original) {
                   widget.controller.text = prettified;
                   showAppSnackBarVia(messenger, 'JSON formatted');

@@ -102,7 +102,11 @@ class _CommandPaletteState extends State<CommandPalette> {
     // Recompute against the live text so Enter works before the debounce fires.
     final results = _resultsFor(_query.text);
     if (results.isEmpty) return;
-    _invoke(results[_selected.value.clamp(0, results.length - 1)]);
+    // The arrow-key index belongs to the DEBOUNCED result list; against a
+    // fresh query it can point at a different row than the visible highlight
+    // (the debounce handler resets it to 0 — mirror that here).
+    final index = _query.text == _queryText.value ? _selected.value : 0;
+    _invoke(results[index.clamp(0, results.length - 1)]);
   }
 
   List<_Command> _buildCommands() {

@@ -32,7 +32,11 @@ class EmptyTabsPlaceholder extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'PRESS CTRL+N TO CREATE A NEW REQUEST',
+            // Shortcuts are platform-exclusive (⌘ on macOS, Ctrl elsewhere) —
+            // Ctrl+N does nothing on a Mac, so the hint must match.
+            Theme.of(context).platform == TargetPlatform.macOS
+                ? 'PRESS ⌘N TO CREATE A NEW REQUEST'
+                : 'PRESS CTRL+N TO CREATE A NEW REQUEST',
             style: TextStyle(
               fontSize: context.appLayout.fontSizeNormal,
               fontWeight: context.appTypography.titleWeight,

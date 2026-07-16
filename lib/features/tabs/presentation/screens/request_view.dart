@@ -204,9 +204,14 @@ class _RequestViewState extends State<RequestView> {
                 ),
                 BeautifyJsonIntent: CallbackAction<BeautifyJsonIntent>(
                   onInvoke: (_) async {
-                    final prettified = await JsonUtils.prettify(
-                      _bodyController.text,
-                    );
+                    final original = _bodyController.text;
+                    final prettified = await JsonUtils.prettify(original);
+                    // prettify runs in an isolate: guard the gap — the tab
+                    // may have closed (disposed controller) or the user may
+                    // have kept typing (their newer text must win).
+                    if (!mounted || _bodyController.text != original) {
+                      return null;
+                    }
                     _bodyController.text = prettified;
                     return null;
                   },
