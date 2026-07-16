@@ -62,6 +62,21 @@ class _ExampleRowState extends State<ExampleRow> {
     final layout = context.appLayout;
     final indent = widget.depth * layout.depthPaddingMultiplier;
 
+    // Swallow-target: without it, a node released over an example row falls
+    // through to the list-level root DragTarget and gets moved to the root.
+    return DragTarget<String>(
+      onAcceptWithDetails: (_) {},
+      builder: (context, candidateData, rejectedData) =>
+          _row(context, theme, layout, indent),
+    );
+  }
+
+  Widget _row(
+    BuildContext context,
+    ThemeData theme,
+    AppLayout layout,
+    double indent,
+  ) {
     return SizedBox(
       width: widget.rowWidth,
       height: widget.rowHeight,

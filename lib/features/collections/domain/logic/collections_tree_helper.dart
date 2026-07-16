@@ -12,7 +12,11 @@ class CollectionsTreeHelper {
         if (!a.isFavorite && b.isFavorite) return 1;
         if (a.isFolder && !b.isFolder) return -1;
         if (!a.isFolder && b.isFolder) return 1;
-        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+        final byName = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+        if (byName != 0) return byName;
+        // Dart's List.sort is not stable — without a total order, siblings
+        // whose names differ only by case can swap on every re-sort.
+        return a.id.compareTo(b.id);
       });
 
     return sorted.map((node) {

@@ -47,6 +47,11 @@ class _CollectionsListState extends State<CollectionsList> {
   // non-equal entities (copyWith rewrites the ancestor chain), so a value-keyed
   // set would lose expansion and collapse folders on every edit.
   final Set<String> _expandedIds = <String>{};
+
+  /// The user's expansion state snapshotted when a search begins, restored
+  /// when the query is cleared — searching force-expands matching folders,
+  /// and that must not permanently overwrite the manual state.
+  Set<String>? _preSearchExpandedIds;
   final TextEditingController _searchController = TextEditingController();
   // Defers the recursive filter + force-expand until typing pauses, so each
   // keystroke doesn't walk the whole tree and rebuild the node forest.
@@ -164,7 +169,13 @@ class _CollectionsListState extends State<CollectionsList> {
     final query = _searchController.text;
     final filtered = _filterNodes(collections, query);
     if (query.isNotEmpty) {
+      _preSearchExpandedIds ??= {..._expandedIds};
       _collectFolderIds(filtered, _expandedIds);
+    } else if (_preSearchExpandedIds != null) {
+      _expandedIds
+        ..clear()
+        ..addAll(_preSearchExpandedIds!);
+      _preSearchExpandedIds = null;
     }
     final next = _buildItems(filtered);
     if (mounted) {

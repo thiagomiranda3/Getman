@@ -140,14 +140,26 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
       content = isPhone
           ? folderInner
           : DragTarget<String>(
+              // Always accept: rejecting (returning false) lets the release
+              // fall through to the list-level root target, which would move
+              // the node to the root — releasing a drag over its own row (the
+              // natural "cancel" gesture) must be swallowed instead. Only
+              // legal drops highlight; the bloc guards illegal moves too.
               onWillAcceptWithDetails: (details) {
-                if (details.data == node.id) return false;
-                setState(() => _isDragOver = true);
+                final legal =
+                    details.data != node.id &&
+                    !CollectionsTreeHelper.isDescendantOrSelf(
+                      context.read<CollectionsBloc>().state.collections,
+                      details.data,
+                      node.id,
+                    );
+                if (legal) setState(() => _isDragOver = true);
                 return true;
               },
               onLeave: (_) => setState(() => _isDragOver = false),
               onAcceptWithDetails: (details) {
                 setState(() => _isDragOver = false);
+                if (details.data == node.id) return; // self-drop: swallow
                 context.read<CollectionsBloc>().add(
                   MoveNode(details.data, node.id),
                 );
@@ -265,14 +277,18 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
       content = isPhone
           ? leafInner
           : DragTarget<String>(
+              // Always accept — see the folder target above for why rejecting
+              // is unsafe (fall-through to the root target).
               onWillAcceptWithDetails: (details) {
-                if (details.data == node.id) return false;
-                setState(() => _isDragOver = true);
+                if (details.data != node.id) {
+                  setState(() => _isDragOver = true);
+                }
                 return true;
               },
               onLeave: (_) => setState(() => _isDragOver = false),
               onAcceptWithDetails: (details) {
                 setState(() => _isDragOver = false);
+                if (details.data == node.id) return; // self-drop: swallow
                 final bloc = context.read<CollectionsBloc>();
                 // Dropping onto a request moves the dragged node into that
                 // request's containing folder (or root when it sits at the top
