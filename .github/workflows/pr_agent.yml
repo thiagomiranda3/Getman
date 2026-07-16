@@ -1,0 +1,39 @@
+name: PR Agent
+
+# Qodo PR-Agent — AI-assisted PR review, backed by Google Gemini (not OpenAI).
+# On a new/updated PR it posts an automatic review; description and improve are
+# left OFF by default and stay available on demand via PR comments:
+#   /review   /describe   /improve   /ask <question>
+#
+# Setup (one-time): add a repository secret GEMINI_API_KEY from
+# https://aistudio.google.com/  — no OpenAI key is required.
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  pr_agent:
+    # Skip Dependabot PRs (its token can't read the secret) and draft PRs.
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+    runs-on: ubuntu-latest
+    steps:
+      - name: PR Agent
+        uses: qodo-ai/pr-agent@8e4d32e5497defd43c023a404f73560c62728961 # v0.39.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GOOGLE_AI_STUDIO.GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          config.model: "gemini/gemini-2.5-flash"
+          config.fallback_models: '["gemini/gemini-2.0-flash"]'
+          # Auto-run review only; describe/improve stay on-demand via comments.
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "false"
+          github_action_config.auto_improve: "false"
