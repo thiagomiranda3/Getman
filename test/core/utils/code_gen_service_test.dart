@@ -354,6 +354,73 @@ void main() {
     });
   });
 
+  group('escaping (snippets must stay syntactically valid)', () {
+    // A single quote is a legal URL sub-delim (e.g. names in a query).
+    const quoteUrl = HttpRequestConfigEntity(
+      id: 'q',
+      url: "https://api.dev/search?q=O'Brien",
+      headers: {},
+    );
+
+    test('cURL single-quotes the URL safely', () {
+      final out = CodeGenService.generate(quoteUrl, CodeGenTarget.curl);
+      expect(out, contains(r"--url 'https://api.dev/search?q=O'\''Brien'"));
+    });
+
+    test('JS fetch / axios / Python escape the URL literal', () {
+      expect(
+        CodeGenService.generate(quoteUrl, CodeGenTarget.jsFetch),
+        contains(r"fetch('https://api.dev/search?q=O\'Brien'"),
+      );
+      expect(
+        CodeGenService.generate(quoteUrl, CodeGenTarget.nodeAxios),
+        contains(r"url: 'https://api.dev/search?q=O\'Brien'"),
+      );
+      expect(
+        CodeGenService.generate(quoteUrl, CodeGenTarget.pythonRequests),
+        contains(r"url = 'https://api.dev/search?q=O\'Brien'"),
+      );
+    });
+
+    test('Python urlencoded/multipart values are escaped', () {
+      const config = HttpRequestConfigEntity(
+        id: 'p',
+        method: 'POST',
+        url: 'https://api.dev/x',
+        headers: {},
+        bodyType: BodyType.urlencoded,
+        formFields: [MultipartFieldEntity(name: 'note', value: "it's fine")],
+      );
+      final out = CodeGenService.generate(
+        config,
+        CodeGenTarget.pythonRequests,
+      );
+      expect(out, contains(r"'note': 'it\'s fine'"));
+    });
+
+    test(
+      'curl/Go urlencoded bodies are form-encoded like the send path '
+      '(no parameter injection)',
+      () {
+        const config = HttpRequestConfigEntity(
+          id: 'u',
+          method: 'POST',
+          url: 'https://api.dev/x',
+          headers: {},
+          bodyType: BodyType.urlencoded,
+          formFields: [
+            MultipartFieldEntity(name: 'q', value: 'a b&admin=true'),
+          ],
+        );
+        final curl = CodeGenService.generate(config, CodeGenTarget.curl);
+        expect(curl, contains('q=a+b%26admin%3Dtrue'));
+        expect(curl, isNot(contains('&admin=true')));
+        final go = CodeGenService.generate(config, CodeGenTarget.goNetHttp);
+        expect(go, contains('q=a+b%26admin%3Dtrue'));
+      },
+    );
+  });
+
   group('graphql body', () {
     test('cURL emits the GraphQL JSON envelope with application/json', () {
       const config = HttpRequestConfigEntity(

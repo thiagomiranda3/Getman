@@ -131,7 +131,7 @@ class CodeGenService {
 
   static String _curl(_Effective e) {
     final b = StringBuffer('curl --request ${e.method} \\\n')
-      ..write("  --url '${e.url}'");
+      ..write("  --url '${_shellSq(e.url)}'");
     e.headers.forEach((k, v) {
       b.write(" \\\n  --header '$k: ${_shellSq(v)}'");
     });
@@ -188,7 +188,7 @@ class CodeGenService {
               "// form.append('${f.name}', /* File for ${f.filePath ?? ''} */);\n",
             );
           } else {
-            b.write("form.append('${f.name}', '${_sq(f.value)}');\n");
+            b.write("form.append('${_sq(f.name)}', '${_sq(f.value)}');\n");
           }
         }
         opts.write('  body: form,\n');
@@ -198,7 +198,7 @@ class CodeGenService {
         );
     }
     b
-      ..write("fetch('${e.url}', {\n")
+      ..write("fetch('${_sq(e.url)}', {\n")
       ..write(opts.toString())
       ..write('});');
     return b.toString();
@@ -208,7 +208,7 @@ class CodeGenService {
 
   static String _python(_Effective e) {
     final b = StringBuffer('import requests\n\n')
-      ..write("url = '${e.url}'\n")
+      ..write("url = '${_sq(e.url)}'\n")
       ..write('headers = {\n');
     _writeHeaders(b, e.headers, '    ');
     b.write('}\n');
@@ -231,9 +231,12 @@ class CodeGenService {
         for (final f in e.formFields) {
           if (f.name.isEmpty) continue;
           if (f.isFile) {
-            b.write("    '${f.name}': open('${f.filePath ?? ''}', 'rb'),\n");
+            b.write(
+              "    '${_sq(f.name)}': open('${_sq(f.filePath ?? '')}', "
+              "'rb'),\n",
+            );
           } else {
-            b.write("    '${f.name}': (None, '${f.value}'),\n");
+            b.write("    '${_sq(f.name)}': (None, '${_sq(f.value)}'),\n");
           }
         }
         b.write('}\n');
@@ -258,7 +261,7 @@ class CodeGenService {
     final pre = StringBuffer();
     final opts = StringBuffer()
       ..write("  method: '${e.method}',\n")
-      ..write("  url: '${e.url}',\n");
+      ..write("  url: '${_sq(e.url)}',\n");
 
     final isMultipart = e.bodyType == BodyType.multipart;
     if (e.headers.isNotEmpty || isMultipart) {
@@ -298,7 +301,7 @@ class CodeGenService {
             "// form.append('${f.name}', fs.createReadStream('${f.filePath ?? ''}'));\n",
           );
         } else {
-          pre.write("form.append('${f.name}', '${_sq(f.value)}');\n");
+          pre.write("form.append('${_sq(f.name)}', '${_sq(f.value)}');\n");
         }
       }
     } else if (e.bodyType == BodyType.binary) {
@@ -489,17 +492,25 @@ class CodeGenService {
     return fallback;
   }
 
+  /// Form-encodes name/value pairs exactly like the send path does (Dio's
+  /// transformer uses `Uri.encodeQueryComponent`) — the raw concatenation
+  /// diverged from the wire bytes and let a value like `a b&admin=true`
+  /// inject a second parameter into the generated curl/Go snippet.
   static String _urlEncodedString(List<MultipartFieldEntity> fields) {
+    String pair(MultipartFieldEntity f) =>
+        '${Uri.encodeQueryComponent(f.name)}'
+        '=${Uri.encodeQueryComponent(f.value)}';
     return [
       for (final f in fields)
-        if (!f.isFile && f.name.isNotEmpty) '${f.name}=${f.value}',
+        if (!f.isFile && f.name.isNotEmpty) pair(f),
     ].join('&');
   }
 
   static String _jsObject(List<MultipartFieldEntity> fields) {
     final entries = [
       for (final f in fields)
-        if (!f.isFile && f.name.isNotEmpty) "'${f.name}': '${_sq(f.value)}'",
+        if (!f.isFile && f.name.isNotEmpty)
+          "'${_sq(f.name)}': '${_sq(f.value)}'",
     ];
     return '{ ${entries.join(', ')} }';
   }
@@ -507,7 +518,8 @@ class CodeGenService {
   static String _pyObject(List<MultipartFieldEntity> fields) {
     final entries = [
       for (final f in fields)
-        if (!f.isFile && f.name.isNotEmpty) "'${f.name}': '${f.value}'",
+        if (!f.isFile && f.name.isNotEmpty)
+          "'${_sq(f.name)}': '${_sq(f.value)}'",
     ];
     return '{${entries.join(', ')}}';
   }
