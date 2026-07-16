@@ -14,19 +14,26 @@ class UrlParts {
 class UrlQueryUtils {
   UrlQueryUtils._();
 
-  static final RegExp _varToken = RegExp(r'\{\{[A-Za-z0-9_\-\.\s]+\}\}');
+  // Mirrors EnvironmentResolver's grammar: optional whitespace inside the
+  // braces and an optional leading $ (dynamic variables like {{$guid}}).
+  // Omitting the $ percent-mangled dynamic tokens on every params edit.
+  static final RegExp _varToken = RegExp(
+    r'\{\{\s*\$?[A-Za-z0-9_\-\.]+\s*\}\}',
+  );
 
   static UrlParts parse(String url) {
-    final qIndex = url.indexOf('?');
+    final hashIndex = url.indexOf('#');
+    var qIndex = url.indexOf('?');
+    // A '?' after the '#' is fragment text, not a query delimiter.
+    if (hashIndex != -1 && qIndex > hashIndex) qIndex = -1;
     if (qIndex == -1) {
-      final hIndex = url.indexOf('#');
-      if (hIndex == -1) {
+      if (hashIndex == -1) {
         return UrlParts(base: url, params: const [], fragment: null);
       }
       return UrlParts(
-        base: url.substring(0, hIndex),
+        base: url.substring(0, hashIndex),
         params: const [],
-        fragment: url.substring(hIndex + 1),
+        fragment: url.substring(hashIndex + 1),
       );
     }
 
