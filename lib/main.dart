@@ -36,6 +36,7 @@ import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/settings/presentation/widgets/network_settings_listener.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/features/tabs/presentation/widgets/request_section_index.dart';
 import 'package:getman/features/updates/presentation/update_controller.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:media_kit/media_kit.dart';
@@ -170,6 +171,9 @@ class MyApp extends StatelessWidget {
         ),
         RepositoryProvider<UrlFocusRegistry>.value(
           value: di.sl<UrlFocusRegistry>(),
+        ),
+        ChangeNotifierProvider<RequestSectionIndex>.value(
+          value: di.sl<RequestSectionIndex>(),
         ),
         RepositoryProvider<NetworkService>.value(
           value: di.sl<NetworkService>(),

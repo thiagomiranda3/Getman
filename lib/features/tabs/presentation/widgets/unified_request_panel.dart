@@ -11,6 +11,7 @@ import 'package:getman/features/tabs/presentation/widgets/auth_tab_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_config_section.dart'
     show RequestConfigSection;
 import 'package:getman/features/tabs/presentation/widgets/request_editor_tabs.dart';
+import 'package:getman/features/tabs/presentation/widgets/request_section_index.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_history_timeline.dart';
 import 'package:getman/features/tabs/presentation/widgets/response_area.dart';
 import 'package:getman/features/tabs/presentation/widgets/response_section.dart'
@@ -44,17 +45,44 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel>
     with SingleTickerProviderStateMixin {
   static const int _responseTabIndex = 5;
   late final TabController _tabController;
+  late final RequestSectionIndex _sectionIndex;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _sectionIndex = context.read<RequestSectionIndex>();
+    _tabController = TabController(
+      length: 6,
+      vsync: this,
+      // The shared index only ever holds a section (0–4), never RESPONSE.
+      initialIndex: _sectionIndex.value.clamp(0, _responseTabIndex - 1),
+    )..addListener(_onTabChanged);
+    _sectionIndex.addListener(_onSectionIndexChanged);
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _sectionIndex.removeListener(_onSectionIndexChanged);
+    _tabController
+      ..removeListener(_onTabChanged)
+      ..dispose();
     super.dispose();
+  }
+
+  void _onTabChanged() {
+    // RESPONSE is specific to this phone layout — only the five request-editor
+    // sections participate in the workspace-global selection.
+    if (_tabController.index < _responseTabIndex) {
+      _sectionIndex.value = _tabController.index;
+    }
+  }
+
+  /// Another request tab's strip picked a section — follow it (even off the
+  /// RESPONSE tab, so every strip lands on the same section).
+  void _onSectionIndexChanged() {
+    if (_sectionIndex.value != _tabController.index) {
+      _tabController.index = _sectionIndex.value;
+    }
   }
 
   @override

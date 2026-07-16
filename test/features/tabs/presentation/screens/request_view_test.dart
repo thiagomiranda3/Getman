@@ -34,8 +34,10 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/screens/request_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_config_section.dart';
+import 'package:getman/features/tabs/presentation/widgets/request_section_index.dart';
 import 'package:getman/features/tabs/presentation/widgets/response_area.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:provider/provider.dart';
 
 // ── mocks ────────────────────────────────────────────────────────────────
 
@@ -132,26 +134,29 @@ Future<void> _pump(
   await tester.pumpWidget(
     RepositoryProvider<UrlFocusRegistry>(
       create: (_) => UrlFocusRegistry(),
-      child: MaterialApp(
-        theme: brutalistTheme(Brightness.light),
-        home: Scaffold(
-          body: MultiBlocProvider(
-            providers: [
-              BlocProvider<TabsBloc>.value(value: tabsBloc),
-              BlocProvider<SettingsBloc>.value(
-                value: settings ?? _settingsBloc(),
-              ),
-              BlocProvider<EnvironmentsBloc>.value(
-                value: environments ?? _envBloc(),
-              ),
-              BlocProvider<CollectionsBloc>.value(
-                value: collections ?? _collectionsBloc(),
-              ),
-              BlocProvider<RealtimeBloc>.value(
-                value: realtime ?? _realtimeBloc(),
-              ),
-            ],
-            child: RequestView(tabId: tabId),
+      child: ChangeNotifierProvider<RequestSectionIndex>(
+        create: (_) => RequestSectionIndex(),
+        child: MaterialApp(
+          theme: brutalistTheme(Brightness.light),
+          home: Scaffold(
+            body: MultiBlocProvider(
+              providers: [
+                BlocProvider<TabsBloc>.value(value: tabsBloc),
+                BlocProvider<SettingsBloc>.value(
+                  value: settings ?? _settingsBloc(),
+                ),
+                BlocProvider<EnvironmentsBloc>.value(
+                  value: environments ?? _envBloc(),
+                ),
+                BlocProvider<CollectionsBloc>.value(
+                  value: collections ?? _collectionsBloc(),
+                ),
+                BlocProvider<RealtimeBloc>.value(
+                  value: realtime ?? _realtimeBloc(),
+                ),
+              ],
+              child: RequestView(tabId: tabId),
+            ),
           ),
         ),
       ),

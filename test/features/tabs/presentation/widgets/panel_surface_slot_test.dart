@@ -41,9 +41,11 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_config_section.dart';
+import 'package:getman/features/tabs/presentation/widgets/request_section_index.dart';
 import 'package:getman/features/tabs/presentation/widgets/response_section.dart';
 import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:provider/provider.dart';
 import 'package:re_editor/re_editor.dart';
 
 // ---------------------------------------------------------------------------
@@ -277,10 +279,13 @@ void main() {
                 BlocProvider<HistoryBloc>(create: (_) => _FakeHistoryBloc()),
                 BlocProvider<RulesBloc>.value(value: rulesBloc),
               ],
-              child: RequestConfigSection(
-                tabId: tabId,
-                bodyController: bodyController,
-                variablesController: variablesController,
+              child: ChangeNotifierProvider<RequestSectionIndex>(
+                create: (_) => RequestSectionIndex(),
+                child: RequestConfigSection(
+                  tabId: tabId,
+                  bodyController: bodyController,
+                  variablesController: variablesController,
+                ),
               ),
             ),
           ),
@@ -331,11 +336,14 @@ void main() {
                 BlocProvider<HistoryBloc>(create: (_) => _FakeHistoryBloc()),
                 BlocProvider<RulesBloc>.value(value: rulesBloc),
               ],
-              child: UnifiedRequestPanel(
-                tabId: tabId,
-                bodyController: bodyController,
-                variablesController: variablesController,
-                responseController: responseController,
+              child: ChangeNotifierProvider<RequestSectionIndex>(
+                create: (_) => RequestSectionIndex(),
+                child: UnifiedRequestPanel(
+                  tabId: tabId,
+                  bodyController: bodyController,
+                  variablesController: variablesController,
+                  responseController: responseController,
+                ),
               ),
             ),
           ),
