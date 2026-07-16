@@ -34,6 +34,13 @@ void main() {
   late _MockSettingsBloc settingsBloc;
   late _MockGitSyncBloc gitSyncBloc;
 
+  setUpAll(() {
+    // Needed for `any()` on `gitSyncBloc.add(...)` in the busy-push test
+    // below — mocktail requires a registered fallback for any type used
+    // with `any`/`captureAny`.
+    registerFallbackValue(const LoadBranchStatus(''));
+  });
+
   const entry = ReviewEntry(
     path: 'a.req.json',
     nodeKind: NodeKind.request,
@@ -313,6 +320,38 @@ void main() {
           ),
         ),
       ).called(1);
+    },
+  );
+
+  testWidgets(
+    'pressing PUSH while git is busy shows a snack bar and does not '
+    'dispatch or pop',
+    (tester) async {
+      when(() => gitSyncBloc.state).thenReturn(
+        const GitSyncState(
+          status: GitSyncStatus.busy,
+          branch: BranchStatus(
+            isRepo: true,
+            current: 'main',
+            branches: ['main'],
+            hasRemote: true,
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        hostAsRoute(const ReviewState(status: ReviewStatus.ready)),
+      );
+      await tester.tap(find.text('open review'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('review_push_button')));
+      await tester.pumpAndSettle();
+
+      verifyNever(() => gitSyncBloc.add(any()));
+      expect(find.text('Git is busy — try again in a moment.'), findsOneWidget);
+      // The dialog route was NOT popped.
+      expect(find.byKey(const ValueKey('review_push_button')), findsOneWidget);
     },
   );
 

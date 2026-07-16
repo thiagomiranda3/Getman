@@ -89,8 +89,7 @@ class _ReviewChangesBodyState extends State<ReviewChangesBody> {
   void _push(BuildContext context) {
     final gitSyncBloc = context.read<GitSyncBloc>();
     if (gitSyncBloc.state.branch.hasRemote) {
-      gitSyncBloc.add(PushChanges(widget.root));
-      _afterPushDispatched(context);
+      _dispatchPush(context, gitSyncBloc, null);
       return;
     }
     unawaited(
@@ -102,14 +101,27 @@ class _ReviewChangesBodyState extends State<ReviewChangesBody> {
         onConfirm: (url) {
           final trimmed = url.trim();
           if (trimmed.isEmpty) return;
-          gitSyncBloc.add(PushChanges(widget.root, addRemoteUrl: trimmed));
-          _afterPushDispatched(context);
+          _dispatchPush(context, gitSyncBloc, trimmed);
         },
       ),
     );
   }
 
-  void _afterPushDispatched(BuildContext context) {
+  /// Dispatches the actual `PushChanges` — checked here, at the point of
+  /// dispatch (after any add-remote prompt is confirmed), so it reflects
+  /// current bloc state: `GitSyncBloc` silently drops a `PushChanges` while
+  /// another op is in flight (e.g. the 5-min auto-fetch), so an unconditional
+  /// "Pushing to remote…" would lie to the user.
+  void _dispatchPush(
+    BuildContext context,
+    GitSyncBloc gitSyncBloc,
+    String? addRemoteUrl,
+  ) {
+    if (gitSyncBloc.state.isBusy) {
+      showAppSnackBar(context, 'Git is busy — try again in a moment.');
+      return;
+    }
+    gitSyncBloc.add(PushChanges(widget.root, addRemoteUrl: addRemoteUrl));
     showAppSnackBar(context, 'Pushing to remote…');
     unawaited(Navigator.of(context).maybePop());
   }

@@ -189,7 +189,19 @@ class _IoGitService implements GitService {
 
   @override
   Future<void> addRemote(String root, String name, String url) async {
-    await _run(root, ['remote', 'add', name, url]);
+    // Idempotent: a retry after a failed paired push/pull/fetch (bad
+    // URL/auth/host) must not dead-end on `fatal: remote <name> already
+    // exists` — there is no remove-remote UI. `remote add` fails when the
+    // remote is already there; fall back to `remote set-url` so a retry
+    // with the same or corrected URL always re-points it and proceeds.
+    final added = await _run(root, [
+      'remote',
+      'add',
+      name,
+      url,
+    ], allowFailure: true);
+    if (added.exitCode == 0) return;
+    await _run(root, ['remote', 'set-url', name, url]);
   }
 
   @override

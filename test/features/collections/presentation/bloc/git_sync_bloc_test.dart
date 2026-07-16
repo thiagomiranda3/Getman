@@ -320,6 +320,39 @@ void main() {
   );
 
   blocTest<GitSyncBloc, GitSyncState>(
+    'PullChanges with addRemoteUrl adds origin before pulling',
+    build: () => GitSyncBloc(service: service),
+    act: (b) => b.add(const PullChanges(root, addRemoteUrl: 'u')),
+    verify: (b) {
+      verifyInOrder([
+        () => service.addRemote(root, 'origin', 'u'),
+        () => service.pull(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ]);
+      expect(b.state.status, GitSyncStatus.ready);
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'PullChanges without addRemoteUrl never calls addRemote',
+    build: () => GitSyncBloc(service: service),
+    act: (b) => b.add(const PullChanges(root)),
+    verify: (b) {
+      verifyNever(() => service.addRemote(root, any(), any()));
+      verify(
+        () => service.pull(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).called(1);
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
     'FetchRemote with addRemoteUrl adds origin before fetching',
     build: () => GitSyncBloc(service: service),
     act: (b) => b.add(const FetchRemote(root, addRemoteUrl: 'u')),
