@@ -129,6 +129,15 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       (e, emit) =>
           _apply(emit, (s) => s.copyWith(skippedUpdateVersion: e.version)),
     );
+    // Both fields are passed explicitly (null clears them) so callers send
+    // the whole current pair with one changed, matching
+    // UpdateClientCertificate.
+    on<UpdateGitIdentity>(
+      (e, emit) => _apply(
+        emit,
+        (s) => s.copyWith(gitUserName: e.name, gitUserEmail: e.email),
+      ),
+    );
   }
   final SaveSettingsUseCase _saveSettingsUseCase;
 

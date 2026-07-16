@@ -32,6 +32,11 @@ import 'package:getman/features/collections/presentation/widgets/workspace_sync_
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
+import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockGitSyncBloc extends MockBloc<GitSyncEvent, GitSyncState>
@@ -39,6 +44,9 @@ class _MockGitSyncBloc extends MockBloc<GitSyncEvent, GitSyncState>
 
 class _MockCollectionsBloc extends MockBloc<CollectionsEvent, CollectionsState>
     implements CollectionsBloc {}
+
+class _MockTabsBloc extends MockBloc<TabsEvent, TabsState>
+    implements TabsBloc {}
 
 class _MockDataSource extends Mock implements WorkspaceCollectionsDataSource {}
 
@@ -88,6 +96,11 @@ void main() {
     bool withMirroring = false,
   }) {
     const listener = BranchSyncListener(child: SizedBox());
+    // BranchSyncListener reads TabsBloc to refresh open tabs after a reload;
+    // an empty panels state makes that a no-op for these collection-focused
+    // tests (the tab-refresh logic is unit-tested separately below).
+    final tabs = _MockTabsBloc();
+    when(() => tabs.state).thenReturn(const TabsState());
     return MaterialApp(
       home: RepositoryProvider<WorkspaceSyncService>.value(
         value: sync,
@@ -96,6 +109,7 @@ void main() {
             BlocProvider<GitSyncBloc>.value(value: gitSync),
             BlocProvider<CollectionsBloc>.value(value: collections),
             BlocProvider<SettingsBloc>.value(value: settings),
+            BlocProvider<TabsBloc>.value(value: tabs),
           ],
           child: withMirroring
               // The real mirroring listener sits above in main.dart — this is
@@ -341,5 +355,91 @@ void main() {
       reason: "the old branch's forest was mirrored onto the new branch",
     );
     expect(collections.state.collections.single.name, 'From disk');
+  });
+
+  group('tabsToRefreshAfterReload', () {
+    HttpRequestConfigEntity cfg(String id, {String url = 'a'}) =>
+        HttpRequestConfigEntity(id: id, url: url);
+    HttpRequestTabEntity tab(
+      String tabId,
+      HttpRequestConfigEntity config, {
+      String? nodeId,
+    }) => HttpRequestTabEntity(
+      config: config,
+      tabId: tabId,
+      collectionNodeId: nodeId,
+    );
+    List<PanelEntity> panels(List<HttpRequestTabEntity> tabs) => [
+      PanelEntity(id: 'p1', name: 'Panel 1', tabs: tabs, activeTabId: ''),
+    ];
+
+    test('refreshes a clean linked tab whose request changed upstream', () {
+      final result = tabsToRefreshAfterReload(
+        panels([tab('t1', cfg('c1', url: 'old'), nodeId: 'n1')]),
+        {'n1': cfg('c1', url: 'old')},
+        {'n1': cfg('c1', url: 'new')},
+      );
+      expect(result, hasLength(1));
+      expect(result.single.tabId, 't1');
+      expect(result.single.config.url, 'new');
+    });
+
+    test('leaves a tab with unsaved edits untouched (never clobbers)', () {
+      final result = tabsToRefreshAfterReload(
+        panels([tab('t1', cfg('c1', url: 'mine'), nodeId: 'n1')]),
+        {'n1': cfg('c1', url: 'old')},
+        {'n1': cfg('c1', url: 'new')},
+      );
+      expect(result, isEmpty);
+    });
+
+    test('ignores an unlinked tab (no collectionNodeId)', () {
+      final result = tabsToRefreshAfterReload(
+        panels([tab('t1', cfg('c1', url: 'old'))]),
+        {'n1': cfg('c1', url: 'old')},
+        {'n1': cfg('c1', url: 'new')},
+      );
+      expect(result, isEmpty);
+    });
+
+    test('leaves a tab whose node was deleted upstream', () {
+      final result = tabsToRefreshAfterReload(
+        panels([tab('t1', cfg('c1', url: 'old'), nodeId: 'n1')]),
+        {'n1': cfg('c1', url: 'old')},
+        const {},
+      );
+      expect(result, isEmpty);
+    });
+
+    test('does not touch a clean tab whose request did not change', () {
+      final result = tabsToRefreshAfterReload(
+        panels([tab('t1', cfg('c1', url: 'same'), nodeId: 'n1')]),
+        {'n1': cfg('c1', url: 'same')},
+        {'n1': cfg('c1', url: 'same')},
+      );
+      expect(result, isEmpty);
+    });
+
+    test('reconciles tabs across every panel, not just the active one', () {
+      final result = tabsToRefreshAfterReload(
+        [
+          PanelEntity(
+            id: 'p1',
+            name: 'Panel 1',
+            tabs: [tab('t1', cfg('c1', url: 'old'), nodeId: 'n1')],
+            activeTabId: 't1',
+          ),
+          PanelEntity(
+            id: 'p2',
+            name: 'Panel 2',
+            tabs: [tab('t2', cfg('c2', url: 'x'), nodeId: 'n2')],
+            activeTabId: 't2',
+          ),
+        ],
+        {'n1': cfg('c1', url: 'old'), 'n2': cfg('c2', url: 'x')},
+        {'n1': cfg('c1', url: 'new'), 'n2': cfg('c2', url: 'y')},
+      );
+      expect(result.map((t) => t.tabId), containsAll(['t1', 't2']));
+    });
   });
 }

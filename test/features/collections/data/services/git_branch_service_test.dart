@@ -46,11 +46,18 @@ void main() {
     when(() => git.stashPush(root, any())).thenAnswer((_) async {});
     when(() => git.stashPop(root, any())).thenAnswer((_) async {});
     when(() => git.stashDrop(root, any())).thenAnswer((_) async {});
-    when(() => git.pull(root)).thenAnswer((_) async {});
+    when(
+      () => git.pull(
+        root,
+        authorName: any(named: 'authorName'),
+        authorEmail: any(named: 'authorEmail'),
+      ),
+    ).thenAnswer((_) async => PullOutcome.clean);
     when(
       () => git.push(root, setUpstream: any(named: 'setUpstream')),
     ).thenAnswer((_) async {});
     when(() => git.hasUpstream(root)).thenAnswer((_) async => true);
+    when(() => git.addRemote(root, any(), any())).thenAnswer((_) async {});
   });
 
   // NB: not `tearDown(sync.dispose)` — a tear-off would read the late `sync`
@@ -199,7 +206,16 @@ void main() {
   test('pull waits for the pending mirror to land first', () {
     return expectGitWaitsForMirror(
       stubGitOp: (onGitOp) {
-        when(() => git.pull(root)).thenAnswer((_) async => onGitOp());
+        when(
+          () => git.pull(
+            root,
+            authorName: any(named: 'authorName'),
+            authorEmail: any(named: 'authorEmail'),
+          ),
+        ).thenAnswer((_) async {
+          onGitOp();
+          return PullOutcome.clean;
+        });
       },
       invoke: () => service.pull(root),
     );
@@ -262,6 +278,22 @@ void main() {
     verify(() => git.stashDrop(root, 1)).called(1);
   });
 
+  test('addRemote delegates to git', () async {
+    await service.addRemote(root, 'origin', 'https://example.invalid/x.git');
+    verify(
+      () => git.addRemote(root, 'origin', 'https://example.invalid/x.git'),
+    ).called(1);
+  });
+
+  test('addRemote does not flush: it never touches the tree', () async {
+    sync.scheduleMirror(root, const []);
+
+    await service.addRemote(root, 'origin', 'https://example.invalid/x.git');
+
+    verifyNever(() => ds.write(any(), any()));
+    verify(() => git.addRemote(root, 'origin', any())).called(1);
+  });
+
   group(
     'a failed mirror write aborts the op (never git over a stale tree)',
     () {
@@ -279,7 +311,13 @@ void main() {
         failTheMirrorWrite();
 
         await expectLater(service.pull(root), throwsA(isA<GitException>()));
-        verifyNever(() => git.pull(root));
+        verifyNever(
+          () => git.pull(
+            root,
+            authorName: any(named: 'authorName'),
+            authorEmail: any(named: 'authorEmail'),
+          ),
+        );
       });
 
       test('isDirty throws and never asks git', () async {
@@ -330,7 +368,16 @@ void main() {
           ),
           'pull': (
             (onOp) =>
-                when(() => git.pull(root)).thenAnswer((_) async => onOp()),
+                when(
+                  () => git.pull(
+                    root,
+                    authorName: any(named: 'authorName'),
+                    authorEmail: any(named: 'authorEmail'),
+                  ),
+                ).thenAnswer((_) async {
+                  onOp();
+                  return PullOutcome.clean;
+                }),
             () => service.pull(root),
           ),
           'stash': (

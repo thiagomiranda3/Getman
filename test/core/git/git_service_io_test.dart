@@ -130,6 +130,20 @@ void main() {
     expect(await git.hasRemote(tmp.path), isFalse);
   });
 
+  test('addRemote adds a remote and hasRemote becomes true', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+    expect(await git.hasRemote(tmp.path), isFalse);
+
+    await git.addRemote(
+      tmp.path,
+      'origin',
+      'https://example.invalid/x/y.git',
+    );
+
+    expect(await git.hasRemote(tmp.path), isTrue);
+  });
+
   test('aheadBehind is (0,0) when the branch has no upstream', () async {
     if (!await gitPresent()) return;
     await seedCommit();

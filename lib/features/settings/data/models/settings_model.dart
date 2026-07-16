@@ -35,6 +35,8 @@ class SettingsModel extends HiveObject {
     this.saveLargeResponsesInHistory = true,
     this.checkForUpdatesOnStartup = true,
     this.skippedUpdateVersion,
+    this.gitUserName,
+    this.gitUserEmail,
   });
 
   factory SettingsModel.fromJson(Map<String, dynamic> json) => SettingsModel(
@@ -66,6 +68,8 @@ class SettingsModel extends HiveObject {
         json['saveLargeResponsesInHistory'] as bool? ?? true,
     checkForUpdatesOnStartup: json['checkForUpdatesOnStartup'] as bool? ?? true,
     skippedUpdateVersion: json['skippedUpdateVersion'] as String?,
+    gitUserName: json['gitUserName'] as String?,
+    gitUserEmail: json['gitUserEmail'] as String?,
   );
 
   factory SettingsModel.fromEntity(SettingsEntity entity) => SettingsModel(
@@ -95,6 +99,8 @@ class SettingsModel extends HiveObject {
     saveLargeResponsesInHistory: entity.saveLargeResponsesInHistory,
     checkForUpdatesOnStartup: entity.checkForUpdatesOnStartup,
     skippedUpdateVersion: entity.skippedUpdateVersion,
+    gitUserName: entity.gitUserName,
+    gitUserEmail: entity.gitUserEmail,
   );
   @HiveField(0, defaultValue: 100)
   int historyLimit;
@@ -174,6 +180,15 @@ class SettingsModel extends HiveObject {
   @HiveField(26)
   String? skippedUpdateVersion;
 
+  /// Commit author identity Getman uses for git ops it performs (never
+  /// written to the user's global git config; passed inline via
+  /// `git -c user.name=… -c user.email=…`). `null` = not yet configured.
+  @HiveField(28)
+  String? gitUserName;
+
+  @HiveField(29)
+  String? gitUserEmail;
+
   SettingsModel copyWith({
     int? historyLimit,
     bool? saveResponseInHistory,
@@ -201,6 +216,8 @@ class SettingsModel extends HiveObject {
     bool? saveLargeResponsesInHistory,
     bool? checkForUpdatesOnStartup,
     Object? skippedUpdateVersion = _unchanged,
+    Object? gitUserName = _unchanged,
+    Object? gitUserEmail = _unchanged,
   }) {
     return SettingsModel(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -249,6 +266,12 @@ class SettingsModel extends HiveObject {
       skippedUpdateVersion: identical(skippedUpdateVersion, _unchanged)
           ? this.skippedUpdateVersion
           : skippedUpdateVersion as String?,
+      gitUserName: identical(gitUserName, _unchanged)
+          ? this.gitUserName
+          : gitUserName as String?,
+      gitUserEmail: identical(gitUserEmail, _unchanged)
+          ? this.gitUserEmail
+          : gitUserEmail as String?,
     );
   }
 
@@ -279,6 +302,8 @@ class SettingsModel extends HiveObject {
     'saveLargeResponsesInHistory': saveLargeResponsesInHistory,
     'checkForUpdatesOnStartup': checkForUpdatesOnStartup,
     'skippedUpdateVersion': skippedUpdateVersion,
+    'gitUserName': gitUserName,
+    'gitUserEmail': gitUserEmail,
   };
 
   SettingsEntity toEntity() => SettingsEntity(
@@ -308,5 +333,7 @@ class SettingsModel extends HiveObject {
     saveLargeResponsesInHistory: saveLargeResponsesInHistory,
     checkForUpdatesOnStartup: checkForUpdatesOnStartup,
     skippedUpdateVersion: skippedUpdateVersion,
+    gitUserName: gitUserName,
+    gitUserEmail: gitUserEmail,
   );
 }

@@ -23,7 +23,12 @@ class _StubGitService implements GitService {
   @override
   Future<void> unstage(String root, List<String> paths) async {}
   @override
-  Future<void> commit(String root, String message) async {}
+  Future<void> commit(
+    String root,
+    String message, {
+    String? authorName,
+    String? authorEmail,
+  }) async {}
   @override
   Future<List<String>> branches(String root) async => const [];
   @override
@@ -33,11 +38,17 @@ class _StubGitService implements GitService {
   @override
   Future<bool> hasRemote(String root) async => false;
   @override
+  Future<void> addRemote(String root, String name, String url) async {}
+  @override
   Future<AheadBehind> aheadBehind(String root) async => AheadBehind.none;
   @override
   Future<bool> hasUpstream(String root) async => false;
   @override
-  Future<void> pull(String root) async {}
+  Future<PullOutcome> pull(
+    String root, {
+    String? authorName,
+    String? authorEmail,
+  }) async => PullOutcome.clean;
   @override
   Future<void> push(String root, {required bool setUpstream}) async {}
   @override
@@ -48,4 +59,30 @@ class _StubGitService implements GitService {
   Future<void> stashPop(String root, int index) async {}
   @override
   Future<void> stashDrop(String root, int index) async {}
+  @override
+  Future<bool> isRebaseInProgress(String root) async => false;
+  @override
+  Future<List<String>> conflictedPaths(String root) async => const [];
+  @override
+  Future<String?> showStage(String root, String path, int stage) async => null;
+  @override
+  Future<void> writeWorkingFile(
+    String root,
+    String path,
+    String content,
+  ) async {}
+  @override
+  Future<void> add(String root, String path) async {}
+  @override
+  Future<void> removeFile(String root, String path) async {}
+  @override
+  Future<void> rebaseContinue(
+    String root, {
+    String? authorName,
+    String? authorEmail,
+  }) async {}
+  @override
+  Future<void> rebaseAbort(String root) async {}
+  @override
+  Future<void> fetch(String root) async {}
 }

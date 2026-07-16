@@ -15,7 +15,7 @@ class _MockService extends Mock implements BranchService {}
 void main() {
   const root = '/ws';
   late _MockService service;
-  late Completer<void> pullGate;
+  late Completer<PullOutcome> pullGate;
 
   const status = BranchStatus(
     isRepo: true,
@@ -39,11 +39,21 @@ void main() {
     when(() => service.isDirty(root)).thenAnswer((_) async => false);
     when(() => service.switchTo(root, any())).thenAnswer((_) async {});
     when(() => service.create(root, any())).thenAnswer((_) async {});
-    when(() => service.pull(root)).thenAnswer((_) async {});
+    when(
+      () => service.pull(
+        root,
+        authorName: any(named: 'authorName'),
+        authorEmail: any(named: 'authorEmail'),
+      ),
+    ).thenAnswer((_) async => PullOutcome.clean);
     when(() => service.push(root)).thenAnswer((_) async {});
     when(() => service.stash(root, any())).thenAnswer((_) async {});
     when(() => service.popStash(root, any())).thenAnswer((_) async {});
     when(() => service.dropStash(root, any())).thenAnswer((_) async {});
+    when(() => service.fetch(root)).thenAnswer((_) async {});
+    when(
+      () => service.addRemote(root, any(), any()),
+    ).thenAnswer((_) async {});
   });
 
   blocTest<GitSyncBloc, GitSyncState>(
@@ -131,7 +141,13 @@ void main() {
   blocTest<GitSyncBloc, GitSyncState>(
     'PullChanges surfaces the git error and does not bump reloadToken',
     build: () {
-      when(() => service.pull(root)).thenThrow(Exception('CONFLICT in a.json'));
+      when(
+        () => service.pull(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenThrow(Exception('CONFLICT in a.json'));
       return GitSyncBloc(service: service);
     },
     act: (b) => b.add(const PullChanges(root)),
@@ -145,7 +161,13 @@ void main() {
   blocTest<GitSyncBloc, GitSyncState>(
     'PullChanges surfaces a failed mirror flush',
     build: () {
-      when(() => service.pull(root)).thenThrow(flushFailure());
+      when(
+        () => service.pull(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenThrow(flushFailure());
       return GitSyncBloc(service: service);
     },
     act: (b) => b.add(const PullChanges(root)),
@@ -164,6 +186,106 @@ void main() {
   );
 
   blocTest<GitSyncBloc, GitSyncState>(
+    'PullChanges conflicted bumps conflictToken, not reloadToken, and still '
+    'lands on a terminal ready state',
+    build: () {
+      when(
+        () => service.pull(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenAnswer((_) async => PullOutcome.conflicted);
+      return GitSyncBloc(service: service);
+    },
+    act: (b) => b.add(const PullChanges(root)),
+    verify: (b) {
+      expect(b.state.status, GitSyncStatus.ready);
+      expect(b.state.conflictToken, 1);
+      expect(b.state.reloadToken, 0);
+      expect(b.state.errorMessage, isNull);
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'FetchRemote(silent: true) swallows a failure — no error state',
+    build: () {
+      when(() => service.fetch(root)).thenThrow(Exception('offline'));
+      return GitSyncBloc(service: service);
+    },
+    act: (b) => b.add(const FetchRemote(root, silent: true)),
+    verify: (b) {
+      expect(b.state.status, GitSyncStatus.ready);
+      expect(b.state.errorMessage, isNull);
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'FetchRemote(silent: false) surfaces a failure as error',
+    build: () {
+      when(() => service.fetch(root)).thenThrow(Exception('auth required'));
+      return GitSyncBloc(service: service);
+    },
+    act: (b) => b.add(const FetchRemote(root)),
+    verify: (b) {
+      expect(b.state.status, GitSyncStatus.error);
+      expect(b.state.errorMessage, contains('auth required'));
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'FetchRemote success refreshes the branch status',
+    build: () => GitSyncBloc(service: service),
+    act: (b) => b.add(const FetchRemote(root)),
+    verify: (b) {
+      verify(() => service.fetch(root)).called(1);
+      expect(b.state.status, GitSyncStatus.ready);
+      expect(b.state.branch.current, 'main');
+    },
+  );
+
+  // FIX C2: a conflicted pull only bumps conflictToken, never reloadToken —
+  // BranchSyncListener reloads solely on reloadToken, so without this event
+  // the resolved files sit on disk while the app's Hive tree stays pre-pull.
+  blocTest<GitSyncBloc, GitSyncState>(
+    'ConflictsResolved bumps reloadToken and reaches a terminal ready state',
+    build: () => GitSyncBloc(service: service),
+    act: (b) => b.add(const ConflictsResolved(root)),
+    verify: (b) {
+      expect(b.state.status, GitSyncStatus.ready);
+      expect(b.state.reloadToken, 1);
+      expect(b.state.branch.current, 'main');
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'ConflictsResolved dispatched while busy is dropped',
+    build: () {
+      pullGate = Completer<PullOutcome>();
+      when(
+        () => service.pull(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenAnswer((_) => pullGate.future);
+      return GitSyncBloc(service: service);
+    },
+    act: (b) async {
+      b.add(const PullChanges(root));
+      await Future<void>.delayed(Duration.zero);
+      b.add(const ConflictsResolved(root)); // dropped: bloc is busy
+      pullGate.complete(PullOutcome.conflicted);
+      await Future<void>.delayed(Duration.zero);
+    },
+    verify: (b) {
+      expect(b.state.status, GitSyncStatus.ready);
+      expect(b.state.conflictToken, 1);
+      expect(b.state.reloadToken, 0); // the dropped event never bumped it
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
     'PushChanges does not bump reloadToken (disk is unchanged)',
     build: () => GitSyncBloc(service: service),
     act: (b) => b.add(const PushChanges(root)),
@@ -171,6 +293,75 @@ void main() {
       verify(() => service.push(root)).called(1);
       expect(b.state.status, GitSyncStatus.ready);
       expect(b.state.reloadToken, 0);
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'PushChanges with addRemoteUrl adds origin before pushing',
+    build: () => GitSyncBloc(service: service),
+    act: (b) => b.add(const PushChanges(root, addRemoteUrl: 'u')),
+    verify: (b) {
+      verifyInOrder([
+        () => service.addRemote(root, 'origin', 'u'),
+        () => service.push(root),
+      ]);
+      expect(b.state.status, GitSyncStatus.ready);
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'PushChanges without addRemoteUrl never calls addRemote',
+    build: () => GitSyncBloc(service: service),
+    act: (b) => b.add(const PushChanges(root)),
+    verify: (b) {
+      verifyNever(() => service.addRemote(root, any(), any()));
+      verify(() => service.push(root)).called(1);
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'PullChanges with addRemoteUrl adds origin before pulling',
+    build: () => GitSyncBloc(service: service),
+    act: (b) => b.add(const PullChanges(root, addRemoteUrl: 'u')),
+    verify: (b) {
+      verifyInOrder([
+        () => service.addRemote(root, 'origin', 'u'),
+        () => service.pull(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ]);
+      expect(b.state.status, GitSyncStatus.ready);
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'PullChanges without addRemoteUrl never calls addRemote',
+    build: () => GitSyncBloc(service: service),
+    act: (b) => b.add(const PullChanges(root)),
+    verify: (b) {
+      verifyNever(() => service.addRemote(root, any(), any()));
+      verify(
+        () => service.pull(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).called(1);
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'FetchRemote with addRemoteUrl adds origin before fetching',
+    build: () => GitSyncBloc(service: service),
+    act: (b) => b.add(const FetchRemote(root, addRemoteUrl: 'u')),
+    verify: (b) {
+      verifyInOrder([
+        () => service.addRemote(root, 'origin', 'u'),
+        () => service.fetch(root),
+      ]);
+      expect(b.state.status, GitSyncStatus.ready);
     },
   );
 
@@ -289,7 +480,13 @@ void main() {
   blocTest<GitSyncBloc, GitSyncState>(
     'a later success clears the stale error message',
     build: () {
-      when(() => service.pull(root)).thenThrow(GitException('boom'));
+      when(
+        () => service.pull(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenThrow(GitException('boom'));
       return GitSyncBloc(service: service);
     },
     act: (b) async {
@@ -340,8 +537,14 @@ void main() {
   blocTest<GitSyncBloc, GitSyncState>(
     'an event dispatched while an op is in flight is dropped',
     build: () {
-      pullGate = Completer<void>();
-      when(() => service.pull(root)).thenAnswer((_) => pullGate.future);
+      pullGate = Completer<PullOutcome>();
+      when(
+        () => service.pull(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenAnswer((_) => pullGate.future);
       return GitSyncBloc(service: service);
     },
     act: (b) async {
@@ -349,7 +552,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       b.add(const SwitchBranch(root, 'feat/x')); // dropped: bloc is busy
       await Future<void>.delayed(Duration.zero);
-      pullGate.complete();
+      pullGate.complete(PullOutcome.clean);
       await Future<void>.delayed(Duration.zero);
     },
     verify: (b) {

@@ -85,6 +85,21 @@ void main() {
     expect(bloc.state.settings.clientCertPassphrase, isNull);
   });
 
+  test('UpdateGitIdentity sets the pair, then clears it', () async {
+    bloc.add(
+      const UpdateGitIdentity(name: 'Ada Lovelace', email: 'ada@example.com'),
+    );
+    await bloc.stream.firstWhere((s) => s.settings.gitUserName != null);
+    expect(bloc.state.settings.gitUserName, 'Ada Lovelace');
+    expect(bloc.state.settings.gitUserEmail, 'ada@example.com');
+    verify(() => save.call(any())).called(1);
+
+    bloc.add(const UpdateGitIdentity());
+    await bloc.stream.firstWhere((s) => s.settings.gitUserName == null);
+    expect(bloc.state.settings.gitUserName, isNull);
+    expect(bloc.state.settings.gitUserEmail, isNull);
+  });
+
   test('UpdateProxyUrl sets and clears the proxy', () async {
     bloc.add(const UpdateProxyUrl('127.0.0.1:8888'));
     await bloc.stream.firstWhere(

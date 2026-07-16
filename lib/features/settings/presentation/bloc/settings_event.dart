@@ -177,3 +177,15 @@ class SetSkippedUpdateVersion extends SettingsEvent {
   @override
   List<Object?> get props => [version];
 }
+
+/// Sets the Getman-owned git commit identity (name + email), passed inline
+/// via `git -c user.name=… -c user.email=…` on commit-creating operations —
+/// never written to the user's global git config. Either field may be
+/// `null` to clear it.
+class UpdateGitIdentity extends SettingsEvent {
+  const UpdateGitIdentity({this.name, this.email});
+  final String? name;
+  final String? email;
+  @override
+  List<Object?> get props => [name, email];
+}

@@ -32,6 +32,8 @@ class SettingsEntity extends Equatable {
     this.saveLargeResponsesInHistory = true,
     this.checkForUpdatesOnStartup = true,
     this.skippedUpdateVersion,
+    this.gitUserName,
+    this.gitUserEmail,
   });
   final int historyLimit;
   final bool saveResponseInHistory;
@@ -96,6 +98,14 @@ class SettingsEntity extends Equatable {
   /// `null` = nothing skipped.
   final String? skippedUpdateVersion;
 
+  /// Commit author identity Getman uses for git ops it performs (name +
+  /// email passed inline via `git -c user.name=… -c user.email=…` on
+  /// commit-creating operations — never written to the user's global git
+  /// config). `null` = not yet configured; Getman prompts just-in-time when a
+  /// commit fails because neither Getman nor the OS git has an identity.
+  final String? gitUserName;
+  final String? gitUserEmail;
+
   SettingsEntity copyWith({
     int? historyLimit,
     bool? saveResponseInHistory,
@@ -123,6 +133,8 @@ class SettingsEntity extends Equatable {
     bool? saveLargeResponsesInHistory,
     bool? checkForUpdatesOnStartup,
     Object? skippedUpdateVersion = _unchanged,
+    Object? gitUserName = _unchanged,
+    Object? gitUserEmail = _unchanged,
   }) {
     return SettingsEntity(
       historyLimit: historyLimit ?? this.historyLimit,
@@ -171,6 +183,12 @@ class SettingsEntity extends Equatable {
       skippedUpdateVersion: identical(skippedUpdateVersion, _unchanged)
           ? this.skippedUpdateVersion
           : skippedUpdateVersion as String?,
+      gitUserName: identical(gitUserName, _unchanged)
+          ? this.gitUserName
+          : gitUserName as String?,
+      gitUserEmail: identical(gitUserEmail, _unchanged)
+          ? this.gitUserEmail
+          : gitUserEmail as String?,
     );
   }
 
@@ -216,5 +234,7 @@ class SettingsEntity extends Equatable {
     saveLargeResponsesInHistory,
     checkForUpdatesOnStartup,
     skippedUpdateVersion,
+    gitUserName,
+    gitUserEmail,
   ];
 }
