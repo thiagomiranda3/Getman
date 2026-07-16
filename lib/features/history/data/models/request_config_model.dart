@@ -1,4 +1,6 @@
+import 'package:collection/collection.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
+import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/request_kind.dart';
@@ -145,9 +147,23 @@ class HttpRequestConfig extends HiveObject {
     );
   }
 
-  // Equality deliberately considers only the request signature — method, url,
-  // and body — ignoring `id` and response fields. URL now carries the query
-  // portion, so dedup distinguishes ?a=1 from ?a=2. See CLAUDE.md §6.
+  // Deep value-equality for the form-body rows. The Hive models
+  // (MultipartFieldModel) use identity equality, so we compare their Equatable
+  // entity projections — consistent with the ListEquality<MultipartFieldEntity>
+  // used in the form editor.
+  static const ListEquality<MultipartFieldEntity> _formFieldEquality =
+      ListEquality<MultipartFieldEntity>();
+
+  List<MultipartFieldEntity> get _formFieldSignature =>
+      formFields.map((f) => f.toEntity()).toList(growable: false);
+
+  // Equality deliberately considers only the request signature — never `id` or
+  // the response fields. It spans everything that shapes the outgoing request:
+  // method, url (which now carries the query, so ?a=1 differs from ?a=2), body,
+  // and the body-shape fields (bodyType / graphqlVariables / bodyFilePath /
+  // formFields). Without the body-shape fields, distinct GraphQL/binary/
+  // multipart sends that share method+url+body would wrongly dedup. `kind`
+  // (HTTP vs WS/SSE) is intentionally excluded. See CLAUDE.md §6.
   @override
   // Signature-only equality is intentional for history dedup; a HiveObject is
   // inherently mutable so it can't be @immutable.
@@ -157,12 +173,27 @@ class HttpRequestConfig extends HiveObject {
     return other is HttpRequestConfig &&
         other.method == method &&
         other.url == url &&
-        other.body == body;
+        other.body == body &&
+        other.bodyType == bodyType &&
+        other.graphqlVariables == graphqlVariables &&
+        other.bodyFilePath == bodyFilePath &&
+        _formFieldEquality.equals(
+          other._formFieldSignature,
+          _formFieldSignature,
+        );
   }
 
   @override
   // Signature-only equality is intentional for history dedup; a HiveObject is
   // inherently mutable so it can't be @immutable.
   // ignore: avoid_equals_and_hash_code_on_mutable_classes
-  int get hashCode => Object.hash(method, url, body);
+  int get hashCode => Object.hash(
+    method,
+    url,
+    body,
+    bodyType,
+    graphqlVariables,
+    bodyFilePath,
+    _formFieldEquality.hash(_formFieldSignature),
+  );
 }

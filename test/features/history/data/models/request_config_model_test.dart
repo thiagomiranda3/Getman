@@ -90,7 +90,9 @@ void main() {
     });
 
     test(
-      'equality/dedup still ignores body type + form fields (CLAUDE.md §6)',
+      'equality/dedup distinguishes body type + form fields (I2): two '
+      'requests with matching method+url+body but different body shape are '
+      'NOT deduped',
       () {
         final a = HttpRequestConfig(
           id: 'a',
@@ -106,9 +108,9 @@ void main() {
           bodyType: 'multipart',
           formFields: [MultipartFieldModel(name: 'x')],
         );
-        // method + url + body match → dedup-equal regardless of body type.
-        expect(a == b, isTrue);
-        expect(a.hashCode, b.hashCode);
+        // method + url + body match, but body type + form fields differ →
+        // distinct requests, so history keeps both.
+        expect(a == b, isFalse);
       },
     );
   });
@@ -148,6 +150,130 @@ void main() {
       final back = HttpRequestConfig.fromEntity(entity).toEntity();
       expect(back.bodyType, BodyType.graphql);
       expect(back.graphqlVariables, '{"a":1}');
+    });
+  });
+
+  group('dedup signature widening (I2)', () {
+    test('same GraphQL query with different variables is NOT equal', () {
+      final a = HttpRequestConfig(
+        id: 'a',
+        method: 'POST',
+        url: 'https://api.example.com/graphql',
+        body: 'query { me { id } }',
+        bodyType: 'graphql',
+        graphqlVariables: '{"page":1}',
+      );
+      final b = HttpRequestConfig(
+        id: 'b',
+        method: 'POST',
+        url: 'https://api.example.com/graphql',
+        body: 'query { me { id } }',
+        bodyType: 'graphql',
+        graphqlVariables: '{"page":2}',
+      );
+      expect(a == b, isFalse);
+    });
+
+    test('two binary uploads with different file paths are NOT equal', () {
+      final a = HttpRequestConfig(
+        id: 'a',
+        method: 'POST',
+        url: 'https://api.example.com/upload',
+        bodyType: 'binary',
+        bodyFilePath: '/tmp/one.bin',
+      );
+      final b = HttpRequestConfig(
+        id: 'b',
+        method: 'POST',
+        url: 'https://api.example.com/upload',
+        bodyType: 'binary',
+        bodyFilePath: '/tmp/two.bin',
+      );
+      expect(a == b, isFalse);
+    });
+
+    test(
+      'multipart requests with different form field values are NOT equal',
+      () {
+        final a = HttpRequestConfig(
+          id: 'a',
+          method: 'POST',
+          url: 'https://api.example.com/form',
+          bodyType: 'multipart',
+          formFields: [MultipartFieldModel(name: 'file', value: 'a')],
+        );
+        final b = HttpRequestConfig(
+          id: 'b',
+          method: 'POST',
+          url: 'https://api.example.com/form',
+          bodyType: 'multipart',
+          formFields: [MultipartFieldModel(name: 'file', value: 'b')],
+        );
+        expect(a == b, isFalse);
+      },
+    );
+
+    test(
+      'bodyType alone distinguishes otherwise-identical requests',
+      () {
+        final raw = HttpRequestConfig(
+          id: 'a',
+          method: 'POST',
+          url: 'https://api.example.com/x',
+          body: '{"k":1}',
+        );
+        final gql = HttpRequestConfig(
+          id: 'b',
+          method: 'POST',
+          url: 'https://api.example.com/x',
+          body: '{"k":1}',
+          bodyType: 'graphql',
+        );
+        expect(raw == gql, isFalse);
+      },
+    );
+
+    test(
+      'identical multipart requests still dedupe (value equality on the '
+      'form-field rows, not identity)',
+      () {
+        HttpRequestConfig make(String id) => HttpRequestConfig(
+          id: id,
+          method: 'POST',
+          url: 'https://api.example.com/form',
+          bodyType: 'multipart',
+          formFields: [
+            MultipartFieldModel(
+              name: 'file',
+              value: 'v',
+              isFile: true,
+              filePath: '/p',
+            ),
+            MultipartFieldModel(name: 'note', value: 'hi'),
+          ],
+        );
+        final a = make('a');
+        final b = make('b');
+        expect(a == b, isTrue);
+        expect(a.hashCode, b.hashCode);
+      },
+    );
+
+    test('plain raw requests with an identical signature still dedupe', () {
+      final a = HttpRequestConfig(
+        id: 'a',
+        method: 'POST',
+        url: 'https://api.example.com/x',
+        body: '{"k":1}',
+      );
+      final b = HttpRequestConfig(
+        id: 'b',
+        method: 'POST',
+        url: 'https://api.example.com/x',
+        body: '{"k":1}',
+      );
+      expect(a == b, isTrue);
+      expect(a.hashCode, b.hashCode);
     });
   });
 }
