@@ -99,6 +99,33 @@ void main() {
   });
 
   test(
+    'pull with unstaged local edits autostashes and reapplies them',
+    () async {
+      if (!await gitPresent()) return;
+      // Teammate publishes a change to a *different* file.
+      await commitFile(b.path, 'teammate.req.json', '{"v":9}');
+      await run(b.path, ['push', 'origin', 'main']);
+      await run(a.path, ['fetch', 'origin']);
+      // A local uncommitted edit — exactly how Getman's mirror leaves the tree
+      // (this is what made a plain `git pull --rebase` fail with "cannot pull
+      // with rebase: You have unstaged changes").
+      File('${a.path}/a.req.json').writeAsStringSync('{"v":"local-wip"}');
+      expect(await git.status(a.path), isNotEmpty); // dirty tree
+
+      final outcome = await git.pull(a.path);
+
+      // --autostash: the pull succeeds, the teammate change lands, AND the
+      // local edit is reapplied on top rather than rejected.
+      expect(outcome, PullOutcome.clean);
+      expect(File('${a.path}/teammate.req.json').existsSync(), isTrue);
+      expect(
+        File('${a.path}/a.req.json').readAsStringSync(),
+        '{"v":"local-wip"}',
+      );
+    },
+  );
+
+  test(
     'a conflicting pull pauses the rebase (PullOutcome.conflicted)',
     () async {
       if (!await gitPresent()) return;

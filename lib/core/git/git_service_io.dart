@@ -244,6 +244,13 @@ class _IoGitService implements GitService {
       ..._identityArgs(authorName, authorEmail),
       'pull',
       '--rebase',
+      // Getman mirrors in-app edits to disk as uncommitted changes, so the
+      // tree is routinely dirty at pull time. --autostash stashes those edits,
+      // rebases, then reapplies them on top (the manual "stash, pull, pop"
+      // done for you) instead of git refusing with "you have unstaged
+      // changes". A rebase conflict still surfaces to the resolver as usual;
+      // the autostash pops when the rebase finishes (incl. via --continue).
+      '--autostash',
     ], allowFailure: true);
     if (r.exitCode == 0) return PullOutcome.clean;
     if (await isRebaseInProgress(root) &&

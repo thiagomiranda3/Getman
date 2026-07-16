@@ -119,12 +119,15 @@ abstract class GitService {
   /// Whether the current branch has an upstream configured.
   Future<bool> hasUpstream(String root);
 
-  /// `git pull --rebase`. On a true conflict, the rebase is left **paused**
-  /// (see [PullOutcome.conflicted]) so the caller can resolve it — see
-  /// [isRebaseInProgress] / [conflictedPaths] / [showStage] /
-  /// [writeWorkingFile] / [add] / [rebaseContinue] / [rebaseAbort]. Any other
-  /// failure (auth/network/local changes) aborts the rebase before throwing,
-  /// so a non-resolvable failed pull leaves the working tree exactly as it
+  /// `git pull --rebase --autostash`. Autostash because Getman mirrors in-app
+  /// edits to disk as uncommitted changes, so the tree is routinely dirty at
+  /// pull time; autostash stashes those edits, rebases, and reapplies them
+  /// instead of git refusing with "you have unstaged changes". On a true
+  /// conflict, the rebase is left **paused** (see [PullOutcome.conflicted]) so
+  /// the caller can resolve it — see [isRebaseInProgress] / [conflictedPaths] /
+  /// [showStage] / [writeWorkingFile] / [add] / [rebaseContinue] /
+  /// [rebaseAbort]. Any other failure (auth/network) aborts the rebase before
+  /// throwing, so a non-resolvable failed pull leaves the working tree as it
   /// was.
   /// [authorName]/[authorEmail] are passed inline to the rebase machinery the
   /// same way as [commit] — a rebase that needs to create a commit (e.g.
