@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
@@ -29,6 +30,19 @@ class MockGetRequestRulesUseCase extends Mock
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 
 class _FakePanel extends Fake implements PanelEntity {}
+
+/// Records errors reported to `Bloc.observer.onError` so a test can assert an
+/// event handler did NOT throw (e.g. a stale reorder must early-return, not
+/// RangeError against a concurrently-shrunk list).
+class _RecordingBlocObserver extends BlocObserver {
+  final List<Object> errors = <Object>[];
+
+  @override
+  void onError(BlocBase<dynamic> bloc, Object error, StackTrace stackTrace) {
+    errors.add(error);
+    super.onError(bloc, error, stackTrace);
+  }
+}
 
 void main() {
   late MockTabsRepository repository;
@@ -581,6 +595,72 @@ void main() {
         expect(bloc.state.activeIndex, 0);
       },
     );
+  });
+
+  group('ReorderTabs bounds guard', () {
+    test(
+      'a stale oldIndex (queued behind a concurrent shrink) is a no-op, '
+      'not a RangeError',
+      () async {
+        final observer = _RecordingBlocObserver();
+        final previous = Bloc.observer;
+        Bloc.observer = observer;
+        addTearDown(() => Bloc.observer = previous);
+
+        await loadWith([tab('a'), tab('b'), tab('c')]);
+        observer.errors.clear();
+
+        // oldIndex 5 is past the end — e.g. a reorder enqueued before CLOSE
+        // OTHERS shrank the list to one tab.
+        bloc.add(const ReorderTabs(5, 0));
+        await pumpEventQueue();
+
+        expect(observer.errors, isEmpty);
+        expect(bloc.state.tabs.map((t) => t.tabId).toList(), ['a', 'b', 'c']);
+      },
+    );
+
+    test('an out-of-range newIndex is a no-op', () async {
+      final observer = _RecordingBlocObserver();
+      final previous = Bloc.observer;
+      Bloc.observer = observer;
+      addTearDown(() => Bloc.observer = previous);
+
+      await loadWith([tab('a'), tab('b')]);
+      observer.errors.clear();
+
+      bloc.add(const ReorderTabs(0, 5));
+      await pumpEventQueue();
+
+      expect(observer.errors, isEmpty);
+      expect(bloc.state.tabs.map((t) => t.tabId).toList(), ['a', 'b']);
+    });
+
+    test('a negative index is a no-op', () async {
+      final observer = _RecordingBlocObserver();
+      final previous = Bloc.observer;
+      Bloc.observer = observer;
+      addTearDown(() => Bloc.observer = previous);
+
+      await loadWith([tab('a'), tab('b')]);
+      observer.errors.clear();
+
+      bloc.add(const ReorderTabs(-1, 0));
+      await pumpEventQueue();
+
+      expect(observer.errors, isEmpty);
+      expect(bloc.state.tabs.map((t) => t.tabId).toList(), ['a', 'b']);
+    });
+
+    test('a valid reorder to the last position still moves the tab', () async {
+      await loadWith([tab('a'), tab('b'), tab('c')]);
+      // newIndex == length-1 is the boundary the guard must still allow
+      // (onReorderItem after-removal semantics).
+      bloc.add(const ReorderTabs(0, 2));
+      await pumpEventQueue();
+
+      expect(bloc.state.tabs.map((t) => t.tabId).toList(), ['b', 'c', 'a']);
+    });
   });
 
   group('SendRequest', () {

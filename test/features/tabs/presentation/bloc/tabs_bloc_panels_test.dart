@@ -3,6 +3,7 @@
 // *event* tests landing in Tasks 5 and 6 reuse. Keep the helpers stable: later
 // tasks append `blocTest`s that call them, so changing their contract ripples.
 import 'package:bloc_test/bloc_test.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
@@ -21,6 +22,18 @@ class MockSendRequestUseCase extends Mock implements SendRequestUseCase {}
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 
 class _FakePanel extends Fake implements PanelEntity {}
+
+/// Records errors reported to `Bloc.observer.onError` so a test can assert a
+/// reorder with stale indices early-returns instead of throwing a RangeError.
+class _RecordingBlocObserver extends BlocObserver {
+  final List<Object> errors = <Object>[];
+
+  @override
+  void onError(BlocBase<dynamic> bloc, Object error, StackTrace stackTrace) {
+    errors.add(error);
+    super.onError(bloc, error, stackTrace);
+  }
+}
 
 void main() {
   // Re-created by [buildBloc] for every bloc under test, so `verify(...)` in a
@@ -471,6 +484,85 @@ void main() {
       );
       await Future<void>.delayed(Duration.zero);
       expect(bloc.state.panels, isEmpty);
+    });
+  });
+
+  group('ReorderPanels bounds guard', () {
+    /// Loads a bloc and adds a second panel so a reorder has something to move.
+    Future<TabsBloc> twoPanelBloc() async {
+      final bloc = await buildLoadedBloc();
+      bloc.add(const AddPanel());
+      await bloc.stream.firstWhere((s) => s.panels.length == 2);
+      return bloc;
+    }
+
+    test(
+      'a stale oldIndex (queued behind a concurrent RemovePanel) is a no-op, '
+      'not a RangeError',
+      () async {
+        final observer = _RecordingBlocObserver();
+        final previous = Bloc.observer;
+        Bloc.observer = observer;
+        addTearDown(() => Bloc.observer = previous);
+
+        final bloc = await twoPanelBloc();
+        addTearDown(bloc.close);
+        final ids = bloc.state.panels.map((p) => p.id).toList();
+        observer.errors.clear();
+
+        bloc.add(const ReorderPanels(5, 0));
+        await pumpEventQueue();
+
+        expect(observer.errors, isEmpty);
+        expect(bloc.state.panels.map((p) => p.id).toList(), ids);
+      },
+    );
+
+    test('an out-of-range newIndex is a no-op', () async {
+      final observer = _RecordingBlocObserver();
+      final previous = Bloc.observer;
+      Bloc.observer = observer;
+      addTearDown(() => Bloc.observer = previous);
+
+      final bloc = await twoPanelBloc();
+      addTearDown(bloc.close);
+      final ids = bloc.state.panels.map((p) => p.id).toList();
+      observer.errors.clear();
+
+      bloc.add(const ReorderPanels(0, 5));
+      await pumpEventQueue();
+
+      expect(observer.errors, isEmpty);
+      expect(bloc.state.panels.map((p) => p.id).toList(), ids);
+    });
+
+    test('a negative index is a no-op', () async {
+      final observer = _RecordingBlocObserver();
+      final previous = Bloc.observer;
+      Bloc.observer = observer;
+      addTearDown(() => Bloc.observer = previous);
+
+      final bloc = await twoPanelBloc();
+      addTearDown(bloc.close);
+      final ids = bloc.state.panels.map((p) => p.id).toList();
+      observer.errors.clear();
+
+      bloc.add(const ReorderPanels(-1, 0));
+      await pumpEventQueue();
+
+      expect(observer.errors, isEmpty);
+      expect(bloc.state.panels.map((p) => p.id).toList(), ids);
+    });
+
+    test('a valid reorder still swaps the panels', () async {
+      final bloc = await twoPanelBloc();
+      addTearDown(bloc.close);
+      final ids = bloc.state.panels.map((p) => p.id).toList();
+
+      bloc.add(const ReorderPanels(0, 1));
+      await pumpEventQueue();
+
+      expect(bloc.state.panels.map((p) => p.id).toList(), [ids[1], ids[0]]);
     });
   });
 }

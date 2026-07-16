@@ -352,6 +352,12 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     if (state.panels.isEmpty) return;
     final active = _activePanel;
     final tabs = [...active.tabs];
+    // A reorder enqueued behind a concurrent shrink (e.g. CLOSE OTHERS) can
+    // carry stale indices; bail rather than RangeError. Both indices use
+    // after-removal semantics (onReorderItem already adjusted newIndex), so on
+    // the post-removal list the valid insert range is 0..length-1.
+    if (event.oldIndex < 0 || event.oldIndex >= tabs.length) return;
+    if (event.newIndex < 0 || event.newIndex >= tabs.length) return;
     // newIndex is already adjusted for the removed item by the source
     // ReorderableListView.onReorderItem callback — no manual decrement.
     final item = tabs.removeAt(event.oldIndex);
@@ -755,6 +761,11 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     Emitter<TabsState> emit,
   ) async {
     final panels = [...state.panels];
+    // A reorder enqueued behind a concurrent RemovePanel can carry stale
+    // indices; bail rather than RangeError. after-removal semantics: on the
+    // post-removal list the valid insert range is 0..length-1.
+    if (event.oldIndex < 0 || event.oldIndex >= panels.length) return;
+    if (event.newIndex < 0 || event.newIndex >= panels.length) return;
     // newIndex is already adjusted for the removed item by the source
     // ReorderableListView.onReorderItem callback — no manual decrement.
     final item = panels.removeAt(event.oldIndex);
