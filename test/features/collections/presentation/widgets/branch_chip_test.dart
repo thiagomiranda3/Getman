@@ -28,6 +28,13 @@ void main() {
   late _MockGitSyncBloc bloc;
   late _MockSettingsBloc settings;
 
+  setUpAll(() {
+    // Needed for `captureAny()` on `bloc.add(...)` in the PULL-no-remote
+    // test below — mocktail requires a registered fallback for any type
+    // used with `any`/`captureAny`.
+    registerFallbackValue(const LoadBranchStatus(root));
+  });
+
   setUp(() {
     bloc = _MockGitSyncBloc();
     settings = _MockSettingsBloc();
@@ -136,6 +143,194 @@ void main() {
 
     verify(() => bloc.add(const PullChanges(root))).called(1);
   });
+
+  testWidgets('PUSH dispatches PushChanges when a remote exists', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(
+        const GitSyncState(
+          status: GitSyncStatus.ready,
+          branch: BranchStatus(
+            isRepo: true,
+            current: 'main',
+            branches: ['main'],
+            hasRemote: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('branch_chip')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('branch_menu_push')));
+    await tester.pumpAndSettle();
+
+    verify(() => bloc.add(const PushChanges(root))).called(1);
+  });
+
+  testWidgets(
+    'PUSH with no remote opens the ADD REMOTE prompt; confirming dispatches '
+    'PushChanges with addRemoteUrl',
+    (tester) async {
+      await tester.pumpWidget(
+        host(
+          const GitSyncState(
+            status: GitSyncStatus.ready,
+            branch: BranchStatus(
+              isRepo: true,
+              current: 'main',
+              branches: ['main'],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('branch_chip')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('branch_menu_push')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ADD REMOTE'), findsWidgets);
+      expect(find.byKey(const ValueKey('name_prompt_field')), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('name_prompt_field')),
+        'https://example.invalid/x/y.git',
+      );
+      await tester.pump();
+      await tester.tap(find.widgetWithText(TextButton, 'ADD REMOTE'));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => bloc.add(
+          const PushChanges(
+            root,
+            addRemoteUrl: 'https://example.invalid/x/y.git',
+          ),
+        ),
+      ).called(1);
+    },
+  );
+
+  testWidgets(
+    'PULL with no remote opens the ADD REMOTE prompt; confirming dispatches '
+    'PullChanges with addRemoteUrl',
+    (tester) async {
+      await tester.pumpWidget(
+        host(
+          const GitSyncState(
+            status: GitSyncStatus.ready,
+            branch: BranchStatus(
+              isRepo: true,
+              current: 'main',
+              branches: ['main'],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('branch_chip')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('branch_menu_pull')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ADD REMOTE'), findsWidgets);
+      expect(find.byKey(const ValueKey('name_prompt_field')), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('name_prompt_field')),
+        'https://example.invalid/x/y.git',
+      );
+      await tester.pump();
+      await tester.tap(find.widgetWithText(TextButton, 'ADD REMOTE'));
+      await tester.pumpAndSettle();
+
+      final captured = verify(
+        () => bloc.add(captureAny(that: isA<PullChanges>())),
+      ).captured;
+      expect(captured, hasLength(1));
+      final event = captured.single as PullChanges;
+      expect(event.root, root);
+      expect(event.addRemoteUrl, 'https://example.invalid/x/y.git');
+      // Identity fields are threaded through from SettingsBloc, exactly as
+      // the hasRemote-true PULL path does.
+      expect(event.authorName, settings.state.settings.gitUserName);
+      expect(event.authorEmail, settings.state.settings.gitUserEmail);
+    },
+  );
+
+  testWidgets('FETCH dispatches FetchRemote', (tester) async {
+    await tester.pumpWidget(
+      host(
+        const GitSyncState(
+          status: GitSyncStatus.ready,
+          branch: BranchStatus(
+            isRepo: true,
+            current: 'main',
+            branches: ['main'],
+            hasRemote: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('branch_chip')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('branch_menu_fetch')));
+    await tester.pumpAndSettle();
+
+    verify(() => bloc.add(const FetchRemote(root))).called(1);
+  });
+
+  testWidgets(
+    'FETCH with no remote opens the ADD REMOTE prompt; confirming dispatches '
+    'FetchRemote with addRemoteUrl',
+    (tester) async {
+      await tester.pumpWidget(
+        host(
+          const GitSyncState(
+            status: GitSyncStatus.ready,
+            branch: BranchStatus(
+              isRepo: true,
+              current: 'main',
+              branches: ['main'],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('branch_chip')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('branch_menu_fetch')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ADD REMOTE'), findsWidgets);
+      expect(find.byKey(const ValueKey('name_prompt_field')), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('name_prompt_field')),
+        'https://example.invalid/x/y.git',
+      );
+      await tester.pump();
+      await tester.tap(find.widgetWithText(TextButton, 'ADD REMOTE'));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => bloc.add(
+          const FetchRemote(
+            root,
+            addRemoteUrl: 'https://example.invalid/x/y.git',
+          ),
+        ),
+      ).called(1);
+    },
+  );
 
   testWidgets('a dirty-switch error shows the commit/stash prompt', (
     tester,

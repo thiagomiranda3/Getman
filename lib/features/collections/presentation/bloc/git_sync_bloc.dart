@@ -1,9 +1,19 @@
 import 'dart:developer';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/git/git_service.dart'
+    show GitException, PullOutcome;
 import 'package:getman/features/collections/domain/branch_service.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_event.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_state.dart';
+
+/// Friendly, actionable replacement for the raw git stderr surfaced when a
+/// pull/rebase hits a missing commit identity — the raw message tells the
+/// user to run `git config --global …`, which contradicts Getman's
+/// no-config-file approach (identity is stored in Getman only).
+const _missingIdentityMessage =
+    'Set your commit identity (your name and email) in Settings → '
+    'Workspace, then try again.';
 
 /// Drives branch + sync over [BranchService]. Errors are surfaced in state
 /// (never only logged) — a silent failure here looks like a no-op to the user.
@@ -21,6 +31,8 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
     on<StashChanges>(_onStash);
     on<PopStash>(_onPop);
     on<DropStash>(_onDrop);
+    on<FetchRemote>(_onFetch);
+    on<ConflictsResolved>(_onResolved);
   }
 
   final BranchService _service;
@@ -54,6 +66,17 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
     } on Object catch (e) {
       _fail(e, emit, 'status');
     }
+  }
+
+  /// Adds [url] as the `origin` remote when non-null/non-blank — set from the
+  /// add-remote prompt when a pull/push/fetch was invoked on a repo with no
+  /// remote configured yet. Runs before the action it is paired with, inside
+  /// the same try/catch, so a failure here surfaces as the normal error state
+  /// instead of a distinct code path.
+  Future<void> _maybeAddRemote(String root, String? url) async {
+    final trimmed = url?.trim();
+    if (trimmed == null || trimmed.isEmpty) return;
+    await _service.addRemote(root, 'origin', trimmed);
   }
 
   void _fail(Object e, Emitter<GitSyncState> emit, String op) {
@@ -136,20 +159,94 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
     );
   }
 
+  /// Unlike the other mutating ops, `pull` doesn't go through the uniform
+  /// [_run] helper: it needs the [PullOutcome] to decide *which* token to
+  /// bump. A clean pull behaves like every other disk-changing op
+  /// (`reloadToken`); a conflicted pull leaves the tree mid-rebase — it must
+  /// NOT bump `reloadToken` (nothing to reload yet, the rebase is paused) and
+  /// instead bumps `conflictToken` so the widget layer opens the resolver.
+  /// Either way a terminal `ready` state is always emitted so the bloc is
+  /// never left stuck on `busy`.
   Future<void> _onPull(PullChanges event, Emitter<GitSyncState> emit) async {
     if (_dropWhileBusy('pull')) return;
-    await _run(
-      event.root,
-      emit,
-      'pull',
-      () => _service.pull(event.root),
-      changedDisk: true,
+    emit(state.copyWith(status: GitSyncStatus.busy));
+    final PullOutcome outcome;
+    try {
+      await _maybeAddRemote(event.root, event.addRemoteUrl);
+      outcome = await _service.pull(
+        event.root,
+        authorName: event.authorName,
+        authorEmail: event.authorEmail,
+      );
+    } on Object catch (e) {
+      log('pull failed: $e', name: 'GitSyncBloc');
+      if (e is GitException && GitException.isMissingIdentity(e.message)) {
+        emit(
+          state.copyWith(
+            status: GitSyncStatus.error,
+            errorMessage: _missingIdentityMessage,
+          ),
+        );
+      } else {
+        emit(
+          state.copyWith(status: GitSyncStatus.error, errorMessage: '$e'),
+        );
+      }
+      return;
+    }
+    emit(
+      state.copyWith(
+        status: GitSyncStatus.busy,
+        reloadToken: outcome == PullOutcome.clean
+            ? state.reloadToken + 1
+            : null,
+        conflictToken: outcome == PullOutcome.conflicted
+            ? state.conflictToken + 1
+            : null,
+      ),
     );
+    await _refresh(event.root, emit);
+  }
+
+  Future<void> _onFetch(FetchRemote event, Emitter<GitSyncState> emit) async {
+    if (_dropWhileBusy('fetch')) return;
+    emit(state.copyWith(status: GitSyncStatus.busy));
+    try {
+      await _maybeAddRemote(event.root, event.addRemoteUrl);
+      await _service.fetch(event.root);
+    } on Object catch (e) {
+      if (event.silent) {
+        // Auto-fetch runs unattended every few minutes — being offline is
+        // normal, not an error. Log only and fall through to the refresh so
+        // the bloc still lands on a terminal `ready` state.
+        log('fetch (silent) failed: $e', name: 'GitSyncBloc');
+      } else {
+        _fail(e, emit, 'fetch');
+        return;
+      }
+    }
+    await _refresh(event.root, emit);
+  }
+
+  /// The conflict resolver finished a rebase (RESOLVE & CONTINUE reached
+  /// `RebaseStep.done`). Nothing here touches git directly — the resolved
+  /// files are already on disk — this only needs to bump `reloadToken` so
+  /// `BranchSyncListener` reloads the merged tree, using the same
+  /// `changedDisk: true` pattern as every other disk-changing op.
+  Future<void> _onResolved(
+    ConflictsResolved event,
+    Emitter<GitSyncState> emit,
+  ) async {
+    if (_dropWhileBusy('resolved')) return;
+    await _run(event.root, emit, 'resolved', () async {}, changedDisk: true);
   }
 
   Future<void> _onPush(PushChanges event, Emitter<GitSyncState> emit) async {
     if (_dropWhileBusy('push')) return;
-    await _run(event.root, emit, 'push', () => _service.push(event.root));
+    await _run(event.root, emit, 'push', () async {
+      await _maybeAddRemote(event.root, event.addRemoteUrl);
+      await _service.push(event.root);
+    });
   }
 
   Future<void> _onStash(StashChanges event, Emitter<GitSyncState> emit) async {

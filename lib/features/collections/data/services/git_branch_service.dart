@@ -55,10 +55,11 @@ class GitBranchService implements BranchService {
   /// aborts), and the suspension drops any edit made *during* it — whose
   /// debounce would otherwise fire after the checkout and mirror the old
   /// branch's tree onto the new one. The suspension is lifted even if git
-  /// throws.
-  Future<void> _runOnTree(Future<void> Function() action) async {
+  /// throws. Generic so callers that need the action's result (e.g. `pull`'s
+  /// [PullOutcome]) don't need a second helper.
+  Future<T> _runOnTree<T>(Future<T> Function() action) async {
     await _flushOrThrow();
-    await _sync.withMirroringSuspended(action);
+    return _sync.withMirroringSuspended(action);
   }
 
   @override
@@ -83,8 +84,21 @@ class GitBranchService implements BranchService {
     await _git.createBranch(root, branch);
   }
 
+  // No flush/suspension here, deliberately: adding a remote only writes to
+  // `.git/config` — it never touches the working tree — so it cannot race a
+  // pending mirror write (same rationale as `dropStash`/`fetch`).
   @override
-  Future<void> pull(String root) => _runOnTree(() => _git.pull(root));
+  Future<void> addRemote(String root, String name, String url) =>
+      _git.addRemote(root, name, url);
+
+  @override
+  Future<PullOutcome> pull(
+    String root, {
+    String? authorName,
+    String? authorEmail,
+  }) => _runOnTree(
+    () => _git.pull(root, authorName: authorName, authorEmail: authorEmail),
+  );
 
   // No suspension here: `git push` reads the working tree, it never rewrites
   // it — an edit made mid-push belongs on disk and must still be mirrored.
@@ -107,4 +121,10 @@ class GitBranchService implements BranchService {
   // it. This omission is intentional; do not "fix" it by adding a flush.
   @override
   Future<void> dropStash(String root, int index) => _git.stashDrop(root, index);
+
+  // No flush/suspension here, deliberately: `git fetch` only updates
+  // remote-tracking refs — it never touches the working tree — so it cannot
+  // race a pending mirror write.
+  @override
+  Future<void> fetch(String root) => _git.fetch(root);
 }

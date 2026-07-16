@@ -6,13 +6,23 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
+import 'package:getman/features/collections/domain/entities/branch_status.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_event.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_state.dart';
+import 'package:getman/features/collections/presentation/widgets/conflict_resolution_dialog.dart';
+import 'package:getman/features/collections/presentation/widgets/pull_requests_dialog.dart';
 import 'package:getman/features/collections/presentation/widgets/review_changes_dialog.dart';
 import 'package:getman/features/collections/presentation/widgets/stash_list_dialog.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
+
+/// How often the chip auto-fetches remote-tracking refs in the background, so
+/// ahead/behind counts stay fresh without the user remembering to pull.
+/// `@visibleForTesting` so a test can assert the interval without waiting for
+/// it to elapse for real.
+@visibleForTesting
+const Duration kAutoFetchInterval = Duration(minutes: 5);
 
 /// Collections-header chip: current branch + ahead/behind, opening the branch
 /// and sync menu. Hidden on web, without a workspace, or when the workspace is
@@ -30,6 +40,16 @@ class BranchChip extends StatefulWidget {
 
 class _BranchChipState extends State<BranchChip> {
   StreamSubscription<String>? _mirrorSub;
+  Timer? _fetchTimer;
+
+  // Tracked locally (not derived from `previous` inside the listener, which
+  // BlocConsumer doesn't expose) so the resolver opens exactly once per bump.
+  // Seeded from `state.conflictToken` on the first BlocConsumer build (not
+  // read from GitSyncBloc directly in initState — the workspace may not have
+  // a git repo yet, or GitSyncBloc may not even be provided above this chip
+  // in a screen that never renders it) so a BranchChip remount after an
+  // earlier, already-resolved conflict doesn't replay a stale open.
+  int? _lastConflictToken;
 
   @override
   void initState() {
@@ -41,19 +61,35 @@ class _BranchChipState extends State<BranchChip> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final root = context.read<SettingsBloc>().state.settings.workspacePath;
-      if (root != null && root.isNotEmpty) _refresh(root);
+      if (root != null && root.isNotEmpty) {
+        _refresh(root);
+        _fetchSilently(root);
+      }
+    });
+    // Keeps ahead/behind counts fresh without the user remembering to pull.
+    // Silent: a routine offline tick must never surface a GIT ERROR dialog.
+    _fetchTimer = Timer.periodic(kAutoFetchInterval, (_) {
+      if (!mounted) return;
+      final root = context.read<SettingsBloc>().state.settings.workspacePath;
+      if (root != null && root.isNotEmpty) _fetchSilently(root);
     });
   }
 
   @override
   void dispose() {
     unawaited(_mirrorSub?.cancel());
+    _fetchTimer?.cancel();
     super.dispose();
   }
 
   void _refresh(String root) {
     if (!mounted) return;
     context.read<GitSyncBloc>().add(LoadBranchStatus(root));
+  }
+
+  void _fetchSilently(String root) {
+    if (!mounted) return;
+    context.read<GitSyncBloc>().add(FetchRemote(root, silent: true));
   }
 
   @override
@@ -68,8 +104,20 @@ class _BranchChipState extends State<BranchChip> {
 
         return BlocConsumer<GitSyncBloc, GitSyncState>(
           listenWhen: (p, n) =>
-              p.errorMessage != n.errorMessage && n.errorMessage != null,
+              (p.errorMessage != n.errorMessage && n.errorMessage != null) ||
+              p.conflictToken != n.conflictToken,
           listener: (context, state) {
+            // A pull halted on conflicts — open the resolver. Checked first
+            // and separately from the error path below: a conflicted pull is
+            // NOT an error state (see GitSyncBloc._onPull), so this is the
+            // only signal for it. `_lastConflictToken` is always seeded by
+            // the builder below before the first stream event can arrive, so
+            // it is never null here.
+            if (state.conflictToken != _lastConflictToken) {
+              _lastConflictToken = state.conflictToken;
+              unawaited(ConflictResolutionDialog.show(context, root: root));
+              return;
+            }
             final message = state.errorMessage;
             if (message == null) return;
             if (message.contains('uncommitted changes')) {
@@ -79,6 +127,10 @@ class _BranchChipState extends State<BranchChip> {
             }
           },
           builder: (context, state) {
+            // Seed on the first build from `bloc.state` (not a separate
+            // `.read()` — this callback already has it) so a later real bump
+            // is the only thing that can ever pop the dialog.
+            _lastConflictToken ??= state.conflictToken;
             final branch = state.branch;
             if (!branch.isRepo || branch.current == null) {
               return const SizedBox.shrink();
@@ -99,7 +151,7 @@ class _BranchChipState extends State<BranchChip> {
       key: const ValueKey('branch_chip'),
       tooltip: 'Branch & sync',
       enabled: !state.isBusy,
-      onSelected: (value) => _onSelected(context, root, value),
+      onSelected: (value) => _onSelected(context, root, branch, value),
       itemBuilder: (context) => [
         for (final b in branch.branches)
           PopupMenuItem<String>(
@@ -120,23 +172,28 @@ class _BranchChipState extends State<BranchChip> {
           value: 'new',
           child: Text('NEW BRANCH…'),
         ),
-        PopupMenuItem<String>(
-          key: const ValueKey('branch_menu_pull'),
+        const PopupMenuItem<String>(
+          key: ValueKey('branch_menu_pull'),
           value: 'pull',
-          enabled: branch.hasRemote,
-          child: Text(
-            branch.hasRemote ? 'PULL (REBASE)' : 'PULL — NO REMOTE',
-          ),
+          child: Text('PULL (REBASE)'),
         ),
-        PopupMenuItem<String>(
-          key: const ValueKey('branch_menu_push'),
+        const PopupMenuItem<String>(
+          key: ValueKey('branch_menu_push'),
           value: 'push',
-          enabled: branch.hasRemote,
-          child: Text(branch.hasRemote ? 'PUSH' : 'PUSH — NO REMOTE'),
+          child: Text('PUSH'),
         ),
         PopupMenuItem<String>(
           value: 'stashes',
           child: Text('STASHES (${branch.stashCount})'),
+        ),
+        const PopupMenuItem<String>(
+          value: 'prs',
+          child: Text('PULL REQUESTS…'),
+        ),
+        const PopupMenuItem<String>(
+          key: ValueKey('branch_menu_fetch'),
+          value: 'fetch',
+          child: Text('FETCH'),
         ),
       ],
       child: Padding(
@@ -184,7 +241,12 @@ class _BranchChipState extends State<BranchChip> {
     );
   }
 
-  void _onSelected(BuildContext context, String root, String value) {
+  void _onSelected(
+    BuildContext context,
+    String root,
+    BranchStatus branch,
+    String value,
+  ) {
     final bloc = context.read<GitSyncBloc>();
     if (value.startsWith('switch:')) {
       bloc.add(SwitchBranch(root, value.substring('switch:'.length)));
@@ -202,12 +264,81 @@ class _BranchChipState extends State<BranchChip> {
           ),
         );
       case 'pull':
-        bloc.add(PullChanges(root));
+        final identity = context.read<SettingsBloc>().state.settings;
+        if (branch.hasRemote) {
+          bloc.add(
+            PullChanges(
+              root,
+              authorName: identity.gitUserName,
+              authorEmail: identity.gitUserEmail,
+            ),
+          );
+        } else {
+          unawaited(
+            _promptAddRemote(
+              context,
+              root,
+              onUrl: (url) => bloc.add(
+                PullChanges(
+                  root,
+                  authorName: identity.gitUserName,
+                  authorEmail: identity.gitUserEmail,
+                  addRemoteUrl: url,
+                ),
+              ),
+            ),
+          );
+        }
       case 'push':
-        bloc.add(PushChanges(root));
+        if (branch.hasRemote) {
+          bloc.add(PushChanges(root));
+        } else {
+          unawaited(
+            _promptAddRemote(
+              context,
+              root,
+              onUrl: (url) => bloc.add(PushChanges(root, addRemoteUrl: url)),
+            ),
+          );
+        }
       case 'stashes':
         unawaited(StashListDialog.show(context, root: root));
+      case 'prs':
+        unawaited(PullRequestsDialog.show(context, root: root));
+      case 'fetch':
+        if (branch.hasRemote) {
+          bloc.add(FetchRemote(root));
+        } else {
+          unawaited(
+            _promptAddRemote(
+              context,
+              root,
+              onUrl: (url) => bloc.add(FetchRemote(root, addRemoteUrl: url)),
+            ),
+          );
+        }
     }
+  }
+
+  /// Prompts for a remote URL (used when the repo has none yet) and, on
+  /// confirm, invokes [onUrl] with the trimmed value — the caller dispatches
+  /// the actual pull/push/fetch event carrying `addRemoteUrl` so the bloc
+  /// adds `origin` before performing the action.
+  Future<void> _promptAddRemote(
+    BuildContext context,
+    String root, {
+    required void Function(String url) onUrl,
+  }) {
+    return NamePromptDialog.show(
+      context,
+      title: 'ADD REMOTE',
+      hintText: 'https://github.com/you/repo.git',
+      confirmLabel: 'ADD REMOTE',
+      onConfirm: (url) {
+        if (url.trim().isEmpty) return;
+        onUrl(url.trim());
+      },
+    );
   }
 
   /// A switch was refused because the tree is dirty: offer the two ways out.

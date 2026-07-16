@@ -18,6 +18,7 @@ import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/settings/presentation/widgets/client_certificate_tile.dart';
+import 'package:getman/features/settings/presentation/widgets/git_identity_settings_tile.dart';
 import 'package:getman/features/updates/presentation/widgets/update_settings_section.dart';
 
 /// Fixed width of the small numeric input boxes (history limit, timeouts, …).
@@ -398,7 +399,10 @@ class _SettingsDialogState extends State<SettingsDialog>
   }
 
   Widget _workspaceTab(BuildContext context) {
-    return _pane(context, const [WorkspaceSettingsTile()]);
+    return _pane(context, const [
+      WorkspaceSettingsTile(),
+      GitIdentitySettingsTile(),
+    ]);
   }
 
   /// A read-only reference of every global keyboard shortcut, grouped by area.

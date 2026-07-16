@@ -92,31 +92,77 @@ void main() {
     await run(b.path, ['push', 'origin', 'main']);
     await run(a.path, ['fetch', 'origin']);
 
-    await git.pull(a.path);
+    final outcome = await git.pull(a.path);
 
+    expect(outcome, PullOutcome.clean);
     expect(File('${a.path}/teammate.req.json').existsSync(), isTrue);
   });
 
-  test('a conflicting pull aborts and leaves the tree untouched', () async {
-    if (!await gitPresent()) return;
-    // Both sides edit the same file differently.
-    await commitFile(b.path, 'a.req.json', '{"v":"theirs"}');
-    await run(b.path, ['push', 'origin', 'main']);
-    await commitFile(a.path, 'a.req.json', '{"v":"mine"}');
+  test(
+    'pull with unstaged local edits autostashes and reapplies them',
+    () async {
+      if (!await gitPresent()) return;
+      // Teammate publishes a change to a *different* file.
+      await commitFile(b.path, 'teammate.req.json', '{"v":9}');
+      await run(b.path, ['push', 'origin', 'main']);
+      await run(a.path, ['fetch', 'origin']);
+      // A local uncommitted edit — exactly how Getman's mirror leaves the tree
+      // (this is what made a plain `git pull --rebase` fail with "cannot pull
+      // with rebase: You have unstaged changes").
+      File('${a.path}/a.req.json').writeAsStringSync('{"v":"local-wip"}');
+      expect(await git.status(a.path), isNotEmpty); // dirty tree
 
-    await expectLater(
-      git.pull(a.path),
-      throwsA(isA<GitException>()),
-    );
+      final outcome = await git.pull(a.path);
 
-    // The abort must restore the pre-pull state exactly: our content is
-    // intact, no conflict markers, no rebase in progress, and the tree is
-    // clean.
-    expect(File('${a.path}/a.req.json').readAsStringSync(), '{"v":"mine"}');
-    expect(await git.status(a.path), isEmpty);
-    expect(Directory('${a.path}/.git/rebase-merge').existsSync(), isFalse);
-    expect(Directory('${a.path}/.git/rebase-apply').existsSync(), isFalse);
-  });
+      // --autostash: the pull succeeds, the teammate change lands, AND the
+      // local edit is reapplied on top rather than rejected.
+      expect(outcome, PullOutcome.clean);
+      expect(File('${a.path}/teammate.req.json').existsSync(), isTrue);
+      expect(
+        File('${a.path}/a.req.json').readAsStringSync(),
+        '{"v":"local-wip"}',
+      );
+    },
+  );
+
+  test(
+    'a conflicting pull pauses the rebase (PullOutcome.conflicted)',
+    () async {
+      if (!await gitPresent()) return;
+      // Both sides edit the same file differently.
+      await commitFile(b.path, 'a.req.json', '{"v":"theirs"}');
+      await run(b.path, ['push', 'origin', 'main']);
+      await commitFile(a.path, 'a.req.json', '{"v":"mine"}');
+
+      final outcome = await git.pull(a.path);
+
+      // Left paused mid-rebase, not aborted — the conflict-resolution
+      // primitives (Task 1) take it from here.
+      expect(outcome, PullOutcome.conflicted);
+      expect(await git.isRebaseInProgress(a.path), isTrue);
+      expect(await git.conflictedPaths(a.path), contains('a.req.json'));
+
+      // Clean up so tearDown's rmdir doesn't fight a paused rebase.
+      await git.rebaseAbort(a.path);
+    },
+  );
+
+  test(
+    'a non-resolvable pull failure aborts and leaves the tree untouched',
+    () async {
+      if (!await gitPresent()) return;
+      // No remote configured: `git pull --rebase` fails outright (no
+      // upstream), which is not a conflict — the rebase is never started.
+      await run(a.path, ['remote', 'remove', 'origin']);
+
+      await expectLater(git.pull(a.path), throwsA(isA<GitException>()));
+
+      expect(File('${a.path}/a.req.json').readAsStringSync(), '{"v":1}');
+      expect(await git.status(a.path), isEmpty);
+      expect(Directory('${a.path}/.git/rebase-merge').existsSync(), isFalse);
+      expect(Directory('${a.path}/.git/rebase-apply').existsSync(), isFalse);
+    },
+  );
 
   test(
     'aheadBehind reports ahead and behind against a real upstream',

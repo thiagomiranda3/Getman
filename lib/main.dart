@@ -17,7 +17,9 @@ import 'package:getman/features/chaining/presentation/bloc/rules_bloc.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/collections/presentation/bloc/conflict_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/pull_requests_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
 import 'package:getman/features/collections/presentation/widgets/branch_sync_listener.dart';
 import 'package:getman/features/collections/presentation/widgets/workspace_sync_listener.dart';
@@ -202,6 +204,8 @@ class MyApp extends StatelessWidget {
           BlocProvider(create: (_) => di.sl<McpBloc>()),
           BlocProvider(create: (_) => di.sl<ReviewBloc>()),
           BlocProvider(create: (_) => di.sl<GitSyncBloc>()),
+          BlocProvider(create: (_) => di.sl<PullRequestsBloc>()),
+          BlocProvider(create: (_) => di.sl<ConflictBloc>()),
         ],
         child: NetworkSettingsListener(
           child: WorkspaceSyncListener(
