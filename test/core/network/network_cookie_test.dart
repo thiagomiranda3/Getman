@@ -37,6 +37,55 @@ void main() {
       ).single;
       expect(c.expiresEpochMs, 1000 + 100 * 1000);
     });
+
+    test(
+      'rejects a Domain that does not cover the request host '
+      '(RFC 6265 §5.3.6 — no cross-domain cookie planting)',
+      () {
+        // evil.com trying to plant a cookie for bank.com.
+        final planted = NetworkCookie.parseSetCookie(
+          'stolen=1; Domain=bank.com',
+          requestUri: Uri.parse('https://evil.com/'),
+          nowEpochMs: 0,
+        );
+        expect(planted, isEmpty);
+
+        // A subdomain trying to set a cookie for a sibling.
+        final sibling = NetworkCookie.parseSetCookie(
+          'x=1; Domain=other.example.com',
+          requestUri: uri,
+          nowEpochMs: 0,
+        );
+        expect(sibling, isEmpty);
+      },
+    );
+
+    test('rejects a bare public-suffix Domain (e.g. Domain=com)', () {
+      final cookies = NetworkCookie.parseSetCookie(
+        'x=1; Domain=com',
+        requestUri: Uri.parse('https://evil.com/'),
+        nowEpochMs: 0,
+      );
+      expect(cookies, isEmpty);
+    });
+
+    test('accepts a parent-domain Domain from a subdomain', () {
+      final c = NetworkCookie.parseSetCookie(
+        'sid=abc; Domain=example.com',
+        requestUri: uri, // api.example.com
+        nowEpochMs: 0,
+      ).single;
+      expect(c.domain, 'example.com');
+    });
+
+    test('accepts Domain equal to a single-label request host', () {
+      final c = NetworkCookie.parseSetCookie(
+        'sid=abc; Domain=localhost',
+        requestUri: Uri.parse('http://localhost:8080/'),
+        nowEpochMs: 0,
+      ).single;
+      expect(c.domain, 'localhost');
+    });
   });
 
   group('matches', () {

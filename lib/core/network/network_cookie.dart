@@ -83,6 +83,17 @@ class NetworkCookie extends Equatable {
         }
       }
       if (domain.isEmpty) domain = requestUri.host;
+      // RFC 6265 §5.3.6: a Domain attribute must cover the request host —
+      // otherwise any server could plant cookies for arbitrary sites
+      // (Domain=bank.com from evil.com). The single-label check on the
+      // suffix arm is a pragmatic public-suffix guard (rejects Domain=com)
+      // without shipping the full PSL; multi-label suffixes like co.uk are
+      // not caught.
+      final host = requestUri.host.toLowerCase();
+      final d = domain.toLowerCase();
+      final domainCoversHost =
+          host == d || (host.endsWith('.$d') && d.contains('.'));
+      if (!domainCoversHost) continue;
       result.add(
         NetworkCookie(
           name: c.name,
