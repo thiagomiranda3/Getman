@@ -70,6 +70,7 @@ class PostmanEnvironmentMapper {
     final name = (data['name'] as String?) ?? 'Imported Environment';
     final rawValues = data['values'];
     final variables = <String, String>{};
+    final secretKeys = <String>{};
     if (rawValues is List) {
       for (final entry in rawValues.whereType<Map<dynamic, dynamic>>()) {
         if (entry['enabled'] == false) continue;
@@ -77,8 +78,16 @@ class PostmanEnvironmentMapper {
         final value = entry['value'];
         if (key is! String || key.isEmpty) continue;
         variables[key] = value is String ? value : (value?.toString() ?? '');
+        // Restore the lock flag: without it a secret arrives as a plain
+        // variable — displayed unobscured and re-exported unmasked. (Real
+        // Postman local exports include secret values in plaintext.)
+        if (entry['type'] == 'secret') secretKeys.add(key);
       }
     }
-    return EnvironmentEntity(name: name, variables: variables);
+    return EnvironmentEntity(
+      name: name,
+      variables: variables,
+      secretKeys: secretKeys,
+    );
   }
 }

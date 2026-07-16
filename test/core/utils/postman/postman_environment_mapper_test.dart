@@ -145,5 +145,37 @@ void main() {
       expect(reimported[0].variables, {'x': '1'});
       expect(reimported[1].variables, {'y': '2', 'z': '3'});
     });
+
+    test('import restores secret flags (type: secret)', () {
+      final original = EnvironmentEntity(
+        name: 'Dev',
+        variables: const {'base': 'https://api.dev', 'token': 'sk-1'},
+        secretKeys: const {'token'},
+      );
+      final envs = PostmanEnvironmentMapper.fromJson(
+        PostmanEnvironmentMapper.toJson(original),
+      );
+      expect(
+        envs.single.secretKeys,
+        {'token'},
+        reason:
+            'a secret variable must arrive locked, not as a plain variable '
+            'displayed unobscured',
+      );
+      // A real Postman export carries the secret VALUE in plaintext — it must
+      // import as a locked variable with its value intact.
+      const postmanExport = '''
+      {
+        "name": "Prod",
+        "values": [
+          {"key": "apiKey", "value": "live-123", "type": "secret",
+           "enabled": true}
+        ],
+        "_postman_variable_scope": "environment"
+      }''';
+      final imported = PostmanEnvironmentMapper.fromJson(postmanExport).single;
+      expect(imported.variables, {'apiKey': 'live-123'});
+      expect(imported.secretKeys, {'apiKey'});
+    });
   });
 }

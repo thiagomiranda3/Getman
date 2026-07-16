@@ -414,6 +414,106 @@ void main() {
       expect(leaf.config!.body, '{"a":1}');
     });
 
+    test('export then import preserves auth (bearer / basic / api-key)', () {
+      CollectionNodeEntity leafWith(Map<String, String> auth) =>
+          CollectionNodeEntity(
+            id: 'leaf',
+            name: 'R',
+            isFolder: false,
+            config: HttpRequestConfigEntity(
+              id: 'cfg',
+              url: 'https://api.dev/x',
+              auth: auth,
+            ),
+          );
+
+      HttpRequestConfigEntity roundTrip(Map<String, String> auth) =>
+          PostmanCollectionMapper.fromJson(
+            PostmanCollectionMapper.toJson(leafWith(auth)),
+          ).children.single.config!;
+
+      expect(
+        roundTrip(const {'type': 'bearer', 'token': 'tok-1'}).auth,
+        {'type': 'bearer', 'token': 'tok-1'},
+        reason:
+            'auth silently dropped means the request sends '
+            'unauthenticated after a Postman round trip',
+      );
+      expect(
+        roundTrip(const {
+          'type': 'basic',
+          'username': 'u',
+          'password': 'p',
+        }).auth,
+        {'type': 'basic', 'username': 'u', 'password': 'p'},
+      );
+      expect(
+        roundTrip(const {
+          'type': 'apikey',
+          'key': 'X-Api-Key',
+          'value': 'v1',
+          'addTo': 'query',
+        }).auth,
+        {'type': 'apikey', 'key': 'X-Api-Key', 'value': 'v1', 'addTo': 'query'},
+      );
+    });
+
+    test('export then import preserves folder and request descriptions', () {
+      const original = CollectionNodeEntity(
+        id: 'root',
+        name: 'My API',
+        children: [
+          CollectionNodeEntity(
+            id: 'folder',
+            name: 'Things',
+            description: 'All the things.',
+            children: [
+              CollectionNodeEntity(
+                id: 'leaf',
+                name: 'Get Thing',
+                isFolder: false,
+                description: 'Fetches one thing by id.',
+                config: HttpRequestConfigEntity(id: 'cfg'),
+              ),
+            ],
+          ),
+        ],
+      );
+      final reimported = PostmanCollectionMapper.fromJson(
+        PostmanCollectionMapper.toJson(original),
+      );
+      final folder = reimported.children.single;
+      expect(folder.description, 'All the things.');
+      expect(folder.children.single.description, 'Fetches one thing by id.');
+    });
+
+    test('import decodes percent-encoded structured query values', () {
+      // Real Postman exports carry `url.query` values exactly as they appear
+      // in url.raw — still percent-encoded.
+      const postmanJson = '''
+      {
+        "info": {"name": "C", "schema":
+          "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+        "item": [
+          {"name": "Search", "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.com/x?q=hello%20world",
+              "query": [{"key": "q", "value": "hello%20world"}]
+            }
+          }}
+        ]
+      }''';
+      final imported = PostmanCollectionMapper.fromJson(postmanJson);
+      final url = imported.children.single.config!.url;
+      expect(
+        url,
+        'https://api.com/x?q=hello%20world',
+        reason: 'the value must not be double-encoded to hello%2520world',
+      );
+    });
+
     test('export then import preserves a urlencoded form body', () {
       const leaf = CollectionNodeEntity(
         id: 'leaf',

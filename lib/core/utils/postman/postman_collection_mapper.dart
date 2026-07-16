@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
@@ -99,9 +100,12 @@ class PostmanCollectionMapper {
   }
 
   static Map<String, dynamic> _nodeToItem(CollectionNodeEntity node) {
+    final description = node.description;
     if (node.isFolder) {
       final item = <String, dynamic>{
         'name': node.name,
+        if (description != null && description.isNotEmpty)
+          'description': description,
         'item': node.children.map(_nodeToItem).toList(),
       };
       if (node.variables.isNotEmpty) {
@@ -111,6 +115,8 @@ class PostmanCollectionMapper {
     }
     return {
       'name': node.name,
+      if (description != null && description.isNotEmpty)
+        'description': description,
       'request': _configToRequest(node.config),
     };
   }
@@ -142,9 +148,46 @@ class PostmanCollectionMapper {
       'header': headers,
       'url': urlObj,
     };
+    final auth = _authToPostman(config.authConfig);
+    if (auth != null) result['auth'] = auth;
     final body = _configToBody(config);
     if (body != null) result['body'] = body;
     return result;
+  }
+
+  /// Maps the request's auth to a Postman `auth` block. `none` and `inherit`
+  /// emit nothing — in Postman, no auth block means "inherit from parent",
+  /// which is the closest match for both.
+  static Map<String, dynamic>? _authToPostman(AuthConfig auth) {
+    switch (auth.type) {
+      case AuthType.none:
+      case AuthType.inherit:
+        return null;
+      case AuthType.bearer:
+        return {
+          'type': 'bearer',
+          'bearer': [
+            {'key': 'token', 'value': auth.token, 'type': 'string'},
+          ],
+        };
+      case AuthType.basic:
+        return {
+          'type': 'basic',
+          'basic': [
+            {'key': 'username', 'value': auth.username, 'type': 'string'},
+            {'key': 'password', 'value': auth.password, 'type': 'string'},
+          ],
+        };
+      case AuthType.apiKey:
+        return {
+          'type': 'apikey',
+          'apikey': [
+            {'key': 'key', 'value': auth.apiKeyName, 'type': 'string'},
+            {'key': 'value', 'value': auth.apiKeyValue, 'type': 'string'},
+            {'key': 'in', 'value': auth.apiKeyLocation.wire, 'type': 'string'},
+          ],
+        };
+    }
   }
 
   /// Maps the request's body type to a Postman `body` block. Returns null when
@@ -240,6 +283,7 @@ class PostmanCollectionMapper {
       return CollectionNodeEntity(
         id: _uuid.v4(),
         name: name,
+        description: _parseDescription(item['description']),
         children: children,
         variables: vars.variables,
         secretKeys: vars.secretKeys,
@@ -253,8 +297,21 @@ class PostmanCollectionMapper {
       id: _uuid.v4(),
       name: name,
       isFolder: false,
+      description:
+          _parseDescription(item['description']) ??
+          (request is Map ? _parseDescription(request['description']) : null),
       config: config,
     );
+  }
+
+  /// Postman descriptions are either a plain string or `{content, type}`.
+  static String? _parseDescription(dynamic description) {
+    if (description is String && description.isNotEmpty) return description;
+    if (description is Map) {
+      final content = description['content'];
+      if (content is String && content.isNotEmpty) return content;
+    }
+    return null;
   }
 
   static HttpRequestConfigEntity _requestToConfig(
@@ -275,12 +332,53 @@ class PostmanCollectionMapper {
       method: method,
       url: mergedUrl,
       headers: headers,
+      auth: _parseAuth(request['auth']),
       body: body.body,
       bodyType: body.bodyType,
       formFields: body.formFields,
       bodyFilePath: body.bodyFilePath,
       graphqlVariables: body.graphqlVariables,
     );
+  }
+
+  /// Inverse of [_authToPostman]. Unknown/absent types (incl. Postman's
+  /// `noauth`) map to the empty map (= [AuthType.none]).
+  static Map<String, String> _parseAuth(dynamic auth) {
+    if (auth is! Map) return const {};
+    String param(String section, String key) {
+      final list = auth[section];
+      if (list is! List) return '';
+      for (final entry in list.whereType<Map<dynamic, dynamic>>()) {
+        if (entry['key'] == key) {
+          final value = entry['value'];
+          return value is String ? value : (value?.toString() ?? '');
+        }
+      }
+      return '';
+    }
+
+    switch (auth['type']) {
+      case 'bearer':
+        return AuthConfig(
+          type: AuthType.bearer,
+          token: param('bearer', 'token'),
+        ).toMap();
+      case 'basic':
+        return AuthConfig(
+          type: AuthType.basic,
+          username: param('basic', 'username'),
+          password: param('basic', 'password'),
+        ).toMap();
+      case 'apikey':
+        return AuthConfig(
+          type: AuthType.apiKey,
+          apiKeyName: param('apikey', 'key'),
+          apiKeyValue: param('apikey', 'value'),
+          apiKeyLocation: ApiKeyLocation.fromWire(param('apikey', 'in')),
+        ).toMap();
+      default:
+        return const {};
+    }
   }
 
   static String _parseUrl(dynamic url) {
@@ -329,14 +427,30 @@ class PostmanCollectionMapper {
       final key = entry['key'];
       final value = entry['value'];
       if (key is! String || key.isEmpty) continue;
+      // Postman's structured entries carry the query as it appears in
+      // `url.raw`, i.e. still percent-encoded — decode before handing them to
+      // replaceQuery (which encodes), or `hello%20world` arrives as
+      // `hello%2520world` and the request sends a literal `%20`.
       result.add(
         QueryParamEntity(
-          key: key,
-          value: value is String ? value : (value?.toString() ?? ''),
+          key: _decodeQueryPart(key),
+          value: _decodeQueryPart(
+            value is String ? value : (value?.toString() ?? ''),
+          ),
         ),
       );
     }
     return result;
+  }
+
+  /// Percent-decodes a structured query key/value; malformed sequences (a
+  /// literal `%` outside an escape) are kept verbatim.
+  static String _decodeQueryPart(String s) {
+    try {
+      return Uri.decodeComponent(s);
+    } on Object catch (_) {
+      return s;
+    }
   }
 
   static Map<String, String> _parseHeaders(dynamic header) {
