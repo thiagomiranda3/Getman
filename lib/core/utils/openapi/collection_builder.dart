@@ -59,7 +59,10 @@ ImportResult buildImport(NormalizedApi api) {
 }
 
 HttpRequestConfigEntity _config(NormalizedOperation op, NormalizedAuth auth) {
-  var url = '{{baseUrl}}${_templatePath(op.path)}';
+  // An op-level/path-item-level `servers` override wins over the shared
+  // {{baseUrl}} environment variable (which reflects the global servers).
+  final base = op.server != null ? _concreteBaseUrl(op.server!) : '{{baseUrl}}';
+  var url = '$base${_templatePath(op.path)}';
   if (op.queryParams.isNotEmpty) {
     url = UrlQueryUtils.replaceQuery(url, [
       for (final q in op.queryParams)

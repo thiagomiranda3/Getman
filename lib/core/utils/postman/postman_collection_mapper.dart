@@ -21,12 +21,19 @@ class PostmanCollectionMapper {
     final items = rootNode.isFolder
         ? rootNode.children.map(_nodeToItem).toList()
         : [_nodeToItem(rootNode)];
+    // A leaf root's own description is already carried on its wrapping item
+    // (see _nodeToItem) — info.description only applies to a folder root.
+    final rootDescription = rootNode.description;
     final collection = <String, dynamic>{
       'info': {
         '_postman_id': _uuid.v4(),
         'name': rootNode.name,
         'schema': _schemaV21,
         '_exporter_id': 'getman',
+        if (rootNode.isFolder &&
+            rootDescription != null &&
+            rootDescription.isNotEmpty)
+          'description': rootDescription,
       },
       'item': items,
     };
@@ -78,6 +85,7 @@ class PostmanCollectionMapper {
     return CollectionNodeEntity(
       id: _uuid.v4(),
       name: name,
+      description: _parseDescription(info['description']),
       children: children,
       variables: vars.variables,
       secretKeys: vars.secretKeys,
@@ -121,6 +129,32 @@ class PostmanCollectionMapper {
     };
   }
 
+  /// Splits the URL's query string into raw (still percent-encoded) key/value
+  /// segments — mirrors `url.raw`, matching Postman's own convention that
+  /// `url.query` entries are NOT decoded (see `_parseQueryList` below). Using
+  /// the decoded [QueryParamEntity] list here would double-encode on import
+  /// (`%2520` would round-trip through a decode step on each side).
+  static List<Map<String, String>> _rawQuery(String url) {
+    final hashIndex = url.indexOf('#');
+    var qIndex = url.indexOf('?');
+    if (hashIndex != -1 && qIndex > hashIndex) qIndex = -1;
+    if (qIndex == -1) return const [];
+    final afterQ = url.substring(qIndex + 1);
+    final hIndex = afterQ.indexOf('#');
+    final queryStr = hIndex == -1 ? afterQ : afterQ.substring(0, hIndex);
+    if (queryStr.isEmpty) return const [];
+    final result = <Map<String, String>>[];
+    for (final pair in queryStr.split('&')) {
+      if (pair.isEmpty) continue;
+      final eqIndex = pair.indexOf('=');
+      final key = eqIndex == -1 ? pair : pair.substring(0, eqIndex);
+      if (key.isEmpty) continue;
+      final value = eqIndex == -1 ? '' : pair.substring(eqIndex + 1);
+      result.add({'key': key, 'value': value});
+    }
+    return result;
+  }
+
   static Map<String, dynamic> _configToRequest(
     HttpRequestConfigEntity? config,
   ) {
@@ -136,12 +170,10 @@ class PostmanCollectionMapper {
         .toList();
     final urlObj = <String, dynamic>{'raw': config.url};
     // Emit the structured `query` array so Postman's UI renders rows.
-    // Derived from the URL's query portion — duplicates preserved.
-    final query = UrlQueryUtils.parseQuery(config.url);
+    // Derived from the URL's raw query segments — duplicates preserved.
+    final query = _rawQuery(config.url);
     if (query.isNotEmpty) {
-      urlObj['query'] = query
-          .map((p) => {'key': p.key, 'value': p.value})
-          .toList();
+      urlObj['query'] = query;
     }
     final result = <String, dynamic>{
       'method': config.method,

@@ -96,6 +96,7 @@ class NormalizedOperation extends Equatable {
     this.headerParams = const [],
     this.body,
     this.security,
+    this.server,
     this.warnings = const [],
   });
 
@@ -109,6 +110,11 @@ class NormalizedOperation extends Equatable {
   final List<NormalizedParam> headerParams;
   final NormalizedBody? body;
   final NormalizedSecurityScheme? security;
+
+  /// The op-level or path-item-level server override (first entry), when
+  /// either scope declares its own `servers` array. Null means "no override"
+  /// — the operation should use the global server(s)/`{{baseUrl}}` env var.
+  final NormalizedServer? server;
   final List<String> warnings;
 
   @override
@@ -121,6 +127,7 @@ class NormalizedOperation extends Equatable {
     headerParams,
     body,
     security,
+    server,
     warnings,
   ];
 }

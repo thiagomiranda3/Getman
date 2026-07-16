@@ -73,6 +73,31 @@ void main() {
     expect(result.root.children.any((n) => n.name == 'ping'), isTrue);
   });
 
+  test(
+    'operation-level server override produces a concrete absolute URL, '
+    'bypassing {{baseUrl}}',
+    () {
+      const api = NormalizedApi(
+        title: 'Demo',
+        servers: [NormalizedServer(url: 'https://api.example.com/v1')],
+        operations: [
+          NormalizedOperation(
+            method: 'POST',
+            path: '/webhook',
+            name: 'Webhook',
+            server: NormalizedServer(
+              url: 'https://{host}',
+              variables: {'host': 'hooks.example.com'},
+            ),
+          ),
+        ],
+      );
+      final result = buildImport(api);
+      final leaf = result.root.children.single.children.single;
+      expect(leaf.config!.url, 'https://hooks.example.com/webhook');
+    },
+  );
+
   test('leaf config: templated url, path-param tokenized, query + header', () {
     final result = buildImport(_api);
     final leaf = result.root.children

@@ -95,4 +95,19 @@ void main() {
   test('a bare empty map as a direct list item stays inline', () {
     expect(YamlEmitter.emit([<String, dynamic>{}]), '- {}\n');
   });
+
+  test('quotes ambiguous map keys the same way as scalar values', () {
+    final yaml = YamlEmitter.emit({'weird: key': 1, '#lead': 2});
+    expect(yaml, '"weird: key": 1\n"#lead": 2\n');
+  });
+
+  test('a map key needing escaping round-trips through a real YAML parser', () {
+    final tree = {
+      'properties': {'weird: key': 1, '#lead': 2},
+    };
+    final parsed = loadYaml(YamlEmitter.emit(tree)) as YamlMap;
+    final props = parsed['properties'] as YamlMap;
+    expect(props['weird: key'], 1);
+    expect(props['#lead'], 2);
+  });
 }

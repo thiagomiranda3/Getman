@@ -31,17 +31,37 @@ class PostmanEnvironmentMapper {
       throw FormatException('Invalid JSON: ${e.message}');
     }
     if (parsed is Map) {
-      return [_mapToEnv(parsed.cast<String, dynamic>())];
+      final data = parsed.cast<String, dynamic>();
+      _requireEnvironmentShape(data);
+      return [_mapToEnv(data)];
     }
     if (parsed is List) {
-      return parsed
-          .whereType<Map<dynamic, dynamic>>()
-          .map((m) => _mapToEnv(m.cast<String, dynamic>()))
-          .toList();
+      final entries =
+          parsed
+              .whereType<Map<dynamic, dynamic>>()
+              .map((m) => m.cast<String, dynamic>())
+              .toList()
+            ..forEach(_requireEnvironmentShape);
+      return entries.map(_mapToEnv).toList();
     }
     throw const FormatException(
       'Expected a JSON object or array for a Postman environment.',
     );
+  }
+
+  /// Mirrors the collections importer's `info.schema` strictness: reject an
+  /// object that doesn't look like a Postman environment (neither a
+  /// `values` list nor the `_postman_variable_scope` marker) rather than
+  /// silently importing it as a junk environment.
+  static void _requireEnvironmentShape(Map<String, dynamic> data) {
+    final hasValues = data['values'] is List;
+    final isEnvironmentScope = data['_postman_variable_scope'] == _scope;
+    if (!hasValues && !isEnvironmentScope) {
+      throw const FormatException(
+        'Not a Postman environment — expected a "values" list or '
+        '"_postman_variable_scope": "environment".',
+      );
+    }
   }
 
   static Map<String, dynamic> _envToMap(EnvironmentEntity env) {

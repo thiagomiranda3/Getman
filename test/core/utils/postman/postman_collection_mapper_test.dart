@@ -112,6 +112,49 @@ void main() {
       },
     );
 
+    test(
+      'exports url.query values RAW (still percent-encoded), matching url.raw',
+      () {
+        const leaf = CollectionNodeEntity(
+          id: 'leaf',
+          name: 'Search',
+          isFolder: false,
+          config: HttpRequestConfigEntity(
+            id: 'cfg',
+            url: 'https://api.com/x?v=%2520',
+          ),
+        );
+        final decoded =
+            jsonDecode(PostmanCollectionMapper.toJson(leaf))
+                as Map<String, dynamic>;
+        final item = (decoded['item'] as List).first as Map<String, dynamic>;
+        final request = item['request'] as Map<String, dynamic>;
+        final url = request['url'] as Map<String, dynamic>;
+        expect(url['raw'], 'https://api.com/x?v=%2520');
+        final query = url['query'] as List;
+        expect(
+          query.single,
+          {'key': 'v', 'value': '%2520'},
+          reason:
+              'the decoded QueryParamEntity list would have produced '
+              '"%20" here, double-decoding on the next import',
+        );
+      },
+    );
+
+    test('emits info.description for a folder root when non-empty', () {
+      const root = CollectionNodeEntity(
+        id: 'root',
+        name: 'My API',
+        description: 'Top-level notes.',
+      );
+      final decoded =
+          jsonDecode(PostmanCollectionMapper.toJson(root))
+              as Map<String, dynamic>;
+      final info = decoded['info'] as Map<String, dynamic>;
+      expect(info['description'], 'Top-level notes.');
+    });
+
     test('wraps a single request leaf as an item', () {
       const leaf = CollectionNodeEntity(
         id: 'leaf',
@@ -485,6 +528,45 @@ void main() {
       final folder = reimported.children.single;
       expect(folder.description, 'All the things.');
       expect(folder.children.single.description, 'Fetches one thing by id.');
+    });
+
+    test(
+      'export then import preserves a double-percent-encoded query value '
+      '(no query-value double-decode round trip)',
+      () {
+        const leaf = CollectionNodeEntity(
+          id: 'leaf',
+          name: 'Search',
+          isFolder: false,
+          config: HttpRequestConfigEntity(
+            id: 'cfg',
+            url: 'https://api.com/x?v=%2520',
+          ),
+        );
+        final reimported = PostmanCollectionMapper.fromJson(
+          PostmanCollectionMapper.toJson(leaf),
+        );
+        expect(
+          reimported.children.first.config!.url,
+          'https://api.com/x?v=%2520',
+          reason:
+              'export must carry the raw (still-encoded) query value so '
+              "the importer's single decode step restores the original "
+              'instead of decoding it twice into a literal space',
+        );
+      },
+    );
+
+    test('export then import preserves the root collection description', () {
+      const original = CollectionNodeEntity(
+        id: 'root',
+        name: 'My API',
+        description: 'Top-level notes.',
+      );
+      final reimported = PostmanCollectionMapper.fromJson(
+        PostmanCollectionMapper.toJson(original),
+      );
+      expect(reimported.description, 'Top-level notes.');
     });
 
     test('import decodes percent-encoded structured query values', () {

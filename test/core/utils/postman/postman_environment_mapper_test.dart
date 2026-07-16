@@ -119,6 +119,45 @@ void main() {
         );
       },
     );
+
+    test(
+      'throws FormatException for a JSON object that is not a Postman '
+      'environment (no "values" list, no _postman_variable_scope)',
+      () {
+        expect(
+          () => PostmanEnvironmentMapper.fromJson('{"foo": "bar"}'),
+          throwsFormatException,
+          reason:
+              'importing a random JSON object must not silently report '
+              '"Imported 1 environment(s)" with a junk env',
+        );
+      },
+    );
+
+    test(
+      'accepts an object with _postman_variable_scope but no "values" list',
+      () {
+        final envs = PostmanEnvironmentMapper.fromJson(
+          '{"name": "Empty", "_postman_variable_scope": "environment"}',
+        );
+        expect(envs.single.name, 'Empty');
+        expect(envs.single.variables, isEmpty);
+      },
+    );
+
+    test(
+      'throws FormatException when an array item is not a Postman '
+      'environment',
+      () {
+        expect(
+          () => PostmanEnvironmentMapper.fromJson(
+            '[{"name": "A", "values": [{"key":"x","value":"1"}]}, '
+            '{"junk": true}]',
+          ),
+          throwsFormatException,
+        );
+      },
+    );
   });
 
   group('round-trip', () {

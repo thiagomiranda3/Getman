@@ -63,6 +63,17 @@ void main() {
       },
     );
 
+    test(
+      'empty array toOpenApi emits a permissive items:{} (OAS 3.0 requires '
+      'an `items` key on every array schema)',
+      () {
+        final schema = JsonSchemaInferrer.infer(<dynamic>[]);
+        final map = schema.toOpenApi();
+        expect(map['type'], 'array');
+        expect(map['items'], <String, dynamic>{});
+      },
+    );
+
     test('binary format round-trips through toOpenApi', () {
       const schema = JsonSchema(type: 'string', format: 'binary');
       expect(schema.toOpenApi(), {'type': 'string', 'format': 'binary'});
