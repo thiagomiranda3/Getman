@@ -76,6 +76,20 @@ void main() {
       expect(config.body, 'q=a%20b');
     });
 
+    test(
+      '--data-urlencode with a leading = encodes the content and drops '
+      'the =',
+      () {
+        // curl docs: `=content` encodes content, the leading `=` is not
+        // included in the posted data (unlike `name=content`).
+        final config = CurlUtils.parse(
+          "curl https://api.dev --data-urlencode '=a b'",
+          id: 'a',
+        );
+        expect(config!.body, 'a%20b');
+      },
+    );
+
     test('-G moves accumulated data into the query string and stays GET', () {
       final config = CurlUtils.parse(
         "curl https://api.dev/search -G -d 'q=term' -d 'p=2'",
@@ -217,6 +231,58 @@ curl --location 'http://test.com/dynamics/websocket-metric' \
       expect(config!.headers['X-Raw'], r'a\nb');
     });
 
+    test(
+      r"ANSI-C $'...' quoting is honored (Chrome/Firefox 'Copy as cURL' "
+      'escapes an apostrophe in the body this way)',
+      () {
+        // Chrome/Firefox emit `--data-raw $'{"name":"O\'Brien"}'` whenever
+        // the captured body contains an apostrophe. Before the fix this
+        // corrupted the body: a leading `$`, truncated at the escaped
+        // quote, and trailing garbage from the rest of the string.
+        const command =
+            r'''curl https://api.dev --data-raw $'{"name":"O\'Brien"}' ''';
+        final config = CurlUtils.parse(command, id: 'a');
+        expect(config, isNotNull);
+        expect(config!.body, '{"name":"O\'Brien"}');
+      },
+    );
+
+    test(
+      r"ANSI-C $'...' honors backslash escapes "
+      '(n, t, r, backslash, and quote)',
+      () {
+        final config = CurlUtils.parse(
+          r'''curl https://api.dev -d $'line1\nline2\ttab\rcr\\slash\"quote' ''',
+          id: 'a',
+        );
+        expect(config!.body, 'line1\nline2\ttab\rcr\\slash"quote');
+      },
+    );
+
+    test(r"ANSI-C $'...' keeps unknown escapes verbatim (e.g. \q)", () {
+      final config = CurlUtils.parse(
+        r'''curl https://api.dev -d $'a\qb' ''',
+        id: 'a',
+      );
+      expect(config!.body, r'a\qb');
+    });
+
+    test(r"ANSI-C $'...' decodes \xHH escapes", () {
+      final config = CurlUtils.parse(
+        r'''curl https://api.dev -d $'\x41BC' ''',
+        id: 'a',
+      );
+      expect(config!.body, 'ABC');
+    });
+
+    test(r"ANSI-C $'...' decodes \uXXXX escapes", () {
+      final config = CurlUtils.parse(
+        r'''curl https://api.dev -d $'A\u0042C' ''',
+        id: 'a',
+      );
+      expect(config!.body, 'ABC');
+    });
+
     test('JSON body without an explicit Content-Type is still raw', () {
       final config = CurlUtils.parse(
         'curl https://api.dev -d \'{"k":1}\'',
@@ -270,6 +336,34 @@ curl --location 'http://test.com/dynamics/websocket-metric' \
       expect(config!.bodyType, BodyType.urlencoded);
       expect(config.formFields.map((f) => f.name).toList(), ['a', 'b']);
     });
+
+    test(
+      '--data-raw with a leading @ is literal data, never a file reference',
+      () {
+        // curl's manual: --data-raw posts data without the special `@`
+        // interpretation that -d/--data and --data-binary apply.
+        final config = CurlUtils.parse(
+          "curl https://api.dev --data-raw '@payload.json'",
+          id: 'a',
+        );
+        expect(config!.bodyFilePath, isNull);
+        expect(config.body, '@payload.json');
+      },
+    );
+
+    test(
+      '-d/--data with a leading @ is a file reference, like --data-binary',
+      () {
+        final config = CurlUtils.parse(
+          'curl https://api.dev -d @payload.json',
+          id: 'a',
+        );
+        expect(config!.method, 'POST');
+        expect(config.bodyType, BodyType.binary);
+        expect(config.bodyFilePath, 'payload.json');
+        expect(config.body, isEmpty);
+      },
+    );
 
     test('-F populates multipart form fields (text + file)', () {
       final config = CurlUtils.parse(
@@ -327,6 +421,26 @@ curl --location 'http://test.com/dynamics/websocket-metric' \
         id: 'a',
       );
       expect(config!.url, 'https://api.dev/x');
+    });
+
+    test('--tlsv1 is a boolean flag and does not swallow the URL', () {
+      // --tlsv1 (and --tlsv1.0/.1/.2/.3) take no value; treating it as a
+      // value-taking flag ate the URL entirely.
+      final config = CurlUtils.parse(
+        'curl --tlsv1 https://example.com',
+        id: 'a',
+      );
+      expect(config, isNotNull);
+      expect(config!.url, 'https://example.com');
+    });
+
+    test('--ciphers consumes its value without swallowing the URL', () {
+      final config = CurlUtils.parse(
+        'curl --ciphers ECDHE-RSA-AES128-GCM-SHA256 https://example.com',
+        id: 'a',
+      );
+      expect(config, isNotNull);
+      expect(config!.url, 'https://example.com');
     });
 
     test('long flag with =value form is tolerated', () {
