@@ -118,9 +118,9 @@ void main() {
 
     final event =
         verify(() => envBloc.add(captureAny())).captured.single
-            as UpdateEnvironment;
-    expect(event.environment.id, 'e1');
-    expect(event.environment.variables, {'old': '1', 'tok': 'abc'});
+            as MergeEnvironmentVariables;
+    expect(event.environmentId, 'e1');
+    expect(event.variables, {'tok': 'abc'});
   });
 
   testWidgets(
@@ -169,10 +169,10 @@ void main() {
 
       final event =
           verify(() => envBloc.add(captureAny())).captured.single
-              as UpdateEnvironment;
-      expect(event.environment.id, 'e1');
+              as MergeEnvironmentVariables;
+      expect(event.environmentId, 'e1');
       expect(
-        event.environment.variables,
+        event.variables,
         {'tok': 'fromA'},
         reason:
             'capture on the non-active tab must still reach the active '
@@ -240,9 +240,9 @@ void main() {
 
       final event =
           verify(() => envBloc.add(captureAny())).captured.single
-              as UpdateEnvironment;
+              as MergeEnvironmentVariables;
       expect(
-        event.environment.variables,
+        event.variables,
         {'tok': 'fromA'},
         reason:
             'a capture landing in a non-active panel must still reach the '
@@ -406,10 +406,10 @@ void main() {
 
       final event =
           verify(() => envBloc.add(captureAny())).captured.single
-              as UpdateEnvironment;
-      expect(event.environment.id, 'e1');
+              as MergeEnvironmentVariables;
+      expect(event.environmentId, 'e1');
       expect(
-        event.environment.variables,
+        event.variables,
         {'tok': 'abc'},
         reason:
             'the pending capture is flushed when an environment becomes active',

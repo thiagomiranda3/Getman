@@ -129,12 +129,14 @@ class _ChainingWriteBackListenerState extends State<ChainingWriteBackListener> {
       return;
     }
 
-    final merged = Map<String, String>.of(active.variables);
-    for (final e in captured) {
-      merged[e.variable] = e.value!;
-    }
+    // MergeEnvironmentVariables (not UpdateEnvironment): the merge happens
+    // against the bloc's live entity inside its handler, so two flushes in the
+    // same event-loop turn — or a keystroke in the open env editor — can't be
+    // lost to a stale full-replacement snapshot.
     context.read<EnvironmentsBloc>().add(
-      UpdateEnvironment(active.copyWith(variables: merged)),
+      MergeEnvironmentVariables(active.id, {
+        for (final e in captured) e.variable: e.value!,
+      }),
     );
     pending.forEach(
       (id, results) => _written[id] = results,

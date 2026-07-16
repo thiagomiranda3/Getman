@@ -28,6 +28,19 @@ class UpdateEnvironment extends EnvironmentsEvent {
   List<Object?> get props => [environment];
 }
 
+/// Merges [variables] into the environment's CURRENT variable map inside the
+/// bloc handler. Used by the chaining write-back: an `UpdateEnvironment`
+/// carrying a full replacement built from a state snapshot loses concurrent
+/// changes (two captures flushing in the same event-loop turn, or a keystroke
+/// in the open env editor) — the merge must read the live entity.
+class MergeEnvironmentVariables extends EnvironmentsEvent {
+  const MergeEnvironmentVariables(this.environmentId, this.variables);
+  final String environmentId;
+  final Map<String, String> variables;
+  @override
+  List<Object?> get props => [environmentId, variables];
+}
+
 class DeleteEnvironment extends EnvironmentsEvent {
   const DeleteEnvironment(this.id);
   final String id;

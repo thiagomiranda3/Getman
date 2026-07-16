@@ -18,6 +18,7 @@ class EnvironmentsBloc extends Bloc<EnvironmentsEvent, EnvironmentsState> {
     on<LoadEnvironments>(_onLoad);
     on<AddEnvironment>(_onAdd);
     on<UpdateEnvironment>(_onUpdate);
+    on<MergeEnvironmentVariables>(_onMergeVariables);
     on<DeleteEnvironment>(_onDelete);
     on<ImportEnvironments>(_onImport);
   }
@@ -64,6 +65,28 @@ class EnvironmentsBloc extends Bloc<EnvironmentsEvent, EnvironmentsState> {
     next[index] = event.environment;
     emit(state.copyWith(environments: next));
     await _persist(() => _putEnvironmentUseCase(event.environment));
+  }
+
+  /// Atomic read-modify-write: merges into the entity as it exists NOW, so
+  /// two merges dispatched in the same event-loop turn both land (events are
+  /// processed sequentially; each handler sees the previous one's emission).
+  Future<void> _onMergeVariables(
+    MergeEnvironmentVariables event,
+    Emitter<EnvironmentsState> emit,
+  ) async {
+    if (event.variables.isEmpty) return;
+    final index = state.environments.indexWhere(
+      (e) => e.id == event.environmentId,
+    );
+    if (index == -1) return;
+    final current = state.environments[index];
+    final merged = current.copyWith(
+      variables: {...current.variables, ...event.variables},
+    );
+    final next = [...state.environments];
+    next[index] = merged;
+    emit(state.copyWith(environments: next));
+    await _persist(() => _putEnvironmentUseCase(merged));
   }
 
   Future<void> _onDelete(

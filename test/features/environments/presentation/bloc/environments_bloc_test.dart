@@ -88,6 +88,39 @@ void main() {
     });
   });
 
+  group('MergeEnvironmentVariables', () {
+    test(
+      'two merges dispatched in the same turn both land (atomic against the '
+      'live entity, unlike a full-replacement UpdateEnvironment)',
+      () async {
+        final env = EnvironmentEntity(
+          id: 'env-1',
+          name: 'Prod',
+          variables: const {'base': 'https://api.dev'},
+        );
+        bloc
+          ..add(AddEnvironment(env))
+          // Same event-loop turn — e.g. two tabs' captures flushing together.
+          ..add(const MergeEnvironmentVariables('env-1', {'tok1': 'a'}))
+          ..add(const MergeEnvironmentVariables('env-1', {'tok2': 'b'}));
+        await Future<void>.delayed(Duration.zero);
+
+        expect(bloc.state.environments.single.variables, {
+          'base': 'https://api.dev',
+          'tok1': 'a',
+          'tok2': 'b',
+        });
+      },
+    );
+
+    test('is a no-op for an unknown environment id or empty map', () async {
+      bloc.add(const MergeEnvironmentVariables('ghost', {'x': '1'}));
+      await Future<void>.delayed(Duration.zero);
+      expect(bloc.state.environments, isEmpty);
+      verifyNever(() => mockRepository.putEnvironment(any()));
+    });
+  });
+
   group('DeleteEnvironment', () {
     test('removes the environment and deletes it by id', () async {
       final env = EnvironmentEntity(id: 'env-1', name: 'Staging');
