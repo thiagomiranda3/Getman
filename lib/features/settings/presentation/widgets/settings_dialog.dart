@@ -19,6 +19,7 @@ import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/settings/presentation/widgets/client_certificate_tile.dart';
 import 'package:getman/features/settings/presentation/widgets/git_identity_settings_tile.dart';
+import 'package:getman/features/settings/presentation/widgets/settings_pane.dart';
 import 'package:getman/features/settings/presentation/widgets/settings_shortcuts_tab.dart';
 import 'package:getman/features/updates/presentation/widgets/update_settings_section.dart';
 
@@ -327,20 +328,9 @@ class _SettingsDialogState extends State<SettingsDialog>
 
   // --- Panes -----------------------------------------------------------------
 
-  Widget _pane(BuildContext context, List<Widget> children) {
-    final layout = context.appLayout;
-    return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(vertical: layout.tabSpacing),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: children,
-      ),
-    );
-  }
-
   Widget _generalTab(BuildContext context, SettingsEntity settings) {
     final bloc = context.read<SettingsBloc>();
-    return _pane(context, [
+    return settingsPane(context, [
       _SettingRow(
         title: 'HISTORY LIMIT',
         trailing: _numberField(
@@ -392,7 +382,7 @@ class _SettingsDialogState extends State<SettingsDialog>
 
   Widget _appearanceTab(BuildContext context, SettingsEntity settings) {
     final bloc = context.read<SettingsBloc>();
-    return _pane(context, [
+    return settingsPane(context, [
       _switch(
         context,
         title: 'DARK MODE',
@@ -432,7 +422,7 @@ class _SettingsDialogState extends State<SettingsDialog>
   Widget _networkTab(BuildContext context, SettingsEntity settings) {
     final bloc = context.read<SettingsBloc>();
     final layout = context.appLayout;
-    return _pane(context, [
+    return settingsPane(context, [
       _SettingRow(
         title: 'CONNECT TIMEOUT (ms)',
         trailing: _numberField(
@@ -524,7 +514,7 @@ class _SettingsDialogState extends State<SettingsDialog>
   }
 
   Widget _workspaceTab(BuildContext context) {
-    return _pane(context, const [
+    return settingsPane(context, const [
       WorkspaceSettingsTile(),
       GitIdentitySettingsTile(),
     ]);

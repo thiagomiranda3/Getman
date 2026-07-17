@@ -5,6 +5,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/features/settings/presentation/widgets/settings_pane.dart';
 
 /// A read-only reference of every global keyboard shortcut, grouped by area.
 /// The displayed key glyphs follow the host platform: macOS shows the symbol
@@ -22,7 +23,7 @@ class SettingsShortcutsTab extends StatelessWidget {
     final shift = isMac ? '⇧' : 'Shift';
     final ctrl = isMac ? '⌃' : 'Ctrl';
 
-    return _pane(context, [
+    return settingsPane(context, [
       _shortcutSection(context, 'REQUEST'),
       _shortcutRow(context, 'Send request', 'Send the active tab’s request', [
         mod,
@@ -88,17 +89,6 @@ class SettingsShortcutsTab extends StatelessWidget {
       ]),
     ]);
   }
-}
-
-Widget _pane(BuildContext context, List<Widget> children) {
-  final layout = context.appLayout;
-  return SingleChildScrollView(
-    padding: EdgeInsets.symmetric(vertical: layout.tabSpacing),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: children,
-    ),
-  );
 }
 
 Widget _shortcutSection(BuildContext context, String label) {
