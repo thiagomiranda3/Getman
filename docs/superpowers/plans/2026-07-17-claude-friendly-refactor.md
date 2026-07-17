@@ -83,7 +83,7 @@ done
 - Modify: `test/features/tabs/presentation/widgets/request_section_index_test.dart` (import)
 
 **Interfaces:**
-- Produces: public widgets `ParamsTabView`, `HeadersTabView`, `BodyTabView` (unchanged APIs, new files) and `BulkModeToggle` (renamed from private `_BulkModeToggle`, same constructor signature otherwise).
+- Produces: public widgets `ParamsTabView`, `HeadersTabView`, `BodyTabView` (unchanged APIs, new files) and `BulkModeToggle` (renamed from private `_BulkModeToggle`; same constructor signature plus the standard optional `super.key` — required by `use_key_in_widget_constructors` once public; amendment recorded during execution, reviewer-sanctioned).
 - Tasks 12 and 17 rely on these exact file names.
 
 Current layout of `request_editor_tabs.dart` (685 lines): `_BulkModeToggle` (l.38), `ParamsTabView`+state (l.95–179), `HeadersTabView`+state (l.181–265), `BodyTabView` (l.267) plus its private family `_BodyTypeSelector`, `_BodyTypeChip`, `_RawBodyEditor`(+state), `_GraphqlBodyEditor`, `_GraphqlPane`, `_EmptyBodyHint`, `_BinaryBodyPicker` (l.321–685).
