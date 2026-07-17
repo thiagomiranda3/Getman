@@ -41,7 +41,7 @@ Three rules apply to every bespoke set (learned from AURIS): `surface` must fill
 
 ### Colors
 
-Method badges use `context.appPalette.methodColor(method)`; status-code bands use `context.appPalette.statusColor(code)` / `.statusAccent(code)`. Text on branded backgrounds (primary, method colors) → `Theme.of(context).colorScheme.onPrimary`. Error/destructive affordances → `colorScheme.error` / `colorScheme.onError`. Never use `Colors.black`/`Colors.red`/`Colors.white` literals for themeable surfaces (`avoid_hardcoded_brand_colors` enforces this); `Colors.white` is only acceptable as deliberate contrast on a variable-colored status badge.
+Method badges use `context.appPalette.methodColor(method)`; status-code bands use `context.appPalette.statusColor(code)` / `.statusAccent(code)`. The supported method list is `HttpMethods.all` (`core/network/http_methods.dart`) — never hardcode `['GET','POST',…]` at a call site (method dropdown, code-gen targets, etc.); adding a method is a one-line change there. Text on branded backgrounds (primary, method colors) → `Theme.of(context).colorScheme.onPrimary`. Error/destructive affordances → `colorScheme.error` / `colorScheme.onError`. Never use `Colors.black`/`Colors.red`/`Colors.white` literals for themeable surfaces (`avoid_hardcoded_brand_colors` enforces this); `Colors.white` is only acceptable as deliberate contrast on a variable-colored status badge.
 
 ### Typography
 
@@ -54,6 +54,8 @@ Method badges use `context.appPalette.methodColor(method)`; status-code bands us
 - `context.appDecoration.wrapInteractive(child: …, onTap: …, scaleDown: …)` — tap animation wrapper; a single uniform `SubtlePress` (~1% scale + slight opacity dim) across all themes (`lib/core/theme/themes/shared/subtle_press.dart`). `BrutalBounce` no longer exists.
 
 The brutalist theme intentionally makes a handful of Material component text sizes responsive to compact mode (buttons, dialog title, dialog content, app bar), marked with single-line comments in `brutalist_theme.dart` — don't "fix" them back to const without a design discussion.
+
+Split panes (the request/response split, the side-menu width) are a UI convention, not a theming one — see the local-during-drag / commit-in-`onEnd` / reset-to-`null` splitter pattern in `docs/architecture/tabs-and-panels.md`.
 
 ## Shared chrome atoms
 

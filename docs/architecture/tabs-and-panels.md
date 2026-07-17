@@ -41,6 +41,16 @@ The metadata-row timeline is `ResponseHistoryTimeline` (hidden under 2 entries);
 - The PARAMS/HEADERS/BODY tab bodies live in `params_tab_view.dart` / `headers_tab_view.dart` / `body_tab_view.dart` (with `bulk_mode_toggle.dart` for the bulk key/value paste mode) and are composed by both the split-pane `RequestConfigSection` and the phone `UnifiedRequestPanel` — edit them once, both layouts follow.
 - `_setControllerPreservingEnd` (in `url_bar.dart`) is the only safe way to push text into a `TextEditingController` without jumping the cursor during an echo-write.
 
+## JSON code editor
+
+`JsonCodeEditor` (`json_code_editor.dart`) must never set `CodeEditorStyle.codeTheme` — re_editor's built-in highlighter runs in an `isolate_manager` worker whose colored results never reach the paint path in this app, so setting `codeTheme` silently reverts everything to a single color. Highlighting instead comes from a synchronous per-line `jsonHighlightSpanBuilder` wired via the controller's `spanBuilder`. Always build controllers fed to `JsonCodeEditor` with `createJsonCodeController()` — it backs both the request body and response body editors in `request_view.dart`.
+
+## Request/response split
+
+`request_view.dart` builds the draggable request/response split via `Splitter` (`core/ui/widgets/splitter.dart`). Drag pattern: a local `ValueNotifier<double?> _localSplitRatio` tracks the ratio while dragging; `onEnd` commits it to `SettingsBloc` (`UpdateSplitRatio`) and resets `_localSplitRatio` back to `null` so the BLoC's `settings.splitRatio` drives the widget again. `main_screen.dart`'s side-menu splitter (`_localSideMenuWidth`) follows the identical local-during-drag / commit-in-`onEnd` / reset-to-`null` pattern — any new splitter must follow it exactly.
+
+`settings.splitRatio` is clamped to `[_splitMin, _splitMax]` (0.1..0.9, both constants in `request_view.dart`) on every drag update; the flex math (`_ratioToFlex`) multiplies by `_splitFlexUnits = 1000`. The clamp is what stops a pane from being dragged to zero width/height — preserve it if you touch this code.
+
 ## Response pane
 
 The response pane is a shell (`response_section.dart` → `ResponseSection`) over per-tab views under `tabs/presentation/widgets/response/` (`ResponseBodyView` + private `_BodyModeToggle`, `ResponseHeadersView`, `ResponseCookiesView`, `ResponseTestsView`, `ResponseMetadataItem`, `ResponseHistoryTimeline`). `ResponseBodyView` carries Copy + Save-to-file (`saveJsonFileWithFeedback`, json/txt) over `_copyableText()` (the verbatim body incl. the large-body cache).
