@@ -1,3 +1,7 @@
+// Shared SwitchThemeData factory for the pre-refactor inline switch colors
+// (secondary-colored thumb / primary-colored track when ON) that every
+// non-glass theme installs; glass ships its own richer SwitchThemeData
+// instead.
 import 'package:flutter/material.dart';
 
 /// Reproduces the switch styling the settings/rule UIs used to hardcode inline

@@ -1,3 +1,9 @@
+// WorkspacePulseController: app-wide idle/presence rhythm signal for
+// ambient backgrounds. idleFactor ramps 0 (active) -> 1 (fully idle) via a
+// 1s timer that only runs while something is listening (started in
+// addListener, cancelled when the last listener leaves), so it never wakes
+// the app when no animated ambient is mounted (reduceEffects or a calm
+// theme). touch() resets idle on user interaction.
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';

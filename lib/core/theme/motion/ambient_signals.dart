@@ -1,3 +1,8 @@
+// AmbientSignals bundles the pointer position plus WorkspacePulseController
+// (session idle/presence rhythm) threaded once into a theme's animated
+// scaffoldBackground painter (VM-C1 pointer parallax + VM-C2 pulse). Built
+// only for the animated variant; the reduceEffects static variant passes
+// null so nothing subscribes or repaints.
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show Offset;
 import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
