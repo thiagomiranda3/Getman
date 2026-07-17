@@ -5,6 +5,96 @@ All notable changes to **Getman** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-07-16
+
+### Added
+
+- **Git-native collaboration for collections** (desktop) — work with your API
+  collections through real git: no account, no cloud workspace. Builds on the
+  git-friendly workspace mirror, and Getman never stores a credential or edits
+  your global git config. Four parts:
+  - **Review & commit** — a **REVIEW CHANGES** dialog in the collections header
+    lists every changed request/folder with a field-level *semantic* diff
+    (method, URL, headers, body, auth — secret values are never printed),
+    per-node stage checkboxes, a commit-message box, and inline error
+    surfacing. Commits use a Getman-owned identity you configure in settings.
+  - **Branch & sync** — a branch chip shows the current branch with
+    ahead/behind counts and a menu to switch or create branches,
+    **PULL (REBASE)**, **PUSH** (sets the upstream on a first push), and manage
+    stashes (list / pop / drop). Switching with uncommitted changes prompts to
+    review or stash first, and the tree reloads automatically after git
+    changes the disk.
+  - **Pull requests** — via the GitHub CLI (`gh`): list the repo's open PRs
+    (draft tag + CI check status, tap to open in the browser) and create one
+    from the current branch — the branch is pushed first, so a never-pushed
+    branch opens a PR in one step. Auth rides entirely on your existing
+    `gh` login.
+  - **Conflict resolution & auto-fetch** — a pull that hits conflicts opens a
+    field-by-field resolver instead of bouncing you to the command line.
+    Fields only one side changed merge automatically; for true overlaps pick
+    **Take Incoming** / **Keep Yours** (with inline edit for text fields),
+    then **RESOLVE & CONTINUE** — or cancel to restore the exact pre-pull
+    state. A background fetch (~5 min) keeps the ahead/behind counts fresh
+    without ever touching your collections.
+
+### Fixed
+
+An app-wide hardening pass — roughly 75 small, surgical fixes, each with a
+regression test. Highlights:
+
+- **Networking & cookies** — the redirect loop now captures each hop's
+  `Set-Cookie` (a login 302's cookie is re-sent on the next hop), applies
+  RFC 6265 host-only semantics, strips `Authorization` when a redirect crosses
+  hosts, and follows 301/302/303 vs 307/308 method semantics correctly.
+  `Set-Cookie` domains that don't cover the request host are rejected.
+  Response charset handling fixed, and the HTTP adapter is only rebuilt when
+  an adapter-relevant setting actually changed.
+- **Realtime** — SSE connections now honor the network settings (verify SSL /
+  proxy / mTLS) and the cookie jar, and a non-2xx connect surfaces as an
+  `HTTP <code>` error frame instead of silently streaming the error body. The
+  Connecting/Streaming frame reaches late subscribers, and connect buttons
+  resolve `{{variables}}` at press time.
+- **Tabs & panels** — bulk close (Close Others / Close to the Right) cancels
+  in-flight sends and prompts for dirty tabs; URL/method edits no longer
+  revert newer config edits; response time-travel keeps the newest entry's
+  full body; chaining write-back works from tabs in non-active panels; the
+  PARAMS/HEADERS/BODY section selection is global across tabs.
+- **Collections & workspace** — a failed workspace read is never treated as an
+  empty workspace (no more wiping collections on a transient read error);
+  app-only data (saved examples, favorites) survives workspace disk reloads;
+  request kind and node descriptions persist in the mirror; drag-and-drop and
+  tree mutations hardened; git sync autostashes conflicts correctly.
+- **Import / export / code generation / cURL** — Postman import/export
+  round-trips auth, descriptions, and secret flags without double-encoding
+  query params; OpenAPI and API-docs exports fixed (including shared
+  parameters); generated code escapes URLs, form fields, header keys, and
+  binary file paths, and urlencoded bodies are actually form-encoded; the
+  cURL parser handles glued short options (`-XPOST`), ANSI-C quoting
+  (`$'...'`), `@file` semantics, and TLS flags.
+- **Chaining & environments** — assertion/extraction engines handle null
+  leaves, regex alternations, and negative ranges; capture write-back is an
+  atomic merge so concurrent captures don't clobber each other; the variable
+  name grammar accepts spaces and symbols; environments sort alphabetically;
+  URL normalization no longer mangles `{{$dynamic}}` tokens.
+- **History** — the dedup signature now covers body shape (GraphQL variables,
+  binary file path, multipart fields), so distinct sends aren't collapsed
+  into one entry.
+- **Settings, updates & misc UI** — numeric settings commit on blur/submit;
+  failed update checks are surfaced (and releases without notes still
+  prompt); JSON Beautify preserves big integers; the command palette keeps
+  the arrow-key selection in view; Cmd/Ctrl+N is dead while a dialog is open;
+  plus assorted widget fixes.
+
+### Contributors
+
+Thanks to everyone who contributed since v1.8.1:
+
+- [@ThiagoCortez81](https://github.com/ThiagoCortez81) (Thiago Cortez) —
+  the git-native collaboration initiative (review & commit, branch & sync,
+  pull requests, conflict resolution) and the PR-Agent CI review gate.
+- [@thiagomiranda3](https://github.com/thiagomiranda3) (Thiago Miranda) —
+  the app-wide bug-hunt hardening pass (~75 fixes).
+
 ## [1.8.1] - 2026-07-02
 
 ### Fixed
