@@ -1,3 +1,5 @@
+// Narrow-layout stand-in for the full tab strip; see class doc below.
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';

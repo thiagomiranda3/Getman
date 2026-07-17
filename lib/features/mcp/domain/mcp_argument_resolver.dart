@@ -1,3 +1,8 @@
+// Resolves `{{var}}`/`{{$dynamic}}` tokens inside an MCP tool-call arguments
+// JSON object, walking Map/List structurally and substituting only String
+// leaves (keeps the document structurally valid). Used by McpPanel at CALL
+// time.
+
 import 'package:getman/core/utils/environment_resolver.dart';
 
 /// Recursively resolves `{{var}}` (and dynamic `{{$...}}`) tokens in a single

@@ -1,3 +1,7 @@
+// RealtimeBloc events: connect (WebSocket or SSE, by RequestKind), send a
+// message, disconnect. FrameReceived is internal — routed through the bloc so
+// state only ever changes inside an event handler.
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/network/realtime_frame.dart';
 import 'package:getman/core/network/request_kind.dart';

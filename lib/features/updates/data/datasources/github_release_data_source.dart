@@ -1,3 +1,6 @@
+// Fetches the GitHub "latest release" for the auto-updater; see class doc
+// below. Picks the platform-specific asset by filename suffix.
+
 import 'package:dio/dio.dart';
 import 'package:getman/features/updates/domain/entities/release_info.dart';
 

@@ -1,3 +1,6 @@
+// Entity for one tool an MCP server advertises via `tools/list`; see class
+// doc below.
+
 import 'package:equatable/equatable.dart';
 
 /// A tool advertised by an MCP server via `tools/list`. [inputSchema] is the

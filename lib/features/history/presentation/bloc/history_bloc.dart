@@ -1,3 +1,8 @@
+// History bloc: no explicit load event (see class doc below) — subscribes to
+// WatchHistoryUseCase on construction and mirrors emissions into state.
+// History is read-only from the UI; all writes happen inside
+// SendRequestUseCase, never through a bloc event dispatched from a widget.
+
 import 'dart:async';
 import 'dart:developer';
 

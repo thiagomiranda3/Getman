@@ -1,3 +1,11 @@
+// Hive model (typeId 1, box: history; also embedded in collection nodes) for
+// a stored HTTP request + its captured response columns. `==`/`hashCode`
+// DELIBERATELY exclude `id` and the response fields so history dedup works on
+// request signature (method/url/body plus the body-shape fields bodyType/
+// graphqlVariables/bodyFilePath/formFields) — do not re-include `id` without
+// a discussion (see CLAUDE.md Sec 6). Also carries a lazy one-time migration
+// of legacy `params` map entries into the URL's query string (see toEntity).
+
 import 'package:collection/collection.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';

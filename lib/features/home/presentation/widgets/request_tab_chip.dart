@@ -1,3 +1,10 @@
+// One tab chip in the desktop/tablet tab strip: title + dirty marker + close
+// button, drag-reorderable and long-press-draggable onto the panel selector.
+// Hover shows a delayed tooltip card with the full title/URL. Right-click (or
+// two-finger tap) opens a context menu with CLOSE / CLOSE OTHERS / CLOSE TO
+// THE LEFT|RIGHT (each gated behind an unsaved-changes confirm when any
+// affected tab is dirty) / DUPLICATE / COPY URL / MOVE TO PANEL.
+
 import 'dart:async';
 
 import 'package:collection/collection.dart';

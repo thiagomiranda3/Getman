@@ -1,3 +1,7 @@
+// Cookie manager dialog: lists every stored cookie grouped by domain, lets
+// the user delete one cookie or clear the whole jar. Reached from Settings ->
+// COOKIES -> MANAGE. See CookieManagerDialog class doc below.
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';

@@ -1,3 +1,11 @@
+// Realtime (WebSocket/SSE) bloc-over-service — no domain/data split by design
+// (see CLAUDE.md's realtime feature note). Owns one live RealtimeConnection
+// per tab; frames from each connection's stream are buffered and flushed as a
+// single _FramesBatchReceived event per 16ms coalescing window so a
+// high-frequency stream causes ~1 state emission per frame at 60fps instead of
+// one per message. Connections are closed on disconnect, on reconnect for the
+// same tab, and on bloc close (mirrors TabsBloc's request-manager teardown).
+
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';

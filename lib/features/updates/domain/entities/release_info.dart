@@ -1,3 +1,6 @@
+// Update-feature domain entities: the target UpdatePlatform enum and the
+// ReleaseInfo the updater consumes; see class docs below.
+
 import 'package:equatable/equatable.dart';
 
 /// The desktop platforms Getman ships update artifacts for.

@@ -1,3 +1,12 @@
+// History is read-only from the UI's perspective — writes happen only via
+// SendRequestUseCase. Dedup is by request signature (HttpRequestConfig's
+// method+url+body plus bodyType/graphqlVariables/bodyFilePath/formFields);
+// header differences do NOT dedupe. addToHistory maintains an in-memory
+// hashCode->keys index (rebuilt if the box length drifts) so dedup lookup is
+// O(1) instead of a full box scan. Trim uses a `while` loop so lowering the
+// history limit actually shrinks the box. watch() exposes Box.watch(); the
+// repository reverses insertion order so callers get newest-first.
+
 import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/features/history/data/models/request_config_model.dart';

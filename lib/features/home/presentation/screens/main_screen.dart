@@ -1,3 +1,15 @@
+// App shell: split-pane (side menu + tab strip + content) on desktop, drawer
+// nav on compact layouts. Hosts every tab/panel keyboard Action — including
+// NewTabIntent, moved here from the root Actions in main.dart (see the D8
+// comment below) — plus the dialog-openers CommandPaletteIntent /
+// SwitchEnvironmentIntent, EXCEPT SaveRequestIntent/BeautifyJsonIntent (those
+// live inside RequestView). This class sits below MaterialApp + the router's
+// Navigator, which dialog-opening actions need for showDialog to find
+// MaterialLocalizations, and which keeps every shortcut here correctly dead
+// while a modal dialog is up. `_buildTabBar` IS the desktop/tablet tab strip
+// (each chip is a RequestTabChip); `TabChip` is the compact-layout stand-in.
+// Also renders the auto-update gate (UpdateGate) as a Stack overlay.
+
 import 'dart:async';
 
 import 'package:flutter/gestures.dart';

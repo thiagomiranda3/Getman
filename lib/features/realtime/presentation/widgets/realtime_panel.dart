@@ -1,3 +1,6 @@
+// Live WebSocket/SSE view for one tab; see class doc below. The composer
+// (send box) only renders for WebSocket — SSE is receive-only.
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/network/realtime_frame.dart';

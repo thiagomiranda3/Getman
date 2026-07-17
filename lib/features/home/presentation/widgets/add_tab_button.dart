@@ -1,3 +1,5 @@
+// "+" button at the end of the tab strip; dispatches AddTab on TabsBloc.
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';

@@ -1,3 +1,6 @@
+// RealtimeBloc state: per-tab connection status + capped message/event log
+// (frames), keyed by tabId.
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/network/realtime_frame.dart';
 

@@ -1,3 +1,6 @@
+// Desktop/drawer side menu: header (logo + new-folder/settings buttons) over
+// a COLLECTIONS/HISTORY BrandedTabBar + TabBarView.
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';

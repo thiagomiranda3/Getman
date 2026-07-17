@@ -1,3 +1,9 @@
+// HistoryRepository impl over HistoryLocalDataSource. watchHistory() debounces
+// the data source's raw Box.watch() events (a single addToHistory can fire up
+// to ~3 mutations) within an 80ms coalescing window so subscribers see one
+// re-read + emission per burst, not one per mutation; the emitted list is
+// always newest-first (models.reversed).
+
 import 'dart:async';
 
 import 'package:getman/core/domain/entities/request_config_entity.dart';

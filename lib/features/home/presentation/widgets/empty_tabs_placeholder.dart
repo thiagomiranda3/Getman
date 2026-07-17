@@ -1,3 +1,6 @@
+// Zero-tabs empty state (shown when a panel has no open tabs, incl. a
+// freshly-added panel — there is no auto-seed). See class doc below.
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';

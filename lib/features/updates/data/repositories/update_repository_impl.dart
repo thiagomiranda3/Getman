@@ -1,3 +1,7 @@
+// UpdateRepository impl over GithubReleaseDataSource. Any fetch failure
+// (offline, rate-limited, malformed JSON) is logged and mapped to `null` —
+// callers treat null as "no update info available", never as an exception.
+
 import 'dart:developer';
 
 import 'package:getman/features/updates/data/datasources/github_release_data_source.dart';

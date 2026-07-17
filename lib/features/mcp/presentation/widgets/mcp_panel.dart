@@ -1,3 +1,8 @@
+// Post-connect MCP UI (tool picker, JSON arguments editor, CALL, result,
+// session log); see class doc below. Tool/result text mutations are always
+// scheduled via addPostFrameCallback, never inline in build(), so controller
+// updates (which notifyListeners) never fire mid-build.
+
 import 'dart:convert';
 
 import 'package:collection/collection.dart';

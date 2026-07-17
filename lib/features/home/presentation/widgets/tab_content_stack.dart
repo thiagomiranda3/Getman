@@ -1,3 +1,7 @@
+// Keeps a capped LRU set of live RequestView instances alive in a Stack so
+// switching tabs doesn't rebuild the editor tree from scratch; see class doc
+// below for the reconciliation algorithm and per-tab focus-scope handling.
+
 import 'package:flutter/material.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/screens/request_view.dart';
