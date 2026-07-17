@@ -22,8 +22,12 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
       (history) {
         if (!isClosed) add(HistoryUpdated(history));
       },
-      onError: (Object e) =>
-          log('History watch error: $e', name: 'HistoryBloc'),
+      onError: (Object e) {
+        log('History watch error: $e', name: 'HistoryBloc');
+        // Clear isLoading too: with only the log, a failed initial read left
+        // the drawer on a permanent spinner with no way to notice or retry.
+        if (!isClosed) add(const HistoryUpdated([]));
+      },
     );
   }
   final WatchHistoryUseCase _watchHistoryUseCase;

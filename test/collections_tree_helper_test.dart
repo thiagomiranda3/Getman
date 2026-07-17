@@ -473,4 +473,94 @@ void main() {
       expect(CollectionsTreeHelper.parentIdOf(nodes, 'child'), 'root');
     });
   });
+
+  group('overlayLocalOnly', () {
+    test('restores masked secret values from the in-memory tree', () {
+      // Disk: the mirror masked the secret 'token' to ''.
+      final onDisk = [
+        const CollectionNodeEntity(
+          id: 'f1',
+          name: 'API',
+          variables: {'base': 'https://api.dev', 'token': ''},
+          secretKeys: {'token'},
+        ),
+      ];
+      final inMemory = [
+        const CollectionNodeEntity(
+          id: 'f1',
+          name: 'API',
+          variables: {'base': 'https://api.dev', 'token': 'sk-123'},
+          secretKeys: {'token'},
+        ),
+      ];
+
+      final merged = CollectionsTreeHelper.overlayLocalOnly(onDisk, inMemory);
+      expect(
+        CollectionsTreeHelper.findNode(merged, 'f1')!.variables,
+        {'base': 'https://api.dev', 'token': 'sk-123'},
+        reason: 'a branch switch/pull/reload must not blank secret values',
+      );
+    });
+
+    test('a non-empty disk value wins over the local secret', () {
+      final onDisk = [
+        const CollectionNodeEntity(
+          id: 'f1',
+          name: 'API',
+          variables: {'token': 'upstream'},
+          secretKeys: {'token'},
+        ),
+      ];
+      final inMemory = [
+        const CollectionNodeEntity(
+          id: 'f1',
+          name: 'API',
+          variables: {'token': 'local'},
+          secretKeys: {'token'},
+        ),
+      ];
+      final merged = CollectionsTreeHelper.overlayLocalOnly(onDisk, inMemory);
+      expect(
+        CollectionsTreeHelper.findNode(merged, 'f1')!.variables['token'],
+        'upstream',
+      );
+    });
+
+    test('carries saved examples over to the reloaded leaf, by id', () {
+      final example = SavedExampleEntity(
+        id: 'ex1',
+        name: '200 OK',
+        capturedAt: DateTime.fromMillisecondsSinceEpoch(1),
+        config: const HttpRequestConfigEntity(id: 'c1'),
+      );
+      final onDisk = [
+        folder('f1', 'Folder', children: [leaf('r1', 'R1')]),
+      ];
+      final inMemory = [
+        folder(
+          'f1',
+          'Folder',
+          children: [
+            leaf('r1', 'R1').copyWith(examples: [example]),
+          ],
+        ),
+      ];
+
+      final merged = CollectionsTreeHelper.overlayLocalOnly(onDisk, inMemory);
+      expect(
+        CollectionsTreeHelper.findNode(merged, 'r1')!.examples,
+        [example],
+        reason: 'examples are app-only and must survive a disk reload',
+      );
+    });
+
+    test('nodes new on disk pass through untouched', () {
+      final onDisk = [leaf('new1', 'New')];
+      final merged = CollectionsTreeHelper.overlayLocalOnly(
+        onDisk,
+        [leaf('old1', 'Old')],
+      );
+      expect(merged, onDisk);
+    });
+  });
 }

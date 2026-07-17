@@ -15,6 +15,7 @@ class NetworkCookie extends Equatable {
     this.secure = false,
     this.httpOnly = false,
     this.expiresEpochMs,
+    this.hostOnly = false,
   });
   final String name;
   final String value;
@@ -26,6 +27,12 @@ class NetworkCookie extends Equatable {
   /// Absolute expiry in epoch ms, or null for a session cookie.
   final int? expiresEpochMs;
 
+  /// RFC 6265 §5.1.3: when the `Set-Cookie` carried no `Domain` attribute the
+  /// cookie is host-only and must match the request host **exactly** (never a
+  /// subdomain). Defaults to false so legacy persisted cookies (missing the
+  /// field) keep the pre-fix suffix-matching behavior.
+  final bool hostOnly;
+
   /// Identity for upsert: a server overwriting (domain, path, name) replaces.
   String get key => '$domain|$path|$name';
 
@@ -36,7 +43,7 @@ class NetworkCookie extends Equatable {
   bool matches(Uri uri) {
     final host = uri.host.toLowerCase();
     final d = _stripLeadingDot(domain.toLowerCase());
-    final domainOk = host == d || host.endsWith('.$d');
+    final domainOk = hostOnly ? host == d : (host == d || host.endsWith('.$d'));
     if (!domainOk) return false;
     if (!_pathMatches(uri.path.isEmpty ? '/' : uri.path)) return false;
     if (secure && uri.scheme != 'https') return false;
@@ -61,7 +68,8 @@ class NetworkCookie extends Equatable {
     final result = <NetworkCookie>[];
     for (final c in CookieParser.parse(header)) {
       var domain = requestUri.host;
-      var path = '/';
+      var hostOnly = true; // no Domain attribute → host-only (RFC 6265 §5.1.3)
+      String? explicitPath;
       var secure = false;
       var httpOnly = false;
       int? expires;
@@ -69,10 +77,17 @@ class NetworkCookie extends Equatable {
         final a = attr.trim();
         final lower = a.toLowerCase();
         if (lower.startsWith('domain=')) {
-          domain = _stripLeadingDot(a.substring(7).trim());
+          final dv = _stripLeadingDot(a.substring(7).trim());
+          // An empty Domain attribute is ignored → the cookie stays host-only.
+          if (dv.isNotEmpty) {
+            domain = dv;
+            hostOnly = false;
+          }
         } else if (lower.startsWith('path=')) {
           final p = a.substring(5).trim();
-          if (p.isNotEmpty) path = p;
+          // RFC 6265 §5.2.4: a Path value not starting with '/' is discarded,
+          // so the default-path (request-URI directory) applies instead.
+          if (p.startsWith('/')) explicitPath = p;
         } else if (lower == 'secure') {
           secure = true;
         } else if (lower == 'httponly') {
@@ -82,7 +97,19 @@ class NetworkCookie extends Equatable {
           if (secs != null) expires = nowEpochMs + secs * 1000;
         }
       }
+      final path = explicitPath ?? _defaultPath(requestUri);
       if (domain.isEmpty) domain = requestUri.host;
+      // RFC 6265 §5.3.6: a Domain attribute must cover the request host —
+      // otherwise any server could plant cookies for arbitrary sites
+      // (Domain=bank.com from evil.com). The single-label check on the
+      // suffix arm is a pragmatic public-suffix guard (rejects Domain=com)
+      // without shipping the full PSL; multi-label suffixes like co.uk are
+      // not caught.
+      final host = requestUri.host.toLowerCase();
+      final d = domain.toLowerCase();
+      final domainCoversHost =
+          host == d || (host.endsWith('.$d') && d.contains('.'));
+      if (!domainCoversHost) continue;
       result.add(
         NetworkCookie(
           name: c.name,
@@ -92,6 +119,7 @@ class NetworkCookie extends Equatable {
           secure: secure,
           httpOnly: httpOnly,
           expiresEpochMs: expires,
+          hostOnly: hostOnly,
         ),
       );
     }
@@ -101,6 +129,16 @@ class NetworkCookie extends Equatable {
   static String _stripLeadingDot(String d) =>
       d.startsWith('.') ? d.substring(1) : d;
 
+  /// RFC 6265 §5.1.4 default-path: the request URI's directory — everything up
+  /// to (but excluding) the rightmost `/`. A rootless or single-segment path
+  /// yields `/`.
+  static String _defaultPath(Uri uri) {
+    final p = uri.path;
+    if (p.isEmpty || !p.startsWith('/')) return '/';
+    final lastSlash = p.lastIndexOf('/');
+    return lastSlash <= 0 ? '/' : p.substring(0, lastSlash);
+  }
+
   NetworkCookie copyWith({String? value, int? expiresEpochMs}) => NetworkCookie(
     name: name,
     value: value ?? this.value,
@@ -109,6 +147,7 @@ class NetworkCookie extends Equatable {
     secure: secure,
     httpOnly: httpOnly,
     expiresEpochMs: expiresEpochMs ?? this.expiresEpochMs,
+    hostOnly: hostOnly,
   );
 
   @override
@@ -120,5 +159,6 @@ class NetworkCookie extends Equatable {
     secure,
     httpOnly,
     expiresEpochMs,
+    hostOnly,
   ];
 }

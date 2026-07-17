@@ -263,4 +263,40 @@ void main() {
     expect(find.text('Login'), findsOneWidget);
     expect(find.text('Production'), findsOneWidget);
   });
+
+  testWidgets(
+    'ArrowDown past the visible fold scrolls the highlighted row into view',
+    (tester) async {
+      // Seed enough history rows that the (capped maxHeight: 360) results
+      // list has to scroll well before the 13th row (index 12) — without
+      // ScrollController wiring, this row would never even get built by the
+      // lazy ListView.builder, since it sits outside both the viewport and
+      // the default cache extent.
+      when(() => history.state).thenReturn(
+        HistoryState(
+          history: [
+            for (var i = 0; i < 20; i++)
+              HttpRequestConfigEntity(
+                id: 'h$i',
+                url: 'https://api.example.com/item/$i',
+              ),
+          ],
+        ),
+      );
+      await pump(tester);
+
+      for (var i = 0; i < 12; i++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+        await tester.pump();
+      }
+      // Let the scroll-into-view animation finish.
+      await tester.pumpAndSettle();
+
+      final row12 = find.byKey(const ValueKey('palette_result_12'));
+      // Built at all (the lazy ListView had to realize it) AND actually
+      // reachable by a tap (not clipped outside the scrollable viewport).
+      expect(row12, findsOneWidget);
+      expect(row12.hitTestable(), findsOneWidget);
+    },
+  );
 }

@@ -40,11 +40,17 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
   /// Drops an event while another op is in flight — the bloc is effectively
   /// droppable. A second op would run git against a working tree the first one
   /// is mid-way through changing, and whichever finished last would overwrite
-  /// the other's terminal state. Every handler always emits a terminal
-  /// (ready/error) state in a try/catch, so [GitSyncStatus.busy] is always
-  /// exited and this cannot deadlock.
+  /// the other's terminal state. `loading` counts as in-flight too: a status
+  /// load runs several git subprocesses, and a mutating op started under it
+  /// would race them — and the load's late `ready` emission would clear the
+  /// op's `busy` mid-run, re-enabling the UI. Every handler always emits a
+  /// terminal (ready/error) state in a try/catch, so neither status can
+  /// deadlock.
   bool _dropWhileBusy(String op) {
-    if (state.status != GitSyncStatus.busy) return false;
+    if (state.status != GitSyncStatus.busy &&
+        state.status != GitSyncStatus.loading) {
+      return false;
+    }
     log('$op ignored: another operation is in flight', name: 'GitSyncBloc');
     return true;
   }
@@ -197,7 +203,10 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
     emit(
       state.copyWith(
         status: GitSyncStatus.busy,
-        reloadToken: outcome == PullOutcome.clean
+        // cleanEditsStashed reloads too: the working tree IS the clean
+        // pulled state (the conflicting local edits were parked in the
+        // stash).
+        reloadToken: outcome != PullOutcome.conflicted
             ? state.reloadToken + 1
             : null,
         conflictToken: outcome == PullOutcome.conflicted
@@ -206,6 +215,17 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
       ),
     );
     await _refresh(event.root, emit);
+    if (outcome == PullOutcome.cleanEditsStashed) {
+      emit(
+        state.copyWith(
+          status: GitSyncStatus.error,
+          errorMessage:
+              'Pulled, but your uncommitted local edits conflicted with the '
+              'pulled changes. They were kept in the git stash — open '
+              'STASHES in the branch menu to re-apply or drop them.',
+        ),
+      );
+    }
   }
 
   Future<void> _onFetch(FetchRemote event, Emitter<GitSyncState> emit) async {
@@ -237,7 +257,12 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
     ConflictsResolved event,
     Emitter<GitSyncState> emit,
   ) async {
-    if (_dropWhileBusy('resolved')) return;
+    // Deliberately NOT guarded by _dropWhileBusy: this event is the only
+    // signal that the just-merged tree must be reloaded into Hive. Dropping
+    // it because e.g. the 5-minute auto-fetch happened to hold `busy` would
+    // leave Hive on the pre-pull forest — and the next mirror would silently
+    // revert the merge on disk. It runs no git subprocess of its own, so
+    // overlapping an in-flight op only interleaves state emissions.
     await _run(event.root, emit, 'resolved', () async {}, changedDisk: true);
   }
 

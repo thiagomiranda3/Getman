@@ -73,6 +73,7 @@ import 'package:getman/features/tabs/data/repositories/tabs_repository_impl.dart
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
+import 'package:getman/features/tabs/presentation/widgets/request_section_index.dart';
 import 'package:getman/features/updates/data/datasources/github_release_data_source.dart';
 import 'package:getman/features/updates/data/repositories/update_repository_impl.dart';
 import 'package:getman/features/updates/domain/repositories/update_repository.dart';
@@ -199,7 +200,9 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
       () => WorkspaceSyncService(createWorkspaceDataSource()),
     )
     ..registerLazySingleton<GitService>(createGitService)
-    ..registerLazySingleton<ReviewService>(() => WorkspaceReviewService(sl()))
+    ..registerLazySingleton<ReviewService>(
+      () => WorkspaceReviewService(sl(), sl()),
+    )
     ..registerLazySingleton<BranchService>(() => GitBranchService(sl(), sl()))
     ..registerLazySingleton<ConflictService>(
       () => GitConflictService(sl(), sl()),
@@ -269,8 +272,9 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
       ),
     )
     ..registerLazySingleton<TabsLocalDataSource>(TabsLocalDataSourceImpl.new)
-    // Features - Realtime (WebSocket / SSE)
-    ..registerLazySingleton(RealtimeService.new)
+    // Features - Realtime (WebSocket / SSE). RealtimeService itself is
+    // registered below, alongside NetworkService, once the cookie store and
+    // initial NetworkConfig it needs (H2) are available.
     ..registerLazySingleton(() => RealtimeBloc(service: sl()))
     // Features - MCP (Model Context Protocol client over Streamable HTTP)
     ..registerLazySingleton(McpService.new)
@@ -285,6 +289,9 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     ..registerLazySingleton(() => UpdateController(sl<UpdateRepository>()))
     // Lets the Cmd/Ctrl+L shortcut focus the active tab's URL field.
     ..registerLazySingleton(UrlFocusRegistry.new)
+    // Session-global PARAMS/AUTH/HEADERS/BODY/RULES selection, shared across
+    // every request tab's editor strip.
+    ..registerLazySingleton(RequestSectionIndex.new)
     ..registerLazySingleton<WorkspacePulseController>(
       WorkspacePulseController.new,
     );
@@ -299,6 +306,17 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     ..registerLazySingleton(
       () => NetworkService(
         dio: NetworkService.buildDio(
+          initialSettings.toNetworkConfig(),
+          CookieInterceptor(cookieStore),
+        ),
+      ),
+    )
+    // Wired like NetworkService: the same NetworkConfig (SSL verify/proxy/
+    // mTLS) and cookie jar, so SSE respects network settings and sends
+    // session cookies (H2) instead of a bare, unconfigured Dio.
+    ..registerLazySingleton(
+      () => RealtimeService(
+        dio: RealtimeService.buildSseDio(
           initialSettings.toNetworkConfig(),
           CookieInterceptor(cookieStore),
         ),

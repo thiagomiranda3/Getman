@@ -8,6 +8,7 @@ import 'package:getman/core/navigation/intents.dart';
 import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/network_service.dart';
+import 'package:getman/core/network/realtime_service.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/motion/theme_switch_transition.dart';
 import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
@@ -36,6 +37,7 @@ import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/settings/presentation/widgets/network_settings_listener.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/features/tabs/presentation/widgets/request_section_index.dart';
 import 'package:getman/features/updates/presentation/update_controller.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:media_kit/media_kit.dart';
@@ -171,8 +173,14 @@ class MyApp extends StatelessWidget {
         RepositoryProvider<UrlFocusRegistry>.value(
           value: di.sl<UrlFocusRegistry>(),
         ),
+        ChangeNotifierProvider<RequestSectionIndex>.value(
+          value: di.sl<RequestSectionIndex>(),
+        ),
         RepositoryProvider<NetworkService>.value(
           value: di.sl<NetworkService>(),
+        ),
+        RepositoryProvider<RealtimeService>.value(
+          value: di.sl<RealtimeService>(),
         ),
         RepositoryProvider<CookieStore>.value(value: di.sl<CookieStore>()),
         RepositoryProvider<WorkspaceSyncService>.value(
@@ -220,59 +228,56 @@ class MyApp extends StatelessWidget {
                     prev.settings.isCompactMode != next.settings.isCompactMode,
                 builder: (context, state) {
                   final settings = state.settings;
+                  // NewTabIntent (and every other tab-strip shortcut) is
+                  // wired in MainScreen, not here — see the D8 note there.
+                  // A root Actions above MaterialApp/the Navigator is
+                  // reachable from focused widgets INSIDE every modal dialog
+                  // (showDialog pushes onto the same root Navigator this
+                  // Shortcuts wraps), so Cmd/Ctrl+N used to fire from inside
+                  // e.g. the settings dialog or the command palette's search
+                  // field, silently stacking new tabs behind the modal
+                  // barrier. MainScreen's Actions sits BELOW the router (a
+                  // sibling of the dialog's overlay route, not an ancestor of
+                  // it), so shortcuts wired there are correctly unreachable
+                  // from a dialog — exactly like CloseTabIntent etc. already
+                  // were.
                   return Shortcuts(
                     shortcuts: appShortcuts,
-                    child: Actions(
-                      actions: <Type, Action<Intent>>{
-                        NewTabIntent: CallbackAction<NewTabIntent>(
-                          onInvoke: (intent) =>
-                              context.read<TabsBloc>().add(const AddTab()),
-                        ),
-                        // CommandPaletteIntent / SwitchEnvironmentIntent are
-                        // wired in MainScreen, not here. Their actions open a
-                        // dialog via showDialog, which needs a context *below*
-                        // MaterialApp (for MaterialLocalizations) and below the
-                        // router's Navigator. This Actions sits above
-                        // MaterialApp, so a dialog launched from here would
-                        // throw "No MaterialLocalizations found". NewTabIntent
-                        // stays — it only reads a bloc.
-                      },
-                      child: MaterialApp.router(
-                        title: 'GETMAN',
-                        debugShowCheckedModeBanner: false,
-                        // Lerping ThemeData triggers ~12 full-tree rebuilds per
-                        // theme change. The app's widget tree is too heavy for
-                        // that; a single instant rebuild is both faster and
-                        // visually cleaner.
-                        themeAnimationDuration: Duration.zero,
-                        theme: resolveThemeData(
-                          settings.themeId,
-                          Brightness.light,
-                          isCompact: settings.isCompactMode,
-                        ),
-                        darkTheme: resolveThemeData(
-                          settings.themeId,
-                          Brightness.dark,
-                          isCompact: settings.isCompactMode,
-                        ),
-                        themeMode: settings.isDarkMode
-                            ? ThemeMode.dark
-                            : ThemeMode.light,
-                        routerConfig: di.sl<AppRouter>().router,
-                        builder: (context, child) {
-                          return Focus(
-                            autofocus: true,
-                            child: ThemeSwitchTransition(
-                              themeId: settings.themeId,
-                              reduceEffects: false,
-                              child: context.appDecoration.scaffoldBackground(
-                                context,
-                                child: child ?? const SizedBox.shrink(),
-                              ),
-                            ),
-                          );
-                        },
+                    child: MaterialApp.router(
+                      title: 'GETMAN',
+                      debugShowCheckedModeBanner: false,
+                      // Lerping ThemeData triggers ~12 full-tree rebuilds per
+                      // theme change. The app's widget tree is too heavy for
+                      // that; a single instant rebuild is both faster and
+                      // visually cleaner.
+                      themeAnimationDuration: Duration.zero,
+                      theme: resolveThemeData(
+                        settings.themeId,
+                        Brightness.light,
+                        isCompact: settings.isCompactMode,
                       ),
+                      darkTheme: resolveThemeData(
+                        settings.themeId,
+                        Brightness.dark,
+                        isCompact: settings.isCompactMode,
+                      ),
+                      themeMode: settings.isDarkMode
+                          ? ThemeMode.dark
+                          : ThemeMode.light,
+                      routerConfig: di.sl<AppRouter>().router,
+                      builder: (context, child) {
+                        return Focus(
+                          autofocus: true,
+                          child: ThemeSwitchTransition(
+                            themeId: settings.themeId,
+                            reduceEffects: false,
+                            child: context.appDecoration.scaffoldBackground(
+                              context,
+                              child: child ?? const SizedBox.shrink(),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   );
                 },

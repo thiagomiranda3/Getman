@@ -15,6 +15,7 @@ class BulkKvEditor extends StatefulWidget {
     required this.initialText,
     required this.onChanged,
     super.key,
+    this.canonicalize,
     this.fieldPrefix,
   });
 
@@ -24,6 +25,13 @@ class BulkKvEditor extends StatefulWidget {
 
   /// Reports the raw text upward on every keystroke.
   final ValueChanged<String> onChanged;
+
+  /// How the owner canonicalizes raw text before echoing it back as
+  /// [initialText] (e.g. `BulkKvCodec.serialize(parse(raw))`). Needed for
+  /// echo suppression: the echo of an in-progress edit rarely equals the raw
+  /// keystrokes (`X` comes back as `X: `), so an exact-text check alone
+  /// re-seeds the field mid-type. Null keeps the exact-text check only.
+  final String Function(String raw)? canonicalize;
 
   /// When set, the field gets a stable `ValueKey('<prefix>_bulk')` so E2E tests
   /// can target it (mirrors `KeyValueListEditor.fieldPrefix`).
@@ -42,9 +50,12 @@ class _BulkKvEditorState extends State<BulkKvEditor> {
   void didUpdateWidget(BulkKvEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Only re-seed on a genuine external change — and never clobber what the
-    // user is currently typing (the echo of our own emission).
-    if (widget.initialText != oldWidget.initialText &&
-        widget.initialText != _controller.text) {
+    // user is currently typing (the echo of our own emission, matched either
+    // exactly or through the owner's canonicalization).
+    final echoOfOwnEdit =
+        widget.initialText == _controller.text ||
+        widget.canonicalize?.call(_controller.text) == widget.initialText;
+    if (widget.initialText != oldWidget.initialText && !echoOfOwnEdit) {
       _controller.text = widget.initialText;
     }
   }

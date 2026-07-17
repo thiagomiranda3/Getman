@@ -136,11 +136,19 @@ class JsonCodeEditor extends StatelessWidget {
     this.readOnly = false,
     this.wordWrap = true,
     this.autofocus = true,
+    this.findController,
   });
   final CodeLineEditingController controller;
   final bool readOnly;
   final bool wordWrap;
   final bool autofocus;
+
+  /// Externally-owned find controller. Pass one when the host widget needs to
+  /// observe find-mode state (e.g. the body editor's Beautify overlay moves
+  /// below the open find panel). Null lets [CodeEditor] create and own its
+  /// internal one — behavior is unchanged. The caller keeps ownership: it must
+  /// dispose the controller itself (re_editor only disposes internal ones).
+  final CodeFindController? findController;
 
   @override
   Widget build(BuildContext context) {
@@ -160,6 +168,7 @@ class JsonCodeEditor extends StatelessWidget {
         // editor element instead, preserving its state across the toggle.
         key: GlobalObjectKey(controller),
         controller: controller,
+        findController: findController,
         readOnly: readOnly,
         wordWrap: wordWrap,
         autofocus: autofocus,

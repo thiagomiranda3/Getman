@@ -186,6 +186,31 @@ void main() {
   );
 
   blocTest<GitSyncBloc, GitSyncState>(
+    'PullChanges with a conflicted autostash reloads AND surfaces where the '
+    'local edits went (the stash)',
+    build: () {
+      when(
+        () => service.pull(
+          root,
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenAnswer((_) async => PullOutcome.cleanEditsStashed);
+      return GitSyncBloc(service: service);
+    },
+    act: (b) => b.add(const PullChanges(root)),
+    verify: (b) {
+      expect(
+        b.state.reloadToken,
+        1,
+        reason: 'the tree IS the clean pulled state — it must reload',
+      );
+      expect(b.state.conflictToken, 0);
+      expect(b.state.errorMessage, contains('stash'));
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
     'PullChanges conflicted bumps conflictToken, not reloadToken, and still '
     'lands on a terminal ready state',
     build: () {
@@ -259,7 +284,9 @@ void main() {
   );
 
   blocTest<GitSyncBloc, GitSyncState>(
-    'ConflictsResolved dispatched while busy is dropped',
+    'ConflictsResolved dispatched while busy is NOT dropped — it is the '
+    'only signal to reload the merged tree, and a busy auto-fetch must not '
+    'swallow it (the next mirror would revert the merge on disk)',
     build: () {
       pullGate = Completer<PullOutcome>();
       when(
@@ -274,14 +301,14 @@ void main() {
     act: (b) async {
       b.add(const PullChanges(root));
       await Future<void>.delayed(Duration.zero);
-      b.add(const ConflictsResolved(root)); // dropped: bloc is busy
+      b.add(const ConflictsResolved(root)); // bloc is busy — must still land
       pullGate.complete(PullOutcome.conflicted);
       await Future<void>.delayed(Duration.zero);
     },
     verify: (b) {
       expect(b.state.status, GitSyncStatus.ready);
       expect(b.state.conflictToken, 1);
-      expect(b.state.reloadToken, 0); // the dropped event never bumped it
+      expect(b.state.reloadToken, 1, reason: 'the resolve reload must land');
     },
   );
 

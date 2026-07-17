@@ -15,7 +15,9 @@ import 'package:getman/features/collections/domain/entities/saved_example_entity
 import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
+import 'package:getman/features/history/presentation/bloc/history_state.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
@@ -231,7 +233,7 @@ class ResponseBodyControls extends StatelessWidget {
     for (final entry in tab.responseHistory) {
       final r = entry.response;
       if (r == current) continue;
-      if (r.body == kResponseBodyTooLargePlaceholder) continue;
+      if (isResponseBodyPlaceholder(r.body)) continue;
       out.add(
         CompareTarget(
           id: entry.id,
@@ -263,21 +265,33 @@ class ResponseBodyControls extends StatelessWidget {
         if (tab == null || tab.response == null) {
           return const SizedBox.shrink();
         }
-        final hasTargets =
-            _exampleTargets(context, tab.collectionNodeId).isNotEmpty ||
-            _historyTargets(context, tab.config).isNotEmpty ||
-            _timelineTargets(context, tab).isNotEmpty;
-        return IconButton(
-          key: const ValueKey('compare_response_button'),
-          tooltip: hasTargets
-              ? 'Compare response'
-              : 'No saved examples or matching history to compare',
-          visualDensity: VisualDensity.compact,
-          icon: Icon(
-            Icons.difference_outlined,
-            size: context.appLayout.iconSize,
+        // hasTargets reads CollectionsBloc/HistoryBloc — subscribe to both,
+        // or "Save as example" leaves the button disabled until an unrelated
+        // TabsBloc change happens to rebuild it.
+        return BlocBuilder<CollectionsBloc, CollectionsState>(
+          buildWhen: (prev, next) => prev.collections != next.collections,
+          builder: (context, _) => BlocBuilder<HistoryBloc, HistoryState>(
+            buildWhen: (prev, next) =>
+                prev.history.length != next.history.length,
+            builder: (context, _) {
+              final hasTargets =
+                  _exampleTargets(context, tab.collectionNodeId).isNotEmpty ||
+                  _historyTargets(context, tab.config).isNotEmpty ||
+                  _timelineTargets(context, tab).isNotEmpty;
+              return IconButton(
+                key: const ValueKey('compare_response_button'),
+                tooltip: hasTargets
+                    ? 'Compare response'
+                    : 'No saved examples or matching history to compare',
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  Icons.difference_outlined,
+                  size: context.appLayout.iconSize,
+                ),
+                onPressed: hasTargets ? () => _compareResponse(context) : null,
+              );
+            },
           ),
-          onPressed: hasTargets ? () => _compareResponse(context) : null,
         );
       },
     );

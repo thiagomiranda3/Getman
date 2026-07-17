@@ -16,9 +16,18 @@ class VariableMatch {
 class EnvironmentResolver {
   // Names may carry a leading `$` for built-in dynamic variables
   // ({{$timestamp}}, {{$guid}}, …); plain names map to environment variables.
-  static final RegExp _pattern = RegExp(
-    r'\{\{\s*(\$?[A-Za-z0-9_\-\.]+)\s*\}\}',
-  );
+  // The name itself accepts any non-empty, non-brace text (trimmed) — the env
+  // editor, Postman import, and the `{{` autocomplete all let a variable name
+  // contain spaces/`@`/`:`/unicode, so the resolution grammar must accept
+  // whatever they can produce or those variables can never resolve.
+  //
+  // Whitespace trimming happens on the captured group in Dart (_name), NOT
+  // via `\s*` in the pattern: `\s*` bordering `[^{}]+?` overlaps on
+  // whitespace, and that ambiguity backtracks quadratically on a large body
+  // containing an unclosed `{{` — resolve() runs on the send path.
+  static final RegExp _pattern = RegExp(r'\{\{([^{}]+?)\}\}');
+
+  static String _name(Match match) => match.group(1)!.trim();
 
   static const _uuid = Uuid();
   static final Random _random = Random();
@@ -64,7 +73,7 @@ class EnvironmentResolver {
     // No early-out on empty variables: dynamic vars resolve without an env.
     if (input.isEmpty) return input;
     return input.replaceAllMapped(_pattern, (match) {
-      final name = match.group(1)!;
+      final name = _name(match);
       final value = variables[name];
       if (value != null) return value;
       return _resolveDynamic(name) ?? match.group(0)!;
@@ -85,7 +94,7 @@ class EnvironmentResolver {
       yield VariableMatch(
         start: match.start,
         end: match.end,
-        name: match.group(1)!,
+        name: _name(match),
       );
     }
   }

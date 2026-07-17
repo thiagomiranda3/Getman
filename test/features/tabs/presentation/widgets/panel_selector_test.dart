@@ -4,12 +4,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/theme_registry.dart';
+import 'package:getman/features/collections/presentation/widgets/node_drag_data.dart';
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/panel_selector.dart';
+import 'package:getman/features/tabs/presentation/widgets/tab_drag_data.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockTabsBloc extends MockBloc<TabsEvent, TabsState> implements TabsBloc {}
@@ -92,7 +94,18 @@ void main() {
     await tester.pumpWidget(_host(bloc));
     final gesture = find.byKey(const ValueKey('panel_selector_button'));
     await tester.tap(gesture);
-    await tester.tap(gesture); // double
+    // A frame MUST be pumped between the two taps: the first tap opens an
+    // overlay whose full-screen barrier sits on top of the button, so a real
+    // double-tap's second tap physically hits the barrier, not the button.
+    // Without this pump the overlay never gets a layout pass, so the second
+    // tap still (incorrectly) reaches the button's own GestureDetector — that
+    // false positive is what let the D1 bug ship undetected.
+    await tester.pump();
+    // The second tap physically lands on the menu's dismiss barrier (which
+    // now covers the button) rather than the button's own GestureDetector —
+    // that's the whole point of the fix, so the "missed" hit-test warning is
+    // expected here.
+    await tester.tap(gesture, warnIfMissed: false); // double
     await tester.pumpAndSettle();
     expect(find.text('RENAME PANEL'), findsOneWidget);
   });
@@ -103,7 +116,13 @@ void main() {
     await tester.pumpWidget(_host(bloc));
     final gesture = find.byKey(const ValueKey('panel_selector_button'));
     await tester.tap(gesture);
-    await tester.tap(gesture); // double
+    await tester.pump(); // see comment above — a real double-tap hits the
+    // barrier on its second tap, which requires the overlay to be laid out.
+    // The second tap physically lands on the menu's dismiss barrier (which
+    // now covers the button) rather than the button's own GestureDetector —
+    // that's the whole point of the fix, so the "missed" hit-test warning is
+    // expected here.
+    await tester.tap(gesture, warnIfMissed: false); // double
     await tester.pumpAndSettle();
 
     await tester.enterText(
@@ -128,9 +147,9 @@ void main() {
               value: bloc,
               child: const Row(
                 children: [
-                  LongPressDraggable<String>(
+                  LongPressDraggable<TabDragData>(
                     key: ValueKey('drag_source'),
-                    data: 't1',
+                    data: TabDragData('t1'),
                     feedback: Material(child: Text('t1')),
                     child: SizedBox(
                       width: 100,
@@ -189,9 +208,9 @@ void main() {
               value: bloc,
               child: const Row(
                 children: [
-                  LongPressDraggable<String>(
+                  LongPressDraggable<TabDragData>(
                     key: ValueKey('drag_source2'),
-                    data: 't1',
+                    data: TabDragData('t1'),
                     feedback: Material(child: Text('t1')),
                     child: SizedBox(
                       width: 100,
@@ -231,6 +250,107 @@ void main() {
       verify(
         () => bloc.add(const MoveTabToNewPanel('t1')),
       ).called(1);
+    },
+  );
+
+  testWidgets(
+    'D4: a collection-node drag (NodeDragData) is rejected by the panel '
+    'selector — no menu opens, no bloc event dispatched',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: resolveTheme('brutalist')(Brightness.light, isCompact: false),
+          home: Scaffold(
+            body: BlocProvider<TabsBloc>.value(
+              value: bloc,
+              child: const Row(
+                children: [
+                  LongPressDraggable<NodeDragData>(
+                    key: ValueKey('node_drag_source'),
+                    data: NodeDragData('node-1'),
+                    feedback: Material(child: Text('node-1')),
+                    child: SizedBox(
+                      width: 100,
+                      height: 50,
+                      child: ColoredBox(
+                        color: Colors.orange,
+                        child: Text('drag me'),
+                      ),
+                    ),
+                  ),
+                  PanelSelector(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final sourceCenter = tester.getCenter(
+        find.byKey(const ValueKey('node_drag_source')),
+      );
+      final targetCenter = tester.getCenter(
+        find.byKey(const ValueKey('panel_selector_button')),
+      );
+      final gesture = await tester.startGesture(sourceCenter);
+      await tester.pump(const Duration(milliseconds: 600));
+      await gesture.moveTo(targetCenter);
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      // A foreign (node) payload must not be accepted by the tab-drop target:
+      // no menu opens and no move event fires.
+      expect(
+        find.byKey(const ValueKey('panel_row_$_workPanelId')),
+        findsNothing,
+      );
+      verifyNever(() => bloc.add(any(that: isA<MoveTabToPanel>())));
+      verifyNever(() => bloc.add(any(that: isA<MoveTabToNewPanel>())));
+    },
+  );
+
+  testWidgets(
+    'D2: two accepted drops in a row do not leave the first menu overlay '
+    'orphaned (which would permanently soft-lock input behind its '
+    'full-screen barrier)',
+    (tester) async {
+      // Once a menu is open, its full-screen barrier covers the selector
+      // button itself, so a *second* real drag-and-drop gesture can never
+      // physically reach the DragTarget again — realistic user input can't
+      // exercise the reentrancy this guards against. Instead, invoke the
+      // DragTarget's accept callback directly twice in a row (the same
+      // technique collection_node_row_test.dart uses), which calls
+      // `_openMenu` exactly as `onTabDropped` would.
+      await tester.pumpWidget(_host(bloc));
+      await tester.pumpAndSettle();
+
+      final dragTarget = tester.widget<DragTarget<TabDragData>>(
+        find.byType(DragTarget<TabDragData>),
+      );
+
+      dragTarget.onAcceptWithDetails!(
+        DragTargetDetails<TabDragData>(
+          data: const TabDragData('t1'),
+          offset: Offset.zero,
+        ),
+      );
+      await tester.pump();
+      dragTarget.onAcceptWithDetails!(
+        DragTargetDetails<TabDragData>(
+          data: const TabDragData('t1'),
+          offset: Offset.zero,
+        ),
+      );
+      await tester.pump();
+
+      // Exactly one copy of the menu is mounted — the first drop's overlay
+      // must have been removed (not orphaned) before the second was opened.
+      expect(
+        find.byKey(const ValueKey('panel_row_$_workPanelId')),
+        findsOneWidget,
+      );
     },
   );
 }

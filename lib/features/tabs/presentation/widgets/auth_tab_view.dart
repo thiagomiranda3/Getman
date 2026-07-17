@@ -146,7 +146,12 @@ class _AuthTabViewState extends State<AuthTabView> {
             stringMapEquality.equals(auth, _lastEmitted)) {
           return;
         }
-        setState(() => _syncFrom(AuthConfig.fromMap(auth)));
+        setState(() {
+          _syncFrom(AuthConfig.fromMap(auth));
+          // Clear so a LATER external change equal to this stale value isn't
+          // wrongly suppressed as if it were an echo of our own emission.
+          _lastEmitted = null;
+        });
       },
       child: TabVariableContextBuilder(
         tabId: widget.tabId,

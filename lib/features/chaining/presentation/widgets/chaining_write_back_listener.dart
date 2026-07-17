@@ -7,6 +7,7 @@ import 'package:getman/features/environments/presentation/bloc/environments_bloc
 import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
+import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 
@@ -59,8 +60,13 @@ class _ChainingWriteBackListenerState extends State<ChainingWriteBackListener> {
     );
   }
 
+  /// Every tab in every panel — `state.tabs` is only the ACTIVE panel's view,
+  /// but a send can finish (and capture) in a tab of any panel.
+  Iterable<HttpRequestTabEntity> _allTabs(TabsState state) =>
+      state.panels.isEmpty ? state.tabs : state.panels.expand((p) => p.tabs);
+
   bool _hasPending(TabsState next) {
-    for (final tab in next.tabs) {
+    for (final tab in _allTabs(next)) {
       if (tab.extractionResults.isEmpty) continue;
       if (!_resultsEquality.equals(
         _written[tab.tabId],
@@ -75,7 +81,7 @@ class _ChainingWriteBackListenerState extends State<ChainingWriteBackListener> {
   void _flush(BuildContext context, TabsState state) {
     final pending = <String, List<ExtractionResult>>{};
     final captured = <ExtractionResult>[];
-    for (final tab in state.tabs) {
+    for (final tab in _allTabs(state)) {
       if (_resultsEquality.equals(_written[tab.tabId], tab.extractionResults)) {
         continue;
       }
@@ -91,7 +97,7 @@ class _ChainingWriteBackListenerState extends State<ChainingWriteBackListener> {
       captured.addAll(matched);
     }
     // Don't let the bookkeeping grow unbounded as tabs come and go.
-    final live = state.tabs.map((t) => t.tabId).toSet();
+    final live = _allTabs(state).map((t) => t.tabId).toSet();
     _written.removeWhere((id, _) => !live.contains(id));
 
     if (captured.isEmpty) return;
@@ -123,12 +129,14 @@ class _ChainingWriteBackListenerState extends State<ChainingWriteBackListener> {
       return;
     }
 
-    final merged = Map<String, String>.of(active.variables);
-    for (final e in captured) {
-      merged[e.variable] = e.value!;
-    }
+    // MergeEnvironmentVariables (not UpdateEnvironment): the merge happens
+    // against the bloc's live entity inside its handler, so two flushes in the
+    // same event-loop turn — or a keystroke in the open env editor — can't be
+    // lost to a stale full-replacement snapshot.
     context.read<EnvironmentsBloc>().add(
-      UpdateEnvironment(active.copyWith(variables: merged)),
+      MergeEnvironmentVariables(active.id, {
+        for (final e in captured) e.variable: e.value!,
+      }),
     );
     pending.forEach(
       (id, results) => _written[id] = results,

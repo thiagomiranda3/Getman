@@ -36,8 +36,11 @@ class JsonSchema extends Equatable {
       };
       if (required.isNotEmpty) map['required'] = List<String>.from(required);
     }
-    if (type == 'array' && items != null) {
-      map['items'] = items!.toOpenApi();
+    if (type == 'array') {
+      // OAS 3.0 requires `items` on every array schema; an empty array gives
+      // us no element to infer from, so fall back to a permissive `{}`
+      // (accepts anything) rather than omitting the key.
+      map['items'] = items?.toOpenApi() ?? <String, dynamic>{};
     }
     if (example != null) map['example'] = example;
     return map;

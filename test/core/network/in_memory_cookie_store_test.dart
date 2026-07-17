@@ -88,6 +88,34 @@ void main() {
     expect(store.cookieHeaderFor(uri), isNull);
   });
 
+  test('all() prunes expired cookies from memory and durable storage', () {
+    final uri = Uri.parse('https://api.dev/');
+    store.storeFromSetCookie(uri, 'sid=abc; Max-Age=10'); // expires at 11000
+    expect(store.all(), hasLength(1));
+
+    persistence.removed.clear();
+    clock = 20000; // now past expiry
+    expect(store.all(), isEmpty);
+    expect(persistence.removed, contains('api.dev|/|sid'));
+  });
+
+  test('hydrate prunes an expired persisted cookie from durable storage', () {
+    persistence = _FakePersistence([
+      const NetworkCookie(
+        name: 'old',
+        value: '1',
+        domain: 'api.dev',
+        expiresEpochMs: 500, // already expired at clock 1000
+      ),
+      const NetworkCookie(name: 'live', value: '2', domain: 'api.dev'),
+    ]);
+    store = InMemoryCookieStore(persistence: persistence, now: () => clock)
+      ..hydrate();
+
+    expect(store.all().map((c) => c.name), ['live']);
+    expect(persistence.removed, contains('api.dev|/|old'));
+  });
+
   test('cookieHeaderFor orders longer paths first (RFC 6265 5.4)', () {
     final uri = Uri.parse('https://api.dev/v1/users');
     store

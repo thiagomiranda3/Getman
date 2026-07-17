@@ -27,27 +27,7 @@ NormalizedApi normalizeOpenApiV3(Map<String, dynamic> spec) {
           : null) ??
       'Imported API';
 
-  final servers = <NormalizedServer>[];
-  final rawServers = spec['servers'];
-  if (rawServers is List) {
-    for (final s in rawServers.whereType<Map<String, dynamic>>()) {
-      final vars = <String, String>{};
-      final rawVars = s['variables'];
-      if (rawVars is Map) {
-        for (final e in rawVars.entries) {
-          final def = e.value is Map ? (e.value as Map)['default'] : null;
-          vars[e.key.toString()] = def?.toString() ?? '';
-        }
-      }
-      servers.add(
-        NormalizedServer(
-          url: (s['url'] as String?) ?? '',
-          description: s['description'] as String?,
-          variables: vars,
-        ),
-      );
-    }
-  }
+  final servers = _parseServers(spec['servers']);
 
   final schemes = _securitySchemes(spec, refs);
   final globalSecurity = firstSecuritySchemeName(spec['security']);
@@ -67,6 +47,8 @@ NormalizedApi normalizeOpenApiV3(Map<String, dynamic> spec) {
             method: method.toUpperCase(),
             path: path,
             op: Map<String, dynamic>.from(op),
+            sharedParameters: pathItem['parameters'],
+            pathItemServers: pathItem['servers'],
             refs: refs,
             schemes: schemes,
             globalSecurity: globalSecurity,
@@ -79,10 +61,38 @@ NormalizedApi normalizeOpenApiV3(Map<String, dynamic> spec) {
   return NormalizedApi(title: title, servers: servers, operations: operations);
 }
 
+/// Parses a raw OpenAPI `servers` array (top-level, path-item, or operation
+/// scope — all share the same shape) into [NormalizedServer]s.
+List<NormalizedServer> _parseServers(dynamic rawServers) {
+  final servers = <NormalizedServer>[];
+  if (rawServers is List) {
+    for (final s in rawServers.whereType<Map<String, dynamic>>()) {
+      final vars = <String, String>{};
+      final rawVars = s['variables'];
+      if (rawVars is Map) {
+        for (final e in rawVars.entries) {
+          final def = e.value is Map ? (e.value as Map)['default'] : null;
+          vars[e.key.toString()] = def?.toString() ?? '';
+        }
+      }
+      servers.add(
+        NormalizedServer(
+          url: (s['url'] as String?) ?? '',
+          description: s['description'] as String?,
+          variables: vars,
+        ),
+      );
+    }
+  }
+  return servers;
+}
+
 NormalizedOperation _operation({
   required String method,
   required String path,
   required Map<String, dynamic> op,
+  required dynamic sharedParameters,
+  required dynamic pathItemServers,
   required RefResolver refs,
   required Map<String, NormalizedSecurityScheme> schemes,
   required String? globalSecurity,
@@ -97,21 +107,21 @@ NormalizedOperation _operation({
 
   final query = <NormalizedParam>[];
   final headers = <NormalizedParam>[];
-  final rawParams = op['parameters'];
-  if (rawParams is List) {
-    for (final p in rawParams.whereType<Map<String, dynamic>>()) {
-      final resolved = refs.resolve(Map<String, dynamic>.from(p));
-      final location = resolved['in'] as String?;
-      final pName = resolved['name'] as String?;
-      if (pName == null) continue;
-      final value = _paramExample(resolved, refs);
-      if (location == 'query') {
-        query.add(NormalizedParam(name: pName, value: value));
-      } else if (location == 'header') {
-        headers.add(NormalizedParam(name: pName, value: value));
-      }
-      // 'path' params stay templated in the path; 'cookie' ignored.
+  for (final resolved in mergedParameters(
+    sharedParameters,
+    op['parameters'],
+    refs,
+  )) {
+    final location = resolved['in'] as String?;
+    final pName = resolved['name'] as String?;
+    if (pName == null) continue;
+    final value = _paramExample(resolved, refs);
+    if (location == 'query') {
+      query.add(NormalizedParam(name: pName, value: value));
+    } else if (location == 'header') {
+      headers.add(NormalizedParam(name: pName, value: value));
     }
+    // 'path' params stay templated in the path; 'cookie' ignored.
   }
 
   NormalizedBody? body;
@@ -133,6 +143,13 @@ NormalizedOperation _operation({
     security = schemes[globalSecurity];
   }
 
+  // Op-level `servers` overrides path-item-level; global is the fallback
+  // (left as null here — callers use the shared global server(s) for that).
+  final opServers = _parseServers(op['servers']);
+  final effectiveServers = opServers.isNotEmpty
+      ? opServers
+      : _parseServers(pathItemServers);
+
   return NormalizedOperation(
     method: method,
     path: path,
@@ -142,6 +159,7 @@ NormalizedOperation _operation({
     headerParams: headers,
     body: body,
     security: security,
+    server: effectiveServers.isEmpty ? null : effectiveServers.first,
     warnings: warnings,
   );
 }

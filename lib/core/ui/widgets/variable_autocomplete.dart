@@ -202,6 +202,9 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
       text: '${text.substring(0, caret)}{{}}${text.substring(caret)}',
       selection: TextSelection.collapsed(offset: caret + 2),
     );
+    // The programmatic write above never fires TextField.onChanged (unlike a
+    // real keystroke), so tell the owner directly — mirrors _acceptAt.
+    widget.onAccepted?.call(widget.controller.text);
   }
 
   @override

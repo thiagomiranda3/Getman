@@ -49,8 +49,10 @@ class AssertionEngine {
       case AssertionTarget.responseTime:
         return (response.durationMs.toString(), true);
       case AssertionTarget.bodyJsonPath:
-        final v = JsonPath.read(decodedBody, a.path);
-        return v == null ? ('(not found)', false) : (_stringify(v), true);
+        // lookup, not read: a present-but-null leaf is a value ('null'), not
+        // a miss — `exists` must pass on the node the TREE view renders.
+        final r = JsonPath.lookup(decodedBody, a.path);
+        return r.found ? (_stringify(r.value), true) : ('(not found)', false);
       case AssertionTarget.header:
         final h = _header(response.headers, a.path);
         return h == null ? ('(absent)', false) : (h, true);
@@ -84,10 +86,15 @@ class AssertionEngine {
         return a != null && e != null && a > e;
       case AssertionComparator.inRange:
         final a = num.tryParse(actual);
-        final parts = expected.split('-');
-        if (a == null || parts.length != 2) return false;
-        final lo = num.tryParse(parts[0].trim());
-        final hi = num.tryParse(parts[1].trim());
+        if (a == null) return false;
+        // `lo-hi` or `lo..hi` — a plain split('-') can't express negative
+        // bounds ('-10-0'), so anchor each bound as a signed number.
+        final m = RegExp(
+          r'^\s*(-?\d+(?:\.\d+)?)\s*(?:\.\.|-)\s*(-?\d+(?:\.\d+)?)\s*$',
+        ).firstMatch(expected);
+        if (m == null) return false;
+        final lo = num.tryParse(m.group(1)!);
+        final hi = num.tryParse(m.group(2)!);
         return lo != null && hi != null && a >= lo && a <= hi;
     }
   }
@@ -121,6 +128,6 @@ class AssertionEngine {
     return null;
   }
 
-  static String _stringify(Object value) =>
+  static String _stringify(Object? value) =>
       value is String ? value : jsonEncode(value);
 }

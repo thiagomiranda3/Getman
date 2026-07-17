@@ -183,7 +183,12 @@ class _KeyValueListEditorState<T extends Object>
             setState(() {
               _keyControllers.removeAt(index).dispose();
               _valControllers.removeAt(index).dispose();
-              if (_keyControllers.isEmpty) {
+              // Re-add a blank row whenever the list is now empty OR the new
+              // last row has a non-empty key — otherwise deleting a trailing
+              // blank row (leaving e.g. [a=1]) would strand the editor with
+              // no row left to type a new entry into.
+              if (_keyControllers.isEmpty ||
+                  _keyControllers.last.text.isNotEmpty) {
                 _addEmptyRow();
               }
               _emit();

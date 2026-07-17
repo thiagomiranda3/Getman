@@ -21,29 +21,29 @@ class YamlEmitter {
         if (v is Map && v.isNotEmpty) {
           buf
             ..write(pad)
-            ..write(key)
+            ..write(_key(key))
             ..writeln(':');
           _emit(v, indent + 2, buf);
         } else if (v is List && v.isNotEmpty) {
           buf
             ..write(pad)
-            ..write(key)
+            ..write(_key(key))
             ..writeln(':');
           _emitList(v, indent + 2, buf);
         } else if (v is Map && v.isEmpty) {
           buf
             ..write(pad)
-            ..write(key)
+            ..write(_key(key))
             ..writeln(': {}');
         } else if (v is List && v.isEmpty) {
           buf
             ..write(pad)
-            ..write(key)
+            ..write(_key(key))
             ..writeln(': []');
         } else {
           buf
             ..write(pad)
-            ..write(key)
+            ..write(_key(key))
             ..write(': ')
             ..writeln(_scalar(v));
         }
@@ -74,25 +74,25 @@ class YamlEmitter {
         final dynamic fv = firstEntry.value;
         if (fv is Map && fv.isNotEmpty) {
           buf
-            ..write(firstEntry.key)
+            ..write(_key(firstEntry.key))
             ..writeln(':');
           _emit(fv, indent + 4, buf);
         } else if (fv is List && fv.isNotEmpty) {
           buf
-            ..write(firstEntry.key)
+            ..write(_key(firstEntry.key))
             ..writeln(':');
           _emitList(fv, indent + 4, buf);
         } else if (fv is Map && fv.isEmpty) {
           buf
-            ..write(firstEntry.key)
+            ..write(_key(firstEntry.key))
             ..writeln(': {}');
         } else if (fv is List && fv.isEmpty) {
           buf
-            ..write(firstEntry.key)
+            ..write(_key(firstEntry.key))
             ..writeln(': []');
         } else {
           buf
-            ..write(firstEntry.key)
+            ..write(_key(firstEntry.key))
             ..write(': ')
             ..writeln(_scalar(fv));
         }
@@ -102,29 +102,29 @@ class YamlEmitter {
           if (v is Map && v.isNotEmpty) {
             buf
               ..write(subPad)
-              ..write(entry.key)
+              ..write(_key(entry.key))
               ..writeln(':');
             _emit(v, indent + 4, buf);
           } else if (v is List && v.isNotEmpty) {
             buf
               ..write(subPad)
-              ..write(entry.key)
+              ..write(_key(entry.key))
               ..writeln(':');
             _emitList(v, indent + 4, buf);
           } else if (v is Map && v.isEmpty) {
             buf
               ..write(subPad)
-              ..write(entry.key)
+              ..write(_key(entry.key))
               ..writeln(': {}');
           } else if (v is List && v.isEmpty) {
             buf
               ..write(subPad)
-              ..write(entry.key)
+              ..write(_key(entry.key))
               ..writeln(': []');
           } else {
             buf
               ..write(subPad)
-              ..write(entry.key)
+              ..write(_key(entry.key))
               ..write(': ')
               ..writeln(_scalar(v));
           }
@@ -157,6 +157,11 @@ class YamlEmitter {
     if (value is num) return value.toString();
     return _scalarString(value.toString());
   }
+
+  /// Runs a map key through the same quoting logic as a scalar value — an
+  /// unquoted key like `weird: key` or `#lead` would either break the
+  /// `key: value` grammar or vanish as a comment.
+  static String _key(Object? key) => _scalarString(key.toString());
 
   static String _scalarString(String s) {
     if (!_needsQuote(s)) return s;

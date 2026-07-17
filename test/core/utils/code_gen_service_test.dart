@@ -189,6 +189,27 @@ void main() {
       final out = CodeGenService.generate(config, CodeGenTarget.curl);
       expect(out, contains(r"X-Note: it'\''s fine"));
     });
+
+    test('escapes a single quote in a header KEY with the POSIX idiom', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        url: 'https://api.dev/x',
+        headers: {"X-It's-Fine": 'v'},
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.curl);
+      expect(out, contains(r"--header 'X-It'\''s-Fine: v'"));
+    });
+
+    test('escapes a single quote in a binary body file path', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        url: 'https://api.dev/x',
+        bodyType: BodyType.binary,
+        bodyFilePath: "/tmp/a's file.png",
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.curl);
+      expect(out, contains(r"--data-binary '@/tmp/a'\''s file.png'"));
+    });
   });
 
   group('JavaScript fetch', () {
@@ -198,6 +219,16 @@ void main() {
       expect(out, contains("method: 'POST'"));
       expect(out, contains("'Authorization': 'Bearer {{token}}'"));
       expect(out, contains('body:'));
+    });
+
+    test('escapes a single quote in a header KEY', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        url: 'https://api.dev/x',
+        headers: {"X-It's-Fine": 'v'},
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.jsFetch);
+      expect(out, contains(r"'X-It\'s-Fine': 'v'"));
     });
 
     test(
@@ -243,6 +274,35 @@ void main() {
       expect(out, contains('data='));
     });
 
+    test('escapes a single quote in a header KEY', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        url: 'https://api.dev/x',
+        headers: {"X-It's-Fine": 'v'},
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.pythonRequests);
+      expect(out, contains(r"'X-It\'s-Fine': 'v'"));
+    });
+
+    test(
+      r'a Windows binary file path never becomes an invalid \U unicode '
+      'escape (backslashes are escaped like the multipart branch already '
+      'does)',
+      () {
+        const config = HttpRequestConfigEntity(
+          id: 'c',
+          url: 'https://api.dev/x',
+          bodyType: BodyType.binary,
+          bodyFilePath: r'C:\Users\me\file.bin',
+        );
+        final out = CodeGenService.generate(
+          config,
+          CodeGenTarget.pythonRequests,
+        );
+        expect(out, contains(r"open('C:\\Users\\me\\file.bin', 'rb')"));
+      },
+    );
+
     test(
       'multiline body is a double-quoted literal, not triple-single-quoted',
       () {
@@ -275,6 +335,16 @@ void main() {
       expect(out, contains("'Authorization': 'Bearer {{token}}'"));
       expect(out, contains('data:'));
       expect(out, contains('axios.request(options)'));
+    });
+
+    test('escapes a single quote in a header KEY', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        url: 'https://api.dev/x',
+        headers: {"X-It's-Fine": 'v'},
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.nodeAxios);
+      expect(out, contains(r"'X-It\'s-Fine': 'v'"));
     });
 
     test('multipart spreads form.getHeaders and appends fields', () {
@@ -352,6 +422,73 @@ void main() {
       expect(out, contains('new FormBody.Builder()'));
       expect(out, contains('.add("a", "1")'));
     });
+  });
+
+  group('escaping (snippets must stay syntactically valid)', () {
+    // A single quote is a legal URL sub-delim (e.g. names in a query).
+    const quoteUrl = HttpRequestConfigEntity(
+      id: 'q',
+      url: "https://api.dev/search?q=O'Brien",
+      headers: {},
+    );
+
+    test('cURL single-quotes the URL safely', () {
+      final out = CodeGenService.generate(quoteUrl, CodeGenTarget.curl);
+      expect(out, contains(r"--url 'https://api.dev/search?q=O'\''Brien'"));
+    });
+
+    test('JS fetch / axios / Python escape the URL literal', () {
+      expect(
+        CodeGenService.generate(quoteUrl, CodeGenTarget.jsFetch),
+        contains(r"fetch('https://api.dev/search?q=O\'Brien'"),
+      );
+      expect(
+        CodeGenService.generate(quoteUrl, CodeGenTarget.nodeAxios),
+        contains(r"url: 'https://api.dev/search?q=O\'Brien'"),
+      );
+      expect(
+        CodeGenService.generate(quoteUrl, CodeGenTarget.pythonRequests),
+        contains(r"url = 'https://api.dev/search?q=O\'Brien'"),
+      );
+    });
+
+    test('Python urlencoded/multipart values are escaped', () {
+      const config = HttpRequestConfigEntity(
+        id: 'p',
+        method: 'POST',
+        url: 'https://api.dev/x',
+        headers: {},
+        bodyType: BodyType.urlencoded,
+        formFields: [MultipartFieldEntity(name: 'note', value: "it's fine")],
+      );
+      final out = CodeGenService.generate(
+        config,
+        CodeGenTarget.pythonRequests,
+      );
+      expect(out, contains(r"'note': 'it\'s fine'"));
+    });
+
+    test(
+      'curl/Go urlencoded bodies are form-encoded like the send path '
+      '(no parameter injection)',
+      () {
+        const config = HttpRequestConfigEntity(
+          id: 'u',
+          method: 'POST',
+          url: 'https://api.dev/x',
+          headers: {},
+          bodyType: BodyType.urlencoded,
+          formFields: [
+            MultipartFieldEntity(name: 'q', value: 'a b&admin=true'),
+          ],
+        );
+        final curl = CodeGenService.generate(config, CodeGenTarget.curl);
+        expect(curl, contains('q=a+b%26admin%3Dtrue'));
+        expect(curl, isNot(contains('&admin=true')));
+        final go = CodeGenService.generate(config, CodeGenTarget.goNetHttp);
+        expect(go, contains('q=a+b%26admin%3Dtrue'));
+      },
+    );
   });
 
   group('graphql body', () {

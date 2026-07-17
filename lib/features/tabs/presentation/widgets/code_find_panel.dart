@@ -16,6 +16,12 @@ import 'package:re_editor/re_editor.dart';
 /// collapsing a burst of typing into one search.
 const Duration kFindDebounce = Duration(milliseconds: 180);
 
+/// Height of the open find panel. re_editor overlays the panel on the
+/// editor's top edge (padding the content down by this amount), so any
+/// control floated over that corner (e.g. the body editor's Beautify button)
+/// must offset itself by this height while find mode is active.
+const double kFindPanelHeight = 54;
+
 class CodeFindPanel extends StatefulWidget implements PreferredSizeWidget {
   const CodeFindPanel({
     required this.controller,
@@ -29,8 +35,9 @@ class CodeFindPanel extends StatefulWidget implements PreferredSizeWidget {
   State<CodeFindPanel> createState() => _CodeFindPanelState();
 
   @override
-  Size get preferredSize =>
-      controller.value == null ? Size.zero : const Size.fromHeight(54);
+  Size get preferredSize => controller.value == null
+      ? Size.zero
+      : const Size.fromHeight(kFindPanelHeight);
 }
 
 class _CodeFindPanelState extends State<CodeFindPanel> {

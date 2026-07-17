@@ -14,6 +14,7 @@ class StoredCookieModel extends HiveObject {
     this.secure = false,
     this.httpOnly = false,
     this.expiresEpochMs,
+    this.hostOnly = false,
   });
 
   factory StoredCookieModel.fromCookie(NetworkCookie c) => StoredCookieModel(
@@ -24,6 +25,7 @@ class StoredCookieModel extends HiveObject {
     secure: c.secure,
     httpOnly: c.httpOnly,
     expiresEpochMs: c.expiresEpochMs,
+    hostOnly: c.hostOnly,
   );
   @HiveField(0)
   String name;
@@ -46,6 +48,11 @@ class StoredCookieModel extends HiveObject {
   @HiveField(6)
   int? expiresEpochMs;
 
+  // Absent on cookies persisted before host-only support → false, i.e. legacy
+  // cookies keep the pre-fix suffix-matching behavior.
+  @HiveField(7, defaultValue: false)
+  bool hostOnly;
+
   NetworkCookie toCookie() => NetworkCookie(
     name: name,
     value: value,
@@ -54,5 +61,6 @@ class StoredCookieModel extends HiveObject {
     secure: secure,
     httpOnly: httpOnly,
     expiresEpochMs: expiresEpochMs,
+    hostOnly: hostOnly,
   );
 }

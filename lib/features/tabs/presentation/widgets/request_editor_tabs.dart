@@ -17,6 +17,8 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
+import 'package:getman/features/tabs/presentation/widgets/code_find_panel.dart'
+    show kFindPanelHeight;
 import 'package:getman/features/tabs/presentation/widgets/form_data_editor.dart';
 import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_config_section.dart'
@@ -148,6 +150,8 @@ class _ParamsTabViewState extends State<ParamsTabView> {
                       initialText: BulkKvCodec.serialize(
                         decode(tab.config.params),
                       ),
+                      canonicalize: (raw) =>
+                          BulkKvCodec.serialize(BulkKvCodec.parse(raw)),
                       onChanged: (text) =>
                           emit(encode(BulkKvCodec.parse(text))),
                     )
@@ -230,6 +234,8 @@ class _HeadersTabViewState extends State<HeadersTabView> {
                       initialText: BulkKvCodec.serialize(
                         decode(tab.config.headers),
                       ),
+                      canonicalize: (raw) =>
+                          BulkKvCodec.serialize(BulkKvCodec.parse(raw)),
                       onChanged: (text) =>
                           emit(encode(BulkKvCodec.parse(text))),
                     )
@@ -412,10 +418,41 @@ class _BodyTypeChip extends StatelessWidget {
   }
 }
 
-class _RawBodyEditor extends StatelessWidget {
+class _RawBodyEditor extends StatefulWidget {
   const _RawBodyEditor({required this.tabId, required this.controller});
   final String tabId;
   final CodeLineEditingController controller;
+
+  @override
+  State<_RawBodyEditor> createState() => _RawBodyEditorState();
+}
+
+class _RawBodyEditorState extends State<_RawBodyEditor> {
+  // Owned here (not left to CodeEditor's internal one) so the Beautify
+  // overlay can observe find-mode state and drop below the open find panel —
+  // otherwise it sits on top of the panel's close button.
+  late CodeFindController _findController;
+
+  @override
+  void initState() {
+    super.initState();
+    _findController = CodeFindController(widget.controller);
+  }
+
+  @override
+  void didUpdateWidget(covariant _RawBodyEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      _findController.dispose();
+      _findController = CodeFindController(widget.controller);
+    }
+  }
+
+  @override
+  void dispose() {
+    _findController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -427,15 +464,24 @@ class _RawBodyEditor extends StatelessWidget {
         // the prompts builder with the fresh context so env switches apply.
         // The Beautify overlay stays outside the autocomplete wrap.
         TabVariableContextBuilder(
-          tabId: tabId,
+          tabId: widget.tabId,
           builder: (context, varContext) => wrapBodyWithVariableAutocomplete(
             contextProvider: () => varContext,
-            child: JsonCodeEditor(controller: controller),
+            child: JsonCodeEditor(
+              controller: widget.controller,
+              findController: _findController,
+            ),
           ),
         ),
-        Positioned(
-          top: 8,
-          right: 8,
+        ValueListenableBuilder<CodeFindValue?>(
+          valueListenable: _findController,
+          builder: (context, findValue, child) => Positioned(
+            // The find panel overlays the editor's top edge; clear it while
+            // open so the button doesn't cover the panel's close button.
+            top: 8 + (findValue == null ? 0 : kFindPanelHeight),
+            right: 8,
+            child: child!,
+          ),
           child: context.appDecoration.wrapInteractive(
             child: IconButton(
               icon: Icon(
@@ -446,10 +492,14 @@ class _RawBodyEditor extends StatelessWidget {
               tooltip: 'Beautify JSON',
               onPressed: () async {
                 final messenger = ScaffoldMessenger.of(context);
-                final original = controller.text;
+                final original = widget.controller.text;
                 final prettified = await JsonUtils.prettify(original);
+                // prettify runs in an isolate: the tab may have closed
+                // (disposed controller) or the user may have kept typing
+                // (their newer text must win) while it ran.
+                if (!mounted || widget.controller.text != original) return;
                 if (prettified != original) {
-                  controller.text = prettified;
+                  widget.controller.text = prettified;
                   showAppSnackBarVia(messenger, 'JSON formatted');
                 } else {
                   showAppSnackBarVia(

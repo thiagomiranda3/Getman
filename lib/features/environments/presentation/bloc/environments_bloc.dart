@@ -18,6 +18,7 @@ class EnvironmentsBloc extends Bloc<EnvironmentsEvent, EnvironmentsState> {
     on<LoadEnvironments>(_onLoad);
     on<AddEnvironment>(_onAdd);
     on<UpdateEnvironment>(_onUpdate);
+    on<MergeEnvironmentVariables>(_onMergeVariables);
     on<DeleteEnvironment>(_onDelete);
     on<ImportEnvironments>(_onImport);
   }
@@ -42,12 +43,22 @@ class EnvironmentsBloc extends Bloc<EnvironmentsEvent, EnvironmentsState> {
 
   // Add/Update persist only the touched environment (single keyed put); delete
   // is a single keyed delete. UI state is emitted first so it never blocks.
+  // Both re-sort the in-session list case-insensitively by name so a
+  // newly-added or renamed environment lands exactly where it will sit after
+  // a restart (`EnvironmentsLocalDataSourceImpl.getEnvironments` sorts the
+  // same way on read) — keys are UUIDs, so Hive's own key order carries no
+  // display meaning.
   Future<void> _onAdd(
     AddEnvironment event,
     Emitter<EnvironmentsState> emit,
   ) async {
     emit(
-      state.copyWith(environments: [...state.environments, event.environment]),
+      state.copyWith(
+        environments: _sortedByName([
+          ...state.environments,
+          event.environment,
+        ]),
+      ),
     );
     await _persist(() => _putEnvironmentUseCase(event.environment));
   }
@@ -62,8 +73,30 @@ class EnvironmentsBloc extends Bloc<EnvironmentsEvent, EnvironmentsState> {
     if (index == -1) return;
     final next = [...state.environments];
     next[index] = event.environment;
-    emit(state.copyWith(environments: next));
+    emit(state.copyWith(environments: _sortedByName(next)));
     await _persist(() => _putEnvironmentUseCase(event.environment));
+  }
+
+  /// Atomic read-modify-write: merges into the entity as it exists NOW, so
+  /// two merges dispatched in the same event-loop turn both land (events are
+  /// processed sequentially; each handler sees the previous one's emission).
+  Future<void> _onMergeVariables(
+    MergeEnvironmentVariables event,
+    Emitter<EnvironmentsState> emit,
+  ) async {
+    if (event.variables.isEmpty) return;
+    final index = state.environments.indexWhere(
+      (e) => e.id == event.environmentId,
+    );
+    if (index == -1) return;
+    final current = state.environments[index];
+    final merged = current.copyWith(
+      variables: {...current.variables, ...event.variables},
+    );
+    final next = [...state.environments];
+    next[index] = merged;
+    emit(state.copyWith(environments: next));
+    await _persist(() => _putEnvironmentUseCase(merged));
   }
 
   Future<void> _onDelete(
@@ -85,7 +118,7 @@ class EnvironmentsBloc extends Bloc<EnvironmentsEvent, EnvironmentsState> {
     Emitter<EnvironmentsState> emit,
   ) async {
     if (event.environments.isEmpty) return;
-    final next = [...state.environments, ...event.environments];
+    final next = _sortedByName([...state.environments, ...event.environments]);
     emit(state.copyWith(environments: next));
     // Import is rare and arrives as a batch — one whole-list write is fine.
     await _persist(() => _saveEnvironmentsUseCase(next));
@@ -98,4 +131,10 @@ class EnvironmentsBloc extends Bloc<EnvironmentsEvent, EnvironmentsState> {
       log('Environments save failed: ${f.message}', name: 'EnvironmentsBloc');
     }
   }
+
+  static List<EnvironmentEntity> _sortedByName(
+    List<EnvironmentEntity> environments,
+  ) =>
+      [...environments]
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 }

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:getman/core/network/dio_adapter_config.dart';
+import 'package:getman/core/network/network_config.dart';
 import 'package:getman/core/network/realtime_frame.dart';
 import 'package:getman/core/network/sse_parser.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -25,19 +27,65 @@ class RealtimeService {
   RealtimeService({
     Dio? dio,
     WebSocketChannel Function(Uri uri)? webSocketFactory,
-  }) : _dio = dio ?? _buildSseDio(),
+  }) : _dio = dio ?? buildSseDio(NetworkConfig.defaults),
        _webSocketFactory = webSocketFactory ?? WebSocketChannel.connect;
   final Dio _dio;
   final WebSocketChannel Function(Uri uri) _webSocketFactory;
 
+  /// Adapter-relevant config of the last [applyConfig] that rebuilt the
+  /// adapter; null until the first swap.
+  NetworkConfig? _adapterConfig;
+
   // SSE is a long-lived stream — no receive timeout, or it would be killed.
-  static Dio _buildSseDio() => Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 30),
-      validateStatus: (_) => true,
-      responseType: ResponseType.stream,
-    ),
-  );
+  // Otherwise wired like NetworkService.buildDio: the same verify-SSL/proxy/
+  // mTLS adapter and (optional) cookie jar interceptor, so a self-signed dev
+  // server or session-cookie auth that works for normal requests also works
+  // for SSE (H2).
+  static Dio buildSseDio(
+    NetworkConfig config, [
+    Interceptor? cookieInterceptor,
+  ]) {
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 30),
+        validateStatus: (_) => true,
+        responseType: ResponseType.stream,
+      ),
+    );
+    configureHttpAdapter(
+      dio,
+      verifySsl: config.verifySsl,
+      proxyUrl: config.proxyUrl,
+      clientCertPath: config.clientCertPath,
+      clientKeyPath: config.clientKeyPath,
+      clientCertPassphrase: config.clientCertPassphrase,
+    );
+    if (cookieInterceptor != null) dio.interceptors.add(cookieInterceptor);
+    return dio;
+  }
+
+  /// Re-applies [config] to the live SSE client without rebuilding it —
+  /// mirrors NetworkService.applyConfig. Only the adapter (SSL/proxy/client
+  /// cert) is touched; interceptors (e.g. the cookie jar) are preserved.
+  void applyConfig(NetworkConfig config) {
+    // Rebuilding the adapter drops its socket pool, so skip the swap when no
+    // adapter-relevant field changed (mirrors NetworkService.applyConfig).
+    if (_adapterConfig != null && _adapterConfig!.sameAdapterConfig(config)) {
+      return;
+    }
+    _adapterConfig = config;
+    final old = _dio.httpClientAdapter;
+    configureHttpAdapter(
+      _dio,
+      verifySsl: config.verifySsl,
+      proxyUrl: config.proxyUrl,
+      clientCertPath: config.clientCertPath,
+      clientKeyPath: config.clientKeyPath,
+      clientCertPassphrase: config.clientCertPassphrase,
+    );
+    // Web stub leaves the adapter untouched (no-op); only close on a real swap.
+    if (!identical(_dio.httpClientAdapter, old)) old.close();
+  }
 
   RealtimeConnection connectWebSocket(String url) =>
       _WebSocketConnection(_webSocketFactory(Uri.parse(url)), url);
@@ -50,9 +98,12 @@ class RealtimeService {
 
 class _WebSocketConnection implements RealtimeConnection {
   _WebSocketConnection(this._channel, String url) {
-    _emit(RealtimeFrame.open('Connecting to $url'));
+    // Deferred: inside the constructor the broadcast controller has no
+    // listener yet (the bloc subscribes right after this returns) and
+    // broadcast streams don't buffer — a synchronous emit is silently lost.
+    scheduleMicrotask(() => _emit(RealtimeFrame.open('Connecting to $url')));
     _sub = _channel.stream.listen(
-      (msg) => _emit(RealtimeFrame.incoming(msg.toString())),
+      (msg) => _emit(RealtimeFrame.incoming(_describe(msg))),
       onError: (Object e) => _emit(RealtimeFrame.error(e.toString())),
       onDone: () => _emit(RealtimeFrame.close()),
     );
@@ -64,6 +115,13 @@ class _WebSocketConnection implements RealtimeConnection {
   void _emit(RealtimeFrame f) {
     if (!_controller.isClosed) _controller.add(f);
   }
+
+  // Binary frames (protobuf, deflate, ...) arrive as a byte list; rendering
+  // `msg.toString()` dumps `[72, 101, ...]` — megabytes of noise for a large
+  // frame. Show a compact placeholder instead.
+  static String _describe(dynamic msg) => msg is List<int>
+      ? '[binary frame · ${msg.length} bytes]'
+      : msg.toString();
 
   @override
   Stream<RealtimeFrame> get frames => _controller.stream;
@@ -84,7 +142,8 @@ class _WebSocketConnection implements RealtimeConnection {
 
 class _SseConnection implements RealtimeConnection {
   _SseConnection(Dio dio, String url, Map<String, String> headers) {
-    _emit(RealtimeFrame.open('Streaming $url'));
+    // Deferred for the same reason as _WebSocketConnection's open frame.
+    scheduleMicrotask(() => _emit(RealtimeFrame.open('Streaming $url')));
     unawaited(
       dio
           .get<ResponseBody>(
@@ -99,6 +158,26 @@ class _SseConnection implements RealtimeConnection {
             final body = response.data;
             if (body == null) {
               _emit(RealtimeFrame.error('No response body'));
+              return;
+            }
+            // The SSE spec fails the connection on a non-2xx status — without
+            // this, a 404/401/500 streams whatever body arrives (or nothing)
+            // and looks like a clean connect/disconnect (H1). The status is
+            // read off `ResponseBody` (not the outer `Response`, which for a
+            // `ResponseType.stream` request only mirrors it after dio's own
+            // internal transform) so it is reliable for both the real client
+            // and hand-built test fakes.
+            final status = body.statusCode;
+            if (status < 200 || status >= 300) {
+              final reason = body.statusMessage ?? response.statusMessage;
+              _emit(
+                RealtimeFrame.error(
+                  reason == null || reason.isEmpty
+                      ? 'HTTP $status'
+                      : 'HTTP $status $reason',
+                ),
+              );
+              _emit(RealtimeFrame.close());
               return;
             }
             // Decode through a single streaming UTF-8 decoder so a multi-byte

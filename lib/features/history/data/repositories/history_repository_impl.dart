@@ -35,8 +35,7 @@ class HistoryRepositoryImpl implements HistoryRepository {
     StreamSubscription<void>? sub;
     Timer? debounce;
     // Ownership-transfer: onCancel closes the controller when the subscriber
-    // cancels; the lint can't trace the close() call inside a closure.
-    // ignore: close_sinks
+    // cancels.
     late StreamController<List<HttpRequestConfigEntity>> controller;
 
     Future<void> push() async {
@@ -59,6 +58,10 @@ class HistoryRepositoryImpl implements HistoryRepository {
       onCancel: () async {
         debounce?.cancel();
         await sub?.cancel();
+        // Actually close — the `// ignore: close_sinks` above promises this;
+        // without it an in-flight push() buffers into a listener-less
+        // controller that lives forever.
+        await controller.close();
       },
     );
     return controller.stream;

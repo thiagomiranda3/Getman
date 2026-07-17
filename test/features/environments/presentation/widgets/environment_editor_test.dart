@@ -98,6 +98,47 @@ void main() {
   });
 
   testWidgets(
+    'clearing the name field does not dispatch an empty-name '
+    'UpdateEnvironment',
+    (tester) async {
+      final env = EnvironmentEntity(id: 'e1', name: 'Production');
+      final bloc = _makeBloc(repo, [env]);
+      addTearDown(bloc.close);
+
+      await _pump(tester, bloc: bloc, environment: env);
+
+      final nameField = find.byKey(const ValueKey('env_name_field'));
+      await tester.enterText(nameField, '');
+      await tester.pump(const Duration(milliseconds: 50));
+
+      verifyNever(() => repo.putEnvironment(any()));
+      expect(bloc.state.environments.first.name, 'Production');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'losing focus with an empty name field restores the last persisted name',
+    (tester) async {
+      final env = EnvironmentEntity(id: 'e1', name: 'Production');
+      final bloc = _makeBloc(repo, [env]);
+      addTearDown(bloc.close);
+
+      await _pump(tester, bloc: bloc, environment: env);
+
+      final nameField = find.byKey(const ValueKey('env_name_field'));
+      await tester.enterText(nameField, '');
+      await tester.pump(const Duration(milliseconds: 50));
+
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(TextField, 'Production'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'typing into the trailing empty row adds a variable and '
     'dispatches UpdateEnvironment',
     (tester) async {

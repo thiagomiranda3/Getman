@@ -3,9 +3,18 @@ import 'dart:io';
 
 import 'package:getman/core/git/git_service.dart';
 
-GitService createGitService() => _IoGitService();
+/// [environmentOverrides] is a test seam: extra environment entries merged
+/// over the inherited environment of every spawned git process (e.g.
+/// `GIT_CONFIG_GLOBAL`/`GIT_CONFIG_NOSYSTEM` so identity tests are isolated
+/// from the developer machine's real git config). Production passes none.
+GitService createGitService({Map<String, String>? environmentOverrides}) =>
+    _IoGitService(environmentOverrides);
 
 class _IoGitService implements GitService {
+  _IoGitService(this._environmentOverrides);
+
+  final Map<String, String>? _environmentOverrides;
+
   Future<ProcessResult> _run(
     String root,
     List<String> args, {
@@ -17,6 +26,7 @@ class _IoGitService implements GitService {
       workingDirectory: root,
       stdoutEncoding: utf8,
       stderrEncoding: utf8,
+      environment: _environmentOverrides,
     );
     if (!allowFailure && result.exitCode != 0) {
       throw GitException(
@@ -70,12 +80,25 @@ class _IoGitService implements GitService {
   @override
   Future<bool> isRepo(String root) async {
     if (!Directory(root).existsSync()) return false;
+    // The workspace must be the repo ROOT, not merely inside one: porcelain
+    // paths are repo-root-relative, so a workspace nested in an outer repo
+    // would misresolve every path (files misclassified as deleted, staging
+    // silently failing) while commits/branch ops hit the outer repo. Treating
+    // "inside but not the root" as not-a-repo makes the feature offer git
+    // init — creating a proper nested repo — instead of half-working.
     final r = await _run(
       root,
-      ['rev-parse', '--is-inside-work-tree'],
+      ['rev-parse', '--show-toplevel'],
       allowFailure: true,
     );
-    return r.exitCode == 0 && (r.stdout as String).trim() == 'true';
+    if (r.exitCode != 0) return false;
+    final toplevel = (r.stdout as String).trim();
+    if (toplevel.isEmpty) return false;
+    try {
+      return FileSystemEntity.identicalSync(toplevel, root);
+    } on Object {
+      return false;
+    }
   }
 
   @override
@@ -252,7 +275,20 @@ class _IoGitService implements GitService {
       // the autostash pops when the rebase finishes (incl. via --continue).
       '--autostash',
     ], allowFailure: true);
-    if (r.exitCode == 0) return PullOutcome.clean;
+    if (r.exitCode == 0) {
+      // `--autostash` exits 0 even when the rebase succeeded but re-applying
+      // the stashed local edits conflicted ("Applying autostash resulted in
+      // conflicts") — the tree is left with conflict markers, an unmerged
+      // index, and the edits kept in stash@{0}. Reporting that as a clean
+      // pull would let the marker-riddled files masquerade as the pulled
+      // state. Restore the clean rebased tree (the edits stay safely in the
+      // stash — git keeps the entry on a conflicted pop) and tell the caller.
+      if ((await conflictedPaths(root)).isNotEmpty) {
+        await _run(root, ['reset', '--hard', 'HEAD'], allowFailure: true);
+        return PullOutcome.cleanEditsStashed;
+      }
+      return PullOutcome.clean;
+    }
     if (await isRebaseInProgress(root) &&
         (await conflictedPaths(root)).isNotEmpty) {
       return PullOutcome.conflicted; // leave paused for the resolver
@@ -371,7 +407,7 @@ class _IoGitService implements GitService {
       workingDirectory: root,
       stdoutEncoding: utf8,
       stderrEncoding: utf8,
-      environment: {'GIT_EDITOR': 'true'},
+      environment: {'GIT_EDITOR': 'true', ...?_environmentOverrides},
     );
     if (r.exitCode != 0) {
       final err = (r.stderr as String).trim();

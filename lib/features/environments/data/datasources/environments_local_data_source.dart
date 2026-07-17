@@ -24,7 +24,15 @@ class EnvironmentsLocalDataSourceImpl implements EnvironmentsLocalDataSource {
   @override
   Future<List<EnvironmentModel>> getEnvironments() async {
     try {
-      return _box().values.toList();
+      // Keys are UUIDs (post key-migration), so Hive's key order has nothing
+      // to do with display order — restart would otherwise show environments
+      // in random UUID-lexicographic order while in-session adds append.
+      // Sort case-insensitively by name for a stable, predictable list.
+      final models = _box().values.toList()
+        ..sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
+      return models;
     } catch (e) {
       throw PersistenceException('Failed to read environments', cause: e);
     }

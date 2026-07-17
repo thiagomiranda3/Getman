@@ -147,6 +147,12 @@ Future<void> _pump(
               final tabs = tabsState.tabs;
               return Actions(
                 actions: <Type, Action<Intent>>{
+                  NewTabIntent: CallbackAction<NewTabIntent>(
+                    onInvoke: (_) {
+                      ctx.read<TabsBloc>().add(const AddTab());
+                      return null;
+                    },
+                  ),
                   CloseTabIntent: CallbackAction<CloseTabIntent>(
                     onInvoke: (_) {
                       if (activeIndex < 0 || activeIndex >= tabs.length) {
@@ -332,6 +338,21 @@ void main() {
   );
 
   group('MainScreen Actions', () {
+    // D8: NewTabIntent moved here from the root Actions in main.dart, so a
+    // dialog-focused field can no longer reach it (see the D8 note on
+    // main.dart / main_screen.dart for why that matters).
+    group('NewTabIntent', () {
+      testWidgets('dispatches AddTab', (tester) async {
+        await pump(tester);
+        Actions.invoke(
+          tester.element(find.byKey(const ValueKey('ms_actions_focus'))),
+          const NewTabIntent(),
+        );
+        await tester.pump();
+        verify(() => tabsBloc.add(const AddTab())).called(1);
+      });
+    });
+
     group('CloseTabIntent', () {
       testWidgets('dispatches RemoveTab for the active tab', (tester) async {
         await pump(tester);

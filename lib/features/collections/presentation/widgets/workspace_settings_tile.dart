@@ -10,6 +10,7 @@ import 'package:getman/core/utils/workspace/workspace_bookmark.dart';
 import 'package:getman/core/utils/workspace/workspace_picker.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
@@ -135,7 +136,14 @@ class WorkspaceSettingsTile extends StatelessWidget {
     try {
       onDisk = await sync.read(picked.path);
     } on Object catch (_) {
-      onDisk = const [];
+      // A failed read must never masquerade as an empty workspace — the
+      // empty-folder branch would overwrite the folder's existing content
+      // with the current collections.
+      showAppSnackBarVia(
+        messenger,
+        'Could not read that folder — workspace not connected.',
+      );
+      return;
     }
     if (!context.mounted) return;
 
@@ -154,7 +162,17 @@ class WorkspaceSettingsTile extends StatelessWidget {
               'REPLACE your current collections?',
           confirmLabel: 'IMPORT',
           onConfirm: () {
-            collections.add(ReplaceCollections(onDisk));
+            // Overlay app-only data (secret values, examples) — a no-op for
+            // a foreign folder, but reconnecting the same folder (e.g. to
+            // restore a macOS bookmark) must not wipe them.
+            collections.add(
+              ReplaceCollections(
+                CollectionsTreeHelper.overlayLocalOnly(
+                  onDisk,
+                  collections.state.collections,
+                ),
+              ),
+            );
             connect();
           },
         ),
@@ -169,14 +187,30 @@ class WorkspaceSettingsTile extends StatelessWidget {
   Future<void> _reload(BuildContext context, String path) async {
     final sync = context.read<WorkspaceSyncService>();
     final collections = context.read<CollectionsBloc>();
+    final messenger = ScaffoldMessenger.of(context);
     List<CollectionNodeEntity> onDisk;
     try {
       onDisk = await sync.read(path);
     } on Object catch (_) {
-      onDisk = const [];
+      // A failed read (e.g. one malformed .req.json) must never masquerade
+      // as an empty workspace: ReplaceCollections(const []) would wipe the
+      // in-app tree, and the next mirror would delete the files on disk too.
+      showAppSnackBarVia(
+        messenger,
+        'Could not read the workspace — nothing was reloaded. '
+        'Fix or remove the malformed file and try again.',
+      );
+      return;
     }
     if (!context.mounted) return;
-    collections.add(ReplaceCollections(onDisk));
+    collections.add(
+      ReplaceCollections(
+        CollectionsTreeHelper.overlayLocalOnly(
+          onDisk,
+          collections.state.collections,
+        ),
+      ),
+    );
     showAppSnackBar(context, 'Reloaded ${onDisk.length} item(s) from disk');
   }
 }

@@ -14,6 +14,7 @@ import 'package:getman/features/environments/presentation/bloc/environments_stat
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
+import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
@@ -117,9 +118,9 @@ void main() {
 
     final event =
         verify(() => envBloc.add(captureAny())).captured.single
-            as UpdateEnvironment;
-    expect(event.environment.id, 'e1');
-    expect(event.environment.variables, {'old': '1', 'tok': 'abc'});
+            as MergeEnvironmentVariables;
+    expect(event.environmentId, 'e1');
+    expect(event.variables, {'tok': 'abc'});
   });
 
   testWidgets(
@@ -168,15 +169,172 @@ void main() {
 
       final event =
           verify(() => envBloc.add(captureAny())).captured.single
-              as UpdateEnvironment;
-      expect(event.environment.id, 'e1');
+              as MergeEnvironmentVariables;
+      expect(event.environmentId, 'e1');
       expect(
-        event.environment.variables,
+        event.variables,
         {'tok': 'fromA'},
         reason:
             'capture on the non-active tab must still reach the active '
             'environment',
       );
+    },
+  );
+
+  testWidgets(
+    'writes captured values from a tab in a NON-active panel '
+    '(request finished in another workspace)',
+    (tester) async {
+      HttpRequestTabEntity tab(String id, List<ExtractionResult> results) =>
+          HttpRequestTabEntity(
+            tabId: id,
+            config: HttpRequestConfigEntity(id: id),
+            extractionResults: results,
+          );
+      // Panel p1 (active) holds tab B; the capture lands in tab A, which
+      // lives in the NON-active panel p2 — so it never appears in
+      // `state.tabs` (the active panel's derived view).
+      TabsState panelState(List<ExtractionResult> aResults) {
+        final tabA = tab('A', aResults);
+        final tabB = tab('B', const []);
+        return TabsState(
+          panels: [
+            PanelEntity(
+              id: 'p1',
+              name: 'Panel 1',
+              tabs: [tabB],
+              activeTabId: 'B',
+            ),
+            PanelEntity(
+              id: 'p2',
+              name: 'Panel 2',
+              tabs: [tabA],
+              activeTabId: 'A',
+            ),
+          ],
+          activePanelId: 'p1',
+          tabs: [tabB],
+        );
+      }
+
+      when(() => tabsBloc.state).thenReturn(panelState(const []));
+      when(() => settingsBloc.state).thenReturn(
+        const SettingsState(
+          settings: SettingsEntity(activeEnvironmentId: 'e1'),
+        ),
+      );
+      when(() => envBloc.state).thenReturn(
+        EnvironmentsState(
+          environments: [EnvironmentEntity(id: 'e1', name: 'Prod')],
+        ),
+      );
+
+      await pump(tester);
+
+      tabsStream.add(
+        panelState(const [
+          ExtractionResult(variable: 'tok', value: 'fromA', matched: true),
+        ]),
+      );
+      await tester.pump();
+
+      final event =
+          verify(() => envBloc.add(captureAny())).captured.single
+              as MergeEnvironmentVariables;
+      expect(
+        event.variables,
+        {'tok': 'fromA'},
+        reason:
+            'a capture landing in a non-active panel must still reach the '
+            'active environment',
+      );
+    },
+  );
+
+  testWidgets(
+    'switching panels neither loses bookkeeping nor re-writes a stale capture',
+    (tester) async {
+      HttpRequestTabEntity tab(String id, List<ExtractionResult> results) =>
+          HttpRequestTabEntity(
+            tabId: id,
+            config: HttpRequestConfigEntity(id: id),
+            extractionResults: results,
+          );
+      TabsState panelState({
+        required String activePanelId,
+        List<ExtractionResult> tResults = const [],
+        List<ExtractionResult> uResults = const [],
+      }) {
+        final tabT = tab('T', tResults);
+        final tabU = tab('U', uResults);
+        return TabsState(
+          panels: [
+            PanelEntity(
+              id: 'p1',
+              name: 'Panel 1',
+              tabs: [tabT],
+              activeTabId: 'T',
+            ),
+            PanelEntity(
+              id: 'p2',
+              name: 'Panel 2',
+              tabs: [tabU],
+              activeTabId: 'U',
+            ),
+          ],
+          activePanelId: activePanelId,
+          tabs: [if (activePanelId == 'p1') tabT else tabU],
+        );
+      }
+
+      when(
+        () => tabsBloc.state,
+      ).thenReturn(panelState(activePanelId: 'p1'));
+      when(() => settingsBloc.state).thenReturn(
+        const SettingsState(
+          settings: SettingsEntity(activeEnvironmentId: 'e1'),
+        ),
+      );
+      when(() => envBloc.state).thenReturn(
+        EnvironmentsState(
+          environments: [EnvironmentEntity(id: 'e1', name: 'Prod')],
+        ),
+      );
+
+      await pump(tester);
+
+      const tCapture = [
+        ExtractionResult(variable: 'tok', value: 'A', matched: true),
+      ];
+      const uCapture = [
+        ExtractionResult(variable: 'other', value: 'B', matched: true),
+      ];
+
+      // Capture in panel 1's tab T → first write.
+      tabsStream.add(panelState(activePanelId: 'p1', tResults: tCapture));
+      await tester.pump();
+      // User switches to panel 2, where tab U captures → second write. This
+      // flush must not prune T's "already written" bookkeeping just because
+      // T isn't in the active panel.
+      tabsStream.add(
+        panelState(
+          activePanelId: 'p2',
+          tResults: tCapture,
+          uResults: uCapture,
+        ),
+      );
+      await tester.pump();
+      // Back to panel 1 with T's capture unchanged → no third write.
+      tabsStream.add(
+        panelState(
+          activePanelId: 'p1',
+          tResults: tCapture,
+          uResults: uCapture,
+        ),
+      );
+      await tester.pump();
+
+      verify(() => envBloc.add(any())).called(2);
     },
   );
 
@@ -248,10 +406,10 @@ void main() {
 
       final event =
           verify(() => envBloc.add(captureAny())).captured.single
-              as UpdateEnvironment;
-      expect(event.environment.id, 'e1');
+              as MergeEnvironmentVariables;
+      expect(event.environmentId, 'e1');
       expect(
-        event.environment.variables,
+        event.variables,
         {'tok': 'abc'},
         reason:
             'the pending capture is flushed when an environment becomes active',

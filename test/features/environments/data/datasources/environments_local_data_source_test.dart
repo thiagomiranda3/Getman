@@ -58,6 +58,24 @@ void main() {
     expect(box.keys.toSet(), {'x', 'y'});
   });
 
+  test(
+    'getEnvironments returns entries sorted case-insensitively by name, '
+    'independent of Hive key order',
+    () async {
+      // Keys are UUIDs (post key-migration) so Hive's own key-lexicographic
+      // order is unrelated to display order; insertion order here is
+      // deliberately neither alphabetical nor key-sorted.
+      await dataSource.putEnvironment(model('zzz-key', 'banana'));
+      await dataSource.putEnvironment(model('aaa-key', 'Apple'));
+      await dataSource.putEnvironment(model('mmm-key', 'cherry'));
+
+      final names = (await dataSource.getEnvironments())
+          .map((e) => e.name)
+          .toList();
+      expect(names, ['Apple', 'banana', 'cherry']);
+    },
+  );
+
   test('migrateLegacyKeysIfNeeded re-keys int-keyed entries by id', () async {
     await box.addAll([
       model('a', 'A'),

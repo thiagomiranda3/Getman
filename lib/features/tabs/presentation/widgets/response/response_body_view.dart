@@ -45,8 +45,12 @@ class ResponseBodyView extends StatelessWidget {
       buildWhen: (prev, next) {
         final p = prev.tabs.byId(tabId)?.response;
         final n = next.tabs.byId(tabId)?.response;
+        // Identity, not length: for media, `body` is a placeholder derived
+        // from content-type + size, so a re-sent response with different
+        // bytes of the same length would otherwise never rebuild. Every send
+        // produces a fresh Uint8List.
         return p?.body != n?.body ||
-            p?.bodyBytes?.length != n?.bodyBytes?.length ||
+            !identical(p?.bodyBytes, n?.bodyBytes) ||
             contentTypeOf(p?.headers ?? const {}) !=
                 contentTypeOf(n?.headers ?? const {});
       },
@@ -137,7 +141,7 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
               .state
               .settings
               .alwaysPrettifyLargeResponses &&
-          rawBody != kResponseBodyTooLargePlaceholder &&
+          !isResponseBodyPlaceholder(rawBody) &&
           canHighlightBody(rawBody.length);
       if (autoPrettify) {
         final prettified = await JsonUtils.prettify(rawBody);
@@ -165,7 +169,7 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
     // Normal path — prettify (or pass through verbatim in raw mode), then load
     // into the editor. The over-1-MB sentinel is known non-JSON, so render it
     // as plain text rather than spawning an isolate to fail-parse it.
-    final isPlaceholder = rawBody == kResponseBodyTooLargePlaceholder;
+    final isPlaceholder = isResponseBodyPlaceholder(rawBody);
     final text = (_mode == _BodyMode.raw || isPlaceholder)
         ? (rawBody ?? '')
         : await JsonUtils.prettify(rawBody);
@@ -261,7 +265,7 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
         .byId(widget.tabId)
         ?.response
         ?.body;
-    if (body == null || body == kResponseBodyTooLargePlaceholder) {
+    if (body == null || isResponseBodyPlaceholder(body)) {
       setState(() {
         _treeAvailable = false;
         if (_mode == _BodyMode.tree) _mode = _BodyMode.pretty;

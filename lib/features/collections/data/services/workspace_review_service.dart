@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:getman/core/git/git_service.dart';
 import 'package:getman/core/utils/workspace/workspace_collection_serializer.dart';
+import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/entities/review_entry.dart';
 import 'package:getman/features/collections/domain/logic/semantic_diff.dart';
@@ -10,17 +11,34 @@ import 'package:getman/features/collections/domain/review_service.dart';
 /// Composes [GitService] + the workspace serializer into a reviewable change
 /// set. Pure of `dart:io` — all filesystem/git access goes through [GitService].
 class WorkspaceReviewService implements ReviewService {
-  WorkspaceReviewService(this._git);
+  WorkspaceReviewService(this._git, this._sync);
   final GitService _git;
+  final WorkspaceSyncService _sync;
 
   static const String _metaDir = '.getman';
   static const String _manifest = 'workspace.json';
   static const String _folderMeta = '.folder.json';
   static const String _reqExt = '.req.json';
 
+  /// Runs the pending Hive → disk mirror to completion before any op that
+  /// reads or mutates the working tree — same gate as `GitBranchService`.
+  /// Without it, opening Review within the mirror debounce and staging lets
+  /// `git add` stage the pre-edit blob while the dialog shows the post-edit
+  /// diff, and the commit records content that differs from what was
+  /// reviewed.
+  Future<void> _flushOrThrow() async {
+    if (!await _sync.flushPending()) {
+      throw GitException(
+        'Could not write the workspace to disk — aborting so git does not '
+        'run over a stale tree. Check the workspace folder is writable.',
+      );
+    }
+  }
+
   @override
   Future<ReviewResult> review(String root) async {
     if (!await _git.isAvailable()) return ReviewResult.empty;
+    await _flushOrThrow();
     if (!await _git.isRepo(root)) {
       return const ReviewResult(
         gitAvailable: true,
@@ -48,8 +66,11 @@ class WorkspaceReviewService implements ReviewService {
   @override
   Future<void> init(String root) => _git.init(root);
   @override
-  Future<void> stage(String root, List<String> paths) =>
-      _git.stage(root, paths);
+  Future<void> stage(String root, List<String> paths) async {
+    await _flushOrThrow();
+    await _git.stage(root, paths);
+  }
+
   @override
   Future<void> unstage(String root, List<String> paths) =>
       _git.unstage(root, paths);
@@ -59,12 +80,15 @@ class WorkspaceReviewService implements ReviewService {
     String message, {
     String? authorName,
     String? authorEmail,
-  }) => _git.commit(
-    root,
-    message,
-    authorName: authorName,
-    authorEmail: authorEmail,
-  );
+  }) async {
+    await _flushOrThrow();
+    await _git.commit(
+      root,
+      message,
+      authorName: authorName,
+      authorEmail: authorEmail,
+    );
+  }
 
   Future<ReviewEntry?> _entryFor(String root, GitStatusEntry s) async {
     final path = s.path;

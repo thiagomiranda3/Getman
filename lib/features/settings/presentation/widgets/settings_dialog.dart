@@ -72,6 +72,19 @@ class _SettingsDialogState extends State<SettingsDialog>
   late final TextEditingController _maxRedirectsController;
   late final TextEditingController _proxyController;
 
+  late final FocusNode _historyLimitFocus;
+  late final FocusNode _responseHistoryLimitFocus;
+  late final FocusNode _connectTimeoutFocus;
+  late final FocusNode _sendTimeoutFocus;
+  late final FocusNode _receiveTimeoutFocus;
+  late final FocusNode _maxRedirectsFocus;
+
+  // Numeric settings fields commit on blur/submit (not per keystroke) — see
+  // `_onNumberFieldFocusChange`. Each binding pairs a field's controller +
+  // focus node with a value selector (to revert/echo the current effective
+  // value) and the dispatcher for its Update event.
+  late final List<_NumberFieldBinding> _numberFieldBindings;
+
   @override
   void initState() {
     super.initState();
@@ -100,10 +113,81 @@ class _SettingsDialogState extends State<SettingsDialog>
       text: s.maxRedirects.toString(),
     );
     _proxyController = TextEditingController(text: s.proxyUrl ?? '');
+
+    _historyLimitFocus = FocusNode();
+    _responseHistoryLimitFocus = FocusNode();
+    _connectTimeoutFocus = FocusNode();
+    _sendTimeoutFocus = FocusNode();
+    _receiveTimeoutFocus = FocusNode();
+    _maxRedirectsFocus = FocusNode();
+
+    _numberFieldBindings = [
+      _NumberFieldBinding(
+        controller: _historyLimitController,
+        focusNode: _historyLimitFocus,
+        valueOf: (s) => s.historyLimit,
+        dispatch: (bloc, v) => bloc.add(UpdateHistoryLimit(v)),
+      ),
+      _NumberFieldBinding(
+        controller: _responseHistoryLimitController,
+        focusNode: _responseHistoryLimitFocus,
+        valueOf: (s) => s.responseHistoryLimit,
+        dispatch: (bloc, v) => bloc.add(UpdateResponseHistoryLimit(v)),
+      ),
+      _NumberFieldBinding(
+        controller: _connectTimeoutController,
+        focusNode: _connectTimeoutFocus,
+        valueOf: (s) => s.connectTimeoutMs,
+        dispatch: (bloc, v) => bloc.add(UpdateConnectTimeout(v)),
+      ),
+      _NumberFieldBinding(
+        controller: _sendTimeoutController,
+        focusNode: _sendTimeoutFocus,
+        valueOf: (s) => s.sendTimeoutMs,
+        dispatch: (bloc, v) => bloc.add(UpdateSendTimeout(v)),
+      ),
+      _NumberFieldBinding(
+        controller: _receiveTimeoutController,
+        focusNode: _receiveTimeoutFocus,
+        valueOf: (s) => s.receiveTimeoutMs,
+        dispatch: (bloc, v) => bloc.add(UpdateReceiveTimeout(v)),
+      ),
+      _NumberFieldBinding(
+        controller: _maxRedirectsController,
+        focusNode: _maxRedirectsFocus,
+        valueOf: (s) => s.maxRedirects,
+        dispatch: (bloc, v) => bloc.add(UpdateMaxRedirects(v)),
+      ),
+    ];
+    for (final binding in _numberFieldBindings) {
+      binding.focusNode.addListener(() => _onNumberFieldFocusChange(binding));
+    }
+  }
+
+  // Captured for dispose-time commits: `context.read` is not usable once the
+  // element is deactivated, but closing the dialog with a number field still
+  // focused (Esc, the close button) must not silently drop the typed value —
+  // blur never fires on that path.
+  SettingsBloc? _settingsBloc;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _settingsBloc = context.read<SettingsBloc>();
   }
 
   @override
   void dispose() {
+    final bloc = _settingsBloc;
+    if (bloc != null) {
+      for (final binding in _numberFieldBindings) {
+        if (!binding.focusNode.hasFocus) continue;
+        final parsed = int.tryParse(binding.controller.text.trim());
+        if (parsed != null && parsed != binding.valueOf(bloc.state.settings)) {
+          binding.dispatch(bloc, parsed);
+        }
+      }
+    }
     _tabController.dispose();
     _historyLimitController.dispose();
     _responseHistoryLimitController.dispose();
@@ -112,7 +196,45 @@ class _SettingsDialogState extends State<SettingsDialog>
     _receiveTimeoutController.dispose();
     _maxRedirectsController.dispose();
     _proxyController.dispose();
+    _historyLimitFocus.dispose();
+    _responseHistoryLimitFocus.dispose();
+    _connectTimeoutFocus.dispose();
+    _sendTimeoutFocus.dispose();
+    _receiveTimeoutFocus.dispose();
+    _maxRedirectsFocus.dispose();
     super.dispose();
+  }
+
+  // Fires on every focus change (gain + loss); only loss commits. Typing
+  // itself no longer dispatches — see `_numberField`'s onSubmitted, which
+  // unfocuses to funnel through this same path.
+  void _onNumberFieldFocusChange(_NumberFieldBinding binding) {
+    if (binding.focusNode.hasFocus) return;
+    final bloc = context.read<SettingsBloc>();
+    final parsed = int.tryParse(binding.controller.text.trim());
+    if (parsed != null) {
+      binding.dispatch(bloc, parsed);
+    } else {
+      // Empty/unparsable: revert to the current effective value instead of
+      // silently leaving stale text with nothing dispatched.
+      _echoValue(binding, bloc.state.settings);
+    }
+  }
+
+  void _echoValue(_NumberFieldBinding binding, SettingsEntity settings) {
+    final text = binding.valueOf(settings).toString();
+    if (binding.controller.text != text) binding.controller.text = text;
+  }
+
+  // Reflects the bloc's current (already-clamped) values back into any
+  // number field that isn't focused right now — e.g. after a commit clamps
+  // an out-of-range value, or after any other settings change. Fields being
+  // actively typed into are left alone so we never clobber in-progress input.
+  void _syncNumberFields(SettingsEntity settings) {
+    for (final binding in _numberFieldBindings) {
+      if (binding.focusNode.hasFocus) continue;
+      _echoValue(binding, settings);
+    }
   }
 
   @override
@@ -121,7 +243,9 @@ class _SettingsDialogState extends State<SettingsDialog>
     final fullscreen = context.isDialogFullscreen;
     final media = MediaQuery.sizeOf(context);
 
-    return BlocBuilder<SettingsBloc, SettingsState>(
+    return BlocConsumer<SettingsBloc, SettingsState>(
+      listenWhen: (prev, next) => prev.settings != next.settings,
+      listener: (context, state) => _syncNumberFields(state.settings),
       buildWhen: (prev, next) => prev.settings != next.settings,
       builder: (context, state) {
         final settings = state.settings;
@@ -221,7 +345,7 @@ class _SettingsDialogState extends State<SettingsDialog>
         trailing: _numberField(
           context,
           _historyLimitController,
-          (v) => bloc.add(UpdateHistoryLimit(v)),
+          _historyLimitFocus,
           fieldKey: const ValueKey('history_limit_field'),
         ),
       ),
@@ -248,7 +372,7 @@ class _SettingsDialogState extends State<SettingsDialog>
         trailing: _numberField(
           context,
           _responseHistoryLimitController,
-          (v) => bloc.add(UpdateResponseHistoryLimit(v)),
+          _responseHistoryLimitFocus,
           fieldKey: const ValueKey('response_history_limit_field'),
         ),
       ),
@@ -313,7 +437,7 @@ class _SettingsDialogState extends State<SettingsDialog>
         trailing: _numberField(
           context,
           _connectTimeoutController,
-          (v) => bloc.add(UpdateConnectTimeout(v)),
+          _connectTimeoutFocus,
         ),
       ),
       _SettingRow(
@@ -321,7 +445,7 @@ class _SettingsDialogState extends State<SettingsDialog>
         trailing: _numberField(
           context,
           _sendTimeoutController,
-          (v) => bloc.add(UpdateSendTimeout(v)),
+          _sendTimeoutFocus,
         ),
       ),
       _SettingRow(
@@ -329,7 +453,7 @@ class _SettingsDialogState extends State<SettingsDialog>
         trailing: _numberField(
           context,
           _receiveTimeoutController,
-          (v) => bloc.add(UpdateReceiveTimeout(v)),
+          _receiveTimeoutFocus,
           fieldKey: const ValueKey('receive_timeout_field'),
         ),
       ),
@@ -346,7 +470,7 @@ class _SettingsDialogState extends State<SettingsDialog>
           trailing: _numberField(
             context,
             _maxRedirectsController,
-            (v) => bloc.add(UpdateMaxRedirects(v)),
+            _maxRedirectsFocus,
           ),
         ),
       _switch(
@@ -564,10 +688,15 @@ class _SettingsDialogState extends State<SettingsDialog>
 
   // --- Row helpers -----------------------------------------------------------
 
+  // Commits on blur/submit, not per keystroke — a partial or transient
+  // keystroke (e.g. "5" while typing "50") must never reach the bloc, since
+  // some fields (history limit, live timeouts) take effect immediately on
+  // dispatch. `onSubmitted` unfocuses so the actual commit funnels through
+  // the single `_onNumberFieldFocusChange` path (see initState).
   Widget _numberField(
     BuildContext context,
     TextEditingController controller,
-    void Function(int) onParsed, {
+    FocusNode focusNode, {
     Key? fieldKey,
   }) {
     final layout = context.appLayout;
@@ -577,6 +706,7 @@ class _SettingsDialogState extends State<SettingsDialog>
         key: fieldKey,
         keyboardType: TextInputType.number,
         controller: controller,
+        focusNode: focusNode,
         decoration: InputDecoration(
           isDense: true,
           contentPadding: EdgeInsets.symmetric(
@@ -584,10 +714,7 @@ class _SettingsDialogState extends State<SettingsDialog>
             vertical: layout.inputPaddingVertical,
           ),
         ),
-        onChanged: (val) {
-          final n = int.tryParse(val);
-          if (n != null) onParsed(n);
-        },
+        onSubmitted: (_) => focusNode.unfocus(),
       ),
     );
   }
@@ -633,6 +760,25 @@ class _SettingsDialogState extends State<SettingsDialog>
       ),
     );
   }
+}
+
+/// Pairs a numeric settings field's [controller] + [focusNode] with a
+/// [valueOf] selector (reads the field's current effective value off
+/// [SettingsEntity], used to revert an emptied field or echo back a clamped
+/// commit) and its [dispatch]er (fires the field's `Update*` event). See
+/// `_SettingsDialogState._onNumberFieldFocusChange`.
+class _NumberFieldBinding {
+  const _NumberFieldBinding({
+    required this.controller,
+    required this.focusNode,
+    required this.valueOf,
+    required this.dispatch,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final int Function(SettingsEntity settings) valueOf;
+  final void Function(SettingsBloc bloc, int value) dispatch;
 }
 
 /// A single labelled settings row with a uniform vertical rhythm: a leading

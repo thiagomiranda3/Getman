@@ -38,12 +38,25 @@ class _GitIdentitySettingsTileState extends State<GitIdentitySettingsTile> {
     super.dispose();
   }
 
-  void _update(BuildContext context, {String? name, String? email}) {
+  /// Sentinel distinguishing "this field wasn't touched" from an explicit
+  /// clear — `name: null` must actually clear the stored name (the bloc and
+  /// entity support it), not silently keep authoring with the old identity.
+  static const Object _unchanged = Object();
+
+  void _update(
+    BuildContext context, {
+    Object? name = _unchanged,
+    Object? email = _unchanged,
+  }) {
     final current = context.read<SettingsBloc>().state.settings;
     context.read<SettingsBloc>().add(
       UpdateGitIdentity(
-        name: name ?? current.gitUserName,
-        email: email ?? current.gitUserEmail,
+        name: identical(name, _unchanged)
+            ? current.gitUserName
+            : name as String?,
+        email: identical(email, _unchanged)
+            ? current.gitUserEmail
+            : email as String?,
       ),
     );
   }

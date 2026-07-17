@@ -22,6 +22,7 @@ import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/features/tabs/presentation/widgets/code_find_panel.dart';
 import 'package:getman/features/tabs/presentation/widgets/form_data_editor.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_editor_tabs.dart';
 import 'package:mocktail/mocktail.dart';
@@ -275,6 +276,57 @@ void main() {
 
     // multipart rows expose an attach-file toggle (urlencoded does not).
     expect(find.byIcon(Icons.attach_file), findsOneWidget);
+  });
+
+  testWidgets('beautify button drops below the find panel while it is open', (
+    tester,
+  ) async {
+    final bloc = await _loadedBloc(
+      repository,
+      sendRequestUseCase,
+      tab(BodyType.raw),
+    );
+    addTearDown(bloc.close);
+
+    final controller = await _pump(tester, bloc, 't');
+    addTearDown(controller.dispose);
+
+    final beautify = find.widgetWithIcon(IconButton, Icons.auto_fix_high);
+    final closedTop = tester.getTopLeft(beautify).dy;
+
+    // Open find mode the same way the Cmd/Ctrl+F shortcut does. The editor
+    // must expose its find controller for the Beautify overlay to react.
+    final editor = tester.widget<CodeEditor>(find.byType(CodeEditor));
+    expect(
+      editor.findController,
+      isNotNull,
+      reason:
+          'the raw body editor owns the find controller so the beautify '
+          'button can move out of the way of the find panel',
+    );
+    editor.findController!.findMode();
+    await tester.pumpAndSettle();
+
+    // The panel overlays the editor's top edge; the beautify button must
+    // clear it rather than covering its close button.
+    final closeButton = find.descendant(
+      of: find.byType(CodeFindPanel),
+      matching: find.widgetWithIcon(IconButton, Icons.close),
+    );
+    expect(closeButton, findsOneWidget);
+    expect(
+      tester.getRect(beautify).overlaps(tester.getRect(closeButton)),
+      isFalse,
+    );
+    expect(
+      tester.getTopLeft(beautify).dy,
+      greaterThanOrEqualTo(closedTop + kFindPanelHeight),
+    );
+
+    // Closing the panel restores the resting position.
+    editor.findController!.close();
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(beautify).dy, closedTop);
   });
 
   testWidgets('GRAPHQL shows the query + variables panes', (tester) async {

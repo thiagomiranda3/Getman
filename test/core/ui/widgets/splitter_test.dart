@@ -81,6 +81,77 @@ void main() {
     expect(endCount, 1);
   });
 
+  testWidgets(
+    'onPanCancel is wired to commit via onEnd (the sole-member arena would '
+    'otherwise sweep a pointer-down straight to onPanEnd, masking a missing '
+    'cancel path)',
+    (tester) async {
+      var endCount = 0;
+      await pumpSplitter(
+        tester,
+        isVertical: false,
+        onUpdate: (_) {},
+        onEnd: () => endCount++,
+      );
+
+      final gestureDetector = tester.widget<GestureDetector>(
+        find.descendant(
+          of: find.byType(Splitter),
+          matching: find.byType(GestureDetector),
+        ),
+      );
+
+      expect(
+        gestureDetector.onPanCancel,
+        isNotNull,
+        reason: 'a mid-drag PointerCancelEvent must still commit the override',
+      );
+      gestureDetector.onPanCancel!();
+      expect(endCount, 1);
+    },
+  );
+
+  testWidgets(
+    'a real gesture cancel while contested by a competing drag recognizer '
+    'still commits (onPanCancel → onEnd)',
+    (tester) async {
+      var endCount = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: brutalistTheme(Brightness.light),
+          home: Scaffold(
+            // The outer horizontal-drag recognizer keeps the gesture arena
+            // contested, so the Splitter's pan stays "possible"; a cancel then
+            // resolves to onPanCancel rather than being swept to onPanEnd.
+            body: GestureDetector(
+              onHorizontalDragUpdate: (_) {},
+              child: Center(
+                child: SizedBox(
+                  width: 400,
+                  height: 400,
+                  child: Splitter(
+                    isVertical: false,
+                    onUpdate: (_) {},
+                    onEnd: () => endCount++,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(Splitter)),
+      );
+      await tester.pump();
+      await gesture.cancel();
+      await tester.pump();
+
+      expect(endCount, 1);
+    },
+  );
+
   testWidgets('lays out without overflow in horizontal configuration', (
     tester,
   ) async {

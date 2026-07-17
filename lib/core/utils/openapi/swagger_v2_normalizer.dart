@@ -55,6 +55,7 @@ NormalizedApi normalizeSwaggerV2(Map<String, dynamic> spec) {
             method: method.toUpperCase(),
             path: path,
             op: Map<String, dynamic>.from(op),
+            sharedParameters: pathItem['parameters'],
             refs: refs,
             schemes: schemes,
             globalSecurity: globalSecurity,
@@ -70,6 +71,7 @@ NormalizedOperation _operation({
   required String method,
   required String path,
   required Map<String, dynamic> op,
+  required dynamic sharedParameters,
   required RefResolver refs,
   required Map<String, NormalizedSecurityScheme> schemes,
   required String? globalSecurity,
@@ -86,52 +88,52 @@ NormalizedOperation _operation({
   final formFields = <MultipartFieldEntity>[];
   NormalizedBody? body;
 
-  final rawParams = op['parameters'];
-  if (rawParams is List) {
-    for (final p in rawParams.whereType<Map<String, dynamic>>()) {
-      final param = refs.resolve(Map<String, dynamic>.from(p));
-      final location = param['in'] as String?;
-      final pName = param['name'] as String?;
-      switch (location) {
-        case 'query':
-          if (pName != null) {
-            query.add(NormalizedParam(name: pName, value: _paramValue(param)));
-          }
-        case 'header':
-          if (pName != null) {
-            headers.add(
-              NormalizedParam(name: pName, value: _paramValue(param)),
-            );
-          }
-        case 'formData':
-          if (pName != null) {
-            formFields.add(
-              MultipartFieldEntity(
-                name: pName,
-                isFile: param['type'] == 'file',
-              ),
-            );
-          }
-        case 'body':
-          final schema = param['schema'];
-          if (schema is Map) {
-            final resolved = refs.deepResolve(
-              Map<String, dynamic>.from(schema),
-            );
-            final sample = resolved is Map<String, dynamic>
-                ? sampleSchema(resolved)
-                : null;
-            body = NormalizedBody(
-              bodyType: BodyType.raw,
-              contentType: 'application/json',
-              raw: sample == null
-                  ? ''
-                  : const JsonEncoder.withIndent('  ').convert(sample),
-            );
-          }
-        default:
-          break; // 'path' stays templated
-      }
+  for (final param in mergedParameters(
+    sharedParameters,
+    op['parameters'],
+    refs,
+  )) {
+    final location = param['in'] as String?;
+    final pName = param['name'] as String?;
+    switch (location) {
+      case 'query':
+        if (pName != null) {
+          query.add(NormalizedParam(name: pName, value: _paramValue(param)));
+        }
+      case 'header':
+        if (pName != null) {
+          headers.add(
+            NormalizedParam(name: pName, value: _paramValue(param)),
+          );
+        }
+      case 'formData':
+        if (pName != null) {
+          formFields.add(
+            MultipartFieldEntity(
+              name: pName,
+              isFile: param['type'] == 'file',
+            ),
+          );
+        }
+      case 'body':
+        final schema = param['schema'];
+        if (schema is Map) {
+          final resolved = refs.deepResolve(
+            Map<String, dynamic>.from(schema),
+          );
+          final sample = resolved is Map<String, dynamic>
+              ? sampleSchema(resolved)
+              : null;
+          body = NormalizedBody(
+            bodyType: BodyType.raw,
+            contentType: 'application/json',
+            raw: sample == null
+                ? ''
+                : const JsonEncoder.withIndent('  ').convert(sample),
+          );
+        }
+      default:
+        break; // 'path' stays templated
     }
   }
 

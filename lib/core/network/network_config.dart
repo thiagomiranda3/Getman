@@ -36,5 +36,17 @@ class NetworkConfig {
   final String? clientKeyPath;
   final String? clientCertPassphrase;
 
+  /// Whether the adapter-relevant fields (SSL verification, proxy, mTLS cert
+  /// trio) match [other]. Timeouts/redirects are applied on `BaseOptions` in
+  /// place, so they are excluded — only these fields require rebuilding the
+  /// HTTP adapter (which drops its socket pool), so the network services can
+  /// skip the swap on a timeout-only change.
+  bool sameAdapterConfig(NetworkConfig other) =>
+      verifySsl == other.verifySsl &&
+      proxyUrl == other.proxyUrl &&
+      clientCertPath == other.clientCertPath &&
+      clientKeyPath == other.clientKeyPath &&
+      clientCertPassphrase == other.clientCertPassphrase;
+
   static const NetworkConfig defaults = NetworkConfig();
 }

@@ -51,6 +51,21 @@ void main() {
     });
   });
 
+  group('lookup (null-valued leaf vs missing path)', () {
+    test('a present null leaf resolves as found', () {
+      final root = JsonPath.tryDecode('{"user": {"middleName": null}}');
+      final r = JsonPath.lookup(root, 'user.middleName');
+      expect(r.found, isTrue);
+      expect(r.value, isNull);
+    });
+
+    test('a missing path reports not found', () {
+      final root = JsonPath.tryDecode('{"user": {}}');
+      expect(JsonPath.lookup(root, 'user.middleName').found, isFalse);
+      expect(JsonPath.lookup(root, 'ghost[2]').found, isFalse);
+    });
+  });
+
   group('isValid', () {
     test('accepts supported syntax', () {
       expect(JsonPath.isValid(r'$.a.b[0]'), isTrue);

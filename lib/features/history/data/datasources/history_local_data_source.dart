@@ -13,9 +13,11 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
   Box<HttpRequestConfig> _box() =>
       Hive.box<HttpRequestConfig>(HiveBoxes.history);
 
-  // Signature index: hashCode(method+url+body) → list of box keys with that
-  // hash. Built lazily on first addToHistory call; rebuilt if box length drifts
-  // (e.g. external deletes or box replacements between sessions).
+  // Signature index: HttpRequestConfig.hashCode (the full request signature —
+  // method/url/body plus bodyType/graphqlVariables/bodyFilePath/formFields) →
+  // list of box keys with that hash. Built lazily on first addToHistory call;
+  // rebuilt if box length drifts (e.g. external deletes or box replacements
+  // between sessions).
   Map<int, List<dynamic>>? _signatureIndex;
   int _indexedKeyCount = 0;
 

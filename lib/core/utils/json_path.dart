@@ -16,28 +16,39 @@ class JsonPath {
 
   /// Reads the value at [path] within already-decoded JSON [root], or null if
   /// the path is invalid or doesn't resolve.
+  ///
+  /// A legitimately-null leaf is indistinguishable from a miss here — callers
+  /// that must tell them apart (exists assertions, extraction) use [lookup].
   static Object? read(Object? root, String path) {
+    final r = lookup(root, path);
+    return r.found ? r.value : null;
+  }
+
+  /// Like [read], but reports whether the path actually RESOLVED: a JSON
+  /// `null` leaf is `(found: true, value: null)`, a missing/invalid path is
+  /// `(found: false, value: null)`.
+  static ({bool found, Object? value}) lookup(Object? root, String path) {
+    const miss = (found: false, value: null);
     final segments = _parse(path);
-    if (segments == null) return null;
+    if (segments == null) return miss;
     var current = root;
     for (final seg in segments) {
-      if (current == null) return null;
       if (seg is int) {
         if (current is List && seg < current.length) {
           current = current[seg];
         } else {
-          return null;
+          return miss;
         }
       } else {
         final key = seg as String;
         if (current is Map && current.containsKey(key)) {
           current = current[key];
         } else {
-          return null;
+          return miss;
         }
       }
     }
-    return current;
+    return (found: true, value: current);
   }
 
   /// Decodes [rawJson] then reads [path]. Null on parse failure or miss.

@@ -44,7 +44,12 @@ class _MainScreenState extends State<MainScreen> {
   double? _localSideMenuWidth;
   final FocusNode _mainFocusNode = FocusNode();
   final ScrollController _tabScrollController = ScrollController();
-  int _lastActiveIndex = -1;
+
+  /// The tab id last scrolled into view. Keyed on identity (not the bare
+  /// index) so switching to a different panel whose active index happens to
+  /// equal the previous panel's still scrolls — a different tab, same
+  /// position, must not be treated as "no change" (D7).
+  String? _lastActiveTabId;
 
   @override
   void initState() {
@@ -63,12 +68,13 @@ class _MainScreenState extends State<MainScreen> {
 
   void _ensureActiveTabVisible(
     int activeIndex,
-    int tabsLength,
+    List<HttpRequestTabEntity> tabs,
     AppLayout layout,
   ) {
-    if (activeIndex < 0 || activeIndex >= tabsLength) return;
-    if (activeIndex == _lastActiveIndex) return;
-    _lastActiveIndex = activeIndex;
+    if (activeIndex < 0 || activeIndex >= tabs.length) return;
+    final activeTabId = tabs[activeIndex].tabId;
+    if (activeTabId == _lastActiveTabId) return;
+    _lastActiveTabId = activeTabId;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_tabScrollController.hasClients) return;
@@ -204,6 +210,22 @@ class _MainScreenState extends State<MainScreen> {
 
             return Actions(
               actions: <Type, Action<Intent>>{
+                // NewTabIntent lives here — not at the root Actions in
+                // main.dart — for the same reason CloseTabIntent etc. do:
+                // MainScreen sits BELOW the router, so a dialog pushed on the
+                // root Navigator is a sibling route, not a descendant of this
+                // Actions. A root-level NewTabIntent used to be reachable
+                // from a focused field INSIDE any dialog (the settings
+                // dialog, the command palette's search box, ...) since the
+                // root Actions sits ABOVE MaterialApp/the Navigator — Cmd/
+                // Ctrl+N would silently stack a new tab behind the modal
+                // barrier (D8).
+                NewTabIntent: CallbackAction<NewTabIntent>(
+                  onInvoke: (_) {
+                    context.read<TabsBloc>().add(const AddTab());
+                    return null;
+                  },
+                ),
                 // Dialog-opening shortcuts live here (not at the root Actions
                 // in main.dart): showDialog needs a context below MaterialApp +
                 // the router's Navigator, both of which MainScreen sits under.
@@ -503,7 +525,7 @@ class _MainScreenState extends State<MainScreen> {
     final theme = Theme.of(context);
     final layout = context.appLayout;
 
-    _ensureActiveTabVisible(activeIndex, tabs.length, layout);
+    _ensureActiveTabVisible(activeIndex, tabs, layout);
 
     return Container(
       height: layout.tabBarHeight,

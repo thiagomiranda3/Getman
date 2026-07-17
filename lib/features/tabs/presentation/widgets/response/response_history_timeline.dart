@@ -34,11 +34,14 @@ class ResponseHistoryTimeline extends StatelessWidget {
     final theme = Theme.of(context);
     final layout = context.appLayout;
 
-    // The displayed entry is the one whose response matches `current`; default
-    // to the head (newest) when nothing matches.
+    // The displayed entry is the one whose response matches `current`;
+    // default to the head (newest) when `current` is null. A genuine miss
+    // (-1) is kept as-is — clamping it to 0 would falsely mark "Latest" as
+    // selected and drop the HISTORY badge for a response that isn't actually
+    // the newest entry.
     final currentIndex = current == null
         ? 0
-        : history.indexWhere((e) => e.response == current).clamp(0, 0x7fffffff);
+        : history.indexWhere((e) => e.response == current);
     final viewingOld = currentIndex > 0;
 
     return PopupMenuButton<String>(

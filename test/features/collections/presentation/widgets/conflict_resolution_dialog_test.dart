@@ -427,7 +427,10 @@ void main() {
       verify(() => conflictBloc.add(const AbortRebase(root))).called(1);
       expect(find.text('Conflicts resolved.'), findsNothing);
       verifyNever(() => gitBloc.add(const ConflictsResolved(root)));
-      verifyNever(() => gitBloc.add(const LoadBranchStatus(root)));
+      // Branch status IS refreshed: the post-conflict status was read
+      // mid-rebase (detached HEAD → current == null), which hides the branch
+      // chip until something else refreshes it.
+      verify(() => gitBloc.add(const LoadBranchStatus(root))).called(1);
       await controller.close();
     },
   );

@@ -48,15 +48,24 @@ class ExtractionEngine {
   ) {
     switch (rule.kind) {
       case ExtractionKind.jsonPath:
-        final v = JsonPath.read(decodedBody, rule.expression);
-        return v == null ? null : _stringify(v);
+        // lookup, not read: a present-but-null leaf (which the TREE view
+        // renders and offers Extract on) must capture 'null', not report a
+        // miss.
+        final r = JsonPath.lookup(decodedBody, rule.expression);
+        return r.found ? _stringify(r.value) : null;
       case ExtractionKind.header:
         return _header(response.headers, rule.expression);
       case ExtractionKind.regex:
         try {
           final match = RegExp(rule.expression).firstMatch(response.body);
           if (match == null) return null;
-          return match.groupCount >= 1 ? match.group(1) : match.group(0);
+          // First PARTICIPATING group: in an alternation like `a=(\w+)|b=(\w+)`
+          // group 1 can be null even though the pattern matched.
+          for (var i = 1; i <= match.groupCount; i++) {
+            final group = match.group(i);
+            if (group != null) return group;
+          }
+          return match.group(0);
         } on Object catch (_) {
           return null; // invalid regex
         }
@@ -71,6 +80,6 @@ class ExtractionEngine {
     return null;
   }
 
-  static String _stringify(Object value) =>
+  static String _stringify(Object? value) =>
       value is String ? value : jsonEncode(value);
 }

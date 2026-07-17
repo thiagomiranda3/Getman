@@ -104,4 +104,96 @@ void main() {
     expect(post.body!.contentType, 'application/json');
     expect(post.body!.raw, contains('"name"'));
   });
+
+  test('no op/path-level servers override leaves server null', () {
+    final api = normalizeOpenApiV3(_spec);
+    for (final op in api.operations) {
+      expect(op.server, isNull);
+    }
+  });
+
+  test(
+    'operation-level servers win over path-level, which wins over global',
+    () {
+      final spec = {
+        'openapi': '3.0.0',
+        'info': {'title': 'T'},
+        'servers': [
+          {'url': 'https://global.example.com'},
+        ],
+        'paths': {
+          '/webhook': {
+            'servers': [
+              {'url': 'https://path.example.com'},
+            ],
+            'get': {
+              'servers': [
+                {'url': 'https://op.example.com'},
+              ],
+            },
+            'post': <String, dynamic>{},
+          },
+        },
+      };
+      final api = normalizeOpenApiV3(spec);
+      final get = api.operations.firstWhere((o) => o.method == 'GET');
+      expect(get.server?.url, 'https://op.example.com');
+      final post = api.operations.firstWhere((o) => o.method == 'POST');
+      expect(
+        post.server?.url,
+        'https://path.example.com',
+        reason: 'no op-level override; falls back to the path-item servers',
+      );
+    },
+  );
+
+  test(
+    'path-item-level shared parameters apply to every operation, '
+    'op-level winning on the same name+in',
+    () {
+      final spec = {
+        'openapi': '3.0.0',
+        'info': {'title': 'T'},
+        'paths': {
+          '/things': {
+            'parameters': [
+              {
+                'name': 'tenant',
+                'in': 'query',
+                'schema': {'default': 'acme'},
+              },
+              {
+                'name': 'verbose',
+                'in': 'query',
+                'schema': {'default': 'false'},
+              },
+            ],
+            'get': {
+              'parameters': [
+                {
+                  'name': 'verbose',
+                  'in': 'query',
+                  'schema': {'default': 'true'},
+                },
+              ],
+            },
+            'delete': <String, dynamic>{},
+          },
+        },
+      };
+      final api = normalizeOpenApiV3(spec);
+      final get = api.operations.firstWhere((o) => o.method == 'GET');
+      expect(
+        {for (final p in get.queryParams) p.name: p.value},
+        {'tenant': 'acme', 'verbose': 'true'},
+        reason: 'shared param inherited; op-level override wins',
+      );
+      final del = api.operations.firstWhere((o) => o.method == 'DELETE');
+      expect(
+        {for (final p in del.queryParams) p.name: p.value},
+        {'tenant': 'acme', 'verbose': 'false'},
+        reason: 'ops with no own list still inherit shared params',
+      );
+    },
+  );
 }

@@ -197,4 +197,50 @@ void main() {
     ], response);
     expect(r, isEmpty);
   });
+
+  test('a JSON null leaf is present — exists must pass on it', () {
+    const nullBody = HttpResponseEntity(
+      statusCode: 200,
+      body: '{"user":{"middleName":null}}',
+      headers: {},
+      durationMs: 1,
+    );
+    final r = AssertionEngine.run(const [
+      Assertion(
+        id: '1',
+        target: AssertionTarget.bodyJsonPath,
+        path: 'user.middleName',
+        comparator: AssertionComparator.exists,
+      ),
+    ], nullBody).single;
+    expect(
+      r.passed,
+      isTrue,
+      reason: 'the TREE view renders this exact node — exists must agree',
+    );
+    expect(r.actual, 'null');
+  });
+
+  test('inRange accepts negative bounds', () {
+    const body = HttpResponseEntity(
+      statusCode: 200,
+      body: '{"delta":-5}',
+      headers: {},
+      durationMs: 1,
+    );
+    AssertionResult range(String expected) => AssertionEngine.run([
+      Assertion(
+        id: '1',
+        target: AssertionTarget.bodyJsonPath,
+        path: 'delta',
+        comparator: AssertionComparator.inRange,
+        expected: expected,
+      ),
+    ], body).single;
+
+    expect(range('-10-0').passed, isTrue);
+    expect(range('-10--1').passed, isTrue);
+    expect(range('-10..0').passed, isTrue);
+    expect(range('0-10').passed, isFalse);
+  });
 }

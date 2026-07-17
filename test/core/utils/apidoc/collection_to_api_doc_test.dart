@@ -78,6 +78,23 @@ void main() {
       expect(doc.servers.single.variables.containsKey('baseUrl'), isTrue);
     });
 
+    test('a leaf root (not a folder) exports as its own single operation', () {
+      final root = _leaf('a', 'Ping', 'GET', 'https://api.test.com/ping');
+      final doc = CollectionToApiDoc.build(root);
+      expect(
+        doc.operations,
+        hasLength(1),
+        reason:
+            'a request leaf used as the export root must not silently '
+            'produce an empty document (root.children is empty for a leaf)',
+      );
+      final op = doc.operations.single;
+      expect(op.method, 'GET');
+      expect(op.path, '/ping');
+      expect(op.summary, 'Ping');
+      expect(doc.servers.single.url, 'https://api.test.com');
+    });
+
     test(
       'bare path with no scheme and no var falls back to server "/" with warning',
       () {

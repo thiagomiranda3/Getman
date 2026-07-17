@@ -10,6 +10,7 @@ import 'package:getman/features/collections/presentation/bloc/collections_bloc.d
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/collection_node_menu.dart';
 import 'package:getman/features/collections/presentation/widgets/node_action_sheet.dart';
+import 'package:getman/features/collections/presentation/widgets/node_drag_data.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 
@@ -139,17 +140,31 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
 
       content = isPhone
           ? folderInner
-          : DragTarget<String>(
+          : DragTarget<NodeDragData>(
+              // Always accept: rejecting (returning false) lets the release
+              // fall through to the list-level root target, which would move
+              // the node to the root — releasing a drag over its own row (the
+              // natural "cancel" gesture) must be swallowed instead. Only
+              // legal drops highlight; the bloc guards illegal moves too.
+              // Typed to NodeDragData (not a bare String) so a dragged TAB
+              // neither highlights this target nor gets accepted (D4).
               onWillAcceptWithDetails: (details) {
-                if (details.data == node.id) return false;
-                setState(() => _isDragOver = true);
+                final legal =
+                    details.data.nodeId != node.id &&
+                    !CollectionsTreeHelper.isDescendantOrSelf(
+                      context.read<CollectionsBloc>().state.collections,
+                      details.data.nodeId,
+                      node.id,
+                    );
+                if (legal) setState(() => _isDragOver = true);
                 return true;
               },
               onLeave: (_) => setState(() => _isDragOver = false),
               onAcceptWithDetails: (details) {
                 setState(() => _isDragOver = false);
+                if (details.data.nodeId == node.id) return; // self: swallow
                 context.read<CollectionsBloc>().add(
-                  MoveNode(details.data, node.id),
+                  MoveNode(details.data.nodeId, node.id),
                 );
               },
               builder: (context, candidateData, rejectedData) =>
@@ -264,15 +279,30 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
 
       content = isPhone
           ? leafInner
-          : DragTarget<String>(
+          : DragTarget<NodeDragData>(
+              // Always accept — see the folder target above for why rejecting
+              // is unsafe (fall-through to the root target).
+              // Typed to NodeDragData (not a bare String) so a dragged TAB
+              // neither highlights this target nor gets accepted (D4).
               onWillAcceptWithDetails: (details) {
-                if (details.data == node.id) return false;
-                setState(() => _isDragOver = true);
+                // Mirrors the folder guard above: dropping an ANCESTOR folder
+                // onto one of its own descendant requests must not highlight
+                // — the bloc rejects the move regardless, so highlighting it
+                // advertised a drop that would silently no-op (D5).
+                final legal =
+                    details.data.nodeId != node.id &&
+                    !CollectionsTreeHelper.isDescendantOrSelf(
+                      context.read<CollectionsBloc>().state.collections,
+                      details.data.nodeId,
+                      node.id,
+                    );
+                if (legal) setState(() => _isDragOver = true);
                 return true;
               },
               onLeave: (_) => setState(() => _isDragOver = false),
               onAcceptWithDetails: (details) {
                 setState(() => _isDragOver = false);
+                if (details.data.nodeId == node.id) return; // self: swallow
                 final bloc = context.read<CollectionsBloc>();
                 // Dropping onto a request moves the dragged node into that
                 // request's containing folder (or root when it sits at the top
@@ -280,7 +310,7 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
                 // to the list-level root drop target.
                 bloc.add(
                   MoveNode(
-                    details.data,
+                    details.data.nodeId,
                     CollectionsTreeHelper.parentIdOf(
                       bloc.state.collections,
                       node.id,
@@ -299,8 +329,8 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
 
     if (isPhone) return content;
 
-    return Draggable<String>(
-      data: node.id,
+    return Draggable<NodeDragData>(
+      data: NodeDragData(node.id),
       feedback: context.appMotion.treeDragFeedback(
         context,
         child: Material(

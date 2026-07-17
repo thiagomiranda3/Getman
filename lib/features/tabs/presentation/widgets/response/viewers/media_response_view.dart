@@ -42,17 +42,36 @@ class _MediaResponseViewState extends State<MediaResponseView> {
     unawaited(_start());
   }
 
+  @override
+  void didUpdateWidget(MediaResponseView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A re-send reuses this element (the panel keys viewers by kind, not by
+    // response) — without a restart the old temp file keeps playing.
+    if (!identical(oldWidget.bytes, widget.bytes)) {
+      final old = _player;
+      if (old != null) unawaited(old.dispose());
+      setState(() {
+        _player = null;
+        _videoController = null;
+        _failed = false;
+      });
+      unawaited(_start());
+    }
+  }
+
   Future<void> _start() async {
+    // Guards a stale _start finishing after a newer response replaced it.
+    final bytes = widget.bytes;
     try {
       final ext = mediaExtension(
         contentType: widget.contentType,
         url: widget.url,
       );
-      final path = await writeMediaTempFile(widget.bytes, ext);
+      final path = await writeMediaTempFile(bytes, ext);
       final player = Player();
       final vc = widget.isVideo ? VideoController(player) : null;
       await player.open(Media('file://$path'), play: false);
-      if (!mounted) {
+      if (!mounted || !identical(bytes, widget.bytes)) {
         unawaited(player.dispose());
         return;
       }
@@ -61,7 +80,9 @@ class _MediaResponseViewState extends State<MediaResponseView> {
         _videoController = vc;
       });
     } on Object {
-      if (mounted) setState(() => _failed = true);
+      if (mounted && identical(bytes, widget.bytes)) {
+        setState(() => _failed = true);
+      }
     }
   }
 

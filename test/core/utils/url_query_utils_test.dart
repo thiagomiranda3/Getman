@@ -209,5 +209,31 @@ void main() {
       );
       expect(rebuilt, url);
     });
+
+    test(r'preserves {{$dynamic}} tokens literally, like plain {{var}}', () {
+      // The resolver grammar allows a leading $ (dynamic variables) and
+      // whitespace inside the braces — the opaque-token pass must match it,
+      // or a params-tab edit percent-mangles {{$guid}} into %7B%7B%24guid...
+      const url = r'https://x/a?id={{$guid}}&t={{ ts }}';
+      final parts = UrlQueryUtils.parse(url);
+      expect(parts.params, const [
+        QueryParamEntity(key: 'id', value: r'{{$guid}}'),
+        QueryParamEntity(key: 't', value: '{{ ts }}'),
+      ]);
+      final rebuilt = UrlQueryUtils.build(
+        base: parts.base,
+        params: parts.params,
+      );
+      expect(rebuilt, url);
+    });
+  });
+
+  group('fragment vs query ordering', () {
+    test('a ? inside the fragment is not a query delimiter', () {
+      final parts = UrlQueryUtils.parse('https://x/a#frag?x=1');
+      expect(parts.base, 'https://x/a');
+      expect(parts.params, isEmpty);
+      expect(parts.fragment, 'frag?x=1');
+    });
   });
 }

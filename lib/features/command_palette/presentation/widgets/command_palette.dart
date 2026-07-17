@@ -67,12 +67,31 @@ class _CommandPaletteState extends State<CommandPalette> {
   // the selection / run a row without recomputing on every event.
   List<_Command> _currentResults = const [];
 
+  // Keeps the keyboard-highlighted row scrolled into view. Rows may be
+  // scrolled out of the ListView's lazy build range (not just clipped), so a
+  // GlobalKey/Scrollable.ensureVisible approach can't reach them — an
+  // explicit ScrollController offset can. `_rowExtent` is measured off the
+  // first rendered row (every row shares the same dense two-line-tile shape)
+  // rather than a hardcoded pixel literal; once known it's also fed back into
+  // the ListView as a fixed `itemExtent` so `index * _rowExtent` stays exact.
+  final ScrollController _resultsScrollController = ScrollController();
+  final GlobalKey _measuredRowKey = GlobalKey();
+  double? _rowExtent;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected.addListener(_scrollSelectedIntoView);
+  }
+
   @override
   void dispose() {
+    _selected.removeListener(_scrollSelectedIntoView);
     _debouncer.dispose();
     _queryText.dispose();
     _selected.dispose();
     _query.dispose();
+    _resultsScrollController.dispose();
     super.dispose();
   }
 
@@ -98,11 +117,51 @@ class _CommandPaletteState extends State<CommandPalette> {
     );
   }
 
+  /// Reads the first row's laid-out height once, so scroll math has a real
+  /// row extent instead of a guessed literal. A no-op once `_rowExtent` is
+  /// set (rows are uniform, so one measurement is enough for the session).
+  void _measureRowExtentIfNeeded() {
+    if (_rowExtent != null) return;
+    final renderObject = _measuredRowKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox) return;
+    if (!renderObject.hasSize) return;
+    setState(() => _rowExtent = renderObject.size.height);
+  }
+
+  /// Scrolls the results list just far enough that the highlighted row is
+  /// fully within the viewport, in either direction. A no-op until the row
+  /// extent is known or before the list has laid out.
+  void _scrollSelectedIntoView() {
+    final extent = _rowExtent;
+    if (extent == null || !_resultsScrollController.hasClients) return;
+    final position = _resultsScrollController.position;
+    final top = _selected.value * extent;
+    final bottom = top + extent;
+    double? target;
+    if (top < position.pixels) {
+      target = top;
+    } else if (bottom > position.pixels + position.viewportDimension) {
+      target = bottom - position.viewportDimension;
+    }
+    if (target == null) return;
+    unawaited(
+      _resultsScrollController.animateTo(
+        target.clamp(0, position.maxScrollExtent),
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+      ),
+    );
+  }
+
   void _runSelected() {
     // Recompute against the live text so Enter works before the debounce fires.
     final results = _resultsFor(_query.text);
     if (results.isEmpty) return;
-    _invoke(results[_selected.value.clamp(0, results.length - 1)]);
+    // The arrow-key index belongs to the DEBOUNCED result list; against a
+    // fresh query it can point at a different row than the visible highlight
+    // (the debounce handler resets it to 0 — mirror that here).
+    final index = _query.text == _queryText.value ? _selected.value : 0;
+    _invoke(results[index.clamp(0, results.length - 1)]);
   }
 
   List<_Command> _buildCommands() {
@@ -199,6 +258,11 @@ class _CommandPaletteState extends State<CommandPalette> {
 
   @override
   Widget build(BuildContext context) {
+    // Measured once the first row has actually laid out; a no-op on every
+    // subsequent frame once `_rowExtent` is set.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _measureRowExtentIfNeeded();
+    });
     // These Shortcuts sit between the focused search field and the root
     // DefaultTextEditingShortcuts, so they win the arrow/Enter keys (nearest
     // Shortcuts to the focus is resolved first) — arrow keys move the
@@ -286,7 +350,9 @@ class _CommandPaletteState extends State<CommandPalette> {
                         context,
                       ).colorScheme.primary.withValues(alpha: 0.14);
                       return ListView.builder(
+                        controller: _resultsScrollController,
                         shrinkWrap: true,
+                        itemExtent: _rowExtent,
                         itemCount: results.length,
                         itemBuilder: (context, i) {
                           final c = results[i];
@@ -301,6 +367,12 @@ class _CommandPaletteState extends State<CommandPalette> {
                                 ? highlight
                                 : Colors.transparent,
                             child: ListTile(
+                              // Only row 0 carries the measuring key — used
+                              // once to read the real rendered row height
+                              // (see `_measureRowExtentIfNeeded`) so arrow-key
+                              // scrolling has an accurate extent without a
+                              // hardcoded pixel literal.
+                              key: i == 0 ? _measuredRowKey : null,
                               dense: true,
                               leading: Icon(c.icon, size: layout.iconSize),
                               title: Text(

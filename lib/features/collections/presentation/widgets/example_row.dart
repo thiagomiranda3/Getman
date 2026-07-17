@@ -4,8 +4,10 @@ import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
 import 'package:getman/features/collections/presentation/widgets/example_menu.dart';
+import 'package:getman/features/collections/presentation/widgets/node_drag_data.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:uuid/uuid.dart';
 
 /// A saved-example row rendered beneath its request node. Tapping opens the
 /// snapshot as a fresh (unlinked) tab with its captured response shown; the
@@ -45,10 +47,15 @@ class _ExampleRowState extends State<ExampleRow> {
           )
         : null;
     // Opened unlinked (no collectionNodeId) so editing/re-sending a snapshot
-    // never overwrites the saved request.
+    // never overwrites the saved request — AND with a fresh config id (mirrors
+    // TabsBloc._onDuplicateTab): chaining rules (assertions/extractions) and
+    // rule-runs are keyed by config id, so reusing the saved request's id
+    // would silently alias its rules — "Extract to {{var}}" from this tab
+    // would add a rule to the ORIGINAL saved request, and re-sending this tab
+    // would run the original's assertions (D3).
     context.read<TabsBloc>().add(
       AddTab(
-        config: cfg.copyWith(),
+        config: cfg.withId(const Uuid().v4()),
         collectionName: '${widget.nodeName} · ${widget.example.name}',
         response: response,
       ),
@@ -62,6 +69,23 @@ class _ExampleRowState extends State<ExampleRow> {
     final layout = context.appLayout;
     final indent = widget.depth * layout.depthPaddingMultiplier;
 
+    // Swallow-target: without it, a node released over an example row falls
+    // through to the list-level root DragTarget and gets moved to the root.
+    // Typed to NodeDragData (not a bare String) so a dragged TAB neither
+    // highlights nor gets swallowed here (D4).
+    return DragTarget<NodeDragData>(
+      onAcceptWithDetails: (_) {},
+      builder: (context, candidateData, rejectedData) =>
+          _row(context, theme, layout, indent),
+    );
+  }
+
+  Widget _row(
+    BuildContext context,
+    ThemeData theme,
+    AppLayout layout,
+    double indent,
+  ) {
     return SizedBox(
       width: widget.rowWidth,
       height: widget.rowHeight,

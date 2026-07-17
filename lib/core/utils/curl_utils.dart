@@ -28,8 +28,45 @@ class CurlUtils {
     '--retry',
     '--limit-rate',
     '--resolve',
-    '--cipher',
-    '--tlsv1',
+    '--ciphers',
+  };
+
+  /// Splits an argument into (flag, inlineValue): a long flag's `=value`
+  /// (`--header=X: y`), or a short flag's glued value (`-XPOST`,
+  /// `-HAccept: json`, `-dbody`) — only for value-taking short flags, so
+  /// boolean bundles like `-sS` stay untouched. Plain tokens pass through
+  /// with a null inline value.
+  static (String, String?) _splitFlag(String raw) {
+    if (raw.startsWith('--') && raw.contains('=')) {
+      final eq = raw.indexOf('=');
+      return (raw.substring(0, eq), raw.substring(eq + 1));
+    }
+    if (raw.length > 2 &&
+        raw.startsWith('-') &&
+        !raw.startsWith('--') &&
+        _gluedShortFlags.contains(raw[1])) {
+      return (raw.substring(0, 2), raw.substring(2));
+    }
+    return (raw, null);
+  }
+
+  /// Single-letter value-taking flags that curl accepts with a glued argument
+  /// (`-XPOST`). Letters of modeled flags plus `o`/`x`/`m`/`w` (skip-flags) so
+  /// `-omyfile` doesn't leak its value into URL detection.
+  static const _gluedShortFlags = {
+    'X',
+    'H',
+    'd',
+    'A',
+    'e',
+    'b',
+    'u',
+    'F',
+    'T',
+    'o',
+    'x',
+    'm',
+    'w',
   };
 
   static final RegExp _domainish = RegExp(r'^[\w.-]+\.[\w.-]+');
@@ -66,10 +103,13 @@ class CurlUtils {
     String? bodyFilePath; // set by `--data-binary @file`
     var auth = const <String, String>{};
 
-    void addData(String data, {bool verbatim = false}) {
+    void addData(String data, {bool allowFileRef = false}) {
       hasData = true;
-      // A leading `@` is a file reference for the binary-ish data flags.
-      if (verbatim && data.startsWith('@')) {
+      // A leading `@` is a file reference for the data flags that support it
+      // (-d/--data/--data-ascii and --data-binary). --data-raw explicitly
+      // does NOT: curl's manual says it posts data without the special `@`
+      // interpretation.
+      if (allowFileRef && data.startsWith('@')) {
         bodyFilePath = data.substring(1);
         return;
       }
@@ -81,13 +121,7 @@ class CurlUtils {
 
       // Split a long flag's inline value: `--header=X: y` ->
       // (`--header`, `X: y`).
-      var flag = raw;
-      String? inlineValue;
-      if (raw.startsWith('--') && raw.contains('=')) {
-        final eq = raw.indexOf('=');
-        flag = raw.substring(0, eq);
-        inlineValue = raw.substring(eq + 1);
-      }
+      final (flag, inlineValue) = _splitFlag(raw);
 
       // Reads the value for a value-taking flag: the inline `=value` if
       // present, else the next token. Returns null if neither exists.
@@ -106,13 +140,19 @@ class CurlUtils {
       } else if (flag == '-H' || flag == '--header') {
         final v = takeValue();
         if (v != null) _addHeader(headers, v);
-      } else if (flag == '-d' || flag == '--data' || flag == '--data-ascii') {
+      } else if (flag == '-d' ||
+          flag == '--data' ||
+          flag == '--data-ascii' ||
+          flag == '--data-binary') {
+        // A leading `@` is a file reference curl reads from disk. Only
+        // --data-raw (below) disables that interpretation.
+        final v = takeValue();
+        if (v != null) addData(v, allowFileRef: true);
+      } else if (flag == '--data-raw') {
+        // curl disables `@`-file interpretation for --data-raw: the value
+        // always posts as literal data.
         final v = takeValue();
         if (v != null) addData(v);
-      } else if (flag == '--data-raw' || flag == '--data-binary') {
-        // Verbatim: not `&`-concatenated; `@file` is a binary file reference.
-        final v = takeValue();
-        if (v != null) addData(v, verbatim: true);
       } else if (flag == '--data-urlencode') {
         final v = takeValue();
         if (v != null) {
@@ -393,10 +433,13 @@ class CurlUtils {
       (c >= 0x41 && c <= 0x46) || // A-F
       (c >= 0x61 && c <= 0x66); // a-f
 
-  /// `name=value` -> `name=<encoded value>`; bare token -> fully encoded.
+  /// `name=value` -> `name=<encoded value>`; bare token -> fully encoded;
+  /// a leading `=` (`=value`) -> encoded value only, the `=` is dropped (curl
+  /// docs: "the preceding = symbol is not included in the data").
   static String _urlEncodeData(String data) {
     final eq = data.indexOf('=');
     if (eq == -1) return Uri.encodeComponent(data);
+    if (eq == 0) return Uri.encodeComponent(data.substring(1));
     final name = data.substring(0, eq);
     final value = Uri.encodeComponent(data.substring(eq + 1));
     return '$name=$value';
@@ -422,6 +465,10 @@ class CurlUtils {
 
   /// Shell-style tokenizer. Handles:
   /// - single quotes `'...'`: literal, may span newlines, no escapes inside;
+  /// - ANSI-C quotes `$'...'`: `\`-escapes honored (`\'`, `\\`, `\"`, `\n`,
+  ///   `\t`, `\r`, `\xHH`, `\uXXXX`); unknown escapes keep the backslash.
+  ///   Emitted by Chrome/Firefox's "Copy as cURL" whenever the body contains
+  ///   an apostrophe (e.g. `--data-raw $'{"name":"O\'Brien"}'`);
   /// - double quotes `"..."`: may span newlines, with `\` escapes (`\"`, `\\`,
   ///   `\$`, `` \` ``); other escapes keep the backslash;
   /// - unquoted `\<char>` escapes that char;
@@ -445,7 +492,67 @@ class CurlUtils {
     while (i < chars.length) {
       final c = chars[i];
 
-      if (c == 0x27) {
+      if (c == 0x24 && i + 1 < chars.length && chars[i + 1] == 0x27) {
+        // ANSI-C quoting: $'...'.
+        hasToken = true;
+        i += 2; // skip `$'`
+        while (i < chars.length && chars[i] != 0x27) {
+          if (chars[i] == 0x5C && i + 1 < chars.length) {
+            final next = chars[i + 1];
+            if (next == 0x27 || next == 0x5C || next == 0x22) {
+              // \' \\ \"  -> literal escaped char
+              buffer.writeCharCode(next);
+              i += 2;
+            } else if (next == 0x6E) {
+              buffer.writeCharCode(0x0A); // \n
+              i += 2;
+            } else if (next == 0x74) {
+              buffer.writeCharCode(0x09); // \t
+              i += 2;
+            } else if (next == 0x72) {
+              buffer.writeCharCode(0x0D); // \r
+              i += 2;
+            } else if (next == 0x78 &&
+                i + 3 < chars.length &&
+                _isHexDigit(chars[i + 2]) &&
+                _isHexDigit(chars[i + 3])) {
+              // \xHH
+              final code = int.parse(
+                String.fromCharCodes([chars[i + 2], chars[i + 3]]),
+                radix: 16,
+              );
+              buffer.writeCharCode(code);
+              i += 4;
+            } else if (next == 0x75 &&
+                i + 5 < chars.length &&
+                _isHexDigit(chars[i + 2]) &&
+                _isHexDigit(chars[i + 3]) &&
+                _isHexDigit(chars[i + 4]) &&
+                _isHexDigit(chars[i + 5])) {
+              // \uXXXX
+              final code = int.parse(
+                String.fromCharCodes([
+                  chars[i + 2],
+                  chars[i + 3],
+                  chars[i + 4],
+                  chars[i + 5],
+                ]),
+                radix: 16,
+              );
+              buffer.writeCharCode(code);
+              i += 6;
+            } else {
+              // Unknown escape: keep the backslash verbatim (shell behavior).
+              buffer.writeCharCode(0x5C);
+              i++;
+            }
+            continue;
+          }
+          buffer.writeCharCode(chars[i]);
+          i++;
+        }
+        i++; // skip closing quote (tolerate EOF)
+      } else if (c == 0x27) {
         // Single quote: copy verbatim until the closing quote.
         hasToken = true;
         i++;

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
+import 'package:getman/core/utils/json_path.dart';
 import 'package:getman/core/utils/json_path_builder.dart';
 
 /// A collapsible, virtualized tree view of decoded JSON. Each node offers
@@ -179,6 +180,13 @@ class _JsonTreeViewState extends State<JsonTreeView> {
   }
 
   void _copyPath(JsonTreeNode node) {
+    // Same guard as the extract action: a key the builder can't represent
+    // (e.g. containing `]`) yields a path JsonPath will never parse — copying
+    // it with a success snackbar would hand the user a broken rule input.
+    if (!JsonPath.isValid(node.path)) {
+      showAppSnackBar(context, 'This key cannot be expressed as a JSON path');
+      return;
+    }
     unawaited(Clipboard.setData(ClipboardData(text: node.path)));
     showAppSnackBar(context, 'Path copied: ${node.path}');
   }

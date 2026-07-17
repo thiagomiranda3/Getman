@@ -117,4 +117,31 @@ void main() {
     expect(get.queryParams[1].value, 'active'); // first enum
     expect(get.headerParams.single.value, 'acme'); // x-example
   });
+
+  test('path-item-level shared parameters apply to every operation', () {
+    final api = normalizeSwaggerV2({
+      'swagger': '2.0',
+      'info': {'title': 'T'},
+      'paths': {
+        '/things': {
+          'parameters': [
+            {'name': 'tenant', 'in': 'query', 'default': 'acme'},
+          ],
+          'get': {
+            'parameters': [
+              {'name': 'verbose', 'in': 'query', 'default': 'true'},
+            ],
+          },
+          'delete': <String, dynamic>{},
+        },
+      },
+    });
+    final get = api.operations.firstWhere((o) => o.method == 'GET');
+    expect(
+      {for (final p in get.queryParams) p.name: p.value},
+      {'tenant': 'acme', 'verbose': 'true'},
+    );
+    final del = api.operations.firstWhere((o) => o.method == 'DELETE');
+    expect(del.queryParams.single.name, 'tenant');
+  });
 }

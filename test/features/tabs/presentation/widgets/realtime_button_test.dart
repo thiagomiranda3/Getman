@@ -78,6 +78,7 @@ Future<void> _pump(
   required MockRealtimeBloc realtimeBloc,
   required String tabId,
   required HttpRequestConfigEntity config,
+  Map<String, String> Function()? activeVars,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -92,7 +93,7 @@ Future<void> _pump(
             tabId: tabId,
             config: config,
             isNarrow: false,
-            activeVars: const {},
+            activeVars: activeVars ?? () => const {},
           ),
         ),
       ),
@@ -260,6 +261,60 @@ void main() {
 
     verify(() => realtimeBloc.add(any(that: isA<Disconnect>()))).called(1);
   });
+
+  testWidgets(
+    'CONNECT resolves activeVars at press time, not widget-build time — '
+    'regression guard for stale-environment CONNECT (A1)',
+    (tester) async {
+      const tabId = 'rt6';
+      const config = HttpRequestConfigEntity(
+        id: tabId,
+        url: 'ws://{{host}}',
+        kind: RequestKind.webSocket,
+      );
+      const tab = HttpRequestTabEntity(tabId: tabId, config: config);
+      final tabsBloc = await _loadedTabsBloc(
+        repository,
+        sendRequestUseCase,
+        tab,
+      );
+      addTearDown(tabsBloc.close);
+
+      final realtimeBloc = _buildRealtimeBloc(tabId: tabId);
+
+      // Simulates the active environment at build time.
+      var currentVars = <String, String>{'host': 'old.example.com'};
+
+      await _pump(
+        tester,
+        tabsBloc: tabsBloc,
+        realtimeBloc: realtimeBloc,
+        tabId: tabId,
+        config: config,
+        activeVars: () => currentVars,
+      );
+
+      // The active environment changes AFTER the button was built (no
+      // rebuild of RealtimeButton follows — mirrors the URL bar's buildWhen
+      // not firing on environment changes).
+      currentVars = {'host': 'new.example.com'};
+
+      await tester.tap(find.byKey(const ValueKey('realtime_connect_button')));
+      await tester.pumpAndSettle();
+
+      final captured = verify(() => realtimeBloc.add(captureAny())).captured;
+      final connectEvent = captured.whereType<Connect>().first;
+      expect(
+        connectEvent.url,
+        'ws://new.example.com',
+        reason:
+            'CONNECT must resolve against the environment active at '
+            'press time, not the one active when the button was built',
+      );
+
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
 
   testWidgets('no overflow', (tester) async {
     const tabId = 'rt5';

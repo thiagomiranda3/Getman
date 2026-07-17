@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/core/ui/widgets/bulk_kv_editor.dart';
+import 'package:getman/core/utils/bulk_kv_codec.dart';
 
 void main() {
   Future<void> pump(WidgetTester tester, Widget child) {
@@ -75,6 +76,46 @@ void main() {
     // Field shows what the user typed, not a stale re-seed.
     expect(find.widgetWithText(TextField, 'A: 12'), findsOneWidget);
   });
+
+  testWidgets(
+    'does not reset the field when the CANONICALIZED text echoes back '
+    '(parents re-serialize, so the echo rarely equals the raw keystrokes)',
+    (tester) async {
+      // Mirror the real parents (params/headers tabs): the emitted raw text
+      // comes back as BulkKvCodec.serialize(parse(raw)) — e.g. typing a new
+      // key 'X' echoes back as 'X: ', which used to overwrite the field
+      // mid-type and invalidate the caret.
+      String canonicalize(String raw) =>
+          BulkKvCodec.serialize(BulkKvCodec.parse(raw));
+      var current = 'Accept: */*';
+      await pump(
+        tester,
+        StatefulBuilder(
+          builder: (context, setState) => Column(
+            children: [
+              Expanded(
+                child: BulkKvEditor(
+                  initialText: current,
+                  canonicalize: canonicalize,
+                  onChanged: (text) =>
+                      setState(() => current = canonicalize(text)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      await tester.enterText(find.byType(TextField), 'Accept: */*\nX');
+      await tester.pump();
+
+      expect(
+        find.widgetWithText(TextField, 'Accept: */*\nX'),
+        findsOneWidget,
+        reason: 'the canonical echo (X: ) must not rewrite in-progress typing',
+      );
+    },
+  );
 
   testWidgets('re-seeds when initialText genuinely changes externally', (
     tester,

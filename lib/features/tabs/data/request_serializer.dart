@@ -74,10 +74,16 @@ class RequestSerializer {
         return config.body.isEmpty ? null : r(config.body);
       case BodyType.urlencoded:
         BodyTypeUtils.applyContentType(headers, BodyType.urlencoded);
-        return <String, String>{
-          for (final f in config.formFields)
-            if (!f.isFile && f.name.isNotEmpty) r(f.name): r(f.value),
-        };
+        // Accumulate list values so repeated field names survive: Dio's
+        // Transformer (with the configured ListFormat.multi) serializes
+        // `{tag: [a, b]}` as `tag=a&tag=b`. A plain Map<String, String> would
+        // silently drop all but the last duplicate.
+        final fields = <String, List<String>>{};
+        for (final f in config.formFields) {
+          if (f.isFile || f.name.isEmpty) continue;
+          fields.putIfAbsent(r(f.name), () => <String>[]).add(r(f.value));
+        }
+        return fields;
       case BodyType.multipart:
         // Dio adds it with the boundary.
         BodyTypeUtils.applyContentType(headers, BodyType.multipart);

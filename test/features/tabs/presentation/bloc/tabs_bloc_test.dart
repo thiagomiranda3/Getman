@@ -1,7 +1,11 @@
+import 'dart:async';
+
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/failures.dart';
+import 'package:getman/core/network/cancel_handle.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/features/chaining/domain/entities/assertion.dart';
 import 'package:getman/features/chaining/domain/entities/extraction_rule.dart';
@@ -26,6 +30,19 @@ class MockGetRequestRulesUseCase extends Mock
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 
 class _FakePanel extends Fake implements PanelEntity {}
+
+/// Records errors reported to `Bloc.observer.onError` so a test can assert an
+/// event handler did NOT throw (e.g. a stale reorder must early-return, not
+/// RangeError against a concurrently-shrunk list).
+class _RecordingBlocObserver extends BlocObserver {
+  final List<Object> errors = <Object>[];
+
+  @override
+  void onError(BlocBase<dynamic> bloc, Object error, StackTrace stackTrace) {
+    errors.add(error);
+    super.onError(bloc, error, stackTrace);
+  }
+}
 
 void main() {
   late MockTabsRepository repository;
@@ -467,6 +484,67 @@ void main() {
     );
 
     test(
+      'DuplicateTab mints a fresh config id — chaining rules are keyed by '
+      'config id and must not be aliased between copy and original',
+      () async {
+        await loadWith([tab('a')]);
+        bloc.add(const DuplicateTab('a'));
+        await Future<void>.delayed(Duration.zero);
+
+        expect(bloc.state.tabs, hasLength(2));
+        final copy = bloc.state.tabs[1];
+        expect(copy.config.id, isNot(bloc.state.tabs.first.config.id));
+        expect(copy.config.url, bloc.state.tabs.first.config.url);
+      },
+    );
+
+    test(
+      "CloseOtherTabs / CloseTabsToTheRight cancel the removed tabs' "
+      'in-flight requests',
+      () async {
+        await loadWith([tab('a'), tab('b'), tab('c')]);
+        final handles = <String, NetworkCancelHandle>{};
+        when(
+          () => sendRequestUseCase.call(
+            config: any(named: 'config'),
+            envVars: any(named: 'envVars'),
+            cancelHandle: any(named: 'cancelHandle'),
+          ),
+        ).thenAnswer((inv) {
+          final config =
+              inv.namedArguments[#config]! as HttpRequestConfigEntity;
+          handles[config.id] =
+              inv.namedArguments[#cancelHandle]! as NetworkCancelHandle;
+          // Stays in flight forever — the tab is mid-send when closed.
+          return Completer<HttpResponseEntity>().future;
+        });
+
+        bloc
+          ..add(const SendRequest(tabId: 'a'))
+          ..add(const SendRequest(tabId: 'c'));
+        await Future<void>.delayed(Duration.zero);
+        expect(handles['a']!.isCancelled, isFalse);
+
+        bloc.add(const CloseTabsToTheRight('b'));
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          handles['c']!.isCancelled,
+          isTrue,
+          reason: "CLOSE TO THE RIGHT must cancel the closed tab's request",
+        );
+        expect(handles['a']!.isCancelled, isFalse);
+
+        bloc.add(const CloseOtherTabs('b'));
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          handles['a']!.isCancelled,
+          isTrue,
+          reason: "CLOSE OTHERS must cancel the closed tab's request",
+        );
+      },
+    );
+
+    test(
       'AddTab focuses an existing tab for the same collection node instead of '
       'duplicating',
       () async {
@@ -517,6 +595,72 @@ void main() {
         expect(bloc.state.activeIndex, 0);
       },
     );
+  });
+
+  group('ReorderTabs bounds guard', () {
+    test(
+      'a stale oldIndex (queued behind a concurrent shrink) is a no-op, '
+      'not a RangeError',
+      () async {
+        final observer = _RecordingBlocObserver();
+        final previous = Bloc.observer;
+        Bloc.observer = observer;
+        addTearDown(() => Bloc.observer = previous);
+
+        await loadWith([tab('a'), tab('b'), tab('c')]);
+        observer.errors.clear();
+
+        // oldIndex 5 is past the end — e.g. a reorder enqueued before CLOSE
+        // OTHERS shrank the list to one tab.
+        bloc.add(const ReorderTabs(5, 0));
+        await pumpEventQueue();
+
+        expect(observer.errors, isEmpty);
+        expect(bloc.state.tabs.map((t) => t.tabId).toList(), ['a', 'b', 'c']);
+      },
+    );
+
+    test('an out-of-range newIndex is a no-op', () async {
+      final observer = _RecordingBlocObserver();
+      final previous = Bloc.observer;
+      Bloc.observer = observer;
+      addTearDown(() => Bloc.observer = previous);
+
+      await loadWith([tab('a'), tab('b')]);
+      observer.errors.clear();
+
+      bloc.add(const ReorderTabs(0, 5));
+      await pumpEventQueue();
+
+      expect(observer.errors, isEmpty);
+      expect(bloc.state.tabs.map((t) => t.tabId).toList(), ['a', 'b']);
+    });
+
+    test('a negative index is a no-op', () async {
+      final observer = _RecordingBlocObserver();
+      final previous = Bloc.observer;
+      Bloc.observer = observer;
+      addTearDown(() => Bloc.observer = previous);
+
+      await loadWith([tab('a'), tab('b')]);
+      observer.errors.clear();
+
+      bloc.add(const ReorderTabs(-1, 0));
+      await pumpEventQueue();
+
+      expect(observer.errors, isEmpty);
+      expect(bloc.state.tabs.map((t) => t.tabId).toList(), ['a', 'b']);
+    });
+
+    test('a valid reorder to the last position still moves the tab', () async {
+      await loadWith([tab('a'), tab('b'), tab('c')]);
+      // newIndex == length-1 is the boundary the guard must still allow
+      // (onReorderItem after-removal semantics).
+      bloc.add(const ReorderTabs(0, 2));
+      await pumpEventQueue();
+
+      expect(bloc.state.tabs.map((t) => t.tabId).toList(), ['b', 'c', 'a']);
+    });
   });
 
   group('SendRequest', () {
@@ -791,28 +935,72 @@ void main() {
     );
 
     test(
-      'saveLargeResponsesInHistory false stores large entries as placeholder',
+      'saveLargeResponsesInHistory false keeps the newest entry full and '
+      'downgrades superseded large entries to the placeholder',
       () async {
         await loadWith([tab('a')]);
         final big = 'x' * (kLargeResponseViewerChars + 1);
-        stubSend(() async => resp(200, big));
+        var n = 0;
+        stubSend(() async => n++ == 0 ? resp(200, big) : resp(200, 'small'));
 
         bloc.add(
           const SendRequest(tabId: 'a', saveLargeResponsesInHistory: false),
         );
-        await expectLater(
-          bloc.stream,
-          emitsThrough(
-            predicate<TabsState>((s) {
-              final t = s.tabs.single;
-              return !t.isSending &&
-                  // Displayed response keeps the full body...
-                  t.response?.body == big &&
-                  // ...but the history entry is metadata-only.
-                  t.responseHistory.single.response.body ==
-                      kResponseBodyTooLargePlaceholder;
-            }),
-          ),
+        await pumpEventQueue();
+        // The newest entry keeps the full body — it is what "Latest" in the
+        // timeline restores.
+        expect(
+          bloc.state.tabs.single.responseHistory.single.response.body,
+          big,
+        );
+
+        bloc.add(
+          const SendRequest(tabId: 'a', saveLargeResponsesInHistory: false),
+        );
+        await pumpEventQueue();
+
+        final t = bloc.state.tabs.single;
+        expect(t.responseHistory, hasLength(2));
+        expect(t.responseHistory.first.response.body, 'small');
+        // Once superseded, the large entry is metadata-only.
+        expect(
+          t.responseHistory.last.response.body,
+          kHistoryBodyNotKeptPlaceholder,
+        );
+      },
+    );
+
+    test(
+      'with saveLargeResponsesInHistory false, viewing an older entry and '
+      'returning to Latest restores the full large body',
+      () async {
+        await loadWith([tab('a')]);
+        final big = 'y' * (kLargeResponseViewerChars + 1);
+        var n = 0;
+        stubSend(() async => n++ == 0 ? resp(200, 'first') : resp(200, big));
+
+        bloc.add(
+          const SendRequest(tabId: 'a', saveLargeResponsesInHistory: false),
+        );
+        await pumpEventQueue();
+        bloc.add(
+          const SendRequest(tabId: 'a', saveLargeResponsesInHistory: false),
+        );
+        await pumpEventQueue();
+
+        final hist = bloc.state.tabs.single.responseHistory; // [big, first]
+        expect(bloc.state.tabs.single.response?.body, big);
+
+        bloc.add(ViewResponseHistoryEntry(tabId: 'a', entryId: hist[1].id));
+        await pumpEventQueue();
+        expect(bloc.state.tabs.single.response?.body, 'first');
+
+        bloc.add(ViewResponseHistoryEntry(tabId: 'a', entryId: hist[0].id));
+        await pumpEventQueue();
+        expect(
+          bloc.state.tabs.single.response?.body,
+          big,
+          reason: 'returning to Latest must not display the placeholder',
         );
       },
     );

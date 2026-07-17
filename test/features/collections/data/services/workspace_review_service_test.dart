@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/git/git_service.dart';
 import 'package:getman/features/collections/data/services/workspace_review_service.dart';
+import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/entities/review_entry.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockGit extends Mock implements GitService {}
+
+class _MockSync extends Mock implements WorkspaceSyncService {}
 
 String reqJson(
   String name, {
@@ -37,15 +40,43 @@ String folderJson(String name, {required List<String> childOrder}) =>
 
 void main() {
   late _MockGit git;
+  late _MockSync sync;
   late WorkspaceReviewService service;
   const root = '/ws';
 
   setUp(() {
     git = _MockGit();
-    service = WorkspaceReviewService(git);
+    sync = _MockSync();
+    when(sync.flushPending).thenAnswer((_) async => true);
+    service = WorkspaceReviewService(git, sync);
     when(() => git.isAvailable()).thenAnswer((_) async => true);
     when(() => git.isRepo(root)).thenAnswer((_) async => true);
     when(() => git.currentBranch(root)).thenAnswer((_) async => 'main');
+  });
+
+  test('review, stage and commit flush the pending mirror first', () async {
+    when(() => git.status(root)).thenAnswer((_) async => const []);
+    when(() => git.stage(root, ['a.req.json'])).thenAnswer((_) async {});
+    when(
+      () => git.commit(
+        root,
+        'msg',
+        authorName: any(named: 'authorName'),
+        authorEmail: any(named: 'authorEmail'),
+      ),
+    ).thenAnswer((_) async {});
+
+    await service.review(root);
+    await service.stage(root, ['a.req.json']);
+    await service.commit(root, 'msg');
+    verify(sync.flushPending).called(3);
+
+    // A failed flush must abort instead of running git over a stale tree.
+    when(sync.flushPending).thenAnswer((_) async => false);
+    await expectLater(
+      () => service.stage(root, ['a.req.json']),
+      throwsA(isA<GitException>()),
+    );
   });
 
   test('reports git unavailable', () async {

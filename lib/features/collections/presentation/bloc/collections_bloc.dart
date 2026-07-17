@@ -305,13 +305,19 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
       state.collections,
       event.nodeId,
     );
-    final next = newParentId == null
-        ? [...afterRemoval, nodeToMove]
-        : CollectionsTreeHelper.addToParent(
+    // A destination deleted since the event was built (e.g. a git reload
+    // finishing while the Move-to sheet was open) must not silently drop the
+    // node: addToParent no-ops on a missing parent, so fall back to root.
+    final destinationExists =
+        newParentId != null &&
+        CollectionsTreeHelper.findNode(afterRemoval, newParentId) != null;
+    final next = destinationExists
+        ? CollectionsTreeHelper.addToParent(
             afterRemoval,
             newParentId,
             nodeToMove,
-          );
+          )
+        : [...afterRemoval, nodeToMove];
     return _commit(emit, next);
   }
 

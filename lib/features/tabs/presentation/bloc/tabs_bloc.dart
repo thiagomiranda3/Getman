@@ -352,6 +352,12 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     if (state.panels.isEmpty) return;
     final active = _activePanel;
     final tabs = [...active.tabs];
+    // A reorder enqueued behind a concurrent shrink (e.g. CLOSE OTHERS) can
+    // carry stale indices; bail rather than RangeError. Both indices use
+    // after-removal semantics (onReorderItem already adjusted newIndex), so on
+    // the post-removal list the valid insert range is 0..length-1.
+    if (event.oldIndex < 0 || event.oldIndex >= tabs.length) return;
+    if (event.newIndex < 0 || event.newIndex >= tabs.length) return;
     // newIndex is already adjusted for the removed item by the source
     // ReorderableListView.onReorderItem callback — no manual decrement.
     final item = tabs.removeAt(event.oldIndex);
@@ -377,10 +383,12 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     if (active.tabs.length <= 1) return;
     final keep = active.tabs.byId(event.tabId);
     if (keep == null) return;
-    final removedIds = active.tabs
-        .where((t) => t.tabId != event.tabId)
-        .map((t) => t.tabId)
-        .toList(growable: false);
+    final removedIds =
+        active.tabs
+            .where((t) => t.tabId != event.tabId)
+            .map((t) => t.tabId)
+            .toList(growable: false)
+          ..forEach(_requests.cancelAndFinish);
     final updated = active.copyWith(tabs: [keep], activeTabId: keep.tabId);
     emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     _dirtyTabIds.removeAll(removedIds);
@@ -397,10 +405,12 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final index = active.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index == -1 || index >= active.tabs.length - 1) return;
     final kept = active.tabs.sublist(0, index + 1);
-    final removedIds = active.tabs
-        .sublist(index + 1)
-        .map((t) => t.tabId)
-        .toList(growable: false);
+    final removedIds =
+        active.tabs
+            .sublist(index + 1)
+            .map((t) => t.tabId)
+            .toList(growable: false)
+          ..forEach(_requests.cancelAndFinish);
     final activeKept = kept.any((t) => t.tabId == active.activeTabId);
     final updated = active.copyWith(
       tabs: kept,
@@ -421,10 +431,12 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final index = active.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index <= 0) return;
     final kept = active.tabs.sublist(index);
-    final removedIds = active.tabs
-        .sublist(0, index)
-        .map((t) => t.tabId)
-        .toList(growable: false);
+    final removedIds =
+        active.tabs
+            .sublist(0, index)
+            .map((t) => t.tabId)
+            .toList(growable: false)
+          ..forEach(_requests.cancelAndFinish);
     final activeKept = kept.any((t) => t.tabId == active.activeTabId);
     final updated = active.copyWith(
       tabs: kept,
@@ -444,9 +456,12 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final active = _activePanel;
     final index = active.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index == -1) return;
+    // A fresh config id too: chaining rules are keyed by config id, so a
+    // duplicate sharing the original's id would silently alias its rules
+    // (editing/deleting one would affect both).
     final dup = HttpRequestTabEntity(
       tabId: _uuid.v4(),
-      config: active.tabs[index].config.copyWith(),
+      config: active.tabs[index].config.withId(_uuid.v4()),
     );
     final tabs = [...active.tabs]..insert(index + 1, dup);
     final updated = active.copyWith(tabs: tabs, activeTabId: dup.tabId);
@@ -539,9 +554,11 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   /// Sets [response] as the tab's displayed response and prepends it to the
   /// time-travel history (newest-first), trimmed to [limit]. A [limit] of 0
   /// disables history (clears any accumulated entries). When [saveLarge] is
-  /// false, a history entry whose body exceeds the large-viewer threshold is
-  /// stored as a placeholder (the displayed [response] still keeps the full
-  /// body); on-disk capping at 1 MiB happens at the persistence boundary.
+  /// false, a *superseded* entry whose body exceeds the large-viewer threshold
+  /// is downgraded to the metadata-only placeholder; the newest entry always
+  /// keeps its full body — it is what "Latest" in the timeline restores after
+  /// time-travelling, so a placeholder there would lose the displayed body.
+  /// On-disk capping at 1 MiB happens at the persistence boundary.
   HttpRequestTabEntity _recordResponse(
     HttpRequestTabEntity live,
     HttpResponseEntity response,
@@ -555,16 +572,24 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         responseHistory: const [],
       );
     }
-    final stored =
-        !saveLarge && response.body.length > kLargeResponseViewerChars
-        ? response.copyWithBody(kResponseBodyTooLargePlaceholder)
-        : response;
     final entry = ResponseHistoryEntry(
       id: _uuid.v4(),
-      response: stored,
+      response: response,
       capturedAt: DateTime.now().millisecondsSinceEpoch,
     );
-    final history = [entry, ...live.responseHistory];
+    Iterable<ResponseHistoryEntry> older = live.responseHistory;
+    if (!saveLarge) {
+      older = older.map(
+        (e) => e.response.body.length > kLargeResponseViewerChars
+            ? e.copyWith(
+                response: e.response.copyWithBody(
+                  kHistoryBodyNotKeptPlaceholder,
+                ),
+              )
+            : e,
+      );
+    }
+    final history = [entry, ...older];
     return live.copyWith(
       isSending: false,
       response: response,
@@ -736,6 +761,11 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     Emitter<TabsState> emit,
   ) async {
     final panels = [...state.panels];
+    // A reorder enqueued behind a concurrent RemovePanel can carry stale
+    // indices; bail rather than RangeError. after-removal semantics: on the
+    // post-removal list the valid insert range is 0..length-1.
+    if (event.oldIndex < 0 || event.oldIndex >= panels.length) return;
+    if (event.newIndex < 0 || event.newIndex >= panels.length) return;
     // newIndex is already adjusted for the removed item by the source
     // ReorderableListView.onReorderItem callback — no manual decrement.
     final item = panels.removeAt(event.oldIndex);
@@ -782,13 +812,22 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     if (detached == null) return;
     final updatedTarget = target.copyWith(
       tabs: [...target.tabs, detached.tab],
+      // A previously-empty target has activeTabId '' — the arriving tab
+      // becomes its active one (invariant: non-empty panels name an active
+      // tab).
+      activeTabId: target.tabs.isEmpty
+          ? detached.tab.tabId
+          : target.activeTabId,
     );
 
     var panels = _replacePanel(state.panels, detached.source);
     panels = _replacePanel(panels, updatedTarget);
     emit(_derive(panels, state.activePanelId)); // stay on current panel
-    await _persistPanel(detached.source);
+    // Target first: if the app dies between the two writes, the tab shows up
+    // in both panels (a visible but recoverable duplicate) instead of in
+    // neither (orphaned in the tabs box, never rendered again).
     await _persistPanel(updatedTarget);
+    await _persistPanel(detached.source);
   }
 
   Future<void> _onMoveTabToNewPanel(
@@ -805,8 +844,9 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     );
     final panels = [..._replacePanel(state.panels, detached.source), newPanel];
     emit(_derive(panels, state.activePanelId)); // stay on current panel
-    await _persistPanel(detached.source);
+    // New panel first — same crash-ordering rationale as _onMoveTabToPanel.
     await _persistPanel(newPanel);
+    await _persistPanel(detached.source);
     await _persistPanelMeta();
   }
 }

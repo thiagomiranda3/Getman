@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/network/network_config.dart';
 import 'package:getman/core/network/network_service.dart';
+import 'package:getman/core/network/realtime_service.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
@@ -11,6 +12,8 @@ import 'package:getman/features/settings/presentation/widgets/network_settings_l
 import 'package:mocktail/mocktail.dart';
 
 class MockNetworkService extends Mock implements NetworkService {}
+
+class MockRealtimeService extends Mock implements RealtimeService {}
 
 class MockSaveSettingsUseCase extends Mock implements SaveSettingsUseCase {}
 
@@ -21,10 +24,12 @@ void main() {
   });
 
   late MockNetworkService network;
+  late MockRealtimeService realtime;
   late SettingsBloc bloc;
 
   setUp(() {
     network = MockNetworkService();
+    realtime = MockRealtimeService();
     final save = MockSaveSettingsUseCase();
     when(() => save.call(any())).thenAnswer((_) async {});
     bloc = SettingsBloc(
@@ -39,9 +44,12 @@ void main() {
     await tester.pumpWidget(
       RepositoryProvider<NetworkService>.value(
         value: network,
-        child: BlocProvider.value(
-          value: bloc,
-          child: const NetworkSettingsListener(child: SizedBox()),
+        child: RepositoryProvider<RealtimeService>.value(
+          value: realtime,
+          child: BlocProvider.value(
+            value: bloc,
+            child: const NetworkSettingsListener(child: SizedBox()),
+          ),
         ),
       ),
     );
@@ -59,6 +67,7 @@ void main() {
     await tester.pump();
 
     verify(() => network.applyConfig(any())).called(1);
+    verify(() => realtime.applyConfig(any())).called(1);
   });
 
   testWidgets('applies config when maxRedirects changes', (tester) async {
@@ -71,6 +80,7 @@ void main() {
     await tester.pump();
 
     verify(() => network.applyConfig(any())).called(1);
+    verify(() => realtime.applyConfig(any())).called(1);
   });
 
   testWidgets('applies config when the client certificate changes', (
@@ -89,6 +99,7 @@ void main() {
     await tester.pump();
 
     verify(() => network.applyConfig(any())).called(1);
+    verify(() => realtime.applyConfig(any())).called(1);
   });
 
   testWidgets('ignores non-network setting changes', (tester) async {
@@ -101,5 +112,6 @@ void main() {
     await tester.pump();
 
     verifyNever(() => network.applyConfig(any()));
+    verifyNever(() => realtime.applyConfig(any()));
   });
 }

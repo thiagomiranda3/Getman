@@ -92,4 +92,27 @@ void main() {
     expect(r.body, '');
     expect(r.bodyBytes, isNull);
   });
+
+  test('iso-8859-1 charset decodes with latin1, not utf8', () async {
+    // 0xE9 is "é" in ISO-8859-1 but an invalid lone UTF-8 byte.
+    final svc = serviceReturning(
+      [0xE9],
+      {
+        'content-type': ['text/plain; charset=iso-8859-1'],
+      },
+    );
+    final r = await svc.request(url: 'https://x/y', method: 'GET');
+    expect(r.body, 'é');
+  });
+
+  test('default (no charset) decodes as utf8', () async {
+    final svc = serviceReturning(
+      utf8.encode('café'),
+      {
+        'content-type': ['text/plain'],
+      },
+    );
+    final r = await svc.request(url: 'https://x/y', method: 'GET');
+    expect(r.body, 'café');
+  });
 }

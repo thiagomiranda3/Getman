@@ -40,7 +40,13 @@ class CollectionToApiDoc {
       }
     }
 
-    walk(root, const []);
+    if (root.isFolder) {
+      walk(root, const []);
+    } else if (root.config != null) {
+      // Mirror PostmanCollectionMapper.toJson: a leaf root is the single
+      // "item", not a folder whose (nonexistent) children get walked.
+      operations.add(_operation(root, const [], env, servers, warnings));
+    }
 
     return ApiDoc(
       title: root.name,

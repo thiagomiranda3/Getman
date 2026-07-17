@@ -203,6 +203,46 @@ void main() {
     },
   );
 
+  testWidgets(
+    'current response matching no history entry does not falsely label '
+    '"Latest" — regression guard (A6)',
+    (tester) async {
+      const tab = HttpRequestTabEntity(
+        tabId: 'rh5',
+        config: HttpRequestConfigEntity(id: 'rh5'),
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      // `current` intentionally matches neither history entry — indexWhere
+      // misses (-1).
+      const currentNotInHistory = HttpResponseEntity(
+        statusCode: 500,
+        body: 'not in history',
+        headers: {},
+        durationMs: 999,
+      );
+
+      await _pump(
+        tester,
+        bloc,
+        tabId: 'rh5',
+        history: [_entry1, _entry2],
+        current: currentNotInHistory,
+      );
+
+      // The button must show plain 'HISTORY', not 'HISTORY: #1' (the old
+      // .clamp(0, ...) mapped a -1 miss to index 0 = "Latest").
+      expect(find.text('HISTORY'), findsOneWidget);
+      expect(find.textContaining('HISTORY:'), findsNothing);
+
+      // No entry in the popup should read as selected.
+      await tester.tap(find.byKey(const ValueKey('response_history_button')));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.radio_button_checked), findsNothing);
+    },
+  );
+
   testWidgets('no overflow', (tester) async {
     const tab = HttpRequestTabEntity(
       tabId: 'rh4',

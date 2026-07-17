@@ -9,6 +9,8 @@ import 'package:getman/features/collections/domain/usecases/collections_usecases
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/collection_node_row.dart';
+import 'package:getman/features/collections/presentation/widgets/node_drag_data.dart';
+import 'package:getman/features/tabs/presentation/widgets/tab_drag_data.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockCollectionsRepository extends Mock implements CollectionsRepository {}
@@ -181,11 +183,14 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final dragTarget = tester.widget<DragTarget<String>>(
-        find.byType(DragTarget<String>),
+      final dragTarget = tester.widget<DragTarget<NodeDragData>>(
+        find.byType(DragTarget<NodeDragData>),
       );
       dragTarget.onAcceptWithDetails!(
-        DragTargetDetails<String>(data: draggedId, offset: Offset.zero),
+        DragTargetDetails<NodeDragData>(
+          data: const NodeDragData(draggedId),
+          offset: Offset.zero,
+        ),
       );
       // Let the MoveNode handler emit, then fire the bloc's debounced-save
       // timer so no timer is left pending when the widget tree is disposed.
@@ -205,6 +210,201 @@ void main() {
       );
     },
   );
+
+  // D5 regression: the leaf target highlighted ANY non-self drag, unlike the
+  // folder target (which already checks isDescendantOrSelf). Dropping folder
+  // F onto a request that lives inside F highlighted, then silently no-op'd
+  // (the bloc rejects moving a folder into its own subtree) — the leaf guard
+  // must mirror the folder's.
+  testWidgets(
+    'dragging an ancestor folder over one of its own descendant requests '
+    'does not highlight the leaf target (D5)',
+    (tester) async {
+      const folderId = 'f1';
+      final tree = <CollectionNodeEntity>[
+        const CollectionNodeEntity(
+          id: folderId,
+          name: 'Folder1',
+          children: [requestNode], // req-1 lives inside Folder1
+        ),
+      ];
+      when(() => repo.getCollections()).thenAnswer((_) async => tree);
+      final bloc = buildBloc()..add(const LoadCollections());
+      addTearDown(bloc.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: resolveTheme('brutalist')(Brightness.light, isCompact: false),
+          home: Scaffold(
+            body: BlocProvider<CollectionsBloc>.value(
+              value: bloc,
+              child: const CollectionNodeRow(
+                node: requestNode, // the leaf that lives inside Folder1
+                isExpanded: false,
+                depth: 1,
+                onToggle: _noop,
+                rowWidth: 300,
+                rowHeight: 44,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final dragTarget = tester.widget<DragTarget<NodeDragData>>(
+        find.byType(DragTarget<NodeDragData>),
+      );
+      // Drag the ANCESTOR folder over its own descendant leaf.
+      dragTarget.onWillAcceptWithDetails!(
+        DragTargetDetails<NodeDragData>(
+          data: const NodeDragData(folderId),
+          offset: Offset.zero,
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        _isBrutalistDropHighlightActive(tester),
+        isFalse,
+        reason:
+            'dropping an ancestor folder onto its own descendant must not '
+            'highlight — the bloc silently rejects that move',
+      );
+    },
+  );
+
+  testWidgets(
+    'dragging an unrelated node over a leaf DOES highlight it (contrast '
+    'check for the D5 assertion above)',
+    (tester) async {
+      const otherId = 'unrelated-node';
+      final tree = <CollectionNodeEntity>[requestNode];
+      when(() => repo.getCollections()).thenAnswer((_) async => tree);
+      final bloc = buildBloc()..add(const LoadCollections());
+      addTearDown(bloc.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: resolveTheme('brutalist')(Brightness.light, isCompact: false),
+          home: Scaffold(
+            body: BlocProvider<CollectionsBloc>.value(
+              value: bloc,
+              child: const CollectionNodeRow(
+                node: requestNode,
+                isExpanded: false,
+                depth: 0,
+                onToggle: _noop,
+                rowWidth: 300,
+                rowHeight: 44,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final dragTarget = tester.widget<DragTarget<NodeDragData>>(
+        find.byType(DragTarget<NodeDragData>),
+      );
+      dragTarget.onWillAcceptWithDetails!(
+        DragTargetDetails<NodeDragData>(
+          data: const NodeDragData(otherId),
+          offset: Offset.zero,
+        ),
+      );
+      await tester.pump();
+
+      expect(_isBrutalistDropHighlightActive(tester), isTrue);
+    },
+  );
+
+  // D4 regression: a tab dragged out of the tab strip must not be accepted
+  // (or even highlight) a collections-tree drop target — the two used to
+  // share `Draggable<String>`/`DragTarget<String>`, so a tab dropped on a
+  // folder row would light it up and dispatch a no-op MoveNode.
+  testWidgets(
+    'a tab drag (TabDragData) is rejected by a folder row — no highlight, '
+    'no MoveNode dispatched',
+    (tester) async {
+      const folderNode = CollectionNodeEntity(id: 'folder-1', name: 'Folder');
+      when(
+        () => repo.getCollections(),
+      ).thenAnswer((_) async => const [folderNode]);
+      final bloc = buildBloc()..add(const LoadCollections());
+      addTearDown(bloc.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: resolveTheme('brutalist')(Brightness.light, isCompact: false),
+          home: Scaffold(
+            body: BlocProvider<CollectionsBloc>.value(
+              value: bloc,
+              child: const Column(
+                children: [
+                  LongPressDraggable<TabDragData>(
+                    key: ValueKey('tab_drag_source'),
+                    data: TabDragData('tab-1'),
+                    feedback: Material(child: Text('tab-1')),
+                    child: SizedBox(
+                      width: 100,
+                      height: 50,
+                      child: ColoredBox(color: Colors.blue),
+                    ),
+                  ),
+                  CollectionNodeRow(
+                    node: folderNode,
+                    isExpanded: false,
+                    depth: 0,
+                    onToggle: _noop,
+                    rowWidth: 300,
+                    rowHeight: 44,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final sourceCenter = tester.getCenter(
+        find.byKey(const ValueKey('tab_drag_source')),
+      );
+      final targetCenter = tester.getCenter(find.byType(CollectionNodeRow));
+      final gesture = await tester.startGesture(sourceCenter);
+      await tester.pump(const Duration(milliseconds: 600));
+      await gesture.moveTo(targetCenter);
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(
+        _isBrutalistDropHighlightActive(tester),
+        isFalse,
+        reason: 'a foreign (tab) payload must not highlight a node target',
+      );
+      expect(
+        bloc.state.collections,
+        const [folderNode],
+        reason: 'no MoveNode should have been dispatched',
+      );
+    },
+  );
+}
+
+/// Whether the brutalist theme's tree-drop highlight is currently active.
+/// `_BrutalistTreeDropHighlight` is a private widget internal to the theme's
+/// motion file, so it's matched by its runtime type name and its `active`
+/// field is read dynamically — there's no public hook to query it otherwise.
+bool _isBrutalistDropHighlightActive(WidgetTester tester) {
+  final matches = tester.widgetList(
+    find.byWidgetPredicate(
+      (w) => w.runtimeType.toString() == '_BrutalistTreeDropHighlight',
+    ),
+  );
+  if (matches.isEmpty) return false;
+  return (matches.single as dynamic).active as bool;
 }
 
 void _noop() {}

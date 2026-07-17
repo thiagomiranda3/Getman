@@ -10,6 +10,14 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 /// formFields) where the raw values aren't surfaced.
 enum FieldConflictKind { scalar, mapEntry, opaque, list }
 
+/// Sentinel carried in a `FileResolution.fieldChoices` value for a
+/// [FieldConflictKind.mapEntry] field when the chosen side DELETED the key
+/// (its value is null). Distinguishes "remove this header/variable" from an
+/// empty-string value — collapsing null to `''` would resurrect the key
+/// empty in the resolved file. Contains a NUL so no real edited value can
+/// collide with it.
+const String kFieldDeletedMarker = '\u0000<deleted>';
+
 /// One field of a request/folder node that [ThreeWayMerge] could not
 /// auto-resolve because both `incoming` and `yours` changed it differently
 /// from `base`. Field labels mirror the vocabulary used by
