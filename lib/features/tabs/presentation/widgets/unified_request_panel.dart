@@ -8,9 +8,11 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/auth_tab_view.dart';
+import 'package:getman/features/tabs/presentation/widgets/body_tab_view.dart';
+import 'package:getman/features/tabs/presentation/widgets/headers_tab_view.dart';
+import 'package:getman/features/tabs/presentation/widgets/params_tab_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_config_section.dart'
     show RequestConfigSection;
-import 'package:getman/features/tabs/presentation/widgets/request_editor_tabs.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_section_index.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_history_timeline.dart';
 import 'package:getman/features/tabs/presentation/widgets/response_area.dart';

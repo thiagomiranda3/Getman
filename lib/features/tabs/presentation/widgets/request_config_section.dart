@@ -4,7 +4,9 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/branded_tab_bar.dart';
 import 'package:getman/features/chaining/presentation/widgets/rules_tab_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/auth_tab_view.dart';
-import 'package:getman/features/tabs/presentation/widgets/request_editor_tabs.dart';
+import 'package:getman/features/tabs/presentation/widgets/body_tab_view.dart';
+import 'package:getman/features/tabs/presentation/widgets/headers_tab_view.dart';
+import 'package:getman/features/tabs/presentation/widgets/params_tab_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_section_index.dart';
 import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.dart'
     show UnifiedRequestPanel;
