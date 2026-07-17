@@ -1,3 +1,5 @@
+// SettingsBloc state: just the current SettingsEntity.
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 

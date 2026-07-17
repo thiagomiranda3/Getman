@@ -1,3 +1,6 @@
+// Hive model (typeId 8) for a single post-response assertion; nested inside
+// RequestRulesModel. Converts to/from the Assertion domain entity.
+
 import 'package:getman/features/chaining/domain/entities/assertion.dart';
 import 'package:hive_ce/hive.dart';
 

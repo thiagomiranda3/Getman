@@ -1,3 +1,6 @@
+// Domain entity for a no-code extraction rule (captures a response value
+// into an environment variable) plus its ExtractionKind enum.
+
 import 'package:equatable/equatable.dart';
 
 /// Where an extraction rule reads its value from.

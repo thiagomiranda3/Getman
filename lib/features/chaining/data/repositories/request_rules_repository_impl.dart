@@ -1,3 +1,7 @@
+// RequestRulesRepository impl: loads/saves RequestRulesEntity via
+// RequestRulesLocalDataSource, deleting the stored record once rules go
+// empty instead of persisting an empty placeholder.
+
 import 'package:getman/core/error/guard.dart';
 import 'package:getman/features/chaining/data/datasources/request_rules_local_data_source.dart';
 import 'package:getman/features/chaining/data/models/request_rules_model.dart';

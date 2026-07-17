@@ -1,3 +1,6 @@
+// Use cases wrapping RequestRulesRepository: GetRequestRulesUseCase and
+// SaveRequestRulesUseCase.
+
 import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';
 import 'package:getman/features/chaining/domain/repositories/request_rules_repository.dart';
 

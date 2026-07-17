@@ -1,3 +1,7 @@
+// Coordinator that pushes network-settings changes into the live
+// NetworkService + RealtimeService; see the class doc below for the
+// listenWhen gating and the bloc-decoupling rationale.
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/network/network_service.dart';

@@ -1,3 +1,6 @@
+// Hive model (typeId 7) for a single extraction rule; nested inside
+// RequestRulesModel. Converts to/from the ExtractionRule domain entity.
+
 import 'package:getman/features/chaining/domain/entities/extraction_rule.dart';
 import 'package:hive_ce/hive.dart';
 

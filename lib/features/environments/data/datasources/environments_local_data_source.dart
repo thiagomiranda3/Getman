@@ -1,3 +1,8 @@
+// Hive-backed persistence for environments (box: 'environments', keyed by
+// id). Sorts case-insensitively by name on read (UUID keys carry no
+// display order) and migrates legacy int keys to id via
+// migrateLegacyKeysIfNeeded.
+
 import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/features/environments/data/models/environment_model.dart';

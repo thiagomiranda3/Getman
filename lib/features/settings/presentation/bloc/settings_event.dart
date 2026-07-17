@@ -1,3 +1,6 @@
+// SettingsBloc events, one Update* per settings field (or a small related
+// group, e.g. UpdateClientCertificate's cert/key/passphrase trio).
+
 import 'package:equatable/equatable.dart';
 
 abstract class SettingsEvent extends Equatable {

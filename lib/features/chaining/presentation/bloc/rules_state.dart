@@ -1,3 +1,6 @@
+// RulesBloc state: the currently-loaded RequestRulesEntity (null until
+// LoadRules completes) plus a loading flag.
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';
 import 'package:getman/features/chaining/presentation/bloc/rules_event.dart'

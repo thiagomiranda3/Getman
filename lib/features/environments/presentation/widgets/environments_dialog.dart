@@ -1,3 +1,12 @@
+// Manage-environments dialog: list + detail editor side-by-side (wide) or a
+// two-page list/detail flow (narrow), plus Postman import/export.
+//
+// Gotchas: deleting the ACTIVE environment dispatches
+// UpdateActiveEnvironmentId(null) on SettingsBloc right after the delete --
+// this dialog holds both blocs, so it is the coordinator (bloc-to-bloc
+// coupling is deliberately avoided). AddEnvironment's entity is built here
+// so its id is known before the bloc processes the event.
+
 import 'dart:async';
 
 import 'package:collection/collection.dart';

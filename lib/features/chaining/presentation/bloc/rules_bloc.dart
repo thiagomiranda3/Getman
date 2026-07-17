@@ -1,3 +1,10 @@
+// RulesBloc: loads/saves the active request editor's chaining rules
+// (assertions + extractions) via the RequestRules use cases.
+//
+// Gotchas: AddExtractionRule always reloads rules fresh before appending, so
+// it never clobbers concurrent edits with stale bloc state -- used by the
+// response tree's "Extract to {{var}}" action, which has no draft of its own.
+
 import 'dart:developer';
 
 import 'package:flutter_bloc/flutter_bloc.dart';

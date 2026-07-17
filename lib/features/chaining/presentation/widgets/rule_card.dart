@@ -1,3 +1,6 @@
+// Shared card chrome for a rule/assertion row: enable toggle + delete button
+// wrapping the row's own fields.
+
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 

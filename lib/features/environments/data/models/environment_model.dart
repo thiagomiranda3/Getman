@@ -1,3 +1,6 @@
+// Hive model (typeId 4) for an environment: name + variables map +
+// secretKeys. Converts to/from EnvironmentEntity.
+
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:uuid/uuid.dart';

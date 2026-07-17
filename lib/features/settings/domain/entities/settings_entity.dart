@@ -1,3 +1,8 @@
+// Domain entity for the single app-wide settings record: history/response
+// limits, appearance, network/mTLS config, workspace, updates, and git
+// identity. copyWith uses an `_unchanged` sentinel so nullable fields can
+// be explicitly cleared (e.g. activeEnvironmentId back to null).
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/network/network_config.dart';
 import 'package:getman/core/theme/theme_ids.dart';

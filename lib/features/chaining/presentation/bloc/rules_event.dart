@@ -1,3 +1,6 @@
+// RulesBloc events: LoadRules, SaveRules, and AddExtractionRule (appends one
+// extraction rule and persists; used by the response tree's capture action).
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/chaining/domain/entities/extraction_rule.dart';
 import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';

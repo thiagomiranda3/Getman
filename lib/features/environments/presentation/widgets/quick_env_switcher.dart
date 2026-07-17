@@ -1,3 +1,7 @@
+// Cmd/Ctrl+E quick switcher: arrow-navigable list of "No Environment" plus
+// every saved environment, dispatching UpdateActiveEnvironmentId directly
+// (no new bloc) -- a smaller sibling of CommandPalette scoped to envs only.
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';

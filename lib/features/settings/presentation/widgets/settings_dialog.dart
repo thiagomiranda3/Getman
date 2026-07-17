@@ -1,3 +1,12 @@
+// The five-tab SETTINGS dialog (GENERAL/APPEARANCE/NETWORK/WORKSPACE/
+// SHORTCUTS); SettingsDialog.show(initialTab:) deep-links a specific pane.
+//
+// Gotchas: numeric fields (timeouts, history limits, max redirects) commit
+// on blur/submit via _NumberFieldBinding, not per keystroke -- an emptied or
+// unparsable field reverts to the bloc's current value on blur. dispose()
+// flushes any still-focused field's pending value, since Esc/close never
+// fires blur.
+
 import 'dart:async';
 import 'dart:math' as math;
 

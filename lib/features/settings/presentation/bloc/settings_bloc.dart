@@ -1,3 +1,13 @@
+// SettingsBloc: one handler per Update* event, each clamping where needed
+// then saving + emitting synchronously (persistence failures are logged,
+// never block the UI update).
+//
+// Gotchas: there is NO LoadSettings event -- settings load synchronously at
+// boot and are injected as initialSettings (don't add a load event without
+// also changing boot). Client-cert / workspace / git-identity fields are
+// passed explicitly rather than via a sentinel, so callers send the whole
+// current group with one field changed (null clears that one field).
+
 import 'dart:developer';
 
 import 'package:flutter_bloc/flutter_bloc.dart';

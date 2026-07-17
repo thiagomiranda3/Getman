@@ -1,3 +1,6 @@
+// Domain entity for a no-code post-response assertion (target + comparator
+// + expected value) plus its AssertionTarget/AssertionComparator enums.
+
 import 'package:equatable/equatable.dart';
 
 /// What part of the response an assertion checks.

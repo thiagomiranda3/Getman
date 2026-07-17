@@ -1,3 +1,5 @@
+// Abstract repository for a request config's chaining rules (get/save).
+
 import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';
 
 abstract class RequestRulesRepository {

@@ -1,12 +1,11 @@
+// One editable extraction-rule row (kind dropdown + expression/target-
+// variable fields) inside the RULES tab. Owns its controllers (keyed by
+// id) so editing keeps focus; reports edits up via onChanged.
+
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/features/chaining/domain/entities/extraction_rule.dart';
 import 'package:getman/features/chaining/presentation/widgets/rule_card.dart';
-
-// ---------------------------------------------------------------------------
-// Extraction rule row — owns its controllers (keyed by id) so editing keeps
-// focus; reports edits up via onChanged.
-// ---------------------------------------------------------------------------
 
 class ExtractionRuleRow extends StatefulWidget {
   const ExtractionRuleRow({

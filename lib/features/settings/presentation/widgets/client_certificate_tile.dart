@@ -1,3 +1,6 @@
+// NETWORK-tab control for the client-certificate (mTLS) trio: pick cert/key
+// files + passphrase; see the class doc below for platform gating.
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';

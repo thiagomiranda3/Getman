@@ -1,3 +1,7 @@
+// WORKSPACE-tab control for the Getman-owned git commit identity (name +
+// email); see the class doc below for why it's never written to global git
+// config.
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';

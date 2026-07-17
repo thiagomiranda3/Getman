@@ -1,3 +1,13 @@
+// Widget-layer coordinator: writes ExtractionEngine's captured values back
+// into the active environment, keeping TabsBloc decoupled from
+// EnvironmentsBloc (bloc-to-bloc coupling deliberately avoided).
+//
+// Gotchas: tracks captures across every tab/panel (a send can finish while
+// the user is elsewhere) and marks a capture written only after it
+// persists -- a capture made with no active environment stays pending and
+// is flushed the moment one is selected, via a separate SettingsBloc
+// listener.
+
 import 'package:collection/collection.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
