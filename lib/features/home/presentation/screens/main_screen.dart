@@ -19,10 +19,10 @@ import 'package:getman/features/environments/presentation/widgets/quick_env_swit
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/home/presentation/widgets/add_tab_button.dart';
 import 'package:getman/features/home/presentation/widgets/empty_tabs_placeholder.dart';
+import 'package:getman/features/home/presentation/widgets/request_tab_chip.dart';
 import 'package:getman/features/home/presentation/widgets/side_menu.dart';
 import 'package:getman/features/home/presentation/widgets/tab_chip.dart';
 import 'package:getman/features/home/presentation/widgets/tab_content_stack.dart';
-import 'package:getman/features/home/presentation/widgets/tab_widget.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
@@ -180,7 +180,8 @@ class _MainScreenState extends State<MainScreen> {
 
   /// True when the shell must re-layout: loading flips, the active tab moves,
   /// or the set/order of tabs changes. Per-tab content (titles, dirty stars)
-  /// rebuilds inside [TabWidget] / [TabChip] with their own narrow selectors.
+  /// rebuilds inside [RequestTabChip] / [TabChip] with their own narrow
+  /// selectors.
   static bool _shellNeedsRebuild(TabsState prev, TabsState next) {
     if (prev.isLoading != next.isLoading) return true;
     if (prev.activeIndex != next.activeIndex) return true;
@@ -582,7 +583,7 @@ class _MainScreenState extends State<MainScreen> {
                           final tab = tabs[index];
                           return _ChipEntrance(
                             key: ValueKey('tab_${tab.tabId}'),
-                            child: TabWidget(
+                            child: RequestTabChip(
                               tabId: tab.tabId,
                               index: index,
                               isActive: activeIndex == index,

@@ -41,12 +41,12 @@ ThemeData draculaTheme(
   // light-mode (Alucard) purple is deep and needs white.
   final onPrimary = isDark ? DraculaPalette.backgroundDark : Colors.white;
   final onSecondary = isDark ? DraculaPalette.backgroundDark : Colors.white;
-  // Request-tab (TabWidget) label color. The active tab sits on the surface
-  // (not the purple indicator), so onPrimary would be unreadable there — dark
-  // text on the dark surface / white text on the white Alucard surface. Use a
-  // single high-contrast color for both active and inactive in each mode
-  // (active/inactive stay distinct via background, font weight, and the purple
-  // top accent line): white on dark, black on light.
+  // Request-tab (RequestTabChip) label color. The active tab sits on the
+  // surface (not the purple indicator), so onPrimary would be unreadable
+  // there — dark text on the dark surface / white text on the white Alucard
+  // surface. Use a single high-contrast color for both active and inactive
+  // in each mode (active/inactive stay distinct via background, font weight,
+  // and the purple top accent line): white on dark, black on light.
   final tabLabelColor = isDark ? Colors.white : Colors.black;
 
   final layout = isCompact ? AppLayout.compact : AppLayout.normal;

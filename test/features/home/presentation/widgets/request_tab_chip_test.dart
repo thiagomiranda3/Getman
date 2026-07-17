@@ -11,7 +11,7 @@ import 'package:getman/features/collections/domain/usecases/collections_usecases
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
-import 'package:getman/features/home/presentation/widgets/tab_widget.dart';
+import 'package:getman/features/home/presentation/widgets/request_tab_chip.dart';
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
@@ -126,7 +126,7 @@ void main() {
               // OUTSIDE the tab — lets the pointer move on/off it to fire
               // MouseRegion onEnter/onExit.
               child: Center(
-                child: TabWidget(
+                child: RequestTabChip(
                   tabId: tab.tabId,
                   index: 0,
                   isActive: true,
@@ -153,7 +153,7 @@ void main() {
     await tester.pump();
     // The tab content is aligned to the top-left of its (tall) layout box, over
     // the title — not the geometric center. Aim just inside the top-left.
-    final rect = tester.getRect(find.byType(TabWidget));
+    final rect = tester.getRect(find.byType(RequestTabChip));
     await gesture.moveTo(rect.topLeft + const Offset(12, 12));
     await tester.pumpAndSettle();
     return gesture;
@@ -221,7 +221,7 @@ void main() {
             child: RepositoryProvider<TabDirtyChecker>.value(
               value: const TabDirtyChecker(),
               child: Center(
-                child: TabWidget(
+                child: RequestTabChip(
                   tabId: tab.tabId,
                   index: 0,
                   isActive: true,
@@ -339,7 +339,7 @@ void main() {
               child: RepositoryProvider<TabDirtyChecker>.value(
                 value: const TabDirtyChecker(),
                 child: Center(
-                  child: TabWidget(
+                  child: RequestTabChip(
                     tabId: tab1.tabId,
                     index: 0,
                     isActive: true,
@@ -420,7 +420,7 @@ void main() {
               child: RepositoryProvider<TabDirtyChecker>.value(
                 value: const TabDirtyChecker(),
                 child: Center(
-                  child: TabWidget(
+                  child: RequestTabChip(
                     tabId: tab1.tabId,
                     index: 0,
                     isActive: true,
@@ -522,7 +522,7 @@ void main() {
               child: RepositoryProvider<TabDirtyChecker>.value(
                 value: const TabDirtyChecker(),
                 child: Center(
-                  child: TabWidget(
+                  child: RequestTabChip(
                     tabId: clean.tabId,
                     index: 1,
                     isActive: true,

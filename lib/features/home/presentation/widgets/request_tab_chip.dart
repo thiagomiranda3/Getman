@@ -25,8 +25,8 @@ const Duration _tabTooltipDelay = Duration(milliseconds: 500);
 /// a little extra room for URLs). Long URLs wrap to 2 lines then ellipsis.
 const double _tabTooltipMaxWidth = 360;
 
-class TabWidget extends StatefulWidget {
-  const TabWidget({
+class RequestTabChip extends StatefulWidget {
+  const RequestTabChip({
     required this.tabId,
     required this.index,
     required this.isActive,
@@ -41,10 +41,11 @@ class TabWidget extends StatefulWidget {
   final Future<bool> Function() onClose;
 
   @override
-  State<TabWidget> createState() => _TabWidgetState();
+  State<RequestTabChip> createState() => _RequestTabChipState();
 }
 
-class _TabWidgetState extends State<TabWidget> with TickerProviderStateMixin {
+class _RequestTabChipState extends State<RequestTabChip>
+    with TickerProviderStateMixin {
   late AnimationController _sizeController;
   late Animation<double> _sizeAnimation;
   bool _isClosing = false;
@@ -752,5 +753,5 @@ class _TabTooltipCard extends StatelessWidget {
 }
 
 /// Which bulk tab-close context-menu action is being confirmed — drives how
-/// [_TabWidgetState._bulkCloseTargets] computes the affected tab set.
+/// [_RequestTabChipState._bulkCloseTargets] computes the affected tab set.
 enum _BulkCloseKind { others, toTheLeft, toTheRight }
