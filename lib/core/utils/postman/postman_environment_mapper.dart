@@ -1,3 +1,11 @@
+// Encodes/decodes Postman environment JSON: toJson/toJsonAll export one or
+// many EnvironmentEntity values (matching Postman's single-export and
+// "Export Data" multi-export shapes); fromJson accepts either shape on
+// import, rejecting anything that isn't recognizably a Postman environment
+// via _requireEnvironmentShape. Secret variables are masked to an empty
+// value (`type:'secret'`) on export; import restores the lock flag so a
+// re-imported secret stays a secret instead of arriving as a plain variable.
+
 import 'dart:convert';
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 import 'package:uuid/uuid.dart';

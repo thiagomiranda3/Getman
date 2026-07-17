@@ -1,3 +1,19 @@
+// Bidirectional Postman v2.1 collection mapper: toJson serializes a
+// CollectionNodeEntity subtree to Postman collection JSON (a folder root's
+// children become top-level items; a leaf root is wrapped as the single
+// item); fromJson deserializes Postman JSON back into a Getman folder tree.
+// Backs the collections import/export UI.
+//
+// Gotchas: collection-/folder-scoped variables mask secret values on export
+// (empty value, `type:'secret'`) via _variablesToPostman — never emit the
+// real secret. Saved examples (CollectionNodeEntity.examples) are local-only
+// and this mapper never reads that field, so they're excluded from export.
+// Query-string handling is asymmetric by design: export always derives
+// `url.query` from the raw URL's still-percent-encoded segments (matching
+// Postman's own convention); import prefers a structured `url.query` when
+// present (percent-decoded before merging back in, else double-encoding
+// results), otherwise keeps the raw URL's query as-is.
+
 import 'dart:convert';
 import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/body_type.dart';

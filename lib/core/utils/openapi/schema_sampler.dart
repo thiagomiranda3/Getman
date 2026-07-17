@@ -1,4 +1,9 @@
-// lib/core/utils/openapi/schema_sampler.dart
+// Produces a representative sample value (Map/List/scalar) for a resolved
+// JSON-Schema, used by the OpenAPI/Swagger normalizers to synthesize request/
+// response body and param examples when the spec gives none. Honors
+// `example` -> `default` -> first `enum`, merges `allOf` branches, samples
+// the first `oneOf`/`anyOf` branch, and caps recursion at _maxDepth to
+// survive a self-referential schema.
 
 const int _maxDepth = 8;
 

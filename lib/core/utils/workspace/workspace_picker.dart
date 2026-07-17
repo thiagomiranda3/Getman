@@ -1,3 +1,6 @@
+// Cross-platform workspace-folder picker; see the function doc below for the
+// macOS security-scoped-bookmark path vs. plain file_picker elsewhere.
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:getman/core/utils/workspace/workspace_bookmark.dart';

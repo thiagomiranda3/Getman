@@ -1,3 +1,6 @@
+// Native (dart:io) half of the file_reader.dart conditional export: reads
+// file bytes for binary/multipart request bodies on desktop/mobile.
+
 import 'dart:io';
 
 /// Native implementation — reads the file at [path] synchronously.

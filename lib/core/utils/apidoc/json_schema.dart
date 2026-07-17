@@ -1,3 +1,9 @@
+// JsonSchema: the subset of JSON Schema OpenAPI 3.0 uses for request/
+// response bodies, plus JsonSchemaInferrer, which synthesizes one from a
+// decoded JSON value (arrays inferred from their first element, object keys
+// all treated as required) — the reverse of the import-side schema_sampler.
+// Pure data, no Flutter/I/O.
+
 import 'package:equatable/equatable.dart';
 
 /// The subset of JSON Schema that OpenAPI 3.0 uses for request/response bodies.

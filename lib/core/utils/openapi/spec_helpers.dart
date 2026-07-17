@@ -1,4 +1,8 @@
-// Shared helpers for the OpenAPI v3 / Swagger v2 normalizers.
+// Shared helpers for the OpenAPI v3 / Swagger v2 normalizers:
+// firstSecuritySchemeName reads the first scheme name off a `security`
+// array, and mergedParameters combines a path-item's shared `parameters`
+// with an operation's own (op-level overrides a shared entry with the same
+// name+in), resolving `$ref`s along the way.
 
 import 'package:getman/core/utils/openapi/ref_resolver.dart';
 

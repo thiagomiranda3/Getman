@@ -1,3 +1,6 @@
+// Minimal block-style YAML serializer for OpenApiSerializer's YAML output;
+// see the class doc below for scope and quoting rules.
+
 /// Minimal block-style YAML serializer for a JSON-like tree (maps, lists,
 /// strings, nums, bools, null). Enough for OpenAPI output — not a general YAML
 /// library. Zero dependencies.

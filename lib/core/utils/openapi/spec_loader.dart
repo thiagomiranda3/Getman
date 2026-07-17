@@ -1,4 +1,8 @@
-// lib/core/utils/openapi/spec_loader.dart
+// Decodes a raw OpenAPI/Swagger spec source (auto-detecting JSON vs YAML by
+// its first non-whitespace character) into a plain mutable Dart Map/List
+// tree, so the rest of the import pipeline never has to special-case
+// `YamlMap`/`YamlList` node types.
+
 import 'dart:convert';
 
 import 'package:yaml/yaml.dart';

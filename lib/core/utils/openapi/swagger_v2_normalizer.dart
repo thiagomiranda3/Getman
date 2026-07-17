@@ -1,4 +1,12 @@
-// lib/core/utils/openapi/swagger_v2_normalizer.dart
+// Converts a Swagger 2.0 spec map into a NormalizedApi: builds the single
+// `scheme://host/basePath` server from the top-level `schemes`/`host`/
+// `basePath` keys, walks every path/method into a NormalizedOperation via
+// its `in: query/header/formData/body` parameters (unlike OpenAPI 3.x,
+// Swagger 2.0 has no `requestBody` — a `body` param IS the request body, and
+// `formData` params combine into one urlencoded/multipart body per
+// `consumes`), and maps `securityDefinitions` the same way auth_mapper
+// expects.
+
 import 'dart:convert';
 
 import 'package:getman/core/domain/entities/body_type.dart';

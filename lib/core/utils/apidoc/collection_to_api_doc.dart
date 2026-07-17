@@ -1,4 +1,11 @@
-// lib/core/utils/apidoc/collection_to_api_doc.dart
+// Builds a format-agnostic ApiDoc from a collection subtree — the reverse of
+// the OpenAPI import: leaves become operations, folders become tags, and
+// request URLs split into servers + `{var}`-templated paths. Env values
+// resolve path/server template vars when an environment is passed; secret
+// values are never resolved (left as a bare `{name}` placeholder). Bodies map
+// per BodyType (raw JSON inferred via JsonSchemaInferrer, urlencoded/
+// multipart to form-field schemas, graphql to a query+variables object).
+
 import 'dart:convert';
 
 import 'package:getman/core/domain/entities/auth_config.dart';
