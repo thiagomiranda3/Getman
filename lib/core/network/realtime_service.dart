@@ -1,3 +1,13 @@
+// RealtimeService: opens WebSocket (web_socket_channel) and SSE (a
+// streaming Dio GET, parsed by SseParser) connections and returns a
+// RealtimeConnection session-log stream, consumed by RealtimeBloc. The
+// WebSocket factory is injectable (webSocketFactory) so teardown is
+// unit-testable with a fake channel; applyConfig mirrors
+// NetworkService.applyConfig (adapter rebuilt only on an adapter-relevant
+// config change). SSE surfaces a non-2xx connect as an `HTTP <code>` error
+// frame instead of silently streaming the error body, and renders a binary
+// WS frame as a `[binary frame · N bytes]` placeholder.
+
 import 'dart:async';
 import 'dart:convert';
 

@@ -1,3 +1,15 @@
+// Native Dio HTTP adapter config: swaps in an IOHttpClientAdapter honoring
+// SSL verification, an optional host:port proxy, and client-certificate
+// (mTLS) auth. Resolved into dio_adapter_config.dart via conditional
+// import, so this file (and its dart:io / dio/io.dart imports) is excluded
+// from web builds entirely.
+//
+// Gotchas: this is the ONLY place a dart:io SecurityContext gets built —
+// core/network/network_config.dart deliberately keeps the cert trio as
+// plain strings so no other file needs dart:io. Cert/key loading is
+// wrapped in try/catch: a bad path or wrong passphrase logs and falls back
+// to a default (uncertified) client instead of crashing every send.
+
 import 'dart:io';
 
 import 'package:dio/dio.dart';

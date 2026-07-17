@@ -1,3 +1,20 @@
+// NetworkService: builds/owns the live Dio client and performs every HTTP
+// send, streaming the response body so it can be capped at
+// kMaxRenderableResponseBytes, classified (textual vs media/binary), and
+// decoded honoring a declared charset — oversize bodies become a "too
+// large" placeholder instead of buffering into memory.
+//
+// Gotchas: redirects are followed with a MANUAL loop, not Dio's built-in
+// follow — each hop is sent with followRedirects:false so the cookie
+// interceptor runs per hop (a login 302's Set-Cookie is captured and
+// re-matched on the next hop; dart:io's auto-follow would discard it). 303
+// and POST-triggered 301/302 become bodyless GETs; 307/308 (and non-POST
+// 301/302) keep method+body; `Authorization` is stripped whenever a
+// redirect crosses hosts. applyConfig only rebuilds the HTTP adapter when
+// NetworkConfig.sameAdapterConfig says an adapter-relevant field changed
+// (SSL/proxy/cert), closing the replaced adapter — timeout/redirect-count
+// edits just mutate BaseOptions in place.
+
 import 'dart:convert';
 import 'dart:typed_data';
 

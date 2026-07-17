@@ -1,3 +1,8 @@
+// Size limits and placeholder strings governing response-body memory/disk
+// use: max bytes buffered from the network (kMaxRenderableResponseBytes),
+// the 1 MiB Hive persistence cap and its placeholder, the large-viewer and
+// syntax-highlighting thresholds, and the JSON-tree background-decode cutoff.
+
 /// Largest response body we will buffer into memory to render. Beyond this the
 /// stream is abandoned and the response carries no renderable body (an "open
 /// externally" card is shown). Protects against pulling a huge video into RAM.

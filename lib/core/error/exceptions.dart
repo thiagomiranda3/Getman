@@ -1,3 +1,11 @@
+// Data-layer exceptions surfaced up to the repository boundary (see
+// core/error/guard.dart + CLAUDE.md §4.7): PersistenceException (Hive I/O
+// failures), FileBodyException (a multipart file row / binary body whose
+// path can't be read at send time), and GraphqlVariablesException (the
+// GraphQL VARIABLES pane holds invalid JSON). All are pure Dart (no
+// dart:io) so they can cross the data -> network boundary; repositories
+// translate them into typed Failure subtypes before a BLoC ever sees them.
+
 class PersistenceException implements Exception {
   PersistenceException(this.message, {this.cause});
   final String message;

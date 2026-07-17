@@ -1,3 +1,10 @@
+// SseParser: incremental Server-Sent-Events parser. Feed it raw decoded
+// text chunks via addChunk; it buffers partial lines/data across chunk
+// boundaries and returns each event's `data` payload once a blank line
+// dispatches it. Call flush() on stream end to recover a final event that
+// never got its trailing blank line. `event:`/`id:`/`retry:` fields and
+// comment lines are ignored in this v1.
+
 /// Incremental parser for Server-Sent Events. Feed it raw chunks; it returns
 /// the `data` payload of each completed event (dispatched on a blank line).
 /// `event:` / `id:` / `retry:` / comment lines are ignored in this v1.

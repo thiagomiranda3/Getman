@@ -1,3 +1,9 @@
+// InMemoryCookieStore: the CookieStore implementation used at runtime — an
+// in-memory list is the session source of truth, with every mutation
+// flushed to a CookiePersistence (best-effort, never blocking the request
+// path) and expired cookies pruned on read. RFC 6265 §5.4 longer-path-first
+// ordering breaks ties when a server reads only the first duplicate name.
+
 import 'dart:async';
 
 import 'package:getman/core/network/cookie_store.dart';

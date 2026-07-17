@@ -1,3 +1,6 @@
+// Repository-boundary helper translating a thrown PersistenceException into
+// a PersistenceFailure — see CLAUDE.md §4.7.
+
 import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/error/failures.dart';
 

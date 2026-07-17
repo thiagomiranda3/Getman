@@ -1,3 +1,17 @@
+// GetIt (`sl`) bootstrap: registers every feature's blocs/usecases/repos and
+// data sources, opens all Hive boxes in parallel, and returns the loaded
+// SettingsEntity for main() to pass in as initialSettings. Hive adapters are
+// registered manually here (kept over the generated hive_registrar.g.dart)
+// and only once per process, guarded by _adaptersRegistered.
+//
+// Gotchas: the cookies + requestRules boxes hydrate via
+// openAndHydrateDeferredBoxes BEFORE NetworkService becomes usable — an
+// earlier post-frame warm-up raced early sends, silently dropping persisted
+// cookies / skipping post-response rules, so don't re-defer them without a
+// readiness gate. reset() tears down get_it + closes boxes for E2E
+// between-test isolation; registered adapters intentionally survive (Hive
+// can't unregister them).
+
 import 'package:get_it/get_it.dart';
 import 'package:getman/core/git/gh_service.dart';
 import 'package:getman/core/git/git_service.dart';

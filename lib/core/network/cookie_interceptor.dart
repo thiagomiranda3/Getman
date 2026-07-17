@@ -1,3 +1,8 @@
+// Dio interceptor wiring the CookieStore into the live client: attaches the
+// jar's Cookie header on each request and captures Set-Cookie on each
+// response. No-op on web (kIsWeb) — the browser owns cookies and the XHR
+// adapter rejects a manually-set Cookie header anyway.
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:getman/core/network/cookie_store.dart';

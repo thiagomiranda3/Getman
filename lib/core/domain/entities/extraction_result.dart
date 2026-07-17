@@ -1,3 +1,7 @@
+// Outcome of running one chaining extraction rule against a response
+// (variable/value/matched), carried on the tab entity independent of the
+// rule itself so tabs stays decoupled from the chaining feature.
+
 import 'package:equatable/equatable.dart';
 
 /// Outcome of running one extraction rule against a response. Self-contained

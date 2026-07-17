@@ -1,3 +1,9 @@
+// Computes the concrete effect (AuthApplication: headers + optional query
+// param) an AuthConfig has on an outgoing request, independent of how it is
+// applied. Shared by the send-path serializer (adds to Dio headers/query)
+// and the code-gen service (adds headers, appends to the URL string) so the
+// per-AuthType decision doesn't drift between the two callers.
+
 import 'dart:convert';
 
 import 'package:getman/core/domain/entities/auth_config.dart';

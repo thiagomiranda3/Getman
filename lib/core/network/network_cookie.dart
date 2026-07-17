@@ -1,3 +1,10 @@
+// NetworkCookie: a stored cookie plus just enough RFC 6265 semantics
+// (domain/host-only matching, path matching, Max-Age expiry) to decide
+// when to send it back. parseSetCookie turns a raw Set-Cookie header into
+// zero or more NetworkCookies, rejecting a Domain attribute that doesn't
+// cover the request host. Only Max-Age is honored precisely; an
+// Expires-only cookie is treated as session-only (documented v1 gap).
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/utils/cookie_parser.dart';
 

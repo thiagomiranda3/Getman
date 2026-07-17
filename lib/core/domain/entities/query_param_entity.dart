@@ -1,3 +1,6 @@
+// A single URL query-parameter key/value pair; duplicates are preserved in
+// order since HttpRequestConfigEntity.params derives from the raw URL.
+
 import 'package:equatable/equatable.dart';
 
 class QueryParamEntity extends Equatable {

@@ -1,3 +1,10 @@
+// McpService: opens MCP (Model Context Protocol) client connections over
+// Streamable HTTP (JSON-RPC 2.0), pure `dio` so it stays web-safe. Runs the
+// `initialize` handshake (capturing the `Mcp-Session-Id` response header),
+// then exposes listTools/callTool over the resulting McpConnection.
+// Responses may arrive as a plain JSON body or a `text/event-stream` body
+// (via SseParser); either way the reply matching `id` is picked out.
+
 import 'dart:async';
 import 'dart:convert';
 

@@ -1,3 +1,6 @@
+// Outcome of one no-code assertion run against a response (label/passed/
+// actual), carried on the tab entity for the RESPONSE > TESTS view.
+
 import 'package:equatable/equatable.dart';
 
 /// Outcome of one assertion against a response. Self-contained display data

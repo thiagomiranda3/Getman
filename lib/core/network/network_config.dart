@@ -1,3 +1,10 @@
+// NetworkConfig: pure transport settings for the Dio client (timeouts,
+// redirects, SSL verification, proxy, client-cert/mTLS trio) with zero dio
+// or feature imports, so NetworkService never depends on the settings
+// feature — SettingsEntity.toNetworkConfig maps user settings into this.
+// sameAdapterConfig narrows down to just the fields that require rebuilding
+// the HTTP adapter, so a timeout-only change can skip that rebuild.
+
 import 'package:getman/core/network/network_service.dart' show NetworkService;
 import 'package:getman/features/settings/domain/entities/settings_entity.dart'
     show SettingsEntity;
