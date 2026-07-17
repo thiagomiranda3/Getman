@@ -1,3 +1,5 @@
+// ReviewService: abstract gateway for the workspace review/stage/commit
+// flow; implemented by WorkspaceReviewService in data/services.
 import 'package:getman/features/collections/domain/entities/review_entry.dart';
 
 /// Abstraction the review bloc depends on. Implemented in the data layer by

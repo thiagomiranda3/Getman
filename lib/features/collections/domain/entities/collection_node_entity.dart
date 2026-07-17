@@ -1,3 +1,6 @@
+// Immutable collections-tree node entity (folder or request leaf): children,
+// saved examples, free-text description, and folder-scoped
+// variables/secretKeys inherited by descendant requests.
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';

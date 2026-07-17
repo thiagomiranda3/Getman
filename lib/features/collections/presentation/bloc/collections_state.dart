@@ -1,3 +1,7 @@
+// CollectionsBloc state: the collections forest + isLoading, plus a lazily
+// memoized id -> HttpRequestConfigEntity index (configById) that lets
+// TabDirtyChecker do an O(1) lookup instead of an O(nodes) tree walk per
+// linked-tab check.
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';

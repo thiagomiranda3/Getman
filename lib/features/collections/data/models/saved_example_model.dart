@@ -1,3 +1,5 @@
+// SavedExampleModel: Hive model (typeId 10) for a saved request+response
+// example, embedded in CollectionNode.examples.
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/features/collections/data/models/collection_node_model.dart'
     show CollectionNode;

@@ -1,3 +1,10 @@
+// GitSyncBloc: drives branch/stash/remote sync over BranchService,
+// surfacing every failure in state (never only logged). Droppable while
+// busy/loading (_dropWhileBusy) since a second op would race git against a
+// working tree the first is mid-way through changing. _onPull bypasses the
+// uniform _run helper because PullOutcome decides which token to bump:
+// reloadToken on a clean pull, conflictToken (never reloadToken) when the
+// rebase halted on a conflict.
 import 'dart:developer';
 
 import 'package:flutter_bloc/flutter_bloc.dart';

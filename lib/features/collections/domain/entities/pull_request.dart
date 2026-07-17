@@ -1,3 +1,5 @@
+// GitHub pull-request domain entities: PR lifecycle state, CI-checks rollup,
+// gh-CLI availability, and PullRequestEntity/PullRequestRef.
 import 'package:equatable/equatable.dart';
 
 /// A PR's lifecycle state (only `open` is listed in v1, but the mapping is

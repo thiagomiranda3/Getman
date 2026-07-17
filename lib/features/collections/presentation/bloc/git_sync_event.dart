@@ -1,3 +1,7 @@
+// GitSyncBloc events: branch status/switch/create, pull/push/stash/pop/
+// drop, fetch (silent auto-fetch tick vs a manual FETCH), and
+// ConflictsResolved (bumps reloadToken once the conflict resolver finishes
+// a rebase).
 import 'package:equatable/equatable.dart';
 
 abstract class GitSyncEvent extends Equatable {

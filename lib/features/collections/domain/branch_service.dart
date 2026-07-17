@@ -1,3 +1,5 @@
+// BranchService: abstract gateway for git branch/stash/remote/sync
+// operations; implemented by GitBranchService in data/services.
 import 'package:getman/core/git/git_service.dart' show PullOutcome;
 import 'package:getman/features/collections/domain/entities/branch_status.dart';
 

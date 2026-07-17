@@ -1,3 +1,6 @@
+// GhPullRequestService: gh-CLI-backed PullRequestService — availability
+// check, listing PRs, and creating one. Composes GhService with
+// BranchService so the pre-create push reuses the flush-guarded push.
 import 'package:getman/core/git/gh_service.dart';
 import 'package:getman/features/collections/domain/branch_service.dart';
 import 'package:getman/features/collections/domain/entities/pull_request.dart';

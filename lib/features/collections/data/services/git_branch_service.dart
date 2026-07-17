@@ -1,3 +1,15 @@
+// GitBranchService: composes GitService + WorkspaceSyncService into the
+// switchTo/create/push/pull/stash/addRemote/fetch operations behind
+// BranchService. Pure of dart:io — all git access goes through GitService.
+//
+// Gotchas: any op that reads/mutates the working tree first flushes the
+// pending Hive -> disk mirror (_flushOrThrow) so git never runs over a stale
+// tree; ops that also rewrite the tree (switchTo/pull/stash/popStash) also
+// suspend mirroring for their duration (_runOnTree) so a concurrent edit
+// isn't mirrored onto the wrong branch afterward. create/push/addRemote/
+// dropStash/fetch deliberately skip the flush and/or suspension because they
+// never rewrite the working tree — see the per-method comments before
+// changing this.
 import 'package:getman/core/git/git_service.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/branch_service.dart';

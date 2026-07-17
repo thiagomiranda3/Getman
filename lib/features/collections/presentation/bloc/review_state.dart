@@ -1,3 +1,7 @@
+// ReviewBloc state: git availability/repo existence, current branch, the
+// reviewable ReviewEntry list, the selected entry's path, and status
+// (including needsIdentity — a commit failed for want of a configured git
+// author; the widget prompts, saves it, and re-dispatches Commit).
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/collections/domain/entities/review_entry.dart';
 

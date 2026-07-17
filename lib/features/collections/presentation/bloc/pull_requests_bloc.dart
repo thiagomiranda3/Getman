@@ -1,3 +1,8 @@
+// PullRequestsBloc: loads gh availability + open PRs and drives PR creation
+// over PullRequestService. Droppable while busy (_dropWhileBusy) since a
+// concurrent gh call could race the push/create. defaultBase is cached per
+// workspace root (_defaultBaseRoot) so switching workspaces re-resolves it
+// instead of prefilling the previous repo's default branch.
 import 'dart:developer';
 
 import 'package:flutter_bloc/flutter_bloc.dart';

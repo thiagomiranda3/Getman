@@ -1,3 +1,7 @@
+// Hive data source for the collections tree (box: 'collections', typeId 3),
+// keyed by root node id so an edit rewrites only the affected root subtree.
+// migrateLegacyKeysIfNeeded re-keys a legacy auto-increment-int-keyed box on
+// the first cold-start read.
 import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/features/collections/data/models/collection_node_model.dart';

@@ -1,3 +1,5 @@
+// PullRequestService: abstract gateway for GitHub pull-request operations;
+// implemented by GhPullRequestService (shells out to the gh CLI).
 import 'package:getman/features/collections/domain/entities/pull_request.dart';
 
 /// Domain gateway for GitHub pull-request operations. The data layer backs this

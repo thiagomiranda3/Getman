@@ -1,3 +1,8 @@
+// GitConflictService: drives semantic conflict resolution over a paused git
+// rebase — classifies conflicted paths (currentConflicts), field-level
+// 3-way merges request/folder JSON via ThreeWayMerge, and writes the user's
+// picks back to the working tree (resolve). Pure orchestration over
+// GitService; no dart:io.
 import 'dart:convert';
 
 import 'package:collection/collection.dart';

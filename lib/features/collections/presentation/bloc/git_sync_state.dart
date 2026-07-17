@@ -1,3 +1,8 @@
+// GitSyncBloc state: status, the current BranchStatus snapshot, and two
+// widget-layer signal tokens (blocs never talk to each other directly) —
+// reloadToken (files changed on disk; BranchSyncListener reloads the tree)
+// and conflictToken (a pull halted on conflicts; BranchChip opens the
+// resolver dialog).
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/collections/domain/entities/branch_status.dart';
 

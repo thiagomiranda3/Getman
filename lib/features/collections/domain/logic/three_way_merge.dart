@@ -1,3 +1,7 @@
+// Pure field-level 3-way merge for git-rebase conflicts: reconciles a
+// request/folder node's base/incoming/yours versions field-by-field,
+// returning a best-effort merged node plus the FieldConflicts that need a
+// user decision, for ConflictService/ConflictBloc to surface.
 import 'package:collection/collection.dart';
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/body_type.dart';

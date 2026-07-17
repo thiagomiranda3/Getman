@@ -1,3 +1,7 @@
+// CollectionsRepositoryImpl: translates CollectionsLocalDataSource models to
+// CollectionNodeEntity and back. Diffs per-root against the last-persisted
+// snapshot so saveCollections rewrites only changed/removed root subtrees
+// (L12 per-root diff) instead of the whole forest on every edit.
 import 'package:getman/core/error/guard.dart';
 import 'package:getman/features/collections/data/datasources/collections_local_data_source.dart';
 import 'package:getman/features/collections/data/models/collection_node_model.dart';

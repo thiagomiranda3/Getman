@@ -1,3 +1,6 @@
+// Abstract data source for mirroring the collections forest to a workspace
+// directory on disk; implemented by the io/stub pair selected in
+// workspace_data_source_factory.dart.
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 
 /// Reads/writes the collection forest to a workspace directory on disk.

@@ -1,3 +1,7 @@
+// Conflict-resolution entities for a halted git rebase: FileConflict (one
+// conflicted file, field-level or coarse) and FileResolution (the user's
+// per-field or whole-file choice), plus the ConflictKind/FileSide/RebaseStep
+// enums.
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/collections/domain/logic/three_way_merge.dart';
 
