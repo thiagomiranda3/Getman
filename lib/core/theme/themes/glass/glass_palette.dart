@@ -1,3 +1,5 @@
+// Raw Color constants for the Liquid Glass theme (see class doc below).
+
 import 'package:flutter/material.dart';
 
 /// Apple "Liquid Glass" palette. Light = "Clear" (pastel wallpaper, near-white

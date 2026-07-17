@@ -1,3 +1,7 @@
+// Maps AurisScheme's resolved tokens onto AppPalette fields (method/status
+// colors, variable-highlight colors, diff colors) so both AURIS brightnesses
+// derive their semantic colors from the scheme instead of hardcoded literals.
+
 import 'package:auris/auris.dart';
 import 'package:getman/core/theme/extensions/app_palette.dart';
 

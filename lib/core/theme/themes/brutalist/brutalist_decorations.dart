@@ -1,3 +1,8 @@
+// AppDecoration closures for Brutalist: panelBox (hard offset ink-shadow,
+// thick border) and tabShape (per-column rules, active tab filled with
+// primaryColor). No scaffold-background/frost hooks here — the animated
+// halftone wallpaper lives in brutalist_ambient.dart.
+
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 

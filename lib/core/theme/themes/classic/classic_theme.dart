@@ -1,3 +1,16 @@
+// Builds the CLASSIC ThemeData: the calm, native/Postman-style default theme
+// (muted-indigo accent, tight paddings, thin borders, no ambient motion). The
+// default theme for fresh installs. Attaches Getman's eight theme extensions
+// (layout/palette/shape/typography/decoration/motion/copy/components) via
+// ThemeData.copyWith; uses calmMotion (identity) and defaultAppComponents()
+// since Classic is the one theme with no bespoke component-slot set.
+//
+// Gotcha: listTileTheme pins titleTextStyle/subtitleTextStyle to inherit:true
+// (leaving leadingAndTrailingTextStyle unset) — this is the convention every
+// theme follows so a ListTile mounted mid theme-switch never lerps mismatched
+// `inherit` values and crashes (see the AURIS text-lerp fix for the failure
+// mode this avoids).
+
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';

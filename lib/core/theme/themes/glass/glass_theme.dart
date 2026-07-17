@@ -1,3 +1,6 @@
+// Builds the Liquid Glass ThemeData (see the function doc below); attaches
+// Getman's eight theme extensions via ThemeData.copyWith.
+
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/themes/glass/glass_components.dart';

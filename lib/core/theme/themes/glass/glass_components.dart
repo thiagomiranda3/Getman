@@ -1,8 +1,8 @@
-// Liquid Glass component-slot overrides — "frosted HUD / Apple control center".
-// Translucent frosted panels, glossy pill lozenges with a specular top
-// highlight, a liquid switch that squishes its thumb, and a soft looping
-// frosted ripple while pending. Built as defaultAppComponents().copyWith(...)
-// so unlisted slots (select) inherit.
+// Liquid Glass component-slot overrides — a frosted HUD styled after Apple's
+// control center. Translucent frosted panels, glossy pill lozenges with a
+// specular top highlight, a liquid switch that squishes its thumb, and a soft
+// looping frosted ripple while pending. Built as
+// defaultAppComponents().copyWith(...) so unlisted slots (select) inherit.
 //
 // Rules: no data/GetIt/BLoC imports; colors come from the theme accessors
 // (context.appPalette / Theme.of). Colors.white / Colors.black specular

@@ -1,3 +1,9 @@
+// AppDecoration closures for Dracula: a clean/flat panelBox (rounded corners,
+// thin border, soft blurred shadow — no brutalist offset), a VS Code-style
+// tabShape (top accent line on the active tab, no bottom rule), and an
+// identity scaffoldBackground (no ambient wallpaper — clean & flat visual
+// personality, no animated background per design).
+
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 

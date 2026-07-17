@@ -1,3 +1,15 @@
+// AppDecoration closures for AURIS: panelBox, tabShape, and the
+// BrandedTabBar selected-tab indicator. The animated scaffold background
+// lives in auris_ambient.dart (moved out so it could plumb AmbientSignals);
+// press feedback is the shared SubtlePress wired in auris_theme.dart.
+//
+// Gotcha: AppDecoration.lerp returns `this`, so these closures can still run
+// mid theme-switch after AurisScheme has been dropped from the ThemeData —
+// each one falls back to a plain themed box/tab instead of throwing. The
+// branded-tab indicator also fills light in dark mode (AurisScheme.textBright)
+// because AURIS never sets ThemeData.primaryColor, which defaults dark and
+// would otherwise leave the (dark) onPrimary label unreadable.
+
 import 'package:auris/auris_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';

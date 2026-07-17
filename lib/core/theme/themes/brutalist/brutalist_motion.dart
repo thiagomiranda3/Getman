@@ -1,3 +1,10 @@
+// Brutalist collections-tree drag/drop/expand motion (AppMotion.
+// treeDragFeedback / treeDropHighlight / treeExpandFlourish): a hard-bordered
+// ink-stamp chip under the drag cursor, a fast thick-border "slam" outline on
+// a drop target, and an overshoot-bounce scale flourish on expand/collapse.
+// `brutalistMotion` returns identity (const AppMotion()) when reduceEffects is
+// true, per THEME_AUTHORING's mandatory degradation rule.
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';

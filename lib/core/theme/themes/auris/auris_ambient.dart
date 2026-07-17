@@ -1,3 +1,18 @@
+// AURIS scaffold-background ambient: a scanning sci-fi HUD grid with a slow
+// radar sweep arc and drifting telemetry ticks, painted by a single
+// RepaintBoundary'd CustomPainter. `aurisScaffoldBackgroundAnimated` (full
+// effects) plumbs AmbientSignals (pointer + WorkspacePulseController session
+// pulse) so parallax + idle-dimming stay live; `aurisStaticScaffoldBackground`
+// (reduceEffects) renders one still frame with no controller/pointer/signals.
+// Wired into `auris_theme.dart`'s AppDecoration.scaffoldBackground.
+//
+// Gotchas: the AnimationController is created once in initState and
+// start/stopped (never disposed+recreated) because SingleTickerProviderState
+// permits only one ticker ever. Pulse is resolved unconditionally in
+// didChangeDependencies (not gated on animate) so a false->true toggle picks
+// up the real provider. The HUD palette falls back to neutral Theme colours
+// (never a hardcoded AURIS gold) when AurisScheme is absent from the theme.
+
 import 'dart:async';
 import 'dart:math' as math;
 

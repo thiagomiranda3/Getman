@@ -1,3 +1,7 @@
+// Raw Color constants for the Editorial ("print magazine") theme: paper/ink
+// pairs per brightness, the single rust-red accent, per-method HTTP colors,
+// and status colors.
+
 import 'package:flutter/material.dart';
 
 class EditorialPalette {

@@ -1,4 +1,10 @@
-// lib/core/theme/themes/glass/glass_motion.dart
+// Liquid Glass collections-tree drag/drop/expand motion (AppMotion.
+// treeDragFeedback / treeDropHighlight / treeExpandFlourish): a frosted
+// rounded chip under the drag cursor, an animated accent glow border on a
+// drop target, and a brief circular glow flourish on expand/collapse.
+// `glassMotion` returns identity (const AppMotion()) when reduceEffects is
+// true, per THEME_AUTHORING's mandatory degradation rule.
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';

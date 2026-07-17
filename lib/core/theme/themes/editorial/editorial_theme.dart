@@ -1,3 +1,8 @@
+// Builds the Editorial ("print magazine") ThemeData: Fraunces serif display +
+// Inter body + IBM Plex Mono code/labels, zero-radius square shapes, muted
+// paper/ink palette, calm (no event-driven) motion. Attaches Getman's eight
+// theme extensions via ThemeData.copyWith, registered in theme_registry.dart.
+
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';
