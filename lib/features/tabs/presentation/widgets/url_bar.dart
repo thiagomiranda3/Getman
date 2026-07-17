@@ -1,3 +1,16 @@
+// The URL input row of a request tab: request-kind/method selector +
+// {{variable}}-highlighted URL field with autocomplete + code-export/save
+// buttons + SEND/CANCEL (or CONNECT for WS/SSE/MCP). Resolves env vars via
+// RequestVariableResolver/ActiveEnvironmentHelper at press time, not build
+// time.
+//
+// Gotchas: push text into _urlController ONLY via
+// _setControllerPreservingEnd — anything else jumps the cursor mid-echo.
+// Typing/pasting a URL starting with `curl ` is parsed as a full request
+// spec (CurlUtils.parse) and applied as a single UpdateTab, with the body
+// then prettified off-thread. buildWhen excludes url/body edits (perf), so
+// every dispatch (send, code-export, curl-parse) re-reads the live tab
+// instead of trusting the builder's snapshot.
 import 'dart:async';
 
 import 'package:flutter/material.dart';

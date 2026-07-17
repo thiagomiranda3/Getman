@@ -1,3 +1,5 @@
+// Workspace-global ValueNotifier<int> for the selected request-editor
+// section (PARAMS/AUTH/HEADERS/BODY/RULES); see the class doc for details.
 import 'package:flutter/foundation.dart';
 
 /// Session-global selected index of the request-editor section strip

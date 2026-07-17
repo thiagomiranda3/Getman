@@ -1,3 +1,8 @@
+// Recolors {{var}} tokens on top of JSON syntax highlighting: resolved
+// (env var or dynamic built-in) vs unresolved, without mutating the
+// highlighter's span tree. Flattens jsonHighlightSpanBuilder's output into
+// runs and does a single monotonic sweep against the variable ranges —
+// O(line + matches), with an early return when the line has no `{{`.
 import 'package:flutter/material.dart';
 import 'package:getman/core/utils/environment_resolver.dart';
 import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart'

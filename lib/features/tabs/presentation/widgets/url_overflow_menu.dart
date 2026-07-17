@@ -1,3 +1,5 @@
+// Narrow-layout URL-bar overflow menu collapsing generate-code / save /
+// layout-toggle behind a single "more actions" button.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 

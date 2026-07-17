@@ -1,3 +1,7 @@
+// Narrow-width alternative to RequestConfigSection + ResponseSection: a
+// single PARAMS/AUTH/HEADERS/BODY/RULES/RESPONSE tab strip with status
+// metadata above it. Auto-jumps to RESPONSE when a send completes, but not
+// on a cancel (which also clears isSending without a new response).
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';

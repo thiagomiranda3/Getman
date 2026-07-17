@@ -1,3 +1,6 @@
+// Split-pane request editor: PARAMS/AUTH/HEADERS/BODY/RULES tab strip, shown
+// beside ResponseSection on wide layouts. The strip's selection is
+// workspace-global (RequestSectionIndex), two-way synced per instance.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';

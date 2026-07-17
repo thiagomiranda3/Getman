@@ -1,3 +1,6 @@
+// Drag payload for a tab dragged out of the tab strip (e.g. onto
+// PanelSelector); see the class doc for why it isn't a bare String.
+
 /// Drag payload for a tab being dragged out of the tab strip (e.g. onto the
 /// panel selector to move it into another panel).
 ///

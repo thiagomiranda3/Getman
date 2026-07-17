@@ -1,3 +1,12 @@
+// Find panel for the JSON body/response code editors: a debounced
+// (kFindDebounce) search box over re_editor's CodeFindController, decoupled
+// from the finder's own controller so typing stays responsive on large docs.
+//
+// Gotchas: _query is separate from controller.findInputController — only
+// _flush() (after the debounce fires or Enter is pressed) pushes text into
+// the finder, which is what actually triggers a scan. Enter/Shift+Enter
+// navigate matches via a raw KeyEvent handler, not TextField.onSubmitted
+// (which fires once then unfocuses on desktop, dropping the second Enter).
 import 'dart:async';
 
 import 'package:flutter/material.dart';

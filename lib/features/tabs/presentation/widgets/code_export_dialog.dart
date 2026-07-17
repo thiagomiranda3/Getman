@@ -1,3 +1,6 @@
+// "Generate code" dialog (cURL/JS/Node/Python/Go/Java) for the active
+// request; env/collection vars are resolved before rendering so the output
+// snippet is runnable outside Getman.
 import 'dart:async';
 
 import 'package:flutter/material.dart';

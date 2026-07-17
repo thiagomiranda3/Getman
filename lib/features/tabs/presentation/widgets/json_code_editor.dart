@@ -1,3 +1,19 @@
+// JSON-highlighting code editor: wraps re_editor's CodeEditor with the
+// synchronous per-line jsonHighlightSpanBuilder highlighter, app-shortcut
+// pass-through, and a find panel. createJsonCodeController() is the required
+// way to build controllers fed to this widget so highlighting (and optional
+// {{var}} recoloring via variableAwareJsonSpan) is wired up.
+//
+// Gotchas: colors come ONLY from jsonHighlightSpanBuilder via the
+// controller's spanBuilder — never set CodeEditorStyle.codeTheme, re_editor's
+// isolate highlighter never delivers colored results here and it silently
+// reverts to single-colour. AppCodeShortcutsActivatorsBuilder strips the
+// `save` activator (so the app's own Cmd/Ctrl+S fires) and the Cmd/Ctrl+Enter
+// chord from `newLine` (so SendRequestIntent fires) while this editor has
+// focus. The editor is keyed by GlobalObjectKey(controller) so a theme
+// switch toggling the glass frost wrapper reparents the element instead of
+// disposing/remounting it (remounting while the old element is still
+// subscribed crashes re_editor).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:getman/core/theme/app_theme.dart';

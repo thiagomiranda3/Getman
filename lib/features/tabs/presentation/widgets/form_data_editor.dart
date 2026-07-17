@@ -1,3 +1,7 @@
+// Editor for urlencoded/multipart form body fields (MultipartFieldEntity
+// list on config.formFields); multipart rows can toggle to a file picker.
+// Owns per-row controllers and echo-suppresses its own emissions like
+// KeyValueListEditor.
 import 'package:collection/collection.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';

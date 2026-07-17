@@ -1,3 +1,11 @@
+// Coordinates closing a tab panel with save prompts for dirty tabs: no dirty
+// tabs -> simple confirm; dirty tabs -> a summary dialog (discard-all vs
+// review-and-save one-by-one) via closePanelWithSavePrompt. Wired to
+// PanelSelector's per-row close (X) action.
+//
+// Gotcha: call with a context BELOW MaterialApp (the root navigator's) —
+// dismissing the panel-selector overlay unmounts the row's own context,
+// which would abort the awaited dialog sequence after the first step.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/ui/widgets/confirm_dialog.dart';
