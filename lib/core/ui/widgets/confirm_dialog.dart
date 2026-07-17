@@ -1,3 +1,5 @@
+// Yes/no confirmation dialog for irreversible actions (delete, clear);
+// destructive confirms tint the confirm button with the theme's error color.
 import 'package:flutter/material.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart'
     show NamePromptDialog;

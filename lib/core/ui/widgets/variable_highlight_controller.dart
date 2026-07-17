@@ -1,3 +1,15 @@
+// TextEditingController subclass that colors `{{var}}` tokens resolved vs.
+// unresolved (plus built-in $dynamic vars) in buildTextSpan, and reports
+// hover enter/exit on each token span for a resolution popover.
+//
+// Gotchas: the constructor takes no colors — they're theme-dependent and
+// unknown before a BuildContext exists — so the owning widget pushes them
+// via updateColors, and pushes the variable map via updateVariables, both
+// typically from didChangeDependencies. Both methods call notifyListeners()
+// ONLY when the value actually changed (MapEquality for variables, == for
+// colors); skipping that check would rebuild the URL bar on every BLoC
+// emission. The variable-match scan is memoized per exact text value
+// (_cachedText), independent of color/variable updates.
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:getman/core/utils/environment_resolver.dart';

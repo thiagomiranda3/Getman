@@ -1,3 +1,7 @@
+// Draggable pane-divider handle (vertical or horizontal); reports drag
+// delta via onUpdate and commits via onEnd, which also fires on a
+// contested-drag cancel so the caller's local split-ratio override doesn't
+// shadow the persisted value for the rest of the session.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 

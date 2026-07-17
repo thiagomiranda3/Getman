@@ -1,3 +1,5 @@
+// Hover-aware AnimatedContainer wrapper that rebuilds only its own
+// decoration on mouse enter/exit, never the (possibly large) child subtree.
 import 'package:flutter/material.dart';
 
 /// Wraps [child] in a hover-aware [AnimatedContainer] whose decoration is

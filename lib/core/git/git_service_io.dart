@@ -1,3 +1,18 @@
+// dart:io implementation of GitService: shells out to the system `git` CLI
+// via Process.run. Notable gotchas per method: isRepo() rejects a workspace
+// merely INSIDE a repo — it must be the toplevel, since porcelain paths are
+// repo-root-relative; status() passes `-uall` so a wholly-untracked folder
+// is listed file-by-file, not collapsed to one entry; pull() runs
+// `--rebase --autostash` and distinguishes a paused rebase
+// (PullOutcome.conflicted) from a conflicted autostash re-apply
+// (PullOutcome.cleanEditsStashed, tree restored, edits left in the stash);
+// addRemote() falls back to `remote set-url` so a retry is idempotent;
+// rebaseContinue() sets GIT_EDITOR=true so it never blocks on an editor.
+// commit()/pull()/rebaseContinue() accept optional authorName/authorEmail,
+// applied by _identityArgs as inline `-c user.name=… -c user.email=…` —
+// never written to the user's global git config; the identity comes from
+// Settings HiveFields 28/29 and is suffixed " via Getman" at commit time
+// only.
 import 'dart:convert';
 import 'dart:io';
 

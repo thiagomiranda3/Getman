@@ -1,3 +1,8 @@
+// Assembles the layered (environment + collection + dynamic) variable
+// context for a tab from live SettingsBloc/EnvironmentsBloc/TabsBloc/
+// CollectionsBloc state, rebuilding only when the fields that actually feed
+// it change; shared by params, headers, auth, form-data, and the body
+// editor so every field offers identical suggestions.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/utils/layered_variable_context.dart';

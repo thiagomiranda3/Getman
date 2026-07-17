@@ -1,3 +1,9 @@
+// Pure parsing helpers for the `gh` CLI: rollupChecks reduces a
+// statusCheckRollup array to none/pending/passing/failing (pending beats
+// failing beats passing); parsePrList maps `gh pr list --json` output to
+// PullRequestInfo, tolerating wrong-typed fields instead of throwing;
+// parsePrUrl extracts the created PR's URL from `gh pr create` stdout.
+// Consumed by gh_service_io.dart.
 import 'dart:convert';
 
 import 'package:getman/core/git/gh_service.dart';

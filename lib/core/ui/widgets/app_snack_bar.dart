@@ -1,3 +1,8 @@
+// Theme-consistent floating snackbar helpers: showAppSnackBar (from a live
+// BuildContext) and showAppSnackBarVia (from a captured
+// ScaffoldMessengerState, for callers firing after an await/dialog
+// dismissal where the original context may be deactivated). Always use
+// these instead of constructing a SnackBar inline.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 
