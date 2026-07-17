@@ -1,3 +1,10 @@
+// Parses a URL into base/query-params/fragment and rebuilds it
+// (UrlParts/parse/build/replaceQuery), keeping the URL bar and the PARAMS
+// tab's row editor in sync. Encoding/decoding both skip over `{{...}}`
+// variable tokens (mirroring EnvironmentResolver's grammar, plus a leading
+// `$` for dynamic vars) so percent-encoding never mangles a variable
+// placeholder while a params row is edited.
+
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 
 class UrlParts {

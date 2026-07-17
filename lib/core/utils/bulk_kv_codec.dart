@@ -1,3 +1,6 @@
+// Converts key/value editor rows to/from a Postman-style `key: value` text
+// block for bulk-edit mode; shared by ParamsTabView and HeadersTabView.
+
 /// Converts between the key/value editor's row currency
 /// `List<(String, String)>` and a Postman-style `key: value` text block.
 ///

@@ -1,3 +1,9 @@
+// The variable set available to a request field: the active environment
+// layered over the request's inherited collection variables (environment
+// wins on conflict), plus dynamic built-ins via classify(). Passed to every
+// variable-aware field (URL bar, headers, body) for highlighting and
+// autocomplete.
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/utils/variable_resolution_helper.dart';
 

@@ -1,3 +1,7 @@
+// Collapses a burst of calls into one deferred action fired after a quiet
+// period; keeps per-keystroke work (search filtering, tree rebuilds) off the
+// typing hot path. Owners must call dispose() to cancel a pending timer.
+
 import 'dart:async';
 
 /// Collapses a burst of calls into a single deferred action: each [run] cancels

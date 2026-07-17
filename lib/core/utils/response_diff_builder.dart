@@ -1,3 +1,10 @@
+// Builds a render-agnostic diff (HeaderDelta list + unified body line diff)
+// between two HttpResponseEntity values for the response Compare view;
+// prettify + the large-body guard already ran here so the widget layer only
+// paints the result. Also reconstructs an HttpResponseEntity from a config's
+// response columns (a saved example or history entry) via
+// responseFromConfig.
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';

@@ -1,3 +1,10 @@
+// Content-Type header rules per BodyType (urlencoded/multipart/binary/
+// graphql), shared by the send-path request serializer and CodeGenService so
+// the two can't drift on what header a body type implies. Callers own WHEN
+// to apply the binary rule: the serializer only calls this for binary after
+// confirming a file exists, while the code generator applies it
+// unconditionally (it always shows the header).
+
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/utils/header_utils.dart';
 

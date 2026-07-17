@@ -1,3 +1,7 @@
+// Case-insensitive get/set/remove helpers for header maps; shared by the
+// send-path request serializer and CodeGenService so header-casing logic
+// (never emit both `Content-Type` and `content-type`) lives in one place.
+
 /// Case-insensitive helpers for HTTP header maps.
 ///
 /// HTTP header names are case-insensitive, but a `Map<String, String>` is not —

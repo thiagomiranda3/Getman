@@ -1,3 +1,9 @@
+// Parses a `Set-Cookie` response header into individual ParsedCookie values.
+// Multiple cookies arrive joined with `, ` by the network layer, which
+// collides with the comma inside an `Expires=Wed, 21 Oct ...` date, so
+// splitting happens only before a `, name=` boundary — not on every comma.
+// Best-effort (see CLAUDE.md notes on the lossy header join).
+
 import 'package:equatable/equatable.dart';
 
 /// One cookie parsed from a `Set-Cookie` response header.

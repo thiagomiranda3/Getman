@@ -1,3 +1,16 @@
+// Generates copy-pasteable request snippets (cURL, JavaScript fetch, Node
+// axios, Python requests, Go net/http, Java OkHttp) from a request config,
+// resolving {{vars}}, auth, and body-type content-type the same way the send
+// path does.
+//
+// Gotchas: a new CodeGenTarget enum value automatically appears in
+// code_export_dialog.dart (it iterates CodeGenTarget.values) — no dialog
+// edit needed. All six emitters build over a shared private _Effective
+// (vars resolved, auth applied, content-type set) computed once in
+// _effective(), so per-language formatting can't drift from what an actual
+// SEND puts on the wire. CurlUtils.generate() is a one-line delegate into
+// this service's curl emitter (single source of truth for code generation).
+
 import 'dart:convert';
 
 import 'package:getman/core/domain/auth_application.dart';
