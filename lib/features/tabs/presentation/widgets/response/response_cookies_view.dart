@@ -1,3 +1,7 @@
+// COOKIES tab: parses the current response's `set-cookie` header (via
+// CookieParser) into name/value rows. Gates its BlocBuilder on response
+// identity, not a headers map compare, since the response is replaced
+// wholesale on every send.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';

@@ -1,3 +1,8 @@
+// Response time-travel dropdown: lists this tab's responseHistory
+// (newest-first, "Latest" + "#N"), highlighting whichever entry currently
+// backs tab.response. Selecting one dispatches ViewResponseHistoryEntry,
+// which swaps the displayed response without mutating the history itself.
+// Hidden entirely below two history entries.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/network/http_response.dart';

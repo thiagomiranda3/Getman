@@ -1,3 +1,6 @@
+// PREVIEW viewer for a CSV response: decodes the bytes as UTF-8 (malformed
+// bytes tolerated) and renders a scrollable DataTable, first row as the
+// header. Capped at 500 body rows with a "showing first N of M" note.
 import 'dart:convert';
 import 'dart:typed_data';
 

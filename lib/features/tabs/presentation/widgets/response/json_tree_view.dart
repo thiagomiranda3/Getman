@@ -1,3 +1,8 @@
+// The TREE body mode: a collapsible, virtualized row list over already-
+// decoded JSON, with per-node Copy value / Copy path (JSONPath) / Extract to
+// {{var}}. flattenVisibleJsonTree is a pure, unit-testable flatten pass; the
+// widget only caches the expanded-paths set, so callers that want expansion
+// to survive rebuilds must keep passing the same `data` instance.
 import 'dart:async';
 import 'dart:convert';
 

@@ -1,3 +1,7 @@
+// TESTS tab: renders the tab's assertionResults (pass/fail summary + per-rule
+// rows) and extractionResults (per-variable capture rows) produced by the
+// chaining engine after the last send. Read-only display; rules themselves
+// are edited in the RULES tab.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/assertion_result.dart';

@@ -1,3 +1,11 @@
+// PREVIEW viewer for a video/audio response: writes the bytes to a temp file
+// (writeMediaTempFile, web-safe conditional import) and plays it via
+// media_kit. Falls back to BinaryResponseView on web (the stub throws) or any
+// player init failure (headless test VM, missing native libs). Because the
+// media panel keys viewers by kind rather than by response, a re-send reuses
+// this element — didUpdateWidget compares widget.bytes by identity and
+// restarts the player on change; every async step re-checks that identity
+// before touching state so a stale load can't clobber a newer one.
 import 'dart:async';
 import 'dart:typed_data';
 
