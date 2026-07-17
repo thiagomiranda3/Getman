@@ -1,3 +1,4 @@
+// Fixture: *_io.dart files MAY import dart:io (platform_io_outside_io_files).
 // ignore_for_file: uri_does_not_exist, unused_import
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';

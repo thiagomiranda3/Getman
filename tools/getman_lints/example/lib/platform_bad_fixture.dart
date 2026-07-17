@@ -1,3 +1,5 @@
+// Fixture: platform_io_outside_io_files — platform-gated imports outside a
+// *_io.dart file must be flagged.
 // ignore_for_file: uri_does_not_exist, unused_import
 
 // expect_lint: platform_io_outside_io_files

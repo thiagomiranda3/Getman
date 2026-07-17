@@ -1,4 +1,5 @@
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/error/error.dart' hide LintCode;
 import 'package:analyzer/error/listener.dart';
 import 'package:custom_lint_builder/custom_lint_builder.dart';
@@ -16,6 +17,7 @@ class _GetmanLints extends PluginBase {
     BlocDependsOnAbstractions(),
     PlatformIoOutsideIoFiles(),
     EquatablePropsComplete(),
+    FileHeaderRequired(),
   ];
 }
 
@@ -334,6 +336,50 @@ class DomainNoInfrastructureImports extends DartLintRule {
           uri.startsWith('package:hive') ||
           (uri.startsWith('package:getman/') && uri.contains('/data/'));
       if (banned) reporter.atNode(node, _code);
+    });
+  }
+}
+
+/// Enforces the file-header mandate (CLAUDE.md §7 "Design for Claude"): every
+/// hand-written file under lib/ opens with a `//` prose comment describing
+/// what lives in it. Lint-plumbing comments (`// ignore...`,
+/// `// expect_lint...`) don't count as headers. Reported at the first token
+/// (not offset 0) so `// expect_lint:` fixtures can precede it.
+class FileHeaderRequired extends DartLintRule {
+  const FileHeaderRequired() : super(code: _code);
+
+  static const _code = LintCode(
+    name: 'file_header_required',
+    problemMessage:
+        'File must open with a `//` header comment describing its purpose '
+        '(what lives here; for services also collaborators + wiring). See '
+        'CLAUDE.md "Design for Claude".',
+    errorSeverity: ErrorSeverity.WARNING,
+  );
+
+  @override
+  void run(
+    CustomLintResolver resolver,
+    ErrorReporter reporter,
+    CustomLintContext context,
+  ) {
+    final path = _posix(resolver.path);
+    if (!path.contains('/lib/') || path.endsWith('.g.dart')) return;
+
+    context.registry.addCompilationUnit((unit) {
+      Token? comment = unit.beginToken.precedingComments;
+      while (comment != null) {
+        final text = comment.lexeme;
+        final isPlumbing =
+            text.startsWith('// ignore') || text.startsWith('// expect_lint');
+        if (!isPlumbing) return; // a real header exists
+        comment = comment.next;
+      }
+      reporter.atOffset(
+        offset: unit.beginToken.offset,
+        length: unit.beginToken.length,
+        diagnosticCode: _code,
+      );
     });
   }
 }

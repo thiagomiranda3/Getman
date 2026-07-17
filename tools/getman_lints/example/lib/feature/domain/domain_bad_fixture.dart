@@ -1,3 +1,5 @@
+// Fixture: domain_no_infrastructure_imports — a domain/ file importing
+// Flutter/dio/hive/data instead of staying pure Dart.
 // ignore_for_file: uri_does_not_exist, unused_import
 
 // expect_lint: domain_no_infrastructure_imports

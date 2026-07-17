@@ -1,3 +1,4 @@
+// Fixture: equatable_props_complete — classes missing fields from `props`.
 // ignore_for_file: uri_does_not_exist, unused_import, must_be_immutable
 import 'package:equatable/equatable.dart';
 
