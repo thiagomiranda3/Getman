@@ -1,3 +1,12 @@
+// Collections-header chip: current branch + ahead/behind counts, with a menu
+// for switch/new-branch/pull/push/stashes/PRs/fetch. Auto-fetches remotes
+// every kAutoFetchInterval and refreshes on WorkspaceSyncService.mirrored.
+// Hidden on web, without a workspace, or when the workspace isn't a git repo.
+//
+// Gotcha: a pull halted on conflicts opens ConflictResolutionDialog exactly
+// once per bump of GitSyncState.conflictToken, tracked via
+// _lastConflictToken (seeded from bloc state on first build, not read in
+// initState — GitSyncBloc may not be provided above this chip yet).
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';

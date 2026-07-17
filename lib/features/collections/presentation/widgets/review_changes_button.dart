@@ -1,3 +1,8 @@
+// Header action that opens the Review Changes dialog, badged with the
+// count of uncommitted workspace changes. Refreshes on
+// WorkspaceSyncService.mirrored (the debounced Hive -> disk write) and on
+// workspace-path changes. With no workspace connected, routes to the
+// WORKSPACE settings pane instead of a dead disabled button. Absent on web.
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';

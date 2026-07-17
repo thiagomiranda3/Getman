@@ -1,3 +1,7 @@
+// Editor dialog for a folder's collection-scoped variables, with per-row
+// secret toggles (KeyValueListEditor). Local state is only committed to
+// CollectionsBloc via UpdateNodeVariables when SAVE is pressed; stale
+// secret flags for removed keys are pruned before dispatch.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/ui/widgets/key_value_list_editor.dart';

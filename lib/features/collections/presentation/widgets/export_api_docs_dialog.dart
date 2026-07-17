@@ -1,4 +1,8 @@
-// lib/features/collections/presentation/widgets/export_api_docs_dialog.dart
+// Dialog to export a collection node as API docs: OpenAPI 3.0.3
+// (JSON/YAML) or Markdown, resolved against an optional environment for
+// variable substitution. `buildExport` is a pure, unit-testable
+// build+serialize step; the dialog itself only picks format/environment
+// and saves the file via saveTextFileWithFeedback.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';

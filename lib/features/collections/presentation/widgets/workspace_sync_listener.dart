@@ -1,3 +1,5 @@
+// Mirrors collection changes to the on-disk workspace when one is set —
+// see the class doc below for the bloc-coupling rationale.
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';

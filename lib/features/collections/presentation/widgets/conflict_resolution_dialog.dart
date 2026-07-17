@@ -1,3 +1,16 @@
+// Drives the resolve -> continue loop for an in-progress rebase, opened
+// from the branch chip when a pull halts on conflicts
+// (GitSyncState.conflictToken). One ConflictState.conflicts batch is one
+// paused commit's worth of files; RESOLVE & CONTINUE may surface another
+// batch before the rebase finishes.
+//
+// Gotchas: field-level conflicts (scalar/mapEntry) allow an editable
+// resolved value; opaque/list conflicts (auth, form fields) only ever
+// store the literal 'incoming'/'yours' marker, never free text — never
+// relax that contract. CANCEL dispatches AbortRebase but does not pop
+// immediately (_aborting flag): the dialog only closes once the abort
+// itself resolves to ConflictStatus.done, so a failed abort leaves the
+// user able to retry instead of stuck with a wedged rebase and no UI.
 import 'dart:async';
 
 import 'package:flutter/material.dart';

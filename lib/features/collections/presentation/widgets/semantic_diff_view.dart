@@ -1,3 +1,5 @@
+// Read-only render of a SemanticDiff: one block per changed field, with
+// multi-line scalar values (e.g. body) shown as a per-line add/remove diff.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/utils/line_diff.dart';

@@ -1,3 +1,4 @@
+// FILE / PASTE / URL segmented source picker for the spec importer.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 

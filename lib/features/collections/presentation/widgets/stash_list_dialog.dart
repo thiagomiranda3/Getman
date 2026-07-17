@@ -1,3 +1,12 @@
+// Lists `git stash` entries with pop/drop actions. Without this, a stash
+// Getman creates (e.g. from the "uncommitted changes" branch-switch guard)
+// would be invisible work the user could never get back to.
+//
+// Gotcha: StashInfo.index is positional and shifts on every pop/drop, so
+// the list is always re-read from bloc state (never cached) and row
+// actions disable while an op is in flight — combined with the bloc
+// dropping events received while busy, no action ever fires against a
+// stale index.
 import 'dart:async';
 
 import 'package:flutter/material.dart';

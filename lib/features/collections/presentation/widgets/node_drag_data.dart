@@ -1,3 +1,4 @@
+// Typed collection-tree drag payload — see the class doc below for why.
 /// Drag payload for a collection-tree node (folder or request) being
 /// reordered/moved within the tree.
 ///
