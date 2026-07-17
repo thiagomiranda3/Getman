@@ -1,3 +1,7 @@
+// Hive model for a tab-panel "workspace" (box: 'panels', typeId 12). Stores
+// only ordered tabIds + activeTabId; tab entities themselves stay in the
+// 'tabs' box. toEntity() rebuilds by mapping ids through a tabsById lookup,
+// dropping ids with no live tab (so a panel may rebuild empty).
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:hive_ce/hive.dart';

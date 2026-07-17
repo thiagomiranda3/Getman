@@ -1,3 +1,7 @@
+// Hive-backed persistence for request tabs (box: HiveBoxes.tabs) and panels
+// (box: HiveBoxes.panels), plus tab/panel order + active-panel id in the
+// tabsMeta box. One-time migration from legacy int-keyed tabs to tabId keys,
+// preserving insertion order as the initial tab order.
 import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/features/tabs/data/models/panel_model.dart';

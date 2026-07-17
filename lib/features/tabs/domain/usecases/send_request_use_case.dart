@@ -1,3 +1,14 @@
+// Couples a network send with best-effort history recording for one
+// request.
+//
+// Gotchas:
+// - History writes never fail the send: _record catches everything and
+//   logs via dart:developer's log so a silent regression still shows up.
+// - NEVER resolve env vars in _record — history must keep the templated
+//   (unresolved) config so re-sending later under a different environment
+//   still substitutes correctly.
+// - Bodies over kMaxPersistedResponseBodyChars are capped to
+//   kResponseBodyTooLargePlaceholder before being written to history.
 import 'dart:developer';
 
 import 'package:getman/core/domain/entities/request_config_entity.dart';

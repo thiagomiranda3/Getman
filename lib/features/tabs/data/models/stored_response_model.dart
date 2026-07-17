@@ -1,3 +1,4 @@
+// Data-layer counterpart to ResponseHistoryEntry; see class doc below.
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/features/tabs/domain/entities/response_history_entry.dart';
 import 'package:hive_ce/hive.dart';

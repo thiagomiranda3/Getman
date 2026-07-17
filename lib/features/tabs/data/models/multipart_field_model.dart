@@ -1,3 +1,4 @@
+// Data-layer model for a single form-body field row (multipart/urlencoded).
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/features/history/data/models/request_config_model.dart'
     show HttpRequestConfig;

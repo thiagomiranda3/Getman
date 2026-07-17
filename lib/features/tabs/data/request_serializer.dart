@@ -1,3 +1,5 @@
+// Wire-level request builder: auth injection + body serialization (raw,
+// urlencoded, multipart, binary, GraphQL) for TabsRepositoryImpl.sendRequest.
 import 'dart:convert';
 
 import 'package:dio/dio.dart';

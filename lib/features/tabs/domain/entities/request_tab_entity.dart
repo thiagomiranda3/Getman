@@ -1,3 +1,8 @@
+// Domain entity for one request tab: request config, the currently displayed
+// response (null = nothing sent, or the last send was cancelled), isSending,
+// and time-travel responseHistory. copyWith uses an internal sentinel so
+// callers can explicitly clear response/collectionNodeId/collectionName back
+// to null (vs. leaving them unchanged).
 import 'package:collection/collection.dart';
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/assertion_result.dart';

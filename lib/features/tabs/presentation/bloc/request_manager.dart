@@ -1,3 +1,4 @@
+// Per-tab request-cancellation bookkeeping, extracted out of TabsBloc.
 import 'package:getman/core/network/cancel_handle.dart';
 
 /// Maps an in-flight `tabId` to its cancel handle so the bloc can cancel a

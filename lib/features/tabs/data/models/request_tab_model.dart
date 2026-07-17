@@ -1,3 +1,12 @@
+// Hive model for a request tab (box: 'tabs', typeId 2). The displayed
+// response is stored as four flat columns (statusCode/body/headers/
+// durationMs); statusCode == null is the discriminator for "no response
+// yet" — the entity keeps a nullable HttpResponseEntity, don't re-flatten.
+//
+// Gotchas:
+// - responseHistory (HiveField 9) is the time-travel list, separate from
+//   the flat "currently displayed" columns; null on tabs persisted before
+//   this field existed (treated as empty on read via toEntity()).
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/features/history/data/models/request_config_model.dart';
 import 'package:getman/features/tabs/data/models/stored_response_model.dart';

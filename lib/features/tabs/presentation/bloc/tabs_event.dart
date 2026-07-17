@@ -1,3 +1,7 @@
+// TabsBloc event definitions: tab CRUD (add/remove/reorder/duplicate/close
+// variants), send/cancel, response time-travel, and panel CRUD/move events.
+// Identity-addressed by tabId/panelId except SetActiveIndex/ReorderTabs
+// (position is the operation) — see tabs_bloc.dart for the invariants.
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/http_response.dart';
