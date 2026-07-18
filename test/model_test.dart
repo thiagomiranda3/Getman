@@ -28,7 +28,7 @@ void main() {
     // DO NOT CHANGE — history dedup depends on `==` ignoring `id`.
     // Without this contract, identical requests with different generated
     // UUIDs would be treated as distinct and the history box would grow
-    // unbounded. See CLAUDE.md §6.
+    // unbounded. See docs/architecture/settings-history-updates.md.
     test('equality and hashCode ignore id (dedup contract)', () {
       final a = HttpRequestConfig(
         id: 'id-a',

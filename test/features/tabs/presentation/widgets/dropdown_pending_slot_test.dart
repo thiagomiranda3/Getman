@@ -170,7 +170,8 @@ void main() {
   // tearDown runs bloc.close() — so the bloc's in-flight handler can drain
   // cleanly without hanging.
   //
-  // Note: LoadTabs resets isSending→false by design (CLAUDE.md §4.2).
+  // Note: LoadTabs resets isSending→false by design
+  // (docs/architecture/tabs-and-panels.md).
   // -------------------------------------------------------------------------
 
   testWidgets(

@@ -2,7 +2,8 @@
 // compares its config against the saved node's config (looked up in the
 // caller-supplied id->config index); an unlinked tab compares against a
 // pristine default HttpRequestConfigEntity. Registered as a lazy singleton
-// (core/di) and read via RepositoryProvider — see CLAUDE.md Sec 4.6.
+// (core/di) and read via RepositoryProvider — see
+// docs/architecture/tabs-and-panels.md (Dirty tracking).
 
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
