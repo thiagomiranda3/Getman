@@ -26,7 +26,7 @@ import 'package:getman/core/utils/layered_variable_context.dart';
 /// Echo suppression: when the parent echoes back exactly what this editor
 /// just emitted (the usual BLoC round-trip), the text controllers are NOT
 /// rebuilt — that keeps focus and half-typed state alive. Only a genuinely
-/// external change resets the rows. See CLAUDE.md §6.
+/// external change resets the rows. See CLAUDE.md's "Global gotchas" section.
 class KeyValueListEditor<T extends Object> extends StatefulWidget {
   const KeyValueListEditor({
     required this.items,

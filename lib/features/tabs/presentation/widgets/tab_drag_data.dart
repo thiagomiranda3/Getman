@@ -9,8 +9,8 @@
 /// `Draggable<String>`/`DragTarget<String>`, so a tab dragged over the
 /// collections tree (or a node dragged over the panel selector) would
 /// silently highlight and get "accepted" by the wrong target, dispatching a
-/// no-op bloc event. Typing each drag distinctly makes foreign targets reject
-/// it at the type level instead.
+/// no-op bloc event. Typing each drag distinctly makes foreign targets
+/// reject it at the type level instead.
 class TabDragData {
   const TabDragData(this.tabId);
 

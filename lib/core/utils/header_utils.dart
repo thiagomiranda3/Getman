@@ -4,11 +4,11 @@
 
 /// Case-insensitive helpers for HTTP header maps.
 ///
-/// HTTP header names are case-insensitive, but a `Map<String, String>` is not —
-/// so we never want to emit both `Content-Type` and `content-type`, and a
-/// "is this header set?" check must ignore case. Shared by the send-path
-/// serializer and the code-gen service, which previously each kept a verbatim
-/// private copy of these. Pure — no dependencies.
+/// HTTP header names are case-insensitive, but a `Map<String, String>` is
+/// not — so we never want to emit both `Content-Type` and `content-type`,
+/// and a "is this header set?" check must ignore case. Shared by the
+/// send-path serializer and the code-gen service, which previously each kept
+/// a verbatim private copy of these. Pure — no dependencies.
 class HeaderUtils {
   HeaderUtils._();
 

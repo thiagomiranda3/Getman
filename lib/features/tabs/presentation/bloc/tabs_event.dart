@@ -97,9 +97,10 @@ class DuplicateTab extends TabsEvent {
   List<Object?> get props => [tabId];
 }
 
-/// Identity-addressed like every other tab event (CLAUDE.md §4.2): the
-/// dispatcher names the tab, so a concurrent tab switch can't redirect the
-/// send. [envVars] must be resolved by the dispatcher via
+/// Identity-addressed like every other tab event (see
+/// docs/architecture/tabs-and-panels.md): the dispatcher names the tab, so a
+/// concurrent tab switch can't redirect the send. [envVars] must be resolved
+/// by the dispatcher via
 /// `ActiveEnvironmentHelper.variablesFor(...)` — an empty map sends `{{var}}`
 /// placeholders to the network verbatim.
 class SendRequest extends TabsEvent {
@@ -131,7 +132,8 @@ class SendRequest extends TabsEvent {
 
 /// Swaps the tab's displayed [HttpRequestTabEntity.response] to the history
 /// entry with [entryId] without mutating the history list (time-travel).
-/// Identity-addressed like every other tab event (CLAUDE.md §4.2).
+/// Identity-addressed like every other tab event (see
+/// docs/architecture/tabs-and-panels.md).
 class ViewResponseHistoryEntry extends TabsEvent {
   const ViewResponseHistoryEntry({required this.tabId, required this.entryId});
   final String tabId;

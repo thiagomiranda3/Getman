@@ -28,7 +28,7 @@ Persistence is `hive_ce` + `hive_ce_flutter` (the community Hive fork — binary
 
 `SettingsModel` is a single record (box `settings`, key `'current'`, loaded synchronously in `main()`). Its `@HiveField` map:
 
-- **`themeId`** at `HiveField(7)` (default `'brutalist'` in the model; `classic` is the fresh-install default via the entity). Drives which theme builder is active.
+- **`themeId`** at `HiveField(7)` (default `kClassicThemeId` — `'classic'` — in both the model and the entity). Drives which theme builder is active.
 - **`activeEnvironmentId`** at `HiveField(8)` (nullable, no default — `null` means "No Environment"). The id of the environment whose variables substitute into `{{var}}` placeholders at send time. `SettingsEntity.copyWith` uses a sentinel (`_unchanged` `Object` constant) so the caller can explicitly clear the id back to `null`.
 - **`alwaysPrettifyLargeResponses`** at `HiveField(17)` (default `false`). When `true`, `_ResponseBodyView` prettifies + highlights bodies over `kLargeResponseViewerChars` automatically instead of the plain-text large viewer — the user accepts the render cost. The `kResponseBodyTooLargePlaceholder` sentinel always stays plain text.
 - **`maxRedirects`** at `HiveField(18)` (default `5`) — see docs/architecture/network-and-cookies.md for the manual redirect loop that enforces it.

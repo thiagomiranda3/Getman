@@ -91,11 +91,12 @@
 
 ### L14 — Panel widgets hardcode a few layout sizes/paddings (not in `AppLayout`)  *(tab-panels follow-up)*
 - **Files**: `panel_selector.dart` (module-level `_labelMaxWidth=120`,
-  `_labelMaxWidthCompact=64`, `_menuWidth=260`, `_menuGap=4`); `tab_widget.dart`
-  (`_TabDragFeedback` paddings); `tab_switcher_sheet.dart` (panel-chip paddings).
-- **Problem**: CLAUDE.md §6 mandates no hardcoded sizes/paddings in widgets (pull
-  from `context.appLayout`). The panels pass left a few literals; not
-  `custom_lint`-caught (that rule only covers colors).
+  `_labelMaxWidthCompact=64`, `_menuWidth=260`, `_menuGap=4`);
+  `request_tab_chip.dart` (`_TabDragFeedback` paddings); `tab_switcher_sheet.dart`
+  (panel-chip paddings).
+- **Problem**: CLAUDE.md's "Mandatory rules" mandates no hardcoded
+  sizes/paddings in widgets (pull from `context.appLayout`). The panels pass
+  left a few literals; not `custom_lint`-caught (that rule only covers colors).
 - **Fix**: Add fields to `AppLayout` (e.g. `selectorLabelMaxWidth`,
   `panelMenuWidth`, a chip padding) and route these through all theme builders.
 - **Effort**: S. **Verify**: analyze clean; rendering unchanged. *Note*: debatable
@@ -226,6 +227,26 @@
 - **Seam**: `environment_resolver.dart` resolution order + a settings-owned
   global map (new `HiveField` on `SettingsModel`).
 - **Effort**: M.
+
+### DW6 — Wire DCM (unused-code/unused-files) into the gate
+- **Files**: `.github/workflows/ci.yml`, `.githooks/pre-commit`,
+  `analysis_options.yaml`; a first cleanup pass starting with the unwired
+  `lib/core/ui/widgets/app_dropdown.dart` (`AppDropdown<T>` — built but never
+  referenced outside its own file/tests).
+- **Problem**: DCM's unused-code/unused-files checks were deferred pending its
+  free-tier MIT relicense; that gate was dated 2026-07-16 and has now passed,
+  so the deferral is stale and the checks are actionable.
+- **Fix**: Add `dcm check-unused-code lib` and `dcm check-unused-files lib` as a
+  CI step in `ci.yml` (same green/red reporting pattern as the existing
+  analyze/custom_lint/bloc_lint steps) and a guarded step in
+  `.githooks/pre-commit` (skip with a clear message if `dcm` isn't installed
+  locally, so the hook doesn't hard-fail on machines without it). Then run one
+  cleanup pass over whatever the two checks surface — at minimum, either wire
+  up `AppDropdown<T>` (see theming.md's `select` slot note) or delete it if it
+  stays unused.
+- **Effort**: S–M. **Verify**: `dcm check-unused-code lib` and
+  `dcm check-unused-files lib` both report 0 after the cleanup pass; CI job and
+  pre-commit hook both green.
 
 ---
 

@@ -5,7 +5,7 @@ import 'package:analyzer/error/listener.dart';
 import 'package:custom_lint_builder/custom_lint_builder.dart';
 
 /// Entry point discovered by custom_lint. Registers Getman's project-local
-/// architecture rules (see CLAUDE.md §7 Development Mandates).
+/// architecture rules (see CLAUDE.md "Mandatory rules").
 PluginBase createPlugin() => _GetmanLints();
 
 class _GetmanLints extends PluginBase {
@@ -25,10 +25,11 @@ class _GetmanLints extends PluginBase {
 /// identically on Windows and POSIX.
 String _posix(String path) => path.replaceAll(r'\', '/');
 
-/// Enforces "GetIt stays in DI" (CLAUDE.md §7): the `sl` service locator and
-/// the `GetIt` type may only be referenced from DI setup (`lib/core/di/`) and
-/// the app entry point (`lib/main.dart`). Everywhere else, services must be
-/// injected via BlocProvider / RepositoryProvider / constructor injection.
+/// Enforces "GetIt stays in DI" (CLAUDE.md "Mandatory rules"): the `sl`
+/// service locator and the `GetIt` type may only be referenced from DI setup
+/// (`lib/core/di/`) and the app entry point (`lib/main.dart`). Everywhere
+/// else, services must be injected via BlocProvider / RepositoryProvider /
+/// constructor injection.
 class AvoidGetItInWidgets extends DartLintRule {
   const AvoidGetItInWidgets() : super(code: _code);
 
@@ -37,7 +38,7 @@ class AvoidGetItInWidgets extends DartLintRule {
     problemMessage:
         'Do not reference the GetIt service locator (`sl`) or `GetIt` outside '
         'DI setup. Inject services via BlocProvider, RepositoryProvider, or '
-        'the constructor instead (CLAUDE.md §7).',
+        'the constructor instead (CLAUDE.md "Mandatory rules").',
     errorSeverity: ErrorSeverity.WARNING,
   );
 
@@ -75,8 +76,8 @@ class AvoidGetItInWidgets extends DartLintRule {
   }
 }
 
-/// Enforces "never hardcode themeable colors" (CLAUDE.md §4.8): bans
-/// `Colors.black* / Colors.white* / Colors.red*` outside the theme layer
+/// Enforces "never hardcode themeable colors" (docs/architecture/theming.md):
+/// bans `Colors.black* / Colors.white* / Colors.red*` outside the theme layer
 /// (`lib/core/theme/`, where raw palette colors legitimately live). Pull colors
 /// from theme extensions (`context.appPalette`) or `colorScheme` instead.
 ///
@@ -91,7 +92,7 @@ class AvoidHardcodedBrandColors extends DartLintRule {
     problemMessage:
         'Do not hardcode Colors.black/white/red on themeable surfaces. Read '
         'colors from theme extensions (context.appPalette) or colorScheme '
-        '(CLAUDE.md §4.8).',
+        '(docs/architecture/theming.md).',
     errorSeverity: ErrorSeverity.WARNING,
   );
 
@@ -127,9 +128,9 @@ class AvoidHardcodedBrandColors extends DartLintRule {
 }
 
 /// Enforces "BLoCs depend on abstract Repository types, never ...Impl/Hive/Dio
-/// directly" (CLAUDE.md §2/§7): a `*_bloc.dart` / `*_cubit.dart` file may not
-/// import a data/ layer, dio, or hive. Detection is by import directory/package,
-/// not an `Impl` name heuristic.
+/// directly" (CLAUDE.md "Mandatory rules"): a `*_bloc.dart` / `*_cubit.dart`
+/// file may not import a data/ layer, dio, or hive. Detection is by import
+/// directory/package, not an `Impl` name heuristic.
 class BlocDependsOnAbstractions extends DartLintRule {
   const BlocDependsOnAbstractions() : super(code: _code);
 
@@ -137,7 +138,8 @@ class BlocDependsOnAbstractions extends DartLintRule {
     name: 'bloc_depends_on_abstractions',
     problemMessage:
         'BLoCs/Cubits must depend on abstract Repository types. Do not import a '
-        'data/ layer, dio, or hive directly from a bloc/cubit (CLAUDE.md §2/§7).',
+        'data/ layer, dio, or hive directly from a bloc/cubit '
+        '(CLAUDE.md "Mandatory rules").',
     errorSeverity: ErrorSeverity.WARNING,
   );
 
@@ -163,9 +165,10 @@ class BlocDependsOnAbstractions extends DartLintRule {
   }
 }
 
-/// Enforces web-safety (CLAUDE.md §1): dart:io / updat / path_provider /
-/// package_info_plus may only be imported from `*_io.dart` files (the
-/// conditional-import native-side convention). Keeps web builds clean.
+/// Enforces web-safety (docs/architecture/settings-history-updates.md):
+/// dart:io / updat / path_provider / package_info_plus may only be imported
+/// from `*_io.dart` files (the conditional-import native-side convention).
+/// Keeps web builds clean.
 class PlatformIoOutsideIoFiles extends DartLintRule {
   const PlatformIoOutsideIoFiles() : super(code: _code);
 
@@ -175,7 +178,7 @@ class PlatformIoOutsideIoFiles extends DartLintRule {
         'dart:io / updat / path_provider / package_info_plus may only be '
         'imported from a *_io.dart file (conditional-import native side). Move '
         'native code behind an *_io.dart + stub split to keep web builds clean '
-        '(CLAUDE.md §1).',
+        '(docs/architecture/settings-history-updates.md).',
     errorSeverity: ErrorSeverity.WARNING,
   );
 
@@ -211,6 +214,10 @@ class PlatformIoOutsideIoFiles extends DartLintRule {
 /// list literal. Limitation: it does not follow indirect inheritance (a class
 /// extending a base that extends Equatable). Deliberately-excluded fields use
 /// `// ignore: equatable_props_complete` + a reason.
+///
+/// Placement matters: the diagnostic is anchored to the class name token, so
+/// the `// ignore: equatable_props_complete` must sit directly above the
+/// class declaration — not above a field — or the ignore won't suppress it.
 class EquatablePropsComplete extends DartLintRule {
   const EquatablePropsComplete() : super(code: _code);
 
@@ -301,9 +308,10 @@ class EquatablePropsComplete extends DartLintRule {
   }
 }
 
-/// Enforces "domain layer has zero imports from data/ or Flutter UI" (CLAUDE.md
-/// §2): a file under any `domain/` directory may import only pure Dart +
-/// equatable — never Flutter, dart:io/dart:ui, dio, hive, or a feature's data/.
+/// Enforces "domain layer has zero imports from data/ or Flutter UI"
+/// (CLAUDE.md "Mandatory rules"): a file under any `domain/` directory may
+/// import only pure Dart + equatable — never Flutter, dart:io/dart:ui, dio,
+/// hive, or a feature's data/.
 class DomainNoInfrastructureImports extends DartLintRule {
   const DomainNoInfrastructureImports() : super(code: _code);
 
@@ -312,7 +320,7 @@ class DomainNoInfrastructureImports extends DartLintRule {
     problemMessage:
         'The domain layer must be pure Dart + equatable. Do not import Flutter, '
         'dart:io/dart:ui, dio, hive, or a feature data/ layer from domain/ '
-        '(CLAUDE.md §2).',
+        '(CLAUDE.md "Mandatory rules").',
     errorSeverity: ErrorSeverity.WARNING,
   );
 
@@ -340,7 +348,7 @@ class DomainNoInfrastructureImports extends DartLintRule {
   }
 }
 
-/// Enforces the file-header mandate (CLAUDE.md §7 "Design for Claude"): every
+/// Enforces the file-header mandate (CLAUDE.md "Design for Claude"): every
 /// hand-written file under lib/ opens with a `//` prose comment describing
 /// what lives in it. Lint-plumbing comments (`// ignore...`,
 /// `// expect_lint...`) don't count as headers. Reported at the first token

@@ -3,8 +3,9 @@
 // DELIBERATELY exclude `id` and the response fields so history dedup works on
 // request signature (method/url/body plus the body-shape fields bodyType/
 // graphqlVariables/bodyFilePath/formFields) — do not re-include `id` without
-// a discussion (see CLAUDE.md Sec 6). Also carries a lazy one-time migration
-// of legacy `params` map entries into the URL's query string (see toEntity).
+// a discussion (see docs/architecture/settings-history-updates.md). Also
+// carries a lazy one-time migration of legacy `params` map entries into the
+// URL's query string (see toEntity).
 
 import 'package:collection/collection.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
@@ -171,7 +172,8 @@ class HttpRequestConfig extends HiveObject {
   // and the body-shape fields (bodyType / graphqlVariables / bodyFilePath /
   // formFields). Without the body-shape fields, distinct GraphQL/binary/
   // multipart sends that share method+url+body would wrongly dedup. `kind`
-  // (HTTP vs WS/SSE) is intentionally excluded. See CLAUDE.md §6.
+  // (HTTP vs WS/SSE) is intentionally excluded. See
+  // docs/architecture/settings-history-updates.md.
   @override
   // Signature-only equality is intentional for history dedup; a HiveObject is
   // inherently mutable so it can't be @immutable.

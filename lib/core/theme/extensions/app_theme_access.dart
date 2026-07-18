@@ -1,7 +1,7 @@
 // `BuildContext` accessors for all 8 theme extensions (appLayout, appPalette,
 // appShape, appTypography, appDecoration, appCopy, appMotion, appComponents).
 // Widgets read sizing/colors/shapes/weights/decorations/components through
-// these instead of hardcoding — CLAUDE.md §4.8.
+// these instead of hardcoding — see docs/architecture/theming.md.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/extensions/app_components.dart';
 import 'package:getman/core/theme/extensions/app_copy.dart';

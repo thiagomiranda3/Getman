@@ -75,7 +75,7 @@ class _UrlBarState extends State<UrlBar> {
   void initState() {
     super.initState();
     // Token colors come from AppPalette in didChangeDependencies — never
-    // hardcode them here (CLAUDE.md §4.10).
+    // hardcode them here (docs/architecture/environments-and-chaining.md).
     _urlController = VariableHighlightController()
       ..onVariableEnter = _showVariablePopover
       ..onVariableExit = _hoverController.scheduleHide;

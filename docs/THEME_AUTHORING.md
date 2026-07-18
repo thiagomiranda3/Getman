@@ -207,8 +207,8 @@ gating in `glass_decorations.dart`).
 5. **Done-bar**: `fvm flutter analyze` + `fvm dart run custom_lint` +
    `fvm dart run bloc_tools:bloc lint lib` all 0 issues, `fvm dart format` clean,
    `fvm flutter test` green.
-6. **Sync the wiki** (CLAUDE.md §7) — the Themes page must describe the new
-   theme's look and its ambient/motion personality.
+6. **Sync the wiki** (CLAUDE.md "Mandatory rules") — the Themes page must
+   describe the new theme's look and its ambient/motion personality.
 
 ---
 

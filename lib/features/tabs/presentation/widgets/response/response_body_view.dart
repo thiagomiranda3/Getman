@@ -546,8 +546,8 @@ class _BodyModeToggle extends StatelessWidget {
     final activeIsDark =
         ThemeData.estimateBrightnessForColor(activeBg) == Brightness.dark;
     // Deliberate contrast: a readable foreground picked from the dynamic,
-    // theme-derived `activeBg` brightness (CLAUDE.md §4.8 exception) — not a
-    // themeable surface color.
+    // theme-derived `activeBg` brightness (docs/architecture/theming.md
+    // exception) — not a themeable surface color.
     // ignore: avoid_hardcoded_brand_colors
     final onActive = activeIsDark ? Colors.white : Colors.black;
     final disabledColor = theme.colorScheme.onSurface.withValues(alpha: 0.35);

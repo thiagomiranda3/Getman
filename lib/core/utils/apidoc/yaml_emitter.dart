@@ -2,8 +2,8 @@
 // see the class doc below for scope and quoting rules.
 
 /// Minimal block-style YAML serializer for a JSON-like tree (maps, lists,
-/// strings, nums, bools, null). Enough for OpenAPI output — not a general YAML
-/// library. Zero dependencies.
+/// strings, nums, bools, null). Enough for OpenAPI output — not a general
+/// YAML library. Zero dependencies.
 class YamlEmitter {
   YamlEmitter._();
 

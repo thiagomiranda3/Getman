@@ -1,6 +1,6 @@
 // String constants for every Hive box name used across the app (see
-// CLAUDE.md §3 for the typeId <-> box mapping); avoids hardcoding box-name
-// literals at each open/watch call site.
+// docs/architecture/persistence-hive.md for the typeId <-> box mapping);
+// avoids hardcoding box-name literals at each open/watch call site.
 
 class HiveBoxes {
   HiveBoxes._();

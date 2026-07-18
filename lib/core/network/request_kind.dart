@@ -2,10 +2,10 @@
 // orthogonal to the HTTP method; persisted as an int discriminator (Hive
 // field 14, default 0 = http) so existing records read as HTTP.
 
-/// The protocol a request speaks. Orthogonal to the HTTP method — a WebSocket,
-/// SSE, or MCP request has no method. Persisted as an int discriminator (Hive
-/// field 14 on the config model, default 0 = http) so existing records read as
-/// HTTP.
+/// The protocol a request speaks. Orthogonal to the HTTP method — a
+/// WebSocket, SSE, or MCP request has no method. Persisted as an int
+/// discriminator (Hive field 14 on the config model, default 0 = http) so
+/// existing records read as HTTP.
 enum RequestKind {
   http(0),
   webSocket(1),

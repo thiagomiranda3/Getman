@@ -84,12 +84,6 @@ class GitBranchService implements BranchService {
   // *drop* it: suspension discards the pending forest, and no reload follows a
   // create (nothing on disk changed), so the edit would live on in Hive while
   // disk silently diverged — until the next switch reloaded over it.
-  // No suspension here: `git switch -c` creates the branch at HEAD, it never
-  // rewrites the working tree — an edit made mid-create belongs on disk (on
-  // the branch just created) and must still be mirrored. Suspending would
-  // *drop* it: suspension discards the pending forest, and no reload follows a
-  // create (nothing on disk changed), so the edit would live on in Hive while
-  // disk silently diverged — until the next switch reloaded over it.
   @override
   Future<void> create(String root, String branch) async {
     await _flushOrThrow();

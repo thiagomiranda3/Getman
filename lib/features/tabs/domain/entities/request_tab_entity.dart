@@ -17,7 +17,8 @@ const Object _unset = Object();
 
 extension HttpRequestTabLookup on Iterable<HttpRequestTabEntity> {
   /// Shorthand for `firstWhereOrNull((t) => t.tabId == id)`.
-  /// All tab addressing is by `tabId`, not list position (see CLAUDE.md §4.2).
+  /// All tab addressing is by `tabId`, not list position (see
+  /// docs/architecture/tabs-and-panels.md).
   HttpRequestTabEntity? byId(String id) =>
       firstWhereOrNull((t) => t.tabId == id);
 }

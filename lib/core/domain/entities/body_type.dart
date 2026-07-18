@@ -3,8 +3,8 @@
 // field 11, default 'raw') so legacy bodyless records still read as raw.
 
 /// The kind of payload a request carries. Persisted as a wire string on the
-/// config model (Hive field 11, default `'raw'`) so legacy records — which have
-/// a plain `body` string and no body-type — read back as [BodyType.raw].
+/// config model (Hive field 11, default `'raw'`) so legacy records — which
+/// have a plain `body` string and no body-type — read back as [BodyType.raw].
 enum BodyType {
   none('none'),
   raw('raw'),

@@ -2,7 +2,8 @@
 // appShortcuts map (new/close/send/save/beautify tab, command palette,
 // environment switcher, tab/panel navigation + jump-to-index, focus URL).
 // Pure markers with no logic; the matching Actions live in MainScreen or
-// deeper, wherever their dependencies are reachable (see CLAUDE.md §4.1).
+// deeper, wherever their dependencies are reachable (see
+// docs/architecture/app-shell.md).
 
 import 'package:flutter/widgets.dart';
 

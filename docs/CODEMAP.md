@@ -242,9 +242,9 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | Git — review changes | `lib/features/collections/data/services/workspace_review_service.dart`, `lib/features/collections/presentation/widgets/review_changes_dialog.dart` |
 | GraphQL | `lib/core/domain/entities/body_type.dart`, `lib/features/tabs/data/request_serializer.dart`, `lib/features/tabs/presentation/widgets/body_tab_view.dart` |
 | History + dedup | `lib/features/history/data/datasources/history_local_data_source.dart` |
+| Hive boxes / storage | `lib/core/storage/hive_boxes.dart`, `lib/core/storage/hive_helpers.dart` |
 | HTTP methods list | `lib/core/network/http_methods.dart` |
 | HTTP send / network client | `lib/core/network/network_service.dart` |
-| Hive boxes / storage | `lib/core/storage/hive_boxes.dart`, `lib/core/storage/hive_helpers.dart` |
 | JSONPath | `lib/core/utils/json_path.dart`, `lib/core/utils/json_path_builder.dart` |
 | Keyboard shortcuts | `lib/main.dart`, `lib/core/navigation/intents.dart`, `lib/features/settings/presentation/widgets/settings_shortcuts_tab.dart` |
 | Large responses | `lib/core/domain/persistence_limits.dart`, `lib/features/tabs/presentation/widgets/response/response_large_body_view.dart` |
@@ -259,8 +259,8 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | Proxy | `lib/core/network/dio_adapter_config_io.dart`, `lib/core/network/network_config.dart` |
 | Redirects (manual loop) | `lib/core/network/network_service.dart` |
 | Request config entity | `lib/core/domain/entities/request_config_entity.dart` |
-| Responsive layout tiers | `lib/core/theme/responsive.dart` |
 | Response time-travel | `lib/features/tabs/domain/entities/response_history_entry.dart`, `lib/features/tabs/presentation/widgets/response/response_history_timeline.dart` |
+| Responsive layout tiers | `lib/core/theme/responsive.dart` |
 | Routing | `lib/core/navigation/app_router.dart` |
 | Secret variables | `lib/core/ui/widgets/key_value_list_editor.dart`, `lib/features/environments/domain/entities/environment_entity.dart` |
 | Settings | `lib/features/settings/presentation/bloc/settings_bloc.dart`, `lib/features/settings/domain/entities/settings_entity.dart`, `lib/features/settings/presentation/widgets/settings_dialog.dart` |
@@ -290,7 +290,7 @@ features; follow them to trace an end-to-end behavior.
 1. `lib/features/tabs/presentation/widgets/url_bar.dart` — SEND button dispatches `SendRequest(tabId, envVars)`; also the `SendRequestIntent` in `lib/features/home/presentation/screens/main_screen.dart`. Both resolve env vars at press time.
 2. `lib/features/tabs/presentation/bloc/tabs_bloc.dart` — `_onSendRequest` sets `isSending`, binds a cancel handle (`request_manager.dart`), calls the use case.
 3. `lib/features/tabs/domain/usecases/send_request_use_case.dart` — couples the network send with best-effort history recording.
-4. `lib/features/tabs/data/repositories/tabs_repository_impl.dart` — resolves `{{var}}` in URL/params/headers/body (via `request_serializer.dart`), then calls the network service.
+4. `lib/features/tabs/data/repositories/tabs_repository_impl.dart` — resolves `{{var}}` in URL/params/headers/body directly via `EnvironmentResolver`; `lib/features/tabs/data/request_serializer.dart` handles auth injection + body building (also resolving vars in auth/body values), then the repository calls the network service.
 5. `lib/core/network/network_service.dart` — performs the send with the manual redirect loop; the cookie interceptor (`cookie_interceptor.dart`) runs per hop.
 6. `lib/features/tabs/presentation/bloc/tabs_bloc.dart` — `_recordResponse` stores the response, trims time-travel history, runs chaining rules.
 7. `lib/features/tabs/presentation/widgets/response_section.dart` (+ `response/` tab bodies) — renders the response.
@@ -344,7 +344,7 @@ features; follow them to trace an end-to-end behavior.
 
 ### 9. Auto-update
 
-1. Boot check in `lib/main.dart` → `lib/features/updates/presentation/update_gate.dart` (conditional export; native = `update_gate_io.dart`, web = `update_gate_stub.dart`).
+1. `lib/main.dart` provides `UpdateController` above `MaterialApp` via `ChangeNotifierProvider`; the startup check itself runs in `lib/features/updates/presentation/update_gate.dart` (conditional export; native = `update_gate_io.dart`, web = `update_gate_stub.dart`), rendered as a `Stack` overlay by `lib/features/home/presentation/screens/main_screen.dart`.
 2. `lib/features/updates/data/datasources/github_release_data_source.dart` — fetches the latest GitHub release.
 3. `lib/features/updates/presentation/update_decision.dart` — `isNewerVersion` + `shouldPromptForUpdate`.
 4. `lib/features/updates/presentation/update_controller.dart` — drives dialog state (a `ChangeNotifier`).
