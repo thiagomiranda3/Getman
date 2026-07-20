@@ -1,3 +1,7 @@
+// Builds JSONPath strings in the exact grammar `JsonPath` (json_path.dart)
+// accepts; backs the response TREE-mode "Copy path" / "Extract to {{var}}"
+// actions, so its output must always parse back via JsonPath.isValid.
+
 /// Builds JSONPath strings in the exact grammar that `JsonPath` accepts
 /// (see `json_path.dart`): optional leading `$`, dot member access, array
 /// indices, and bracket-quoted keys for anything not identifier-safe.

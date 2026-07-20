@@ -1,3 +1,9 @@
+// Lets an OpenAPI/Swagger import be narrowed to a chosen subset of request
+// leaves before it's added to the collection tree: collectLeafIds walks a
+// node for its checkbox-selectable ids, applySelection then prunes an
+// ImportResult's tree to just the selected leaves, dropping any folder left
+// empty (environments/warnings pass through unchanged).
+
 import 'package:getman/core/utils/openapi/normalized_api.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 

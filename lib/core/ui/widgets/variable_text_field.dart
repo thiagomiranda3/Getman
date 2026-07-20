@@ -1,3 +1,8 @@
+// TextField that combines variable highlighting
+// (VariableHighlightController), `{{`-triggered autocomplete
+// (VariableAutocomplete), and a hover-resolution popover
+// (VariableHoverPopover) behind one widget — the controller is caller-owned
+// so its echo-suppression survives the BLoC round-trip.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/variable_autocomplete.dart';

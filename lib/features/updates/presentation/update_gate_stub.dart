@@ -1,3 +1,6 @@
+// Web-safe no-op stand-in for update_gate_io.dart's UpdateGate; see class doc
+// below.
+
 import 'package:flutter/widgets.dart';
 
 /// Web (and any non-`dart:io`) build: the updater is unavailable, so the gate

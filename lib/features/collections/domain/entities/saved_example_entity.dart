@@ -1,3 +1,5 @@
+// SavedExampleEntity: a named request+response snapshot saved on a
+// collection leaf node.
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 

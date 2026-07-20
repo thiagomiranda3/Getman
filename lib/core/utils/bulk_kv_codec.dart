@@ -1,12 +1,15 @@
+// Converts key/value editor rows to/from a Postman-style `key: value` text
+// block for bulk-edit mode; shared by ParamsTabView and HeadersTabView.
+
 /// Converts between the key/value editor's row currency
 /// `List<(String, String)>` and a Postman-style `key: value` text block.
 ///
 /// Pure Dart — no Flutter, no bloc — so both `ParamsTabView` and
 /// `HeadersTabView` reuse it and it is unit-testable in isolation. It deals
-/// only in `(key, value)` rows; the per-tab `encode`/`decode` closures convert
-/// rows ↔ the canonical value (`List<QueryParamEntity>` / `Map<String,String>`)
-/// exactly as the row editor already does, so bulk and row paths produce
-/// identical canonical values.
+/// only in `(key, value)` rows; the per-tab `encode`/`decode` closures
+/// convert rows ↔ the canonical value (`List<QueryParamEntity>` /
+/// `Map<String,String>`) exactly as the row editor already does, so bulk and
+/// row paths produce identical canonical values.
 class BulkKvCodec {
   const BulkKvCodec._();
 

@@ -1,3 +1,5 @@
+// Read-only unified response diff view: status/header summary above a
+// per-line-colored body diff, driven by a precomputed ResponseDiffModel.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';

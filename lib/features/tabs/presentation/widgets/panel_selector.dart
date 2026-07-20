@@ -1,3 +1,16 @@
+// Tab-strip dropdown for switching/reordering/renaming virtual-desktop
+// panels; opens as a manually-managed OverlayEntry (not PopupMenuButton) so
+// it can host a ReorderableListView. Double-tapping the button renames the
+// active panel; dropping a dragged tab (TabDragData) opens the menu in
+// "move to panel" mode.
+//
+// Gotchas: a real double-tap's second tap often lands on the menu's own
+// dismiss barrier, not the button (the barrier now covers it) —
+// _handleBarrierTapUp replays that as a double-tap when it falls inside the
+// captured _buttonRect within kDoubleTapTimeout (D1). Always _removeMenu()
+// before assigning a new _menuEntry, or the old barrier orphans as a
+// permanent input soft-lock (D2). DragTarget is typed <TabDragData>, not
+// String, so a collection-node drag can't be mistakenly accepted here (D4).
 import 'dart:async';
 
 import 'package:flutter/gestures.dart';

@@ -1,3 +1,6 @@
+// HistoryBloc state: the newest-first request list plus an isLoading flag
+// (true until the first watchHistory() emission arrives).
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 

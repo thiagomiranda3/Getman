@@ -1,3 +1,5 @@
+// Raw Color constants for the Arcane Quest (RPG) theme (see class doc below).
+
 import 'package:flutter/material.dart';
 
 /// Arcane Quest RPG palette — dark fantasy jewels + parchment light mode.

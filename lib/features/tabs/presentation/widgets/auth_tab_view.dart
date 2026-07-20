@@ -1,3 +1,5 @@
+// AUTH tab of the request editor: bearer/basic/api-key/inherit form over
+// AuthConfig, composed by RequestConfigSection and UnifiedRequestPanel.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/auth_config.dart';

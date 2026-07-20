@@ -1,3 +1,15 @@
+// GitBranchService: composes GitService + WorkspaceSyncService into the
+// switchTo/create/push/pull/stash/addRemote/fetch operations behind
+// BranchService. Pure of dart:io — all git access goes through GitService.
+//
+// Gotchas: any op that reads/mutates the working tree first flushes the
+// pending Hive -> disk mirror (_flushOrThrow) so git never runs over a stale
+// tree; ops that also rewrite the tree (switchTo/pull/stash/popStash) also
+// suspend mirroring for their duration (_runOnTree) so a concurrent edit
+// isn't mirrored onto the wrong branch afterward. create/push/addRemote/
+// dropStash/fetch deliberately skip the flush and/or suspension because they
+// never rewrite the working tree — see the per-method comments before
+// changing this.
 import 'package:getman/core/git/git_service.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/branch_service.dart';
@@ -66,12 +78,6 @@ class GitBranchService implements BranchService {
   Future<void> switchTo(String root, String branch) =>
       _runOnTree(() => _git.switchBranch(root, branch));
 
-  // No suspension here: `git switch -c` creates the branch at HEAD, it never
-  // rewrites the working tree — an edit made mid-create belongs on disk (on
-  // the branch just created) and must still be mirrored. Suspending would
-  // *drop* it: suspension discards the pending forest, and no reload follows a
-  // create (nothing on disk changed), so the edit would live on in Hive while
-  // disk silently diverged — until the next switch reloaded over it.
   // No suspension here: `git switch -c` creates the branch at HEAD, it never
   // rewrites the working tree — an edit made mid-create belongs on disk (on
   // the branch just created) and must still be mirrored. Suspending would

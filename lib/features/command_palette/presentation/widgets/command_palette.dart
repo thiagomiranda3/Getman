@@ -1,3 +1,7 @@
+// Cmd/Ctrl+K command palette: fuzzy jump to a saved request, history entry,
+// environment, or theme. Reads bloc state at open time and dispatches through
+// existing events (see CommandPalette class doc below for wiring details).
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';

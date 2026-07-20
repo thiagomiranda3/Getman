@@ -1,3 +1,10 @@
+// AppDecoration closures for Editorial: a hairline-ruled, square-cornered
+// panelBox, a print-column tabShape (side rules + bottom underline), and a
+// scaffoldBackground that overlays a static fine dot-grid texture (a "paper
+// grain" — CALM by design, not an animation: `_DotGridPainter` caches its
+// Float32List of dot coordinates keyed by canvas size and only recomputes on
+// a resize, never per frame).
+
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';

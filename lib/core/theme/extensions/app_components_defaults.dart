@@ -113,9 +113,9 @@ class _DefaultStatusBadge extends StatelessWidget {
     final baseColor = context.appPalette.statusAccent(statusCode);
     final isDark = theme.brightness == Brightness.dark;
     final lightOn = context.appPalette.onColor(baseColor);
-    // Deliberate contrast on a variable-colored status badge (CLAUDE.md §4.8
-    // exception): STATUS text is always white in dark mode; light mode keeps
-    // the higher-contrast on-color.
+    // Deliberate contrast on a variable-colored status badge
+    // (docs/architecture/theming.md exception): STATUS text is always white
+    // in dark mode; light mode keeps the higher-contrast on-color.
     // ignore: avoid_hardcoded_brand_colors
     final textColor = isDark ? Colors.white : lightOn;
 
@@ -205,9 +205,9 @@ class _DefaultMetric extends StatelessWidget {
     final baseColor = theme.colorScheme.secondary;
     final isDark = theme.brightness == Brightness.dark;
     final lightOn = context.appPalette.onColor(baseColor);
-    // Deliberate contrast on a variable-colored metric chip (CLAUDE.md §4.8
-    // exception): TIME/SIZE text is always white in dark mode; light mode keeps
-    // the higher-contrast on-color.
+    // Deliberate contrast on a variable-colored metric chip
+    // (docs/architecture/theming.md exception): TIME/SIZE text is always
+    // white in dark mode; light mode keeps the higher-contrast on-color.
     // ignore: avoid_hardcoded_brand_colors
     final textColor = isDark ? Colors.white : lightOn;
     final displayValue = unit != null ? '$value $unit' : value;

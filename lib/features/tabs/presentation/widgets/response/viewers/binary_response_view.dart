@@ -1,3 +1,7 @@
+// The RAW-tab / unviewable-kind fallback card for a media response: content
+// type, byte size, and a Save-to-file button. The Save button (and its bytes)
+// disappear once the live bytes are gone (restored tab / older time-travel
+// entry) since captured bytes are never persisted to Hive.
 import 'dart:async';
 import 'dart:typed_data';
 

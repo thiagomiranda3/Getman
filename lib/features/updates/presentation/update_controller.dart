@@ -1,3 +1,6 @@
+// Web-safe command bus shared by the io-only update gate, the update dialog,
+// and the Settings "Check for updates" button; see class doc below.
+
 import 'package:flutter/foundation.dart';
 import 'package:getman/features/updates/domain/entities/release_info.dart';
 import 'package:getman/features/updates/domain/repositories/update_repository.dart';

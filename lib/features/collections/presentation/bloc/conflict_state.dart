@@ -1,3 +1,6 @@
+// ConflictBloc state: status (initial/loading/ready/resolving/done/error),
+// the current batch of FileConflicts, and a 0-based batch counter driving
+// the dialog's "commit N" header.
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/collections/domain/entities/file_conflict.dart';
 

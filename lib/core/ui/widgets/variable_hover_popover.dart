@@ -1,3 +1,8 @@
+// Hover popover resolving a `{{var}}` token: VariableHoverPopover renders
+// the name/value/source card (with a reveal toggle for secrets);
+// VariableHoverController owns the single OverlayEntry, anchoring it near
+// the pointer and delaying the hide so the cursor can travel from the token
+// into the card.
 import 'dart:async';
 
 import 'package:flutter/material.dart';

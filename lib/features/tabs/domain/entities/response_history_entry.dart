@@ -1,3 +1,4 @@
+// Domain entity for one time-travel history entry; see class doc below.
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/network/http_response.dart';
 

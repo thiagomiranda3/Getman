@@ -22,9 +22,9 @@ import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/features/tabs/presentation/widgets/body_tab_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/code_find_panel.dart';
 import 'package:getman/features/tabs/presentation/widgets/form_data_editor.dart';
-import 'package:getman/features/tabs/presentation/widgets/request_editor_tabs.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:re_editor/re_editor.dart';
 

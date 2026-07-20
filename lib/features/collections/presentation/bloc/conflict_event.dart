@@ -1,3 +1,6 @@
+// ConflictBloc events: load a rebase-halt's conflict batch (LoadConflicts),
+// apply resolutions and continue the rebase (ResolveAndContinue), or abort
+// it (AbortRebase).
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/collections/domain/entities/file_conflict.dart';
 

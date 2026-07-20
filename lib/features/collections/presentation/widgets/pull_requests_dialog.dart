@@ -1,3 +1,7 @@
+// GitHub pull-request panel reached from the branch chip. Renders one of
+// three views based on GhAvailability: install prompt, `gh auth login`
+// prompt, or the open-PR list with create + refresh. Rides on the user's
+// own `gh auth` session — stores no credential itself.
 import 'dart:async';
 
 import 'package:flutter/material.dart';

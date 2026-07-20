@@ -1,3 +1,13 @@
+// PREVIEW viewer for a PDF response, rendered inline via pdfx (native
+// pdfium). Explicit load/error state management (never an infinite spinner
+// on a corrupt/truncated PDF), plus a re-send reload guard on bytes identity
+// like the other media viewers.
+//
+// Gotcha: pdfx's PdfDocument.openData calls assertHasPdfSupport() WITHOUT
+// awaiting it, so on a platform with no pdfium binding (headless test VM /
+// CI) that assert throws a *detached* async error no try/catch here can
+// catch. hasPdfSupport() is awaited and checked FIRST, before ever calling
+// openData, to avoid that unrecoverable throw.
 import 'dart:async';
 import 'dart:typed_data';
 

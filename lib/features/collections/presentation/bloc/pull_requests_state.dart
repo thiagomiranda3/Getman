@@ -1,3 +1,6 @@
+// PullRequestsBloc state: status, gh-CLI availability, the loaded open-PR
+// list, the just-created PR ref (lastCreated), and the repo's default base
+// branch (defaultBase) used to prefill the create form.
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/collections/domain/entities/pull_request.dart';
 

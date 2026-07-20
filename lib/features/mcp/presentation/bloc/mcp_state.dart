@@ -1,3 +1,6 @@
+// McpBloc state: per-tab MCP session map. See McpTabSession class doc below
+// for what one tab's session carries.
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/mcp/domain/entities/mcp_session.dart';
 import 'package:getman/features/mcp/domain/entities/mcp_tool.dart';

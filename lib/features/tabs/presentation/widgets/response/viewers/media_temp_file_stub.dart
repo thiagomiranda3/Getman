@@ -1,3 +1,6 @@
+// Web stub half of writeMediaTempFile — throws, since media_kit playback
+// needs a filesystem path; MediaResponseView catches this and shows the
+// binary fallback card. See media_temp_file.dart for the routing.
 import 'dart:typed_data';
 
 /// Web (and any non-dart:io) build: writing a temp media file is unavailable.

@@ -1,3 +1,6 @@
+// Detects the in-progress `{{name` token at the caret to drive the variable
+// autocomplete menu and compute its replacement range.
+
 /// The `{{variable}}` token currently being typed at the caret, used to drive
 /// the variable autocomplete menu and to compute the insertion. Pure Dart.
 class ActiveVariableQuery {

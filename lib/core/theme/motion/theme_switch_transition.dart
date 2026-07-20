@@ -1,3 +1,8 @@
+// ThemeSwitchTransition plays a brief one-shot accent sweep/dissolve overlay
+// over `child` whenever `themeId` changes, so switching themes feels
+// intentional rather than an instant cut. Instant (no overlay) when
+// reduceEffects, matching main.dart's `themeAnimationDuration:
+// Duration.zero` decision.
 import 'dart:async';
 
 import 'package:flutter/material.dart';

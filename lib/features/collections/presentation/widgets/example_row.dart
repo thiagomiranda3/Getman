@@ -1,3 +1,11 @@
+// A saved-example row rendered beneath its request node in the tree.
+// Tapping opens the snapshot as a fresh, unlinked tab with its captured
+// response shown; the trailing menu renames or deletes the example.
+//
+// Gotcha: the opened tab gets a fresh config id (via config.withId), not
+// the saved request's id — chaining rules (assertions/extractions) are
+// keyed by config id, so reusing the original id would silently alias an
+// "Extract to {{var}}" or a re-send onto the original saved request (D3).
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/network/http_response.dart';

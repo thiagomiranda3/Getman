@@ -1,3 +1,6 @@
+// Generic typed dropdown atom wrapping the AppComponents.select component
+// slot. Currently built but not yet wired into any editor — see BACKLOG
+// item VM-F2.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/extensions/app_components.dart';
 import 'package:getman/core/theme/extensions/app_theme_access.dart';

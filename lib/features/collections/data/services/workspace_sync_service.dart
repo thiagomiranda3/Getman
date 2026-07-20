@@ -1,3 +1,18 @@
+// WorkspaceSyncService: coordinates the one-directional, in-session mirror
+// of collections from Hive to disk (the git-friendly workspace). Hive stays
+// the source of truth; opening a workspace imports disk -> Hive once
+// (read), then every mutation debounces a Hive -> disk write
+// (scheduleMirror) through WorkspaceCollectionsDataSource, whose serializer
+// omits saved examples and response-cache fields from the mirrored files.
+//
+// Gotchas: writes are chained, never fired in parallel, so two overlapping
+// debounce cycles can't race each other onto disk. flushPending() must be
+// awaited before any git op reads the tree, and callers MUST abort when it
+// returns false (a failed write leaves disk stale). suspendMirroring/
+// resumeMirroring (prefer withMirroringSuspended — leak-safe on throw) gate
+// mirroring off during git working-tree ops and the disk reload that
+// follows them, since a Hive mutation mid-checkout would otherwise be
+// mirrored back onto the wrong branch.
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';

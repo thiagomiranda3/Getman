@@ -1,3 +1,6 @@
+// EnvironmentsRepository impl: converts EnvironmentModel <-> Entity around
+// EnvironmentsLocalDataSource's keyed put/delete/get/save calls.
+
 import 'package:getman/core/error/guard.dart';
 import 'package:getman/features/environments/data/datasources/environments_local_data_source.dart';
 import 'package:getman/features/environments/data/models/environment_model.dart';

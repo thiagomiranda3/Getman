@@ -1,3 +1,5 @@
+// Domain entities for git branch/stash state (BranchStatus + StashInfo),
+// consumed by the collections branch chip UI.
 import 'package:equatable/equatable.dart';
 
 /// One stashed change set. Domain-owned (the domain layer never depends on

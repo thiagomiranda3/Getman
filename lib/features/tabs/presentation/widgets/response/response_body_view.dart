@@ -1,3 +1,14 @@
+// BODY tab: dispatches media responses to ResponseMediaPanel and textual
+// responses to a PRETTY/RAW/TREE toggle (keys body_toggle_*) over the JSON
+// editor / JsonTreeView. TREE is only offered for a JSON object/array under
+// kLargeResponseViewerChars; its decode is lazy (only on first TREE select)
+// and cached in _decoded so JsonTreeView keeps its expansion state across
+// rebuilds — a fresh decode object would reset it. Bodies over the threshold
+// fall back to a plain-text large-body view unless
+// alwaysPrettifyLargeResponses opts in (or the user taps PRETTIFY ANYWAY);
+// the kResponseBodyTooLargePlaceholder sentinel always stays plain text.
+// Extract-to-{{var}} from a tree node dispatches AddExtractionRule to the
+// global RulesBloc, closing the loop with the chaining feature.
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show compute;
@@ -535,8 +546,8 @@ class _BodyModeToggle extends StatelessWidget {
     final activeIsDark =
         ThemeData.estimateBrightnessForColor(activeBg) == Brightness.dark;
     // Deliberate contrast: a readable foreground picked from the dynamic,
-    // theme-derived `activeBg` brightness (CLAUDE.md §4.8 exception) — not a
-    // themeable surface color.
+    // theme-derived `activeBg` brightness (docs/architecture/theming.md
+    // exception) — not a themeable surface color.
     // ignore: avoid_hardcoded_brand_colors
     final onActive = activeIsDark ? Colors.white : Colors.black;
     final disabledColor = theme.colorScheme.onSurface.withValues(alpha: 0.35);

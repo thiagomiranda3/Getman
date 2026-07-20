@@ -1,3 +1,6 @@
+// Domain entity bundling one request config's extraction rules + assertions,
+// stored separately from the config to avoid dedup overhead on most requests.
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/chaining/domain/entities/assertion.dart';
 import 'package:getman/features/chaining/domain/entities/extraction_rule.dart';

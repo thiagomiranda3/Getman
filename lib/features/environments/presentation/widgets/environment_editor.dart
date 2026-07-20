@@ -1,3 +1,7 @@
+// Detail editor for one environment: name field + KeyValueListEditor for
+// variables with per-row secret toggles. Emits UpdateEnvironment on edit;
+// blank-name edits are dropped, and losing focus reverts an emptied name.
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';

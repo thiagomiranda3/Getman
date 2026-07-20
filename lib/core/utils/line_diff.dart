@@ -1,3 +1,8 @@
+// A dependency-free LCS-based unified line diff, used by the response
+// Compare view. The DP table is sized by line count (not characters), so it
+// stays cheap for response bodies; within a changed hunk, removed lines
+// precede added lines (unified-diff convention).
+
 import 'package:equatable/equatable.dart';
 
 /// Whether a line is unchanged, present only on the right (added), or present

@@ -1,3 +1,18 @@
+// AppDecoration closures + the animated wallpaper for Liquid Glass:
+// panelBox/tabShape/brandedTabIndicator (a translucent panel + specular glass
+// lozenge for the active tab), glassFrost/glassDialogSurface (real
+// BackdropFilter blur, gated to full effects only), and GlassWallpaper (the
+// scaffold background — a drifting mesh-gradient of soft blobs plus a cursor-
+// following specular sheen, painted by `_GlassMeshPainter`).
+//
+// Gotchas: `kGlassBlurSigma` is the single tunable for all frost blur
+// intensity. Frost/dialogSurface are only wired into AppDecoration when
+// reduceEffects is false (glass_theme.dart's effectiveDecoration) — the base
+// `decoration` keeps the identity frost. GlassWallpaper mirrors
+// auris_ambient.dart/brutalist_ambient.dart's AmbientSignals + single-ticker
+// lifecycle discipline (build once in initState, start/stop rather than
+// dispose+recreate, resolve pulse unconditionally in didChangeDependencies).
+
 import 'dart:async';
 import 'dart:ui' show ImageFilter;
 

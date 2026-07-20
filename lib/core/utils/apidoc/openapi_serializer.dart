@@ -1,4 +1,9 @@
-// lib/core/utils/apidoc/openapi_serializer.dart
+// Renders an ApiDoc to an OpenAPI 3.0.3 document (map/JSON/YAML), collecting
+// each operation's auth into a shared `components.securitySchemes` entry
+// (bearerAuth/basicAuth/apiKeyAuth) the first time it's used. Reads only auth
+// SHAPE from ApiOperation.security — never token/password/key values. YAML
+// output goes through the local YamlEmitter.
+
 import 'dart:convert';
 
 import 'package:getman/core/domain/entities/auth_config.dart';

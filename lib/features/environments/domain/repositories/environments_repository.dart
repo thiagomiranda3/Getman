@@ -1,3 +1,6 @@
+// Abstract repository for environments: get/put/delete one, or save
+// (replace) the whole list for import.
+
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 
 abstract class EnvironmentsRepository {

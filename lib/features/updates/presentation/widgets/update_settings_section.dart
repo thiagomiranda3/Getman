@@ -1,3 +1,5 @@
+// GENERAL-tab auto-update settings block; see class doc below. Hidden on web.
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';

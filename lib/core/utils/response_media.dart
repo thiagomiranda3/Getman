@@ -1,3 +1,10 @@
+// Classifies a response body for rendering (textual/image/pdf/html/csv/
+// video/audio/binary) and derives a save-file extension. Resolution order:
+// content-type header -> URL extension -> magic-byte sniff -> textual
+// default — an API returning JSON without a content-type still renders as
+// text, since a dedicated media/binary viewer only kicks in on a positive
+// signal.
+
 import 'dart:typed_data';
 
 /// How a response body should be rendered. `textual` is the existing

@@ -1,3 +1,16 @@
+// THE Postman-compatible JSON import/export plumbing: file pickers, snackbar
+// feedback, and save/import helpers shared by the collections and
+// environments features.
+//
+// Gotchas: slugFilename / saveJsonFileWithFeedback /
+// importJsonFilesWithFeedback are the canonical entry points — don't
+// reimplement picker/snackbar logic per feature. saveJsonFileWithFeedback
+// (and the underlying saveTextFileWithFeedback) take an `allowedExtensions`
+// param (default `['json']`); the response body's Save action passes
+// `['json','txt']`. On web the picker's `bytes:` already triggers the
+// download, so the redundant `File(...).writeAsString` is skipped behind a
+// `kIsWeb` guard.
+
 import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';

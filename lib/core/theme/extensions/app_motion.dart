@@ -1,3 +1,8 @@
+// The AppMotion theme extension: three event-driven collections-tree
+// drag/drop hooks (treeDragFeedback, treeDropHighlight, treeExpandFlourish)
+// that decorate the tree without touching TreeView internals. All three
+// default to identity, so a theme that supplies none is unaffected; read
+// docs/THEME_AUTHORING.md before adding motion to a theme.
 import 'package:flutter/material.dart';
 
 /// VM-B3: themed widget shown under the cursor while dragging a tree node.

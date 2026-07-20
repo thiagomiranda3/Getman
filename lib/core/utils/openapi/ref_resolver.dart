@@ -1,4 +1,7 @@
-// lib/core/utils/openapi/ref_resolver.dart
+// Resolves internal JSON-pointer `$ref`s (`#/...`) within a single OpenAPI/
+// Swagger spec document; external refs are left intact. deepResolve recurses
+// through an entire node, replacing every ref with a copy of its target and
+// short-circuiting cycles to `{}` so resolution always terminates.
 
 /// Resolves internal JSON-pointer `$ref`s (`#/...`) within a single spec
 /// document. External refs (anything not starting with `#/`) are left intact.

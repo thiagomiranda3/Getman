@@ -1,11 +1,10 @@
+// One editable assertion row (target/comparator dropdowns + path/expected
+// fields) inside the RULES tab; reports edits up via onChanged.
+
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/features/chaining/domain/entities/assertion.dart';
 import 'package:getman/features/chaining/presentation/widgets/rule_card.dart';
-
-// ---------------------------------------------------------------------------
-// Assertion row
-// ---------------------------------------------------------------------------
 
 class AssertionRuleRow extends StatefulWidget {
   const AssertionRuleRow({

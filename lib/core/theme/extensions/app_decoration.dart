@@ -1,3 +1,11 @@
+// The AppDecoration theme extension: panelBox (hard-shadow/thick-border
+// panel), tabShape (per-tab chrome), wrapInteractive (tap animation
+// wrapper), scaffoldBackground (ambient), plus the optional frost
+// (frosted-glass blur), brandedTabIndicator (BrandedTabBar selected-tab
+// override), and dialogSurface (custom frosted dialog card) hooks. frost /
+// brandedTabIndicator / dialogSurface default to identity/null, so only
+// themes that opt in (chiefly Liquid Glass, plus AURIS for
+// brandedTabIndicator) are affected.
 import 'package:flutter/material.dart';
 
 typedef PanelBoxBuilder =

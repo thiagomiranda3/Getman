@@ -1,3 +1,7 @@
+// Raw Color constants for the Brutalist theme: light/dark background/surface/
+// text/border pairs, the yellow primary + purple secondary accents, per-method
+// HTTP colors, and variable-highlight (resolved/unresolved) colors.
+
 import 'package:flutter/material.dart';
 
 class BrutalistPalette {

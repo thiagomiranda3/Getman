@@ -1,3 +1,6 @@
+// ReviewBloc: drives the Review Changes dialog over ReviewService. git's
+// index is the source of truth, so every stage/unstage/commit mutation
+// re-dispatches LoadReview rather than patching state locally.
 import 'dart:developer';
 
 import 'package:flutter_bloc/flutter_bloc.dart';

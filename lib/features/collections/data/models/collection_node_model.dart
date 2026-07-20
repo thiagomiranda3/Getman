@@ -1,3 +1,7 @@
+// Hive model for a collections-tree node (box: 'collections', typeId 3).
+// Converts CollectionNode <-> CollectionNodeEntity; nests SavedExampleModel
+// (examples) and HttpRequestConfig (config); consumed by
+// CollectionsLocalDataSourceImpl / CollectionsRepositoryImpl.
 import 'package:getman/features/collections/data/models/saved_example_model.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/history/data/models/request_config_model.dart';

@@ -1,3 +1,6 @@
+// Native (dart:io) half of writeMediaTempFile, used by MediaResponseView to
+// hand media_kit a playable file path. Routed to only on non-web platforms —
+// see media_temp_file.dart.
 import 'dart:io';
 import 'dart:typed_data';
 

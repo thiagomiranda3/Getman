@@ -1,3 +1,6 @@
+// Web build's GhService: `gh` is a desktop CLI, so every call is a no-op
+// reporting unavailable/failure. Selected by gh_service.dart's conditional
+// export when dart:io is absent.
 import 'package:getman/core/git/gh_service.dart';
 
 GhService createGhServiceImpl() => _StubGhService();

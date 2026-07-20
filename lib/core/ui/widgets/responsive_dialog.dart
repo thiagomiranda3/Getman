@@ -1,3 +1,9 @@
+// Responsive dialog chrome: ResponsiveDialogScaffold renders as a centered
+// AlertDialog (or a frosted card on themes with a dialogSurface) on wide
+// viewports and a full-screen Scaffold page on narrow ones;
+// showResponsiveDialog picks the right presentation via
+// BuildContext.isDialogFullscreen. Swap an existing AlertDialog(...) for
+// this 1:1.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';

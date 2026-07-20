@@ -1,3 +1,5 @@
+// PullRequestsBloc events: LoadPullRequests (checks gh availability, then
+// lists open PRs) and CreatePullRequest (pushes the branch and opens a PR).
 import 'package:equatable/equatable.dart';
 
 abstract class PullRequestsEvent extends Equatable {

@@ -1,3 +1,8 @@
+// WorkspaceReviewService: builds the Review tab's change set by diffing git
+// status entries against the workspace serializer, one SemanticDiff per
+// file. Every op that reads/mutates the tree flushes the pending Hive ->
+// disk mirror first (_flushOrThrow, same gate as GitBranchService) so a
+// debounced edit can't land between staging and diffing.
 import 'dart:convert';
 
 import 'package:getman/core/git/git_service.dart';

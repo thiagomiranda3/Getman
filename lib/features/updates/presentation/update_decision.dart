@@ -1,3 +1,9 @@
+// Pure decision logic for the auto-updater: dotted-version comparison
+// (isNewerVersion) and whether to surface the update dialog
+// (shouldPromptForUpdate). shouldPromptForUpdate suppresses a prompt only for
+// the EXACT skipped version — a still-newer release prompts again, and the
+// stored skipped-version setting is never cleared by this function.
+
 /// True iff [latest] is a strictly higher dotted-numeric version than
 /// [current]. Lenient: missing components count as 0; any non-numeric component
 /// makes the comparison return false (we never prompt on a version we can't

@@ -1,3 +1,8 @@
+// The per-tab request/response screen: owns the body/GraphQL-variables/
+// response CodeLineEditingControllers, the draggable request/response split
+// (desktop) vs UnifiedRequestPanel (compact), and the SAVE-TO-COLLECTION
+// flow. Wires SaveRequestIntent/BeautifyJsonIntent; reads TabsBloc,
+// SettingsBloc, CollectionsBloc.
 import 'dart:async';
 
 import 'package:flutter/material.dart';

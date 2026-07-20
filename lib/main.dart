@@ -1,3 +1,18 @@
+// App entry point: boots DI (di.init()), re-acquires macOS security-scoped
+// workspace access from a saved bookmark before the first git-mirror write,
+// then runs MyApp — MultiRepositoryProvider/MultiBlocProvider wiring every
+// feature bloc (settings/history/collections/tabs/environments/chaining/
+// realtime/MCP/git review+sync+PRs+conflicts), the root MaterialApp.router
+// with theme resolution, and the global keyboard Shortcuts map.
+//
+// Gotchas: appShortcuts is a computed, @visibleForTesting,
+// platform-exclusive map — buildAppShortcuts(useMeta:) picks Meta on macOS,
+// Ctrl elsewhere (only the Ctrl+Tab pair stays cross-platform). ONLY the
+// Shortcuts map lives at this root — every Action lives in MainScreen or
+// deeper, because a root Actions above MaterialApp is reachable from
+// focused widgets inside every modal dialog (dialogs push onto the same
+// root Navigator) — that's how Cmd/Ctrl+N used to stack invisible tabs
+// behind an open dialog.
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

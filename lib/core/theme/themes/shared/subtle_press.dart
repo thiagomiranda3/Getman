@@ -1,3 +1,6 @@
+// The single AppDecoration.wrapInteractive implementation shared by every
+// theme (see the class doc below) — a uniform tap-press feel across themes.
+
 import 'package:flutter/material.dart';
 
 /// Subtle, theme-agnostic press feedback: a quick opacity dim + tiny scale

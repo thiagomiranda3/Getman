@@ -1,3 +1,15 @@
+// A single collection-tree row (folder or request), with hover highlight,
+// long-press action sheet on phone, and desktop drag-and-drop. Expansion is
+// owned by the parent tree coordinator (CollectionsList): this row only
+// reflects `isExpanded` and calls `onToggle` — it never tracks expansion
+// itself (the H2 fix).
+//
+// Gotchas: drag targets always accept (never reject) so a release over a
+// row doesn't fall through to the list-level root target and move the node
+// to root; illegal moves (onto self/a descendant) are still visually
+// rejected via onWillAcceptWithDetails and separately guarded by the bloc.
+// Drag payload is the typed NodeDragData wrapper, not a bare String, so a
+// dragged tab-strip tab is never highlighted or accepted here (D4/D5).
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/network/request_kind.dart';

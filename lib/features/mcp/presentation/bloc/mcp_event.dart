@@ -1,3 +1,6 @@
+// McpBloc events: connect/disconnect a tab's MCP session, select the active
+// tool, and request a tool call.
+
 import 'package:equatable/equatable.dart';
 
 abstract class McpEvent extends Equatable {

@@ -1,3 +1,6 @@
+// ConflictBloc: drives the resolve -> continue loop over an in-progress git
+// rebase, one conflict batch at a time; droppable while busy (every handler
+// always exits isBusy via a terminal state, so this cannot deadlock).
 import 'dart:developer';
 
 import 'package:flutter_bloc/flutter_bloc.dart';

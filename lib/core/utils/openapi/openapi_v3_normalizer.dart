@@ -1,4 +1,11 @@
-// lib/core/utils/openapi/openapi_v3_normalizer.dart
+// Converts an OpenAPI 3.x spec map into a NormalizedApi: walks every
+// path/method into a NormalizedOperation, resolving `$ref`s via RefResolver,
+// merging path-item + operation-level shared parameters, and preferring a
+// JSON request body (else urlencoded/multipart form fields, else the first
+// declared content type as raw). Body/param examples are synthesized by
+// schema_sampler when the spec gives no literal example. Operation- then
+// path-item- then global-level `servers` cascades per the OpenAPI spec.
+
 import 'dart:convert';
 
 import 'package:getman/core/domain/entities/body_type.dart';

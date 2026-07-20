@@ -1,3 +1,14 @@
+// CollectionsBloc: owns the collections tree state, handling CRUD/move/
+// import/replace events via CollectionsTreeHelper's pure tree functions.
+// Granular edits (_commit) emit immediately and debounce a whole-tree save
+// (2s, coalescing a burst of edits); import/replace (_commitNow) flush right
+// away since waiting out the debounce risks losing a large change.
+//
+// Gotchas: _onMoveNode rejects moving a node into its own subtree (would
+// orphan it via removeFromTree) and falls back to appending at root if the
+// destination parent vanished since the event was built (e.g. a concurrent
+// git reload) — addToParent itself no-ops on a missing parent rather than
+// erroring.
 import 'dart:async';
 import 'dart:developer';
 

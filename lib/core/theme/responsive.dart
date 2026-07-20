@@ -1,3 +1,6 @@
+// Viewport-width breakpoints and the derived LayoutMode tiers (compactPhone /
+// phone / tablet / desktop) that drive navigation and panel-layout branches;
+// orthogonal to AppLayout's isCompact density, which drives paddings/fonts.
 import 'package:flutter/material.dart' show Drawer;
 import 'package:flutter/widgets.dart';
 import 'package:getman/core/theme/app_theme.dart' show AppLayout;

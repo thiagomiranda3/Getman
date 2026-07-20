@@ -1,3 +1,14 @@
+// Review Changes dialog: stage/unstage files, view a per-file semantic
+// diff (SemanticDiffView), commit, and push. Dispatches ReviewBloc for
+// stage/commit and GitSyncBloc for push (widget-layer coordination).
+//
+// Gotchas: a commit that fails for lack of a git identity transitions
+// ReviewState to `needsIdentity`, which this dialog catches via
+// listenWhen to prompt for name/email, save it to Settings, and retry the
+// same commit message. PUSH only *starts* the push (busy/error/ahead-
+// count feedback surfaces later on the branch chip, not here) and is
+// dropped silently by GitSyncBloc if another op is already in flight —
+// checked again at dispatch time so the "Pushing..." snackbar can't lie.
 import 'dart:async';
 
 import 'package:flutter/material.dart';

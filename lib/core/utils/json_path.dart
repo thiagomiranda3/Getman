@@ -1,3 +1,9 @@
+// A deliberately small JSONPath subset (optional leading `$`, dot member
+// access, bracket-quoted keys, array indices — no wildcards/filters/
+// recursive descent/negative indices/slices) for no-code response extraction
+// and assertions. Pure Dart; never throws, a miss or parse failure yields
+// null/false.
+
 import 'dart:convert';
 
 /// A deliberately small JSONPath subset for no-code response extraction and

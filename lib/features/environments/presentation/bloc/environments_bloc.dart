@@ -1,3 +1,12 @@
+// EnvironmentsBloc: loads/adds/updates/deletes/imports environments, each
+// persisting via a single keyed Hive write (import batches the whole list).
+//
+// Gotchas: add/update/import re-sort the in-session list by name
+// (case-insensitive) to match the data source's read-time sort -- Hive keys
+// are UUIDs, so key order has no display meaning. MergeEnvironmentVariables
+// reads the LIVE entity inside its handler (not a stale state snapshot) so
+// two merges dispatched in the same event-loop turn both land.
+
 import 'dart:developer';
 
 import 'package:flutter_bloc/flutter_bloc.dart';

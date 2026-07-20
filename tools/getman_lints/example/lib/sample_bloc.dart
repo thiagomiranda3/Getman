@@ -1,3 +1,5 @@
+// Fixture: bloc_depends_on_abstractions — a *_bloc.dart importing concrete
+// data/dio/hive instead of an abstract Repository.
 // ignore_for_file: uri_does_not_exist, unused_import
 
 // expect_lint: bloc_depends_on_abstractions

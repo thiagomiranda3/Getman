@@ -1,3 +1,6 @@
+// Decodes a response body once and runs both chaining engines against it;
+// runRules is a top-level compute entry point (see the class docs below).
+
 import 'package:getman/core/domain/entities/assertion_result.dart';
 import 'package:getman/core/domain/entities/extraction_result.dart';
 import 'package:getman/core/network/http_response.dart';

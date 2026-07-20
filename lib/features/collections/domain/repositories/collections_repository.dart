@@ -1,3 +1,5 @@
+// Abstract repository for loading/saving the full collections tree;
+// implemented by CollectionsRepositoryImpl in data/repositories.
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 
 abstract class CollectionsRepository {

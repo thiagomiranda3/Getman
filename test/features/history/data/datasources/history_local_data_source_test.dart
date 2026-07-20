@@ -71,7 +71,8 @@ void main() {
       'headers are not part of the dedup key',
       () async {
         // Headers are intentionally excluded from the dedup signature per
-        // CLAUDE.md §4.4. Two requests that differ only in headers share the
+        // docs/architecture/settings-history-updates.md. Two requests that
+        // differ only in headers share the
         // same method+url+body signature and are therefore treated as the
         // same logical request.
         final withAccept = makeConfig(

@@ -1,3 +1,6 @@
+// MCP bloc: see class doc below for the per-tab connection ownership and
+// teardown discipline (mirrors RealtimeBloc).
+
 import 'dart:developer';
 
 import 'package:flutter_bloc/flutter_bloc.dart';

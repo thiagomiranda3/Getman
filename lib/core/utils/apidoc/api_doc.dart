@@ -1,3 +1,9 @@
+// Format-agnostic API-doc entities (ApiDoc/ApiServer/ApiParam/ApiBody/
+// ApiResponse/ApiOperation) built by CollectionToApiDoc from a collection
+// subtree, then rendered by OpenApiSerializer and MarkdownDocSerializer.
+// ApiOperation.security carries auth SHAPE only — never token/password/key
+// values.
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/utils/apidoc/json_schema.dart';

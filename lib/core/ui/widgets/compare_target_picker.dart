@@ -1,3 +1,7 @@
+// Response-diff target picker: CompareTarget/CompareTargetSource model a
+// selectable prior response (saved example, history, or this tab's
+// time-travel timeline); CompareTargetPicker is a pure presentational
+// dialog listing them in three sections and popping the chosen target.
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:getman/core/network/http_response.dart';

@@ -1,3 +1,7 @@
+// Pure JSON (de)serialization for the on-disk git-workspace format (request
+// leaf / folder / manifest); see the class doc below for what's curated out
+// of the request file on purpose (response cache fields, saved examples).
+
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';

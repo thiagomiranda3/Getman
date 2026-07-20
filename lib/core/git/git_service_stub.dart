@@ -1,3 +1,8 @@
+// Web build's GitService: git is unavailable, so every op is a no-op or
+// reports false/empty/clean. Selected by git_service.dart's conditional
+// export when dart:io is absent; mirrors git_service_io.dart's method
+// signatures exactly (incl. the unused environmentOverrides test seam) so
+// both platforms satisfy the same abstract interface.
 import 'package:getman/core/git/git_service.dart';
 
 // Signature parity with the io variant: [environmentOverrides] is the io

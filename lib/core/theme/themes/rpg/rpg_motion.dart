@@ -1,4 +1,10 @@
-// lib/core/theme/themes/rpg/rpg_motion.dart
+// Arcane Quest (RPG) collections-tree drag/drop/expand motion (AppMotion.
+// treeDragFeedback / treeDropHighlight / treeExpandFlourish): a gold rune-glow
+// chip under the drag cursor, an animated gold glow-pull border on a drop
+// target, and a gold glow flourish on expand/collapse. `rpgMotion` returns
+// identity (const AppMotion()) when reduceEffects is true, per
+// THEME_AUTHORING's mandatory degradation rule.
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/extensions/app_motion.dart';

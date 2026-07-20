@@ -1,3 +1,8 @@
+// Side-menu HISTORY tab: a debounced search field over HistoryBloc's
+// newest-first list, filtering by URL/method/status code. Tapping an entry
+// opens it as a new (unlinked) tab via AddTab with the stored, templated
+// config — re-sending stays free to pick up whatever environment is active.
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';

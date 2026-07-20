@@ -1,3 +1,7 @@
+// The AppLayout theme extension: sizes, paddings, border widths, and row
+// extents that widgets pull via context.appLayout instead of hardcoded
+// literals. Ships two presets, `normal` and `compact`, selected by
+// SettingsEntity.isCompactMode.
 import 'package:flutter/material.dart';
 
 class AppLayout extends ThemeExtension<AppLayout> {

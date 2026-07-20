@@ -1,3 +1,7 @@
+// The Failure hierarchy BLoCs are allowed to handle (never raw exceptions):
+// PersistenceFailure for storage errors, and NetworkFailure with a typed
+// NetworkFailureType enum + optional HTTP status code for send failures.
+
 import 'package:equatable/equatable.dart';
 
 abstract class Failure extends Equatable implements Exception {

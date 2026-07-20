@@ -1,3 +1,26 @@
+// BLoC for request tabs, grouped into virtual-desktop "panels". Owns tab
+// CRUD, panel CRUD, send/cancel, response time-travel history, and
+// post-response chaining (extraction/assertions) via GetRequestRulesUseCase.
+//
+// Gotchas:
+// - Identity-addressed events (tabId), never index — only SetActiveIndex and
+//   ReorderTabs are position-based; SetActiveIndex rejects an out-of-range
+//   index so widgets can safely index tabs[activeIndex].
+// - Mutations debounce a 10s save via _scheduleSave/_flushDirtyTabs; close()
+//   cancels the timer, cancels in-flight requests, then flushes.
+// - LoadTabs sanitizes isSending back to false — no real request survives a
+//   restart.
+// - Any non-NetworkFailure error in _onSendRequest still resets isSending —
+//   a tab must never get stuck on SENDING.
+// - Panels: always >=1 (RemovePanel on the last panel is rejected); a panel
+//   may be empty (activeTabId == ''); there is NO auto-seed for an emptied
+//   panel — don't reintroduce one.
+// - In-flight sends and updates resolve the tab ACROSS all panels via
+//   _findTab/_replaceTabAcrossPanels — a send started in a background panel
+//   still lands correctly even after the active panel changes.
+// - Keeps a narrowly-scoped `flutter/foundation.dart` import (justified
+//   `// ignore: avoid_flutter_imports`) only for `compute`, since Isolate.run
+//   is unsupported on web.
 import 'dart:async';
 import 'dart:developer';
 

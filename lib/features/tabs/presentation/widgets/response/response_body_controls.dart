@@ -1,3 +1,8 @@
+// The response-body action-button row (Copy / Save-to-file / Compare /
+// Save-as-example), shared by the small and large body views. Compare builds
+// its candidate list from saved examples, matching history, and this tab's
+// own response time-travel; Save-as-example only appears once the tab is
+// linked to a collection node and a response exists to capture.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';

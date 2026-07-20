@@ -1,3 +1,7 @@
+// Semantic (field-level) diffing for the review tab: FieldChange/SemanticDiff
+// plus RequestConfigDiff/FolderNodeDiff, which diff the workspace-serialized
+// fields of a request or folder node (never the whole JSON blob). Auth
+// changes are reported as changed without surfacing the (secret) values.
 import 'package:collection/collection.dart';
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';

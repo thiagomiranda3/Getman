@@ -1,3 +1,15 @@
+// Pure functional helpers over the collections tree: sort/addToParent/
+// removeFromTree/renameInTree/toggleFavoriteInTree/updateConfigInTree/
+// describeInTree/setVariablesInTree, saved-example CRUD, ancestor/parent
+// lookups, and overlayLocalOnly (restores app-only data after a disk
+// reload).
+//
+// Gotchas: every function returns a new tree and never mutates its input.
+// addToParent does NOT treat a missing parentId as an error — it's a no-op
+// walk; CollectionsBloc verifies the parent exists via findNode first and
+// appends to root on a miss. sort() orders favorites, then folders, then
+// leaves, each group alphabetical (case-insensitive, tie-broken by id since
+// List.sort isn't stable).
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';

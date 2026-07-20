@@ -1,3 +1,5 @@
+// EnvironmentsBloc state: the environments list plus a loading flag.
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 

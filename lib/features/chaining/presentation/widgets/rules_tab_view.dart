@@ -1,3 +1,7 @@
+// RULES tab body: extraction-rule + assertion lists for the active tab's
+// config, loaded/saved through RulesBloc keyed by config id; tracks its own
+// draft and echo-suppresses matching RulesBloc emissions via _lastEmitted.
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';

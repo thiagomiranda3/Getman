@@ -1,3 +1,6 @@
+// Use cases wrapping SettingsRepository: GetSettingsUseCase and
+// SaveSettingsUseCase.
+
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/domain/repositories/settings_repository.dart';
 

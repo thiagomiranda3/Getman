@@ -21,7 +21,7 @@ analyzer:
   # plus any other custom_lint plugins. NOTE: these do NOT surface in
   # `fvm flutter analyze` — they are a separate pass, run via
   # `fvm dart run custom_lint` (wired into the pre-commit hook + the
-  # verification bar in CLAUDE.md §5).
+  # verification bar in CLAUDE.md "Build & verification bar").
   plugins:
     - custom_lint
   errors:
@@ -54,7 +54,8 @@ linter:
 
 # bloc_lint config (the bloc team's official rules). NOT read by the analyzer —
 # it is a separate pass run via `fvm dart run bloc_tools:bloc lint lib`
-# (wired into the pre-commit hook + the verification bar in CLAUDE.md §5).
+# (wired into the pre-commit hook + the verification bar in CLAUDE.md
+# "Build & verification bar").
 # Rule set: bloc_lint's "recommended".
 bloc:
   rules:
@@ -77,6 +78,7 @@ custom_lint:
     - bloc_depends_on_abstractions
     - platform_io_outside_io_files
     - equatable_props_complete
+    - file_header_required
     # solid_lints — cherry-picked metrics only. Regression-gate baselines set
     # just above the current codebase max so the gate is green now and only
     # FUTURE drift beyond these bounds is blocked (tunable downward later).

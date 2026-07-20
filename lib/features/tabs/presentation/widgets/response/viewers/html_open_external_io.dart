@@ -1,3 +1,6 @@
+// Native (dart:io) half of the "OPEN IN BROWSER" action for HTML responses:
+// writes the bytes to a temp file and launches it via url_launcher. Routed to
+// only on non-web platforms — see html_open_external.dart.
 import 'dart:io';
 import 'dart:typed_data';
 

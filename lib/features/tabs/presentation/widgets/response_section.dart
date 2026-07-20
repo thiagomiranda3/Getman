@@ -1,3 +1,6 @@
+// Shell for the HTTP response pane: status/time/size metadata row plus the
+// BODY/HEADERS/COOKIES/TESTS tab strip. Each tab body lives under response/;
+// this widget owns the sending/empty/loaded state switch.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';

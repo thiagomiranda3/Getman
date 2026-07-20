@@ -1,3 +1,7 @@
+// NetworkCancelHandle: a pure-Dart cancellation token carried through the
+// domain layer, bound to a real Dio CancelToken by NetworkService at
+// request time (bindCancel) so domain code never imports dio directly.
+
 import 'package:getman/core/network/network_service.dart' show NetworkService;
 
 /// Pure-Dart cancellation handle carried across the send pipeline.

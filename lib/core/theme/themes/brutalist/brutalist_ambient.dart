@@ -1,3 +1,18 @@
+// Brutalist scaffold-background ambient: a slowly drifting risograph/halftone
+// dot grid with a faint misaligned "registration ghost" copy, painted by a
+// single RepaintBoundary'd CustomPainter. `brutalistScaffoldBackgroundAnimated`
+// (full effects) plumbs AmbientSignals (pointer + WorkspacePulseController
+// session pulse) for cursor-force parting + idle-dimming;
+// `brutalistStaticScaffoldBackground` (reduceEffects) renders one static
+// frame with no controller/pointer/signals. Wired into brutalist_theme.dart's
+// AppDecoration.scaffoldBackground.
+//
+// Gotchas: mirrors auris_ambient.dart's lifecycle discipline — the
+// AnimationController is created once and start/stopped (never
+// disposed+recreated, since SingleTickerProviderState allows only one
+// ticker), and pulse is resolved unconditionally in didChangeDependencies so
+// a false->true animate toggle picks up the real provider.
+
 import 'dart:async';
 import 'dart:math' as math;
 

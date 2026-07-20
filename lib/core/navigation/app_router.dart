@@ -1,3 +1,6 @@
+// go_router setup: a single '/' route rendering MainScreen. Room to grow as
+// more routes are added.
+
 import 'package:getman/features/home/presentation/screens/main_screen.dart';
 import 'package:go_router/go_router.dart';
 

@@ -233,8 +233,9 @@ class GemBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final layout = context.appLayout;
     final color = context.appPalette.statusColor(statusCode);
-    // Deliberate contrast on a variable-colored gem badge (CLAUDE.md §4.8
-    // exception): status text is always white for legibility on jewel tones.
+    // Deliberate contrast on a variable-colored gem badge
+    // (docs/architecture/theming.md exception): status text is always white
+    // for legibility on jewel tones.
     // ignore: avoid_hardcoded_brand_colors
     const on = Colors.white;
     return Container(

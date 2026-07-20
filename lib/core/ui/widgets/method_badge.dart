@@ -1,3 +1,5 @@
+// Colored pill badge showing an HTTP method (GET/POST/...); rendering comes
+// from the theme's AppComponents.methodBadge component slot.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/extensions/app_theme_access.dart';
 

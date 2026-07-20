@@ -1,3 +1,7 @@
+// Hive-backed CookiePersistence for the cookie jar (box: cookies); see the
+// class doc below for the domain|path|name keying scheme, legacy-key
+// migration, and best-effort (swallow-and-log) failure handling.
+
 import 'package:flutter/foundation.dart';
 import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/network_cookie.dart';

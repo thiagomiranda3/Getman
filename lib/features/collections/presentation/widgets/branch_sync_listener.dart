@@ -1,3 +1,15 @@
+// Reloads the collections tree from disk after a git op (branch switch,
+// pull, stash, pop) changes files under the app, and carries along any open
+// tabs whose linked request is untouched so they show the new version.
+// Widget-layer coordinator — GitSyncBloc must not depend on
+// CollectionsBloc/TabsBloc — same shape as WorkspaceSyncListener.
+//
+// Gotcha: the disk read + ReplaceCollections dispatch run inside
+// WorkspaceSyncService.withMirroringSuspended to close two races: a live
+// edit landing mid-read, and CollectionsBloc's own state change re-
+// triggering WorkspaceSyncListener's mirror (a reload -> mirror -> reload
+// loop). This relies on CollectionsBloc emitting synchronously before its
+// awaited save — see the inline comment before changing that ordering.
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';

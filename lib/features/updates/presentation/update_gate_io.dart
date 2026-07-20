@@ -1,3 +1,12 @@
+// Native-only auto-update gate: the SOLE importer of dart:io, package:updat,
+// and package_info_plus (the web-safety gate — see update_gate.dart's
+// conditional export to update_gate_stub.dart on web). Uses `updat` purely for
+// the GitHub version *check*; the actual download is always handed off to the
+// user's default browser (_openDownloadInBrowser), never performed in-process
+// — a file downloaded by this sandboxed, unsigned app carries a strict
+// com.apple.quarantine flag that macOS Gatekeeper reports as "damaged", and
+// the sandbox forbids clearing that flag ourselves. See class doc below.
+
 import 'dart:async';
 import 'dart:io';
 

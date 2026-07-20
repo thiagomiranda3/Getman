@@ -1,3 +1,18 @@
+// Resolves `{{name}}` tokens in strings/maps against a set of environment
+// variables, falling back to dynamic built-ins ($guid/$randomUUID/
+// $timestamp/$isoTimestamp/$randomInt). Used on the send path
+// (TabsRepositoryImpl) and by the URL/variable highlighter.
+//
+// Gotchas: the name grammar accepts any non-empty, non-brace text (trimmed)
+// — spaces/`@`/`:`/unicode are all valid, matching whatever the env editor,
+// Postman import, and `{{` autocomplete can produce. Unknown names are left
+// VERBATIM, never blanked. A leading `$` marks a dynamic built-in; each
+// occurrence resolves independently (freshly generated, never cached), and
+// an environment variable of the same name always wins over the dynamic.
+// isDynamic() is the single source of truth for classifying a name as
+// dynamic (e.g. what the URL highlighter uses for resolved/unresolved
+// coloring).
+
 import 'dart:math';
 
 import 'package:uuid/uuid.dart';

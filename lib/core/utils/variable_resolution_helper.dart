@@ -1,3 +1,9 @@
+// Classifies a `{{var}}` name against the active environment (classify) or
+// against both the environment and inherited collection layers
+// (classifyLayered, environment wins) for the hover tooltip and
+// autocomplete preview. Pure Dart, lives beside EnvironmentResolver so core
+// widgets don't need to reach into a feature.
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/utils/environment_resolver.dart';
 

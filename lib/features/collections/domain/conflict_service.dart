@@ -1,3 +1,5 @@
+// ConflictService: abstract gateway for git-rebase conflict resolution;
+// implemented by GitConflictService in data/services.
 import 'package:getman/core/git/git_service.dart';
 import 'package:getman/features/collections/domain/entities/file_conflict.dart';
 

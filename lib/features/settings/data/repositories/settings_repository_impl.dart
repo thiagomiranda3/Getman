@@ -1,3 +1,6 @@
+// SettingsRepository impl: converts SettingsModel <-> SettingsEntity around
+// SettingsLocalDataSource's single get/save.
+
 import 'package:getman/core/error/guard.dart';
 import 'package:getman/features/settings/data/datasources/settings_local_data_source.dart';
 import 'package:getman/features/settings/data/models/settings_model.dart';

@@ -1,3 +1,8 @@
+// HttpResponseEntity: the response half of a request/response pair
+// (statusCode/body/headers/durationMs), plus optional in-memory-only
+// bodyBytes for non-textual (media/binary) responses — never persisted to
+// Hive, so it is null on a restored tab or an older history entry.
+
 import 'dart:typed_data';
 
 import 'package:equatable/equatable.dart';

@@ -1,3 +1,8 @@
+// The banner (size label + PRETTIFY ANYWAY / SHOW FULL + action-button
+// cluster) shown above a large response body. Purely presentational: the
+// scrollable body content stays with the caller so the editor widget keeps a
+// stable tree position across small/large-mode switches (avoids tearing down
+// re_editor state).
 import 'package:flutter/material.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/theme/app_theme.dart';

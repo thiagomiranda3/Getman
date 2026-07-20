@@ -1,3 +1,5 @@
+// Raw Color constants for the Dracula theme (see class doc below).
+
 import 'package:flutter/material.dart';
 
 /// Dracula (dark) + Alucard (the official Dracula light companion) palettes.

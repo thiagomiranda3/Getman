@@ -1,3 +1,7 @@
+// Dropdown-style button showing/switching the active environment (or "No
+// Environment"); opens EnvironmentsDialog via its "Manage..." entry. Both
+// picks dispatch UpdateActiveEnvironmentId on SettingsBloc.
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';

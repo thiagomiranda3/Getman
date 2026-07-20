@@ -1,3 +1,5 @@
+// Result entity for an MCP `tools/call`; see class doc below.
+
 import 'package:equatable/equatable.dart';
 
 /// The result of a `tools/call`. [textBlocks] are the `type: "text"` content

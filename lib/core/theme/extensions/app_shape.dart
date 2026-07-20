@@ -1,3 +1,5 @@
+// The AppShape theme extension: panel/button/input/dialog/sheet corner radii
+// (sheetRadius is the modal bottom-sheet top-corner radius).
 import 'package:flutter/material.dart';
 
 class AppShape extends ThemeExtension<AppShape> {

@@ -1,3 +1,5 @@
+// Raw Color constants for the CLASSIC theme (see class doc below).
+
 import 'package:flutter/material.dart';
 
 /// Calm, conventional palette for the CLASSIC theme — neutral grays with a

@@ -1,3 +1,7 @@
+// Builds the ranked, filtered variable-autocomplete suggestion list (user
+// variables union curated dynamic built-ins) for a given query; prefix
+// matches rank above substring matches, user variables before dynamics.
+
 import 'package:getman/core/utils/variable_resolution_helper.dart';
 
 /// One row in the variable autocomplete menu: the [name] to insert plus its

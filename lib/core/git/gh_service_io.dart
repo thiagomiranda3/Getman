@@ -1,3 +1,9 @@
+// dart:io implementation of GhService: shells out to the `gh` CLI via
+// Process.run. Gotcha: Process.run closes the child's stdin (EOF), so `gh`
+// runs non-interactively and errors instead of prompting — this upholds the
+// "throws, never hangs" contract. Never switch to Process.start with an
+// open stdin, and note there is no timeout, so a gh call blocked on
+// something other than stdin would hang forever.
 import 'dart:convert';
 import 'dart:io';
 

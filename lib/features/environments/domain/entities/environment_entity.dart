@@ -1,3 +1,6 @@
+// Domain entity for an environment: name + a flat variables map + a set of
+// secretKeys flagging which variables render masked in the editor/export.
+
 import 'package:equatable/equatable.dart';
 import 'package:uuid/uuid.dart';
 

@@ -1,3 +1,5 @@
+// Get/SaveCollectionsUseCase: thin use-case wrappers over
+// CollectionsRepository for loading and persisting the collections tree.
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
 

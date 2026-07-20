@@ -1,3 +1,13 @@
+// Generic editable key/value row list backing params (ordered list),
+// headers (map), and environment variables (map) — the canonical type is
+// supplied via decode/encode/equals codecs so all three share this one
+// editor.
+//
+// Gotchas: never bypass with a bespoke row editor — _lastEmitted
+// echo-suppression is what keeps focus and half-typed text alive across the
+// BLoC round-trip (a matching echo does NOT reset the row controllers).
+// Optional secretKeys/onSecretKeysChanged adds the per-row lock+reveal
+// affordance; wired only by the env editor, left null for params/headers.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
@@ -16,7 +26,7 @@ import 'package:getman/core/utils/layered_variable_context.dart';
 /// Echo suppression: when the parent echoes back exactly what this editor
 /// just emitted (the usual BLoC round-trip), the text controllers are NOT
 /// rebuilt — that keeps focus and half-typed state alive. Only a genuinely
-/// external change resets the rows. See CLAUDE.md §6.
+/// external change resets the rows. See CLAUDE.md's "Global gotchas" section.
 class KeyValueListEditor<T extends Object> extends StatefulWidget {
   const KeyValueListEditor({
     required this.items,

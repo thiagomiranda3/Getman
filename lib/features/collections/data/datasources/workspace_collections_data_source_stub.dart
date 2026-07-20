@@ -1,3 +1,5 @@
+// Web/no-filesystem stub for WorkspaceCollectionsDataSource: read/write are
+// inert no-ops (workspace mode never activates on web).
 import 'package:getman/features/collections/data/datasources/workspace_collections_data_source.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 

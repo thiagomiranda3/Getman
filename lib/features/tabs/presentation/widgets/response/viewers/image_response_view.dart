@@ -1,3 +1,5 @@
+// PREVIEW viewer for an image response: Image.memory in an InteractiveViewer
+// (pan/zoom), falling back to a short note on decode failure.
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';

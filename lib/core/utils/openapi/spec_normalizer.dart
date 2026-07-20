@@ -1,4 +1,7 @@
-// lib/core/utils/openapi/spec_normalizer.dart
+// Detects whether a decoded spec map is OpenAPI 3.x or Swagger 2.0 (by the
+// `openapi`/`swagger` version key) and dispatches to the matching normalizer;
+// throws FormatException for anything else.
+
 import 'package:getman/core/utils/openapi/normalized_api.dart';
 import 'package:getman/core/utils/openapi/openapi_v3_normalizer.dart';
 import 'package:getman/core/utils/openapi/swagger_v2_normalizer.dart';

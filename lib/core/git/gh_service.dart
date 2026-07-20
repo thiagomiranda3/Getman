@@ -1,3 +1,8 @@
+// Abstract GhService talking to GitHub through the `gh` CLI (PR list/create,
+// auth status, default branch) — rides on the user's own `gh auth`, Getman
+// stores no credentials. Conditional export picks gh_service_io.dart
+// (dart:io, the sole `gh`-process boundary) or gh_service_stub.dart (web
+// no-op). Also declares PullRequestInfo and GhException.
 import 'package:getman/core/git/gh_service_stub.dart'
     if (dart.library.io) 'package:getman/core/git/gh_service_io.dart';
 

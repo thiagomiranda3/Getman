@@ -1,3 +1,5 @@
+// Single-line (or multiline) name/text prompt dialog used across
+// collections/tabs for rename, new-folder, and save-to-collection flows.
 import 'package:flutter/material.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 

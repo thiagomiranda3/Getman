@@ -1,3 +1,6 @@
+// Subsequence fuzzy matcher + ranked filter backing the command palette's
+// search (Cmd/Ctrl+K).
+
 /// Tiny subsequence fuzzy matcher for the command palette. No package — keeps
 /// the local-first/lightweight dependency surface small.
 class FuzzyMatcher {

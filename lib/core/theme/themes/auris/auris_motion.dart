@@ -1,4 +1,11 @@
-// lib/core/theme/themes/auris/auris_motion.dart
+// AURIS collections-tree drag/drop/expand motion (AppMotion.treeDragFeedback /
+// treeDropHighlight / treeExpandFlourish): a HUD chip under the drag cursor,
+// animated corner-bracket "lock-on" brackets on a drop target, and a teal glow
+// flourish on expand/collapse. `aurisMotion` returns identity (const
+// AppMotion()) when reduceEffects is true, per THEME_AUTHORING's mandatory
+// degradation rule. Each widget bails to its plain child when AurisScheme is
+// absent from the active theme (transitional theme-switch guard).
+
 import 'dart:async';
 import 'package:auris/auris_widgets.dart';
 import 'package:flutter/material.dart';

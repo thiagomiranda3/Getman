@@ -1,3 +1,5 @@
+// Domain entity for a tab-panel "workspace"; see class doc below for the
+// empty-panel invariant.
 import 'package:collection/collection.dart';
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';

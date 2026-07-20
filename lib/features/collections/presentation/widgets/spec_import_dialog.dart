@@ -1,3 +1,6 @@
+// Two-step OpenAPI 3.x / Swagger 2.0 importer dialog: pick a source (file,
+// paste, URL) and parse, then a selectable preview before committing. See
+// the class doc below for the bloc-agnostic wiring contract.
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:getman/core/network/network_service.dart';

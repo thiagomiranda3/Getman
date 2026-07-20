@@ -1,3 +1,9 @@
+// Abstract cookie-jar contracts: CookieStore is what the request
+// interceptor reads/writes (matching + expiry are the implementation's
+// job, see InMemoryCookieStore); CookiePersistence is the durable backing
+// it delegates to, kept Hive-free here so the store stays unit-testable
+// (the data-layer impl lives in features/cookies).
+
 import 'package:getman/core/network/network_cookie.dart';
 
 /// The cookie jar as seen by the request interceptor. Implementations decide

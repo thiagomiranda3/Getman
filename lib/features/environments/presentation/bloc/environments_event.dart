@@ -1,3 +1,8 @@
+// EnvironmentsBloc events. AddEnvironment carries the full entity (not just
+// a name) so the dispatching widget knows the new id synchronously;
+// MergeEnvironmentVariables merges into the bloc's live entity (see its own
+// doc comment) for the chaining write-back's concurrent-capture safety.
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 

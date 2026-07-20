@@ -1,3 +1,7 @@
+// Hive model (typeId 0) for the single app-wide settings record. Mirrors
+// SettingsEntity field-for-field; copyWith uses an `_unchanged` sentinel so
+// nullable fields (e.g. activeEnvironmentId) can be explicitly cleared.
+
 import 'package:getman/core/theme/theme_ids.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:hive_ce/hive.dart';

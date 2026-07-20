@@ -1,3 +1,6 @@
+// Keyed FocusNode registry letting the global Cmd/Ctrl+L shortcut focus the
+// active tab's URL field without MainScreen holding a widget reference.
+
 import 'package:flutter/widgets.dart';
 import 'package:getman/features/tabs/presentation/widgets/url_bar.dart'
     show UrlBar;

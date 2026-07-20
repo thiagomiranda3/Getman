@@ -1,3 +1,15 @@
+// Theme registry: maps a themeId to its ThemeDescriptor (id, display name,
+// AppThemeBuilder) in the `appThemes` map. resolveTheme(themeId) returns the
+// builder, invoked as builder(brightness, {isCompact, reduceEffects}); an
+// unknown id falls back to defaultThemeId (classic). resolveThemeData caches
+// built ThemeData by (resolved id, brightness, isCompact, reduceEffects)
+// since builders are pure functions of those inputs — this avoids re-running
+// an expensive builder on every BLoC rebuild.
+//
+// Gotcha: adding a theme means a new lib/core/theme/themes/<name>/ dir plus a
+// ThemeDescriptor entry here and an id constant in theme_ids.dart — read
+// docs/THEME_AUTHORING.md first, since a theme is motion + components, not
+// just colors.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/theme_ids.dart';
 import 'package:getman/core/theme/themes/auris/auris_theme.dart';

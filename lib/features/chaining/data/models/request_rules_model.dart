@@ -1,3 +1,6 @@
+// Hive model (typeId 9) for the assertions + extraction rules attached to
+// one request config, keyed by configId in the 'requestRules' box.
+
 import 'package:getman/features/chaining/data/models/assertion_model.dart';
 import 'package:getman/features/chaining/data/models/extraction_rule_model.dart';
 import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';

@@ -1,3 +1,6 @@
+// Use cases wrapping EnvironmentsRepository: get all, save (replace) all,
+// put one, delete one.
+
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 import 'package:getman/features/environments/domain/repositories/environments_repository.dart';
 

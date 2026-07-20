@@ -1,3 +1,6 @@
+// TabsBloc state: all panels plus a derived view (tabs/activeIndex) of the
+// active panel, recomputed on every emit so existing widgets keep reading
+// state.tabs/state.activeIndex unchanged regardless of panel structure.
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';

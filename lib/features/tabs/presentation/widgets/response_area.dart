@@ -1,3 +1,5 @@
+// Switches the response pane by request kind: HTTP -> ResponseSection, MCP ->
+// McpPanel, WebSocket/SSE -> RealtimePanel.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/network/request_kind.dart';

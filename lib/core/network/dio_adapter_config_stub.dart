@@ -1,3 +1,8 @@
+// Web no-op counterpart to dio_adapter_config_io.dart: browsers own TLS,
+// proxying, and client certs, so this does nothing. Signature is kept
+// identical (unused cert params included) so the conditional-import
+// contract in dio_adapter_config.dart type-checks on both platforms.
+
 import 'package:dio/dio.dart';
 
 /// Web no-op: browsers manage TLS, proxying, and client certificates

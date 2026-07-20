@@ -1,3 +1,8 @@
+// Hive model (typeId 6, box: cookies) for one persisted cookie. hostOnly at
+// HiveField(7) implements RFC 6265 host-only matching (true = exact-host
+// only); it defaults to false so cookies persisted before this field existed
+// keep the legacy, more-permissive suffix-domain matching.
+
 import 'package:getman/core/network/network_cookie.dart';
 import 'package:hive_ce/hive.dart';
 

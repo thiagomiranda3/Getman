@@ -1,3 +1,7 @@
+// Generic Hive box helper: replaceAllInBox does a best-effort atomic
+// clear+addAll (Hive has no real transactions), restoring the previous
+// contents on a write failure instead of leaving the box empty.
+
 import 'package:hive_ce/hive.dart';
 
 /// Replaces the contents of [box] with [items] (clear + addAll).

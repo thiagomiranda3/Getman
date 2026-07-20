@@ -1,3 +1,17 @@
+// JSON prettify used by Beautify (Cmd+B), the cURL-paste shortcut, and
+// response viewing.
+//
+// Gotchas: prettify() hops to a background isolate via compute() for
+// anything that looks like top-level JSON (off the UI thread), but
+// short-circuits non-JSON bodies (HTML/text/binary) without spawning one.
+// The reindent is a lexeme-preserving TOKEN rewrite, not a decode->re-encode
+// round trip: json.decode is used only as a validity gate (its result is
+// discarded) because re-encoding would coerce big integers to lossy doubles,
+// rewrite `\uXXXX` escapes to raw characters, and throw on out-of-range
+// magnitudes like `1e999` — corruption that matters here because Beautify
+// and cURL-paste write the result back into the body that actually gets
+// sent.
+
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 

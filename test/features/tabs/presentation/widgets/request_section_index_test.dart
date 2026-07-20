@@ -29,8 +29,9 @@ import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart'
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/widgets/auth_tab_view.dart';
+import 'package:getman/features/tabs/presentation/widgets/headers_tab_view.dart';
+import 'package:getman/features/tabs/presentation/widgets/params_tab_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_config_section.dart';
-import 'package:getman/features/tabs/presentation/widgets/request_editor_tabs.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_section_index.dart';
 import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.dart';
 import 'package:mocktail/mocktail.dart';

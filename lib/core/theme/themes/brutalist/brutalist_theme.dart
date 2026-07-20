@@ -1,3 +1,15 @@
+// Builds the Brutalist ThemeData: hard offset ink-shadows, thick borders,
+// uppercase display type, yellow/purple accents. Attaches Getman's eight theme
+// extensions (layout/palette/shape/typography/decoration/motion/copy/
+// components) via ThemeData.copyWith, registered in theme_registry.dart.
+//
+// Gotcha: a handful of Material component text sizes (app bar title, dialog
+// title/content, elevated/outlined/text button text) are deliberately wired
+// to `layout.fontSize*` (compact-mode-responsive) rather than left as the
+// pre-refactor const literals — each site is marked with an inline
+// "Intentionally responsive via AppLayout" comment. Don't const them back
+// without a design discussion.
+
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_switch_theme.dart';
 import 'package:getman/core/theme/app_theme.dart';

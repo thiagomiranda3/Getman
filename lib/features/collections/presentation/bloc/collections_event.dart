@@ -1,3 +1,7 @@
+// CollectionsBloc events: CRUD on the collection tree (folders/requests,
+// description, collection-scoped variables, favorites, saved examples),
+// plus move/import/replace-whole-tree. Identity-addressed by node id
+// (id/nodeId), not position.
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';

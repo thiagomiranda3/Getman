@@ -1,3 +1,7 @@
+// Hive-backed persistence for per-request chaining rules (box:
+// 'requestRules', keyed by config id). Wraps RequestRulesModel get/save/
+// delete; consumed by RequestRulesRepositoryImpl.
+
 import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/features/chaining/data/models/request_rules_model.dart';

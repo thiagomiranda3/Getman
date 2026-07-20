@@ -1,3 +1,5 @@
+// The app's signature filled-indicator tab bar, shared by the request
+// config panel, unified phone panel, response panel, and side menu.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 

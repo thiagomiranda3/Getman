@@ -1,3 +1,5 @@
+// Review-tab entities: one reviewable git change (ReviewEntry, carrying a
+// SemanticDiff) and the overall workspace review outcome (ReviewResult).
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/collections/domain/logic/semantic_diff.dart';
 

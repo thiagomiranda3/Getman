@@ -1,3 +1,8 @@
+// Settings control for the git-friendly workspace folder: choose/reload/
+// disconnect, plus a macOS reconnect prompt when a connected path has no
+// stored security-scoped bookmark. Lives in the collections feature (it
+// coordinates CollectionsBloc + WorkspaceSyncService); the settings dialog
+// just embeds it. Desktop/mobile only.
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';

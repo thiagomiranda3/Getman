@@ -29,7 +29,8 @@ import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
-import 'package:getman/features/tabs/presentation/widgets/request_editor_tabs.dart';
+import 'package:getman/features/tabs/presentation/widgets/headers_tab_view.dart';
+import 'package:getman/features/tabs/presentation/widgets/params_tab_view.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockTabsRepository extends Mock implements TabsRepository {}

@@ -1,3 +1,18 @@
+// Full cURL command PARSER: tokenizes a pasted `curl ...` string (handling
+// shell/ANSI-C/double quoting and `\`-newline line continuations), reads its
+// flags (-X/-H/-d/--data-raw/--data-urlencode/-F/-u/-b/-G/-T/...), and
+// resolves the method + body type into an HttpRequestConfigEntity. Powers
+// the URL bar's curl-paste shortcut (see url_bar.dart's `_handleUrlChanged`).
+//
+// Gotchas: method/body-type are INFERRED when -X/--request isn't given
+// (HEAD if -I, GET if -G, PUT if -T/--upload-file, POST if any -d/-F data,
+// else GET); -d/--data/--data-binary honor a leading `@file` reference while
+// --data-raw explicitly does not (matches curl's own semantics).
+// `generate()` at the bottom of this file is a one-line delegate to
+// CodeGenService.generate(..., CodeGenTarget.curl) — the actual curl-string
+// FORMATTING lives there, not here, so parse and generate are not
+// symmetric code paths.
+
 import 'dart:convert';
 
 import 'package:getman/core/domain/entities/auth_config.dart';

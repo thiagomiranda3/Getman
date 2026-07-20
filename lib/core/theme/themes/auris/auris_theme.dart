@@ -1,3 +1,21 @@
+// Builds the AURIS ("sci-fi HUD") ThemeData: composes the external auris
+// package's AurisTheme.dark/.light as the base, then attaches Getman's eight
+// theme extensions (layout/palette/shape/typography/decoration/motion/
+// copy/components) via ThemeData.copyWith, registered in theme_registry.dart.
+//
+// Gotchas: MUST spread `base.extensions.values` first in the extensions list
+// so AurisScheme — which every Auris* widget force-unwraps via
+// `Theme.of(context).extension<AurisScheme>()!` — survives the copyWith and
+// stays attached. AURIS never sets ThemeData.primaryColor, so in dark mode it
+// defaults to a near-black color; read accents/cursors from
+// `colorScheme.primary` instead (see the AURIS dark-primaryColor gotcha).
+// `_normalizeTextLerp` forces ONLY the ListTile leadingAndTrailingTextStyle to
+// inherit:false (matching every other theme's localized fallback) because the
+// auris kit sets it inherit:true, and lerping mismatched `inherit` values
+// during a theme-switch throws "Failed to interpolate TextStyles with
+// different inherit values" (see auris_text_lerp_test) — do not touch
+// title/subtitle or textTheme, which are already aligned.
+
 import 'package:auris/auris.dart';
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/extensions/app_copy.dart';

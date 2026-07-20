@@ -1,3 +1,6 @@
+// Thin use-case wrappers over HistoryRepository: append one config (respecting
+// a size limit) and subscribe to the newest-first watch stream.
+
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/history/domain/repositories/history_repository.dart';
 

@@ -1,3 +1,8 @@
+// Computes a response body's byte size (bodyBytes, else numeric
+// Content-Length header, else the UTF-8 length of the body text, memoized
+// per response instance via an Expando) and humanizes it as B/KB/MB for the
+// response metadata row.
+
 import 'dart:convert';
 
 import 'package:getman/core/network/http_response.dart';

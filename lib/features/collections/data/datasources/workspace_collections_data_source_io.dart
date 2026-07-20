@@ -1,3 +1,10 @@
+// Native filesystem mirror of the collections forest under a workspace
+// directory: one .req.json file per request, a .folder.json + nested
+// directory per folder, and a root-order manifest under .getman/. Writes are
+// atomic (write to a .tmp file, then rename) and reconcile() deletes
+// orphaned files/folders no longer present in the forest. dart:io is safe
+// here — this is the _io.dart half of the io/stub pair selected by
+// workspace_data_source_factory.dart.
 import 'dart:convert';
 import 'dart:io';
 

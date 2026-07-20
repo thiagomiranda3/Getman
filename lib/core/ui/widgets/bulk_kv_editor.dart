@@ -1,3 +1,6 @@
+// Multiline "Key: Value" bulk-edit text view backing the bulk mode of the
+// params/headers tabs; mirrors KeyValueListEditor's echo-suppression so the
+// BLoC round-trip never resets the field mid-type.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 

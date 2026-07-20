@@ -1,3 +1,7 @@
+// RealtimeFrame: one entry in a WebSocket/SSE session log (open/incoming/
+// outgoing/close/error) with a timestamp, rendered by the realtime
+// feature's log view.
+
 import 'package:equatable/equatable.dart';
 
 enum RealtimeDirection { open, incoming, outgoing, close, error }

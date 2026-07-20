@@ -1,3 +1,10 @@
+// Builds an ImportResult (collection tree + environments) from a
+// NormalizedApi: operations group into folders by tag, else by their path's
+// first segment; each op's `{param}` path template becomes `{{param}}`; auth
+// is mapped per-operation via auth_mapper, collecting every seeded secret
+// var name onto one shared `{{baseUrl}}`-keyed environment per server (or a
+// single "Imported" environment when the spec declares no servers).
+
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';

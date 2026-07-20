@@ -1,3 +1,16 @@
+// The 8th theme extension: per-theme widget-slot builders (surface,
+// methodBadge, statusBadge, metric, toggle, logView, dataRow, select,
+// pendingIndicator, statusBanner) plus their builder typedefs and small value
+// types (AppLogLine/AppLogLineKind, AppSelectItem/AppSelectSpec,
+// AppBannerState). Read via context.appComponents; a theme that doesn't
+// override a slot inherits defaultAppComponents()
+// (app_components_defaults.dart).
+//
+// Slot rules for implementers: `surface` must fill (it lives in an
+// Expanded), `logView` sizes to bounded height, `metric` stays a compact
+// inline chip (sits in the metadata Wrap). Animated slots build their
+// CustomPainter once and drive it via `repaint:` (no per-frame allocation),
+// and must degrade to a static rendering under reduceEffects.
 import 'package:flutter/material.dart';
 
 /// Mirrors realtime frame directions (the log view's only consumer).

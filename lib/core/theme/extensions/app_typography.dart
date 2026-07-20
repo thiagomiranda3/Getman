@@ -1,3 +1,6 @@
+// The AppTypography theme extension: the TextTheme, code editor font
+// family, and the three display/title/body FontWeights widgets pull instead
+// of hardcoding font weights.
 import 'package:flutter/material.dart';
 
 class AppTypography extends ThemeExtension<AppTypography> {

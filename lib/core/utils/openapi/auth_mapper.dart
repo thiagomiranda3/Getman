@@ -1,4 +1,9 @@
-// lib/core/utils/openapi/auth_mapper.dart
+// Maps a NormalizedSecurityScheme (from an OpenAPI/Swagger import) to a
+// Getman AuthConfig: shape only, secret values always left blank. Returns
+// the scheme's suggested secret env-var name to seed (bearerToken/
+// basicPassword/apiKey) and a human warning for oauth2/unsupported schemes,
+// which map to AuthConfig.none.
+
 import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/utils/openapi/normalized_api.dart';
 

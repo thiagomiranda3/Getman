@@ -1,3 +1,20 @@
+// TabsRepository implementation: maps HttpRequestTabEntity/PanelEntity to
+// their Hive models via TabsLocalDataSource, and builds+sends the network
+// request (query/header/body resolution, auth injection via
+// RequestSerializer).
+//
+// Gotchas:
+// - _toPersistableModel caps the current response body AND every
+//   responseHistory entry over kMaxPersistedResponseBodyChars (1 MiB) to
+//   kResponseBodyTooLargePlaceholder before writing to disk; the in-memory
+//   session always keeps the full bodies.
+// - That on-disk cap is unconditional and distinct from the
+//   saveLargeResponsesInHistory downgrade of superseded history entries to
+//   kHistoryBodyNotKeptPlaceholder, which happens earlier in
+//   TabsBloc._recordResponse (a different threshold and placeholder).
+// - getPanels() upgrades a legacy (pre-panels) install by wrapping all saved
+//   tabs, in their saved order, into one synthesized "Panel 1"; the bloc
+//   persists that assembled panel back on first load.
 import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';

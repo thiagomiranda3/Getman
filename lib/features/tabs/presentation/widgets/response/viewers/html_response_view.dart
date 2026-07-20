@@ -1,3 +1,8 @@
+// PREVIEW viewer for an HTML response: shows the decoded source as selectable
+// text (no embedded webview, so the raw markup stays inspectable) plus an
+// "OPEN IN BROWSER" button that hands the bytes to openHtmlInBrowser
+// (html_open_external.dart); the button is hidden on web (kIsWeb), where that
+// action is a no-op.
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';

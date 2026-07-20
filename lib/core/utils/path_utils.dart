@@ -1,3 +1,6 @@
+// Cross-platform (POSIX `/` and Windows `\`) basename() helper for file
+// paths.
+
 /// Filesystem path helpers that work for both POSIX (`/`) and Windows (`\`)
 /// separators — Getman runs on macOS, Linux and Windows.
 class PathUtils {

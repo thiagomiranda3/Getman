@@ -1,3 +1,19 @@
+// Collections tree screen: search bar, branch chip + import menu, and the
+// scrollable TreeView (folders + saved-example rows) with drag-and-drop
+// moves. Sole consumer of two_dimensional_scrollables' TreeView in the app.
+// Tracks the tab-linked node to highlight + auto-scroll on focus change.
+//
+// Gotchas: expansion is owned manually via _expandedIds (a Set<String>
+// keyed by CollectionNodeEntity.id, reseeded into TreeViewNode(expanded:)
+// each rebuild) because TreeView has no id-keyed expansion hook and
+// collection mutations rebuild non-equal entities — value-keyed expansion
+// would collapse every folder on every edit (the H2 fix). Rows use
+// TreeViewIndentationType.none + manual depthPaddingMultiplier padding, a
+// fixed AppLayout.treeRowExtent row height, and a LayoutBuilder-derived
+// viewport-width SizedBox (rows have unbounded cross-axis width in the 2D
+// viewport). Drag-and-drop carries node ids via the typed NodeDragData
+// wrapper (Draggable<NodeDragData>/DragTarget<NodeDragData>) — not a bare
+// String — so a dragged tab-strip tab can't be mistakenly accepted here.
 import 'dart:async';
 
 import 'package:flutter/material.dart';

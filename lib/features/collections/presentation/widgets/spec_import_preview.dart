@@ -1,3 +1,6 @@
+// Selectable preview for the OpenAPI/Swagger importer: folder rows with a
+// tristate group checkbox over their indented request leaves, plus the
+// created-environments summary and any import warnings.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/method_badge.dart';

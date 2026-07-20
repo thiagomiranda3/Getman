@@ -1,3 +1,7 @@
+// CONNECT/DISCONNECT button for an MCP request tab; see class doc below for
+// the press-time variable-resolution gotcha (activeVars is a provider, not a
+// snapshot).
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';

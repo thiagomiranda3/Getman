@@ -1,3 +1,7 @@
+// dart:developer Timeline wrappers (traceSync/traceAsync) for profile-mode
+// instrumentation; no-ops in release builds, so safe to leave on hot paths.
+// View spans in DevTools -> Performance under `fvm flutter run --profile`.
+
 import 'dart:developer' as developer;
 
 /// Thin wrappers over `dart:developer` [developer.Timeline] for profile-mode

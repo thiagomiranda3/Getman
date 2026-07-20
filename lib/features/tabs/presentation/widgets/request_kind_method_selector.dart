@@ -1,3 +1,6 @@
+// Leading HTTP-method / request-kind (HTTP/WS/SSE/MCP) dropdown cluster of
+// the URL bar; the method dropdown only shows for HTTP requests and always
+// re-reads the live tab before dispatching UpdateTab.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/network/http_methods.dart';

@@ -1,3 +1,8 @@
+// Touch-first replacement for the desktop three-dot context menu. Opened
+// via long-press on a collection node when `BuildContext.isPhone`. Mirrors
+// CollectionNodeMenu's actions (favorite, rename, describe, add subfolder,
+// variables, export, delete) plus a MOVE TO... folder picker that makes up
+// for the lack of drag-and-drop on narrow screens.
 import 'dart:async';
 
 import 'package:flutter/material.dart';

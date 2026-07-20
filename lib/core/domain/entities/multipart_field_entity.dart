@@ -1,3 +1,7 @@
+// One row of a urlencoded/multipart form body: a name/value text row, or a
+// file row (isFile + filePath + optional contentType). Values may contain
+// {{env vars}}, resolved at send time.
+
 import 'package:equatable/equatable.dart';
 
 /// One row of a form body (`x-www-form-urlencoded` or `multipart/form-data`).

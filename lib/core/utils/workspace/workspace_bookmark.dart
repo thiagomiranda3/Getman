@@ -1,3 +1,9 @@
+// macOS security-scoped workspace-folder bookmarking: WorkspaceLocation and
+// WorkspaceAccessResult value types plus WorkspaceBookmarks, a method-channel
+// wrapper over the native `getman/workspace_bookmark` handler that is a safe
+// no-op (returns null) on every other platform. See the class doc below for
+// why the App Sandbox needs this at all.
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 

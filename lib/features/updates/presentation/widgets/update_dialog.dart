@@ -1,3 +1,7 @@
+// Update-available dialog (SKIP THIS VERSION / LATER / UPDATE NOW); see class
+// doc below. UPDATE NOW hands the download off to the browser, never
+// downloads in-process.
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';

@@ -1,3 +1,6 @@
+// ReviewBloc events: LoadReview, per-path stage/unstage (StageNode/
+// UnstageNode) and select-all/clear-all (StageAll/UnstageAll), SelectEntry
+// (diff-pane selection), Commit, and InitRepo (git init).
 import 'package:equatable/equatable.dart';
 
 abstract class ReviewEvent extends Equatable {

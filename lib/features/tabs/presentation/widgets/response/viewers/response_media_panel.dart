@@ -1,3 +1,11 @@
+// Root dispatcher for non-textual responses: a PREVIEW/RAW toggle (keys
+// media_toggle_*) over the kind-specific viewer picked by
+// classifyResponseMedia (image/csv/html/pdf/video/audio/binary). RAW is
+// always BinaryResponseView; PREVIEW shows a "not stored this session"
+// placeholder when the live bytes are gone (restored tab / older time-travel
+// entry, since bodyBytes is never persisted to Hive). Gates its BlocBuilder
+// on bodyBytes identity + body + content-type, not length, because a
+// re-sent response can have different bytes of the same length.
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';

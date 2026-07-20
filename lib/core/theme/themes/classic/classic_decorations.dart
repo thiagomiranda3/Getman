@@ -1,3 +1,8 @@
+// AppDecoration closures for Classic: a flat native-style panelBox (hairline
+// border + subtle soft shadow, no brutalist offset), a browser-tab-style
+// tabShape, and an identity scaffoldBackground (no ambient wallpaper — the
+// calm, native default).
+
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 

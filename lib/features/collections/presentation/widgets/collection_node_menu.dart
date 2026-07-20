@@ -1,3 +1,7 @@
+// Trailing more-actions popup menu on a collection node row: rename, edit
+// description, variables (folders), add subfolder (folders), export to
+// Postman, export as API docs, favorite/unfavorite, delete (with confirm).
+// Dispatches CollectionsBloc events; delete/favorite show a snackbar.
 import 'dart:async';
 
 import 'package:flutter/material.dart';

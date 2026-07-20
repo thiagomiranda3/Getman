@@ -1,3 +1,8 @@
+// re_editor {{variable}} autocomplete for the body/response code editors:
+// detects an open {{name query at the caret (variablePromptsFor), ranks
+// suggestions via buildVariableSuggestions, and renders the same
+// name/source/preview row style as the URL bar's overlay.
+// wrapBodyWithVariableAutocomplete wires this onto a CodeEditor.
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';

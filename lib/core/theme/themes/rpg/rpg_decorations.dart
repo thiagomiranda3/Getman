@@ -1,3 +1,19 @@
+// AppDecoration closures + the animated wallpaper for Arcane Quest (RPG):
+// panelBox/tabShape (gold aura glow, gold-tinted active tab), and
+// _RpgAnimatedBackground (the scaffold background — a slowly drifting
+// starfield of "motes" with parallax + constellation lines + an occasional
+// traveling shooting star, over a radial vignette; painted by
+// `_StarfieldPainter`). `rpgStaticScaffoldBackground` (reduceEffects) keeps
+// only the vignette, no controller/starfield.
+//
+// Gotchas: `rpgShootingStarSegment` is the pure, @visibleForTesting geometry
+// helper for the comet's moving head/tail segment — the shooting star must
+// *travel* across the sky, not just fade a static line in/out (a past
+// regression). Mirrors auris_ambient.dart/glass_decorations.dart's
+// AmbientSignals + single-ticker lifecycle discipline (build once, start/
+// stop, resolve pulse unconditionally in didChangeDependencies so a re-enable
+// round-trip isn't missed).
+
 import 'dart:async';
 import 'dart:math' as math;
 

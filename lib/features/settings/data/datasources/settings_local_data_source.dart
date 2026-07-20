@@ -1,3 +1,6 @@
+// Hive-backed persistence for the single settings record (box: 'settings',
+// key 'current'). getSettings falls back to SettingsModel() defaults.
+
 import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/features/settings/data/models/settings_model.dart';

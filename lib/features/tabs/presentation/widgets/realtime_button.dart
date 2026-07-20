@@ -1,3 +1,6 @@
+// CONNECT/DISCONNECT button for WebSocket/SSE tabs; activeVars is a provider
+// (not a snapshot) so press-time env resolution reads the live environment
+// even though the URL bar's builder doesn't rebuild on environment changes.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';

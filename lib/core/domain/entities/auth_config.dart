@@ -1,3 +1,9 @@
+// Type-safe view over the raw `Map<String, String> auth` stored on
+// HttpRequestConfigEntity (Hive field 6): AuthType + ApiKeyLocation enums
+// plus the AuthConfig value object, with fromMap/toMap round-tripping the
+// persisted map so the entity and Hive model need no migration. An empty
+// map reads as AuthType.none, so pre-existing records keep working.
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart'
     show HttpRequestConfigEntity;

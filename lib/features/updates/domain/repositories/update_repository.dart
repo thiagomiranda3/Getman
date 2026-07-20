@@ -1,3 +1,6 @@
+// Abstract repository for the auto-update feature; see class doc below.
+// Implemented by UpdateRepositoryImpl.
+
 import 'package:getman/features/updates/domain/entities/release_info.dart';
 
 /// Fetches the latest published release for a given [UpdatePlatform].

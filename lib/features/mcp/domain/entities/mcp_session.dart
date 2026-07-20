@@ -1,3 +1,6 @@
+// Pure-data entity for a negotiated MCP (Model Context Protocol) session; see
+// class doc below.
+
 import 'package:equatable/equatable.dart';
 
 /// An established MCP session: the negotiated protocol version, the server's

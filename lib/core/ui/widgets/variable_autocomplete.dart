@@ -1,3 +1,8 @@
+// `{{variable}}` autocomplete overlay wrapping a TextField: typing `{{` (or
+// Cmd/Ctrl+Space) opens a keyboard-navigable suggestion menu built from
+// suggestionsFor; accepting inserts the closing `}}` and reports the new
+// text via onAccepted, since a programmatic controller write never fires
+// TextField.onChanged the way a real keystroke does.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:getman/core/theme/app_theme.dart';

@@ -1,3 +1,7 @@
+// Renders an ApiDoc as a human-readable Markdown API reference: one section
+// per operation tag, a parameters table (path/query/header), and fenced
+// JSON/text example blocks for request bodies and each response.
+
 import 'dart:convert';
 
 import 'package:getman/core/domain/entities/auth_config.dart';

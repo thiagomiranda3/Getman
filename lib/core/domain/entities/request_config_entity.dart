@@ -1,3 +1,19 @@
+// HttpRequestConfigEntity: the shared request+response snapshot used by the
+// tabs, collections, and history features (it lives in core, not one
+// feature's domain, because all three reference it). Holds method/url/
+// headers/body/auth plus the last response's columns (responseBody/
+// responseHeaders/statusCode/durationMs — null discriminates "nothing sent
+// yet"), and derives `params` from `url` (the query string is the single
+// source of truth; params are never stored separately).
+//
+// Gotchas: copyWith uses a private `_unset` sentinel to distinguish "leave
+// unchanged" from "explicitly set to null" for the nullable response/body
+// fields, so pass the value (even null) explicitly to clear one. withId()
+// is a separate constructor path used when duplicating a tab: it does not
+// go through copyWith's own-id default, since per-request state (chaining
+// rules, saved collection nodes) is keyed by id and a duplicate must get a
+// genuinely new one, never silently share the original's.
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/body_type.dart';

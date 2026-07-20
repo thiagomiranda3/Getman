@@ -1,3 +1,6 @@
+// Compact-phone modal bottom sheet replacing the horizontal tab strip: a
+// panel chip row plus a reorderable list of open tabs (method badge, title,
+// close, move-to-panel, drag handle).
 import 'dart:async';
 
 import 'package:collection/collection.dart';

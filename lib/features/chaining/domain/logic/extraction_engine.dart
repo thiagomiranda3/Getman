@@ -1,3 +1,6 @@
+// Pure engine that runs ExtractionRules against a response; see the class
+// doc for the run/runDecoded shared-decode contract with AssertionEngine.
+
 import 'dart:convert';
 
 import 'package:getman/core/domain/entities/extraction_result.dart';

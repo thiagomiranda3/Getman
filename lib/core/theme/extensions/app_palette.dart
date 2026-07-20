@@ -1,3 +1,7 @@
+// The AppPalette theme extension: method/status/variable/diff colors plus
+// codeBackground and the methodColor(...)/statusColor(int)/statusAccent(int)
+// lookups widgets use instead of hardcoding Colors.*. onColor(background)
+// picks black or white for the higher-WCAG-contrast text on a colored chip.
 import 'package:flutter/material.dart';
 
 class AppPalette extends ThemeExtension<AppPalette> {

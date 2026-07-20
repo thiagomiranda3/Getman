@@ -1,3 +1,16 @@
+// Abstract GitService driving the system `git` CLI over a workspace
+// directory: status/stage/commit/branch/push/pull plus stash and a paused-
+// rebase conflict-resolution flow (isRebaseInProgress/conflictedPaths/
+// showStage/writeWorkingFile/add/rebaseContinue/rebaseAbort). Conditional
+// export picks git_service_io.dart (dart:io, the sole process boundary) or
+// git_service_stub.dart (web no-op).
+//
+// Gotcha: commit()/pull()/rebaseContinue() take optional authorName/
+// authorEmail, passed inline as `-c user.name=… -c user.email=…` — never
+// written to the user's global git config, sourced from Settings HiveFields
+// 28/29 — so those operations succeed even with no git identity configured.
+// Also declares GitStatusEntry, GitException (+ isMissingIdentity),
+// AheadBehind, StashEntry, and PullOutcome.
 export 'git_service_stub.dart'
     if (dart.library.io) 'git_service_io.dart'
     show createGitService;

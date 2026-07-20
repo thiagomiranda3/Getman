@@ -1,4 +1,9 @@
-// lib/core/utils/openapi/normalized_api.dart
+// Version-agnostic data model an OpenAPI 3.x or Swagger 2.0 spec normalizes
+// into (NormalizedApi/Server/Param/Body/SecurityScheme/Operation/Auth),
+// consumed by collection_builder to build the actual import. ImportResult is
+// the top-level product: one collection root + the environments to create +
+// any non-fatal warnings to surface to the user.
+
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
