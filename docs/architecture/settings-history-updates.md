@@ -45,7 +45,9 @@ the io gate at startup):
   `chmod +x` before the AppImage starts. A failed download pops the dialog and
   snackbars; a failed launch surfaces the downloaded path. `updat`'s own
   `openOnDownload`/`closeOnInstall` stay **off** — its `closeOnInstall` calls
-  `exit(0)` without flushing tabs.
+  `exit(0)` without flushing tabs. A 10-minute download-stall watchdog guards
+  `updat`'s single unbounded `http.get`: on fire the dialog closes and a
+  snackbar explains the timeout, with the app staying open.
 
 ### Web-safety gate
 

@@ -1,6 +1,7 @@
-// Native-only auto-update gate: the SOLE importer of dart:io, package:updat,
-// package_info_plus, and path_provider (the web-safety gate — see
-// update_gate.dart's conditional export to update_gate_stub.dart on web).
+// Native-only auto-update gate: the SOLE importer of package:updat and
+// package_info_plus; one of the io-gated (*_io.dart) importers of dart:io and
+// path_provider (the web-safety gate — see update_gate.dart's conditional
+// export to update_gate_stub.dart on web).
 // Two flows: macOS hands the download to the browser (a file downloaded by
 // this sandboxed, unsigned app carries a strict com.apple.quarantine flag
 // that Gatekeeper reports as "damaged", and the sandbox forbids clearing it);
@@ -33,14 +34,16 @@ import 'package:url_launcher/url_launcher.dart';
 ///
 /// macOS: the download is handed to the user's browser (see
 /// `_openDownloadInBrowser`) — never performed in-process. Windows/Linux:
-/// updat downloads the installer (blocking [UpdateDownloadDialog]), then
-/// [finishInAppUpdate] launches it, flushes tabs, and quits.
+/// updat downloads the installer (blocking [UpdateDownloadDialog], guarded by
+/// a download-stall watchdog), then [finishInAppUpdate] launches it, flushes
+/// tabs, and quits.
 class UpdateGate extends StatefulWidget {
   const UpdateGate({
     super.key,
     this.debugInstallsInApp,
     this.debugInstallerLauncher,
     this.debugQuit,
+    this.debugDownloadTimeout,
   });
 
   /// Test seams — widget tests run on a macOS host, so the Windows/Linux
@@ -53,6 +56,11 @@ class UpdateGate extends StatefulWidget {
 
   @visibleForTesting
   final void Function()? debugQuit;
+
+  /// Overrides the download-stall watchdog's duration (production default:
+  /// 10 minutes) so a fire path can be exercised deterministically in tests.
+  @visibleForTesting
+  final Duration? debugDownloadTimeout;
 
   @override
   State<UpdateGate> createState() => _UpdateGateState();
@@ -77,6 +85,13 @@ class _UpdateGateState extends State<UpdateGate> {
 
   /// updat's real in-process downloader, captured from the chip builder.
   void Function()? _updatStartUpdate;
+
+  /// Guards against updat's downloader (a single `http.get` with no timeout)
+  /// stalling mid-transfer and leaving the non-dismissible
+  /// [UpdateDownloadDialog] up forever. Started in [_startInAppDownload];
+  /// cancelled on any terminal resolution (`_onStatus`'s error/readyToInstall
+  /// branches) and in [dispose].
+  Timer? _downloadWatchdog;
 
   bool get _installsInApp =>
       widget.debugInstallsInApp ?? (Platform.isWindows || Platform.isLinux);
@@ -103,6 +118,12 @@ class _UpdateGateState extends State<UpdateGate> {
       context.read<UpdateController>().installsInApp = _installsInApp;
       unawaited(_loadVersion());
     }
+  }
+
+  @override
+  void dispose() {
+    _downloadWatchdog?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadVersion() async {
@@ -261,14 +282,33 @@ class _UpdateGateState extends State<UpdateGate> {
 
   /// Confirmed in-app flow: block the UI with [UpdateDownloadDialog] and hand
   /// off to updat's downloader. Resolution arrives via [_onStatus]
-  /// (readyToInstall → [_finishInAppUpdate]; error → pop + snackbar).
+  /// (readyToInstall → [_finishInAppUpdate]; error → pop + snackbar). A
+  /// watchdog timer guards against the download stalling forever (see
+  /// [_downloadWatchdog]).
   Future<void> _startInAppDownload() async {
+    // Capture always precedes prompts today, so `_updatStartUpdate` should
+    // never be null here — this guard just prevents a permanent blocking
+    // modal if that ever stops being true.
+    if (_updatStartUpdate == null) return;
     _inAppDownloadInFlight = true;
     _downloadDialogOpen = true;
     unawaited(
       UpdateDownloadDialog.show(
         context,
       ).whenComplete(() => _downloadDialogOpen = false),
+    );
+    _downloadWatchdog = Timer(
+      widget.debugDownloadTimeout ?? const Duration(minutes: 10),
+      () {
+        if (!_inAppDownloadInFlight || !mounted) return;
+        _inAppDownloadInFlight = false;
+        _popDownloadDialogIfOpen();
+        showAppSnackBar(context, 'The update download timed out.');
+        // If updat's downloader resolves after this fires, `_onStatus`'s
+        // readyToInstall/error branches see `_inAppDownloadInFlight ==
+        // false` and no-op, so a late completion is a harmless no-op rather
+        // than reopening the dialog or launching a stale installer.
+      },
     );
     _updatStartUpdate?.call();
   }
@@ -330,6 +370,7 @@ class _UpdateGateState extends State<UpdateGate> {
           if (_inAppDownloadInFlight) {
             // The in-app download failed (not a version check): unblock the
             // UI and keep the app running.
+            _downloadWatchdog?.cancel();
             _inAppDownloadInFlight = false;
             _popDownloadDialogIfOpen();
             showAppSnackBar(context, "Couldn't download the update.");
@@ -342,6 +383,7 @@ class _UpdateGateState extends State<UpdateGate> {
           }
         case UpdatePhase.readyToInstall:
           if (_inAppDownloadInFlight) {
+            _downloadWatchdog?.cancel();
             _inAppDownloadInFlight = false;
             unawaited(_finishInAppUpdate());
           }
@@ -424,8 +466,9 @@ Future<UpdateFinishResult> finishInAppUpdate({
   }
   try {
     await flushTabs();
-  } on Object {
+  } on Object catch (e) {
     // Best-effort only — see doc above.
+    debugPrint('Tab flush before update install failed: $e');
   }
   quit();
   return UpdateFinishResult.quitting;
