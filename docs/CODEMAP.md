@@ -194,7 +194,7 @@ widgets + screens). Shared cross-feature code lives under `lib/core/`. See
 | `lib/features/updates/domain/entities` | `release_info.dart` (`ReleaseInfo` + `UpdatePlatform`). |
 | `lib/features/updates/domain/repositories` | `update_repository.dart` (abstract). |
 | `lib/features/updates/presentation` | Web-safety gate + logic: `update_gate.dart` (conditional export), `update_gate_io.dart`, `update_gate_stub.dart`, `update_decision.dart`, `update_controller.dart`, `update_phase.dart`. |
-| `lib/features/updates/presentation/widgets` | `update_dialog.dart`, `update_settings_section.dart`. |
+| `lib/features/updates/presentation/widgets` | `update_dialog.dart`, `update_download_dialog.dart` (blocking in-app download progress), `update_settings_section.dart`. |
 
 ---
 
@@ -348,4 +348,4 @@ features; follow them to trace an end-to-end behavior.
 2. `lib/features/updates/data/datasources/github_release_data_source.dart` — fetches the latest GitHub release.
 3. `lib/features/updates/presentation/update_decision.dart` — `isNewerVersion` + `shouldPromptForUpdate`.
 4. `lib/features/updates/presentation/update_controller.dart` — drives dialog state (a `ChangeNotifier`).
-5. `lib/features/updates/presentation/widgets/update_dialog.dart` — Update now / Skip this version / Later (UPDATE NOW opens the browser).
+5. `lib/features/updates/presentation/widgets/update_dialog.dart` — Update now / Skip this version / Later (UPDATE NOW: macOS opens the browser; Windows/Linux confirm, download in-app, launch the installer, and quit).

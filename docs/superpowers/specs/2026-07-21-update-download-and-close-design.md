@@ -40,14 +40,15 @@ not change.)
 3. A non-dismissible themed **DOWNLOADING UPDATE…** dialog (indeterminate
    spinner) blocks the UI. `updat` downloads the installer to the user's
    **Downloads folder** as `getman-<version>.exe` / `getman-<version>.AppImage`.
-4. On success, in order:
-   1. Flush unsaved tabs — `TabsBloc.close()` (cancels the 10 s debounce and
-      writes dirty tabs; see docs/architecture/persistence-hive.md).
-   2. Launch the installer:
-      - **Windows:** shell-open the downloaded `.exe` (updat's
-        `launchInstaller`, a `file://` open).
-      - **Linux:** `chmod +x` the AppImage, then `Process.start` it detached
+4. On success, in order (*amended during planning — launch moved first: a
+   failed launch must leave the app fully usable, and flushing first would
+   have `close()`d the TabsBloc, killing tab persistence*):
+   1. Launch the installer:
+      - **Windows:** start the downloaded `.exe` detached.
+      - **Linux:** `chmod +x` the AppImage, then start it detached
         (a plain file-open does not execute a fresh AppImage).
+   2. Flush unsaved tabs — `TabsBloc.close()` (cancels the 10 s debounce and
+      writes dirty tabs; best-effort — a failed flush never blocks the quit).
    3. `exit(0)`.
 
 ### macOS
