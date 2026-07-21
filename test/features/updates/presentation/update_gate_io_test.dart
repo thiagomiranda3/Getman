@@ -146,4 +146,39 @@ void main() {
       expect(controller.manualInFlight, isFalse);
     },
   );
+
+  group('finishInAppUpdate', () {
+    test('launches, then flushes tabs, then quits — in that order', () async {
+      final calls = <String>[];
+      final result = await finishInAppUpdate(
+        launchInstaller: () async => calls.add('launch'),
+        flushTabs: () async => calls.add('flush'),
+        quit: () => calls.add('quit'),
+      );
+      expect(result, UpdateFinishResult.quitting);
+      expect(calls, ['launch', 'flush', 'quit']);
+    });
+
+    test('a failed launch keeps the app alive: no flush, no quit', () async {
+      final calls = <String>[];
+      final result = await finishInAppUpdate(
+        launchInstaller: () async => throw Exception('no such file'),
+        flushTabs: () async => calls.add('flush'),
+        quit: () => calls.add('quit'),
+      );
+      expect(result, UpdateFinishResult.launchFailed);
+      expect(calls, isEmpty);
+    });
+
+    test('a failed tab flush still quits (best-effort flush)', () async {
+      var quitCalled = false;
+      final result = await finishInAppUpdate(
+        launchInstaller: () async {},
+        flushTabs: () async => throw Exception('hive is gone'),
+        quit: () => quitCalled = true,
+      );
+      expect(result, UpdateFinishResult.quitting);
+      expect(quitCalled, isTrue);
+    });
+  });
 }

@@ -262,3 +262,59 @@ class _UpdateGateState extends State<UpdateGate> {
     UpdatStatus.dismissed => UpdatePhase.dismissed,
   };
 }
+
+/// Outcome of [finishInAppUpdate]: tells the gate (and tests) apart "the app
+/// is about to exit" from "installer launch failed, keep the app alive".
+enum UpdateFinishResult { quitting, launchFailed }
+
+/// Terminal sequence of the in-app update: launch the downloaded installer,
+/// best-effort flush unsaved tabs, then quit.
+///
+/// Launch comes FIRST deliberately — flushing first would `close()` the
+/// TabsBloc, and if the launch then failed the app would sit open with dead
+/// tab persistence. A failed launch here leaves the app fully intact; a
+/// failed flush never blocks the quit (losing <10 s of tab edits beats
+/// stranding the update with the installer already running).
+@visibleForTesting
+Future<UpdateFinishResult> finishInAppUpdate({
+  required Future<void> Function() launchInstaller,
+  required Future<void> Function() flushTabs,
+  required void Function() quit,
+}) async {
+  try {
+    await launchInstaller();
+  } on Object {
+    return UpdateFinishResult.launchFailed;
+  }
+  try {
+    await flushTabs();
+  } on Object {
+    // Best-effort only — see doc above.
+  }
+  quit();
+  return UpdateFinishResult.quitting;
+}
+
+/// Launches the downloaded installer. Windows: start the Inno Setup `.exe`
+/// detached. Linux: `chmod +x` first, then start the AppImage detached — a
+/// fresh download has no execute bit, so a plain file-open would not run it.
+/// Throws on failure so [finishInAppUpdate] can keep the app alive.
+@visibleForTesting
+Future<void> launchDownloadedInstaller(File installer) async {
+  if (Platform.isLinux) {
+    final chmod = await Process.run('chmod', ['+x', installer.path]);
+    if (chmod.exitCode != 0) {
+      throw ProcessException(
+        'chmod',
+        ['+x', installer.path],
+        chmod.stderr.toString(),
+        chmod.exitCode,
+      );
+    }
+  }
+  await Process.start(
+    installer.path,
+    const <String>[],
+    mode: ProcessStartMode.detached,
+  );
+}
