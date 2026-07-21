@@ -65,7 +65,7 @@ and closes Getman to run it.").
 |---|---|
 | `update_controller.dart` (web-safe) | New `installsInApp` flag (default `false`), set by the gate on Windows/Linux. This is how the platform-agnostic dialog picks its flow without importing `dart:io` (`platform_io_outside_io_files` stays happy). |
 | `update_dialog.dart` | UPDATE NOW checks `installsInApp` → shows the ConfirmDialog first (cancel keeps the update dialog open); browser path untouched. Note text becomes flag-aware. |
-| `update_gate_io.dart` | Keeps `openOnDownload: false` and `closeOnInstall: false` and orchestrates itself: captures updat's real `startUpdate`, supplies `getDownloadFileLocation` (so the installer path is known for launch/chmod/error messages), tracks an `_inAppDownloadInFlight` flag so `_onStatus` routes `downloading` → show progress dialog, `readyToInstall` → flush-launch-exit, `error` → pop progress dialog + error snackbar (app stays open). |
+| `update_gate_io.dart` | Keeps `openOnDownload: false` and `closeOnInstall: false` and orchestrates itself: captures updat's real `startUpdate`, supplies `getDownloadFileLocation` (so the installer path is known for launch/chmod/error messages), tracks an `_inAppDownloadInFlight` flag so `_onStatus` routes `downloading` → show progress dialog, `readyToInstall` → launch-flush-exit, `error` → pop progress dialog + error snackbar (app stays open). |
 | `widgets/update_download_dialog.dart` (new) | The blocking progress dialog (`PopScope(canPop: false)`, themed, indeterminate spinner). |
 | Quit seam | The `exit(0)` call sits behind an injectable hook so tests can assert "would have exited" without killing the test runner. |
 
@@ -87,7 +87,7 @@ immediately after launching the installer, which would skip the tab flush.
   invokes `startUpdate`. Flag false → browser path unchanged. Note text per
   flag. Progress dialog renders and is not dismissible.
 - Gate orchestration tests via the injectable exit seam: ready-to-install
-  triggers flush → launch → exit in order; error path keeps the app open.
+  triggers launch → flush → exit in order; error path keeps the app open.
 - Existing macOS-path tests stay green.
 
 ## Docs & wiki (sync mandate)
