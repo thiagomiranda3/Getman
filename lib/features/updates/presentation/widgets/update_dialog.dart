@@ -1,12 +1,13 @@
-// Update-available dialog (SKIP THIS VERSION / LATER / UPDATE NOW); see class
-// doc below. UPDATE NOW hands the download off to the browser, never
-// downloads in-process.
+// Update-available dialog (SKIP THIS VERSION / LATER / UPDATE NOW). UPDATE
+// NOW branches on UpdateController.installsInApp: Windows/Linux confirm
+// "close and update" then download in-app; macOS hands off to the browser.
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/ui/widgets/confirm_dialog.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
@@ -15,9 +16,11 @@ import 'package:provider/provider.dart';
 
 /// Themed dialog shown when an update is available. Shows the version line,
 /// optional changelog, a note about how the download works, and three actions:
-/// SKIP THIS VERSION, LATER, and UPDATE NOW. UPDATE NOW opens the release
-/// download in the user's browser (see `update_gate_io._openDownloadInBrowser`)
-/// and closes the dialog.
+/// SKIP THIS VERSION, LATER, and UPDATE NOW. When
+/// [UpdateController.installsInApp] is true (Windows/Linux) UPDATE NOW first
+/// confirms via [ConfirmDialog] that Getman may close, then starts the in-app
+/// download (see `update_gate_io.dart`); otherwise it opens the release
+/// download in the user's browser and closes the dialog.
 ///
 /// Normally opened via [UpdateDialog.show], which injects [UpdateController]
 /// via [ChangeNotifierProvider] and [SettingsBloc] via [BlocProvider]. The
@@ -74,6 +77,7 @@ class UpdateDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final layout = context.appLayout;
     final controller = _controller(context);
+    final installsInApp = controller?.installsInApp ?? false;
 
     return ResponsiveDialogScaffold(
       title: const Text('UPDATE AVAILABLE'),
@@ -82,6 +86,7 @@ class UpdateDialog extends StatelessWidget {
         currentVersion: currentVersion,
         changelog: changelog,
         layout: layout,
+        installsInApp: installsInApp,
       ),
       actions: [
         TextButton(
@@ -105,8 +110,29 @@ class UpdateDialog extends StatelessWidget {
         TextButton(
           key: const ValueKey('update_now_button'),
           onPressed: () {
-            unawaited(controller?.startUpdate?.call());
-            Navigator.pop(context);
+            if (installsInApp) {
+              unawaited(
+                ConfirmDialog.show(
+                  context,
+                  title: 'CLOSE AND UPDATE?',
+                  message:
+                      'Getman will download the update to your Downloads '
+                      'folder and then close itself so the installer can '
+                      'run. Continue?',
+                  confirmLabel: 'DOWNLOAD AND CLOSE',
+                  destructive: false,
+                  // ConfirmDialog pops itself before onConfirm, so `context`
+                  // (the still-mounted update dialog) is safe to pop here.
+                  onConfirm: () {
+                    Navigator.pop(context);
+                    unawaited(controller?.startUpdate?.call());
+                  },
+                ),
+              );
+            } else {
+              unawaited(controller?.startUpdate?.call());
+              Navigator.pop(context);
+            }
           },
           style: TextButton.styleFrom(
             foregroundColor: Theme.of(context).colorScheme.primary,
@@ -125,12 +151,14 @@ class _DialogBody extends StatelessWidget {
     required this.currentVersion,
     required this.changelog,
     required this.layout,
+    required this.installsInApp,
   });
 
   final String latestVersion;
   final String currentVersion;
   final String? changelog;
   final AppLayout layout;
+  final bool installsInApp;
 
   @override
   Widget build(BuildContext context) {
@@ -155,9 +183,14 @@ class _DialogBody extends StatelessWidget {
           ),
         SizedBox(height: layout.tabSpacing),
         Text(
-          'UPDATE NOW opens the download in your browser. Getman is not '
-          'code-signed, so your OS may warn on first launch — allow it via '
-          'right-click → Open (macOS) or More info → Run anyway (Windows).',
+          installsInApp
+              ? 'UPDATE NOW downloads the installer to your Downloads folder '
+                    'and closes Getman so the installer can run. Getman is '
+                    'not code-signed, so your OS may warn before running it.'
+              : 'UPDATE NOW opens the download in your browser. Getman is '
+                    'not code-signed, so your OS may warn on first launch — '
+                    'allow it via right-click → Open (macOS) or More info → '
+                    'Run anyway (Windows).',
           style: TextStyle(fontSize: layout.fontSizeSmall),
         ),
       ],
