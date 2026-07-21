@@ -181,4 +181,57 @@ void main() {
       expect(quitCalled, isTrue);
     });
   });
+
+  testWidgets(
+    'in-app flow: confirm shows the blocking dialog; a failed download pops '
+    'it, shows the error snackbar, and never quits',
+    (tester) async {
+      final controller = UpdateController(
+        _ReleaseRepo(
+          const ReleaseInfo(
+            version: '99.0.0',
+            changelog: null,
+            assetUrl: 'https://example.com/getman-99.0.0.exe',
+          ),
+        ),
+      );
+      final bloc = buildSettingsBloc();
+      var quitCalled = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: brutalistTheme(Brightness.light),
+          home: ChangeNotifierProvider<UpdateController>.value(
+            value: controller,
+            child: BlocProvider.value(
+              value: bloc,
+              child: Scaffold(
+                body: UpdateGate(
+                  debugInstallsInApp: true,
+                  debugQuit: () => quitCalled = true,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Startup check found 99.0.0 → update dialog prompted.
+      await tester.tap(find.byKey(const ValueKey('update_now_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('DOWNLOAD AND CLOSE'));
+      await tester.pump();
+
+      // The blocking dialog is up while updat downloads.
+      expect(find.text('DOWNLOADING UPDATE…'), findsOneWidget);
+
+      // flutter_test's HttpClient 400s every request, so the download fails:
+      // dialog popped, snackbar shown, app still alive.
+      await tester.pumpAndSettle();
+      expect(find.text('DOWNLOADING UPDATE…'), findsNothing);
+      expect(find.text("Couldn't download the update."), findsOneWidget);
+      expect(quitCalled, isFalse);
+    },
+  );
 }
