@@ -22,6 +22,12 @@ class UpdateController extends ChangeNotifier {
   bool manualInFlight = false;
   ReleaseInfo? cachedRelease;
 
+  /// True when this platform installs updates in-app (Windows/Linux: download
+  /// to the Downloads folder, then auto-launch + quit) rather than handing
+  /// the download to the browser (macOS, web). Set once by the io gate at
+  /// startup — a plain field, no [notifyListeners] needed.
+  bool installsInApp = false;
+
   // Set by the gate each build (captured from `updat`'s builder callbacks).
   VoidCallback? triggerCheck;
   Future<void> Function()? startUpdate;
