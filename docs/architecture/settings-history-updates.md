@@ -54,10 +54,11 @@ the io gate at startup):
 The platform gate keeps web builds clean via a conditional export:
 
 - `update_gate.dart` — conditional export.
-- `update_gate_io.dart` — native only; the **sole importer of `updat`,
-  `dart:io`, `package_info_plus`, and `path_provider`** (the latter for
-  `getDownloadsDirectory` in the in-app download flow; the response media
-  viewers' `*_io.dart` files also import it).
+- `update_gate_io.dart` — native only; the **sole importer of `updat` and
+  `package_info_plus`**, and one of the io-gated `*_io.dart` importers of
+  `dart:io`/`path_provider` (the latter for `getDownloadsDirectory` in the
+  in-app download flow; the response media viewers' `*_io.dart` files also
+  import it).
 - `update_gate_stub.dart` — web no-op.
 
 This split is machine-enforced by the `platform_io_outside_io_files` custom lint (imports of `dart:io`/`updat`/`package_info_plus`/`path_provider` are forbidden outside `*_io.dart` files).
