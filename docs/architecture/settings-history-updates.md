@@ -18,14 +18,47 @@
 
 ## Auto-update (GitHub-release)
 
-On startup (when `checkForUpdatesOnStartup` is `true`) one `releases/latest` check via `GithubReleaseDataSource`; if a newer version is found, `UpdateDialog` prompts Update now / Skip this version / Later. Logic lives in `update_decision.dart` (`isNewerVersion` + `shouldPromptForUpdate`); `UpdateController` (a `ChangeNotifier`) drives dialog state and is provided via `ChangeNotifierProvider` above `MaterialApp`. A GENERAL-tab toggle + "CHECK FOR UPDATES" button are in `UpdateSettingsSection`. Per-platform installers: `.dmg` (macOS), Inno Setup `.exe` (Windows), `AppImage` (Linux). On macOS, "UPDATE NOW" opens the asset URL in the browser (an in-app download tripped Gatekeeper on the unsigned build).
+On startup (when `checkForUpdatesOnStartup` is `true`) one `releases/latest`
+check via `GithubReleaseDataSource`; if a newer version is found, `UpdateDialog`
+prompts Update now / Skip this version / Later. Logic lives in
+`update_decision.dart` (`isNewerVersion` + `shouldPromptForUpdate`);
+`UpdateController` (a `ChangeNotifier`) drives dialog state and is provided via
+`ChangeNotifierProvider` above `MaterialApp`. A GENERAL-tab toggle + "CHECK FOR
+UPDATES" button are in `UpdateSettingsSection`. Per-platform installers: `.dmg`
+(macOS), Inno Setup `.exe` (Windows), `AppImage` (Linux).
+
+UPDATE NOW is platform-split via `UpdateController.installsInApp` (set once by
+the io gate at startup):
+
+- **macOS** (`installsInApp == false`): opens the asset URL in the browser —
+  an in-app download by the sandboxed, unsigned app carries a strict
+  `com.apple.quarantine` flag that Gatekeeper reports as "damaged", and the
+  sandbox can't clear it (the v1.4.1 fix; do not re-enable without
+  signing/notarization).
+- **Windows/Linux** (`installsInApp == true`): a `ConfirmDialog`
+  ("CLOSE AND UPDATE?") warns that Getman will close; on confirm, `updat`
+  downloads the installer to the user's Downloads folder behind the blocking
+  `UpdateDownloadDialog`, then `finishInAppUpdate` runs **launch installer →
+  flush tabs (`TabsBloc.close()`, cancels the 10 s debounce) → `exit(0)`**.
+  Launch comes first deliberately: a failed launch must leave the app fully
+  usable, and an early flush would have closed the TabsBloc. Linux gets a
+  `chmod +x` before the AppImage starts. A failed download pops the dialog and
+  snackbars; a failed launch surfaces the downloaded path. `updat`'s own
+  `openOnDownload`/`closeOnInstall` stay **off** — its `closeOnInstall` calls
+  `exit(0)` without flushing tabs. A 10-minute download-stall watchdog guards
+  `updat`'s single unbounded `http.get`: on fire the dialog closes and a
+  snackbar explains the timeout, with the app staying open.
 
 ### Web-safety gate
 
 The platform gate keeps web builds clean via a conditional export:
 
 - `update_gate.dart` — conditional export.
-- `update_gate_io.dart` — native only; the **sole importer of `updat`, `dart:io`, and `package_info_plus`**. (It does **not** import `path_provider` — that package is imported only by `html_open_external_io.dart` and `media_temp_file_io.dart` under the response media viewers.)
+- `update_gate_io.dart` — native only; the **sole importer of `updat` and
+  `package_info_plus`**, and one of the io-gated `*_io.dart` importers of
+  `dart:io`/`path_provider` (the latter for `getDownloadsDirectory` in the
+  in-app download flow; the response media viewers' `*_io.dart` files also
+  import it).
 - `update_gate_stub.dart` — web no-op.
 
 This split is machine-enforced by the `platform_io_outside_io_files` custom lint (imports of `dart:io`/`updat`/`package_info_plus`/`path_provider` are forbidden outside `*_io.dart` files).

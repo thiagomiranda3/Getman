@@ -58,4 +58,8 @@ void main() {
       expect(controller.phase, UpdatePhase.available);
     },
   );
+
+  test('installsInApp defaults to false (browser hand-off is the default)', () {
+    expect(controller.installsInApp, isFalse);
+  });
 }

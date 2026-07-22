@@ -15,9 +15,14 @@ import 'package:getman/core/git/git_service.dart';
 /// Deliberately does **not** run `git config user.name/user.email` in
 /// [setUp] (unlike `git_service_io_test.dart`'s shared fixture) — the whole
 /// point is a repo with no identity of its own. The service is built with
-/// `GIT_CONFIG_GLOBAL` pointed at an empty file (+ `GIT_CONFIG_NOSYSTEM`) so
-/// the developer machine's real `~/.gitconfig` identity can't leak in and
-/// make the missing-identity commits silently succeed.
+/// `GIT_CONFIG_GLOBAL` pointed at an isolated file (+ `GIT_CONFIG_NOSYSTEM`)
+/// so the developer machine's real `~/.gitconfig` identity can't leak in and
+/// make the missing-identity commits silently succeed. That file sets
+/// `user.useConfigOnly = true`, which disables git's own fallback of
+/// guessing an identity from the OS account/hostname (real on a normal
+/// desktop account — `git commit` there just warns and succeeds instead of
+/// failing) — without it this test is flaky/environment-dependent instead of
+/// deterministic.
 void main() {
   late GitService git;
   late Directory tmp;
@@ -26,10 +31,11 @@ void main() {
 
   setUp(() async {
     tmp = await Directory.systemTemp.createTemp('getman_git_identity_test');
-    final emptyGlobalConfig = File('${tmp.path}/empty-gitconfig')..createSync();
+    final isolatedGlobalConfig = File('${tmp.path}/empty-gitconfig')
+      ..writeAsStringSync('[user]\n\tuseConfigOnly = true\n');
     git = createGitService(
       environmentOverrides: {
-        'GIT_CONFIG_GLOBAL': emptyGlobalConfig.path,
+        'GIT_CONFIG_GLOBAL': isolatedGlobalConfig.path,
         'GIT_CONFIG_NOSYSTEM': '1',
       },
     );
