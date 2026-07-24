@@ -49,6 +49,16 @@ void main() {
       );
       expect(rows, [en('tag', 'a'), pk('tag', 'c'), en('tag', 'b')]);
     });
+
+    test('tied rowIndex with clamping maintains stable sort order', () {
+      // Regression: both m and n clamp to position 1 but must appear in
+      // sorted order [m, n], not reversed [n, m].
+      final rows = ParamRowComposer.compose(
+        params: [q('a', '1')],
+        parked: [p('m', '0', 99), p('n', '9', 99)],
+      );
+      expect(rows, [en('a', '1'), pk('m', '0'), pk('n', '9')]);
+    });
   });
 
   group('park', () {
@@ -151,6 +161,47 @@ void main() {
         ),
         (params: params, parked: parked),
       );
+    });
+
+    test('unpark on tied+clamped input removes the correct entity', () {
+      // Regression: unparking displayIndex 1 should remove m, not n.
+      final result = ParamRowComposer.unpark(
+        params: [q('a', '1')],
+        parked: [p('m', '0', 99), p('n', '9', 99)],
+        displayIndex: 1,
+      );
+      expect(result.params, [q('a', '1'), q('m', '0')]);
+      expect(result.parked, [p('n', '9', 99)]);
+    });
+
+    test('park/unpark round-trip is lossless on tied+clamped input', () {
+      // Regression: compose with tied+clamped parked items must be reversible.
+      final initial = (
+        params: [q('a', '1')],
+        parked: [p('m', '0', 99), p('n', '9', 99)],
+      );
+      // Compose: [a(en), m(pk@1), n(pk@2)]
+      final composed = ParamRowComposer.compose(
+        params: initial.params,
+        parked: initial.parked,
+      );
+      expect(composed, [en('a', '1'), pk('m', '0'), pk('n', '9')]);
+
+      // Unpark displayIndex 1 (m): should remove m from parked, add to params.
+      final unparked = ParamRowComposer.unpark(
+        params: initial.params,
+        parked: initial.parked,
+        displayIndex: 1,
+      );
+      expect(unparked.params, [q('a', '1'), q('m', '0')]);
+      expect(unparked.parked, [p('n', '9', 99)]);
+
+      // Verify the unpark result recomposes correctly.
+      final recomposed = ParamRowComposer.compose(
+        params: unparked.params,
+        parked: unparked.parked,
+      );
+      expect(recomposed, [en('a', '1'), en('m', '0'), pk('n', '9')]);
     });
   });
 

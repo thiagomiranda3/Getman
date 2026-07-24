@@ -5,11 +5,14 @@
 // interleaves both populations into display rows and converts edited rows
 // back, so ParamsTabView stays a thin wiring layer.
 //
-// Gotchas: decompose matches parked entities to emitted rows by exact
-// key+value content, preferring the unclaimed occurrence nearest the
-// remembered rowIndex — that keeps flags on the right row through single
-// deletions and duplicate content. Parked rows are read-only in the editor
-// (disabledRowsReadOnly), so their content never drifts from the entities.
+// Gotchas: (1) compose inserts tied items (equal rowIndex) as a contiguous
+// block maintaining their sorted order, so stable sort is guaranteed even
+// when clamping changes the insertion target. (2) decompose matches parked
+// entities to emitted rows by exact key+value content, preferring the
+// unclaimed occurrence nearest the remembered rowIndex — that keeps flags on
+// the right row through single deletions and duplicate content. (3) Parked
+// rows are read-only in the editor (disabledRowsReadOnly), so their content
+// never drifts from the entities.
 
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/parked_param_entity.dart';
@@ -58,6 +61,8 @@ class ParamRowComposer {
 
   /// Interleaves enabled URL [params] with [parked] rows at their remembered
   /// (clamped) rowIndex. Duplicate keys are preserved in both populations.
+  /// Items with equal rowIndex are inserted as a contiguous block in their
+  /// sorted order, ensuring stable sort even under clamping.
   static List<ParamRow> compose({
     required List<QueryParamEntity> params,
     required List<ParkedParamEntity> parked,
@@ -66,13 +71,22 @@ class ParamRowComposer {
       for (final p in params)
         ParamRow(key: p.key, value: p.value, enabled: true),
     ];
-    // Insert in reverse so items with equal rowIndex maintain their original
-    // list order when inserted at the same position.
-    for (final p in _sortedParked(parked).reversed) {
-      rows.insert(
-        _clamp(p.rowIndex, rows.length),
-        ParamRow(key: p.key, value: p.value, enabled: false),
-      );
+    // Group sorted items by rowIndex and insert each group as a contiguous
+    // block. This ensures tied items (same rowIndex) maintain their sorted
+    // order even when clamping changes the insertion point.
+    final grouped = <int, List<ParkedParamEntity>>{};
+    for (final p in _sortedParked(parked)) {
+      grouped.putIfAbsent(p.rowIndex, () => []).add(p);
+    }
+    for (final rowIndex in grouped.keys.toList()..sort()) {
+      var insertPos = _clamp(rowIndex, rows.length);
+      for (final item in grouped[rowIndex]!) {
+        rows.insert(
+          insertPos,
+          ParamRow(key: item.key, value: item.value, enabled: false),
+        );
+        insertPos++;
+      }
     }
     return rows;
   }
