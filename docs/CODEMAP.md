@@ -255,6 +255,7 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | Name prompt dialog | `lib/core/ui/widgets/name_prompt_dialog.dart` |
 | OpenAPI / Swagger import | `lib/core/utils/openapi/spec_normalizer.dart`, `lib/core/utils/openapi/collection_builder.dart`, `lib/features/collections/presentation/widgets/spec_import_dialog.dart` |
 | Panels (virtual desktops) | `lib/features/tabs/data/models/panel_model.dart`, `lib/features/tabs/presentation/widgets/panel_selector.dart`, `lib/features/tabs/presentation/bloc/tabs_bloc.dart` |
+| Per-row enable/disable (params/headers) | `lib/core/utils/param_row_composer.dart`, `lib/features/tabs/presentation/widgets/params_tab_view.dart`, `lib/features/tabs/presentation/widgets/headers_tab_view.dart` |
 | Postman import / export | `lib/core/utils/postman/postman_collection_mapper.dart`, `lib/core/utils/postman/postman_environment_mapper.dart`, `lib/core/utils/json_file_io.dart` |
 | Proxy | `lib/core/network/dio_adapter_config_io.dart`, `lib/core/network/network_config.dart` |
 | Redirects (manual loop) | `lib/core/network/network_service.dart` |
