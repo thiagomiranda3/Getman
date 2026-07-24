@@ -6,6 +6,13 @@
 // and read-only (re-check to edit). Toggling updates URL + parked list in
 // one UpdateTab via ParamRowComposer. Composed by RequestConfigSection
 // (split view) and UnifiedRequestPanel (phone).
+//
+// B2: drag-reorder and duplicate operate on display indices over the
+// composed (enabled + parked) row list. Reorder/duplicate touch only the
+// enabled/URL sequence — a parked row has no live URL position, so an
+// operation sourced from one is a no-op, and a parked row's rowIndex anchor
+// is never recomputed from its new display position when an enabled row's
+// drag crosses it.
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -104,6 +111,82 @@ class _ParamsTabViewState extends State<ParamsTabView> {
           );
         }
 
+        // B2: position IS the operation for these two — index-based over the
+        // composed display list (parked rows included). Both re-read the
+        // live tab (same guard as emit) and recompute display rows fresh
+        // rather than closing over the outer `composed`, matching
+        // toggle()/emit()'s existing pattern.
+        //
+        // Deviation from a naive "operate on config.params directly" (what
+        // the plain brief sketch assumed pre-B1): parked rows have no live
+        // URL position, so a reorder/duplicate sourced from a parked row is
+        // a no-op rather than inventing park semantics nothing else
+        // specifies. When an ENABLED row's drag crosses a parked row's
+        // display slot, only the enabled/URL sequence is rewritten — a
+        // parked row's own rowIndex anchor (disabledParams) is left
+        // completely untouched, never recomputed from its new display
+        // position.
+        void reorder(int oldIndex, int newIndex) {
+          final bloc = context.read<TabsBloc>();
+          final current = bloc.state.tabs.byId(tabId);
+          if (current == null) return;
+          final displayRows = ParamRowComposer.compose(
+            params: current.config.params,
+            parked: current.config.disabledParams,
+          );
+          if (oldIndex < 0 || oldIndex >= displayRows.length) return;
+          if (!displayRows[oldIndex].enabled) return;
+          final oldEnabledIndex = displayRows
+              .take(oldIndex)
+              .where((r) => r.enabled)
+              .length;
+          final afterRemoval = [...displayRows]..removeAt(oldIndex);
+          final target = newIndex.clamp(0, afterRemoval.length);
+          final newEnabledIndex = afterRemoval
+              .take(target)
+              .where((r) => r.enabled)
+              .length;
+          final enabledRows = [...current.config.params];
+          final row = enabledRows.removeAt(oldEnabledIndex);
+          enabledRows.insert(
+            newEnabledIndex.clamp(0, enabledRows.length),
+            row,
+          );
+          bloc.add(
+            UpdateTab(
+              current.copyWith(
+                config: current.config.copyWith(params: enabledRows),
+              ),
+            ),
+          );
+        }
+
+        void duplicate(int index) {
+          final bloc = context.read<TabsBloc>();
+          final current = bloc.state.tabs.byId(tabId);
+          if (current == null) return;
+          final displayRows = ParamRowComposer.compose(
+            params: current.config.params,
+            parked: current.config.disabledParams,
+          );
+          if (index < 0 || index >= displayRows.length) return;
+          if (!displayRows[index].enabled) return;
+          final enabledIndex = displayRows
+              .take(index)
+              .where((r) => r.enabled)
+              .length;
+          final enabledRows = [...current.config.params];
+          // Exact duplicate — duplicate keys are legal in a query string.
+          enabledRows.insert(enabledIndex + 1, enabledRows[enabledIndex]);
+          bloc.add(
+            UpdateTab(
+              current.copyWith(
+                config: current.config.copyWith(params: enabledRows),
+              ),
+            ),
+          );
+        }
+
         void toggle(int displayIndex, {required bool enabled}) {
           final bloc = context.read<TabsBloc>();
           final current = bloc.state.tabs.byId(tabId);
@@ -176,6 +259,8 @@ class _ParamsTabViewState extends State<ParamsTabView> {
                                 toggle(index, enabled: enabled),
                             disabledRowsReadOnly: true,
                             onChanged: emit,
+                            onReorder: reorder,
+                            onDuplicate: duplicate,
                           ),
                     ),
             ),

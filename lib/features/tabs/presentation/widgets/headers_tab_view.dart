@@ -5,6 +5,12 @@
 // skipped at send/code-gen. Renaming a disabled row's key renames the set
 // entry; deleting the row prunes it. Composed by RequestConfigSection
 // (split view) and UnifiedRequestPanel (phone).
+//
+// B2: drag-reorder rebuilds the insertion-ordered map; duplicate inserts a
+// '-copy'-suffixed key below. Unlike params, a disabled header's row stays
+// inline in the same map (position is orthogonal to disabledHeaderKeys, a
+// key set), so neither operation needs B1-specific handling — both route
+// through emit(), which already keeps disabledHeaderKeys in lockstep.
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -97,6 +103,41 @@ class _HeadersTabViewState extends State<HeadersTabView> {
           );
         }
 
+        // B2: reorder rebuilds the insertion-ordered map; duplicate suffixes
+        // '-copy' until unique (map keys must be unique, unlike params).
+        // Both route through emit(), so disabledHeaderKeys stays in
+        // lockstep exactly as it already does for edits/deletes/renames: a
+        // pure reorder changes no keys (nextDisabled passes through
+        // unchanged) and a duplicate only adds a key (the new row starts
+        // enabled by default).
+        void reorder(int oldIndex, int newIndex) {
+          final current = context.read<TabsBloc>().state.tabs.byId(tabId);
+          if (current == null) return;
+          final entries = current.config.headers.entries.toList();
+          if (oldIndex < 0 || oldIndex >= entries.length) return;
+          final entry = entries.removeAt(oldIndex);
+          entries.insert(newIndex.clamp(0, entries.length), entry);
+          emit(Map.fromEntries(entries));
+        }
+
+        void duplicate(int index) {
+          final current = context.read<TabsBloc>().state.tabs.byId(tabId);
+          if (current == null) return;
+          final headers = current.config.headers;
+          final entries = headers.entries.toList();
+          if (index < 0 || index >= entries.length) return;
+          final source = entries[index];
+          final keyBuffer = StringBuffer(source.key)..write('-copy');
+          while (headers.containsKey(keyBuffer.toString())) {
+            keyBuffer.write('-copy');
+          }
+          entries.insert(
+            index + 1,
+            MapEntry(keyBuffer.toString(), source.value),
+          );
+          emit(Map.fromEntries(entries));
+        }
+
         void toggle(String key, {required bool enabled}) {
           final bloc = context.read<TabsBloc>();
           final current = bloc.state.tabs.byId(tabId);
@@ -181,6 +222,8 @@ class _HeadersTabViewState extends State<HeadersTabView> {
                             onToggleEnabled: (index, key, value, enabled) =>
                                 toggle(key, enabled: enabled),
                             onChanged: emit,
+                            onReorder: reorder,
+                            onDuplicate: duplicate,
                           ),
                     ),
             ),
