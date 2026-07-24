@@ -1,19 +1,25 @@
 // Theme-consistent floating snackbar helpers: showAppSnackBar (from a live
 // BuildContext) and showAppSnackBarVia (from a captured
 // ScaffoldMessengerState, for callers firing after an await/dialog
-// dismissal where the original context may be deactivated). Always use
-// these instead of constructing a SnackBar inline.
+// dismissal where the original context may be deactivated). Both take an
+// optional actionLabel + onAction pair that renders a themed SnackBarAction
+// (used by the undo-on-delete flows). Always use these instead of
+// constructing a SnackBar inline.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 
 /// Theme-consistent floating snackbar. Use this instead of constructing
 /// `SnackBar`s inline so every feature gets the same chrome (panel border,
-/// radius, display-weight text).
+/// radius, display-weight text). Pass BOTH [actionLabel] and [onAction] to
+/// render an action button (e.g. UNDO); pressing it fires [onAction] and
+/// dismisses the snackbar.
 void showAppSnackBar(
   BuildContext context,
   String message, {
   Color? backgroundColor,
   Duration duration = const Duration(seconds: 2),
+  String? actionLabel,
+  VoidCallback? onAction,
 }) {
   _showVia(
     ScaffoldMessenger.of(context),
@@ -21,6 +27,8 @@ void showAppSnackBar(
     message,
     backgroundColor: backgroundColor,
     duration: duration,
+    actionLabel: actionLabel,
+    onAction: onAction,
   );
 }
 
@@ -33,6 +41,8 @@ void showAppSnackBarVia(
   String message, {
   Color? backgroundColor,
   Duration duration = const Duration(seconds: 2),
+  String? actionLabel,
+  VoidCallback? onAction,
 }) {
   _showVia(
     messenger,
@@ -40,6 +50,8 @@ void showAppSnackBarVia(
     message,
     backgroundColor: backgroundColor,
     duration: duration,
+    actionLabel: actionLabel,
+    onAction: onAction,
   );
 }
 
@@ -49,6 +61,8 @@ void _showVia(
   String message, {
   Color? backgroundColor,
   Duration duration = const Duration(seconds: 2),
+  String? actionLabel,
+  VoidCallback? onAction,
 }) {
   final theme = Theme.of(themeContext);
   final layout = themeContext.appLayout;
@@ -69,6 +83,16 @@ void _showVia(
           fontWeight: themeContext.appTypography.displayWeight,
         ),
       ),
+      // The action slot is typed SnackBarAction. Colors come from the theme
+      // (label color mirrors the content's onPrimary); the label's font
+      // rides the theme's button typography, so nothing is hardcoded.
+      action: actionLabel != null && onAction != null
+          ? SnackBarAction(
+              label: actionLabel,
+              textColor: theme.colorScheme.onPrimary,
+              onPressed: onAction,
+            )
+          : null,
       duration: duration,
     ),
   );
