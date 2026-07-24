@@ -76,6 +76,18 @@ void main() {
       expect(out, ['https://api.dev/users', 'https://api.dev/b']);
     });
 
+    test('dedupes case-insensitively — first (history) spelling wins', () {
+      final out = buildUrlSuggestions(
+        query: 'api',
+        historyUrls: const ['http://api.dev/x'],
+        collectionUrls: const ['HTTP://API.dev/x', 'http://api.dev/y'],
+      );
+      expect(out, [
+        'http://api.dev/x', // history spelling preserved
+        'http://api.dev/y',
+      ]);
+    });
+
     test('a candidate equal to the query itself is dropped', () {
       final out = buildUrlSuggestions(
         query: 'https://api.dev/users',
