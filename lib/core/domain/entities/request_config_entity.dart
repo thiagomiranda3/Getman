@@ -101,6 +101,16 @@ class HttpRequestConfigEntity extends Equatable {
   /// [AuthType.none], so legacy records round-trip without migration.
   AuthConfig get authConfig => AuthConfig.fromMap(auth);
 
+  /// [headers] minus the user-disabled rows ([disabledHeaderKeys]) — what
+  /// SEND and code-gen actually put on the wire. Disabled headers stay in
+  /// [headers] (editor order preserved); they are only skipped here.
+  Map<String, String> get enabledHeaders => disabledHeaderKeys.isEmpty
+      ? headers
+      : {
+          for (final e in headers.entries)
+            if (!disabledHeaderKeys.contains(e.key)) e.key: e.value,
+        };
+
   /// Rebuilds the entity. If [url] is supplied it wins. Otherwise, if [params]
   /// is supplied, the current URL's query portion is rewritten to match.
   HttpRequestConfigEntity copyWith({

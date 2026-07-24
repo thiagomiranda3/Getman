@@ -72,9 +72,11 @@ class CodeGenService {
     String Function(String value) resolve,
   ) {
     // Resolve header VALUES (not keys) — same scope as the send path
-    // (TabsRepositoryImpl.sendRequest / RequestSerializer).
+    // (TabsRepositoryImpl.sendRequest / RequestSerializer). enabledHeaders
+    // drops user-disabled rows (B1), mirroring the send skip for all six
+    // targets at once (every emitter reads this map).
     final headers = <String, String>{
-      for (final e in config.headers.entries) e.key: resolve(e.value),
+      for (final e in config.enabledHeaders.entries) e.key: resolve(e.value),
     };
     var url = resolve(config.url);
 

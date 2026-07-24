@@ -168,8 +168,10 @@ class TabsRepositoryImpl implements TabsRepository {
 
     // Mutable copy: resolveMap can return the original (const) map verbatim
     // when there are no variables, which auth injection must not mutate.
+    // enabledHeaders drops user-disabled rows (B1) before anything else sees
+    // the map — including injectAuth's skip-if-set check.
     final headers = Map<String, String>.of(
-      EnvironmentResolver.resolveMap(config.headers, envVars),
+      EnvironmentResolver.resolveMap(config.enabledHeaders, envVars),
     );
     RequestSerializer.injectAuth(
       auth: AuthConfig.fromMap(config.auth),

@@ -202,4 +202,37 @@ void main() {
       expect(headerOff == base, isFalse);
     });
   });
+
+  group('HttpRequestConfigEntity.enabledHeaders', () {
+    test('returns headers verbatim when nothing is disabled', () {
+      const config = HttpRequestConfigEntity(
+        id: 'x',
+        headers: {'A': '1', 'B': '2'},
+      );
+      expect(config.enabledHeaders, {'A': '1', 'B': '2'});
+    });
+
+    test('skips disabled keys, preserving order of the rest', () {
+      const config = HttpRequestConfigEntity(
+        id: 'x',
+        headers: {'A': '1', 'B': '2', 'C': '3'},
+        disabledHeaderKeys: {'B'},
+      );
+      expect(config.enabledHeaders.keys.toList(), ['A', 'C']);
+      expect(
+        config.headers.containsKey('B'),
+        isTrue,
+        reason: 'the disabled header stays in the stored map',
+      );
+    });
+
+    test('a stale disabled key not present in headers is harmless', () {
+      const config = HttpRequestConfigEntity(
+        id: 'x',
+        headers: {'A': '1'},
+        disabledHeaderKeys: {'Gone'},
+      );
+      expect(config.enabledHeaders, {'A': '1'});
+    });
+  });
 }
