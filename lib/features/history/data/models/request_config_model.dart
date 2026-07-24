@@ -15,6 +15,7 @@ import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
 import 'package:getman/features/tabs/data/models/multipart_field_model.dart';
+import 'package:getman/features/tabs/data/models/parked_param_model.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:uuid/uuid.dart';
 
@@ -39,6 +40,8 @@ class HttpRequestConfig extends HiveObject {
     this.responseHeaders,
     this.statusCode,
     this.durationMs,
+    this.disabledParams,
+    this.disabledHeaderKeys,
   }) : id = id ?? const Uuid().v4(),
        headers =
            headers ??
@@ -71,6 +74,10 @@ class HttpRequestConfig extends HiveObject {
         responseHeaders: entity.responseHeaders,
         statusCode: entity.statusCode,
         durationMs: entity.durationMs,
+        disabledParams: entity.disabledParams
+            .map(ParkedParamModel.fromEntity)
+            .toList(),
+        disabledHeaderKeys: entity.disabledHeaderKeys.toList(),
       );
   @HiveField(0)
   String id;
@@ -126,6 +133,16 @@ class HttpRequestConfig extends HiveObject {
   @HiveField(15, defaultValue: '')
   String graphqlVariables;
 
+  // B1 per-row disable. Nullable + defaultValue so records persisted before
+  // this migration read back as "nothing disabled" — exactly today's
+  // behavior. The disabled header rows themselves STAY in [headers]
+  // (order preserved); only their keys are listed here.
+  @HiveField(16, defaultValue: <ParkedParamModel>[])
+  List<ParkedParamModel>? disabledParams;
+
+  @HiveField(17, defaultValue: <String>[])
+  List<String>? disabledHeaderKeys;
+
   HttpRequestConfigEntity toEntity() {
     // Lazy migration: if a legacy record stored params in the separate map,
     // merge them into the URL's query string. Next save writes params back
@@ -153,6 +170,10 @@ class HttpRequestConfig extends HiveObject {
       responseHeaders: responseHeaders,
       statusCode: statusCode,
       durationMs: durationMs,
+      disabledParams: (disabledParams ?? const [])
+          .map((p) => p.toEntity())
+          .toList(),
+      disabledHeaderKeys: (disabledHeaderKeys ?? const []).toSet(),
     );
   }
 

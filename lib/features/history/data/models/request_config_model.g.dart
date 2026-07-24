@@ -33,13 +33,19 @@ class HttpRequestConfigAdapter extends TypeAdapter<HttpRequestConfig> {
       responseHeaders: (fields[8] as Map?)?.cast<String, String>(),
       statusCode: (fields[9] as num?)?.toInt(),
       durationMs: (fields[10] as num?)?.toInt(),
+      disabledParams: fields[16] == null
+          ? []
+          : (fields[16] as List?)?.cast<ParkedParamModel>(),
+      disabledHeaderKeys: fields[17] == null
+          ? []
+          : (fields[17] as List?)?.cast<String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, HttpRequestConfig obj) {
     writer
-      ..writeByte(16)
+      ..writeByte(18)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -71,7 +77,11 @@ class HttpRequestConfigAdapter extends TypeAdapter<HttpRequestConfig> {
       ..writeByte(14)
       ..write(obj.kind)
       ..writeByte(15)
-      ..write(obj.graphqlVariables);
+      ..write(obj.graphqlVariables)
+      ..writeByte(16)
+      ..write(obj.disabledParams)
+      ..writeByte(17)
+      ..write(obj.disabledHeaderKeys);
   }
 
   @override

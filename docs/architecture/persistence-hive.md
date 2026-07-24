@@ -9,7 +9,7 @@ Persistence is `hive_ce` + `hive_ce_flutter` (the community Hive fork — binary
 | typeId | Model | Box name | Notes |
 |---|---|---|---|
 | 0 | `SettingsModel` | `settings` | Single key `'current'`; loaded synchronously in `main()` |
-| 1 | `HttpRequestConfig` | `history` | Shared between history and collection nodes |
+| 1 | `HttpRequestConfig` | `history` | Shared between history and collection nodes; `List<ParkedParamModel>? disabledParams` at `HiveField(16)` + `List<String>? disabledHeaderKeys` at `HiveField(17)` (B1 per-row disable; next free: 18) |
 | 2 | `HttpRequestTabModel` | `tabs` | Tab state including response cache; `List<StoredResponseModel> responseHistory` at `HiveField(9)` — time-travel history (next free: 10) |
 | 3 | `CollectionNode` | `collections` | Nested (children list stored as `HiveField(3)`); `String? description` at `HiveField(6)`; `List<SavedExampleModel> examples` at `HiveField(7)`; `Map<String,String> variables` at `HiveField(8)`; `List<String> secretKeys` at `HiveField(9)` (next free: 10) |
 | 4 | `EnvironmentModel` | `environments` | Flat list; `variables` is `Map<String, String>` at `HiveField(2)`; `List<String> secretKeys` at `HiveField(3)` (next free: 4) |
@@ -21,8 +21,9 @@ Persistence is `hive_ce` + `hive_ce_flutter` (the community Hive fork — binary
 | 10 | `SavedExampleModel` | (embedded) | A saved request+response example; nested in `CollectionNode.examples`. `name` + epoch-millis `capturedAt` + a reused `HttpRequestConfig` (carries the response columns) |
 | 11 | `StoredResponseModel` | (embedded) | One captured response in a tab's time-travel history; nested as a list in `HttpRequestTabModel` (field 9). `id` + status/body/headers/`durationMs` + epoch-millis `capturedAt` |
 | 12 | `PanelModel` | `panels` | Virtual-desktop workspace structure: `{id, name, List<String> orderedTabIds, activeTabId}` at `HiveField` 0–3. Stores only **ids** — tab entities stay in the `tabs` box (typeId 2). Panel order + active panel live in the `tabs_meta` box under keys `panelOrder` / `activePanelId` (next free: 4) |
+| 13 | `ParkedParamModel` | (embedded) | One parked (disabled) query param `{key, value, rowIndex}`; nested inside `HttpRequestConfig` (typeId 1, field 16). Plain class — no `HiveObject` (its `key` field would shadow the box-key getter) |
 
-**Never renumber an existing `typeId`.** Add new models with a fresh ID (**next free: 13**).
+**Never renumber an existing `typeId`.** Add new models with a fresh ID (**next free: 14**).
 
 ## SettingsModel fields (typeId 0)
 
