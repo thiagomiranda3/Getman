@@ -22,6 +22,8 @@ import 'package:getman/features/collections/presentation/bloc/collections_state.
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
+import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
+import 'package:getman/features/history/presentation/bloc/history_state.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_event.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_state.dart';
@@ -49,6 +51,8 @@ class MockEnvironmentsBloc extends Mock implements EnvironmentsBloc {}
 class MockSettingsBloc extends Mock implements SettingsBloc {}
 
 class MockCollectionsBloc extends Mock implements CollectionsBloc {}
+
+class MockHistoryBloc extends Mock implements HistoryBloc {}
 
 class MockRealtimeBloc extends Mock implements RealtimeBloc {}
 
@@ -112,6 +116,15 @@ MockCollectionsBloc _defaultCollectionsBloc() {
   return b;
 }
 
+MockHistoryBloc _defaultHistoryBloc([
+  List<HttpRequestConfigEntity> history = const [],
+]) {
+  final b = MockHistoryBloc();
+  when(() => b.state).thenReturn(HistoryState(history: history));
+  when(() => b.stream).thenAnswer((_) => const Stream.empty());
+  return b;
+}
+
 MockRealtimeBloc _defaultRealtimeBloc() {
   final b = MockRealtimeBloc();
   when(() => b.state).thenReturn(const RealtimeState());
@@ -128,6 +141,7 @@ Future<void> _pump(
   MockSettingsBloc? settingsBloc,
   MockCollectionsBloc? collectionsBloc,
   MockRealtimeBloc? realtimeBloc,
+  MockHistoryBloc? historyBloc,
 }) async {
   await tester.pumpWidget(
     RepositoryProvider<UrlFocusRegistry>(
@@ -149,6 +163,9 @@ Future<void> _pump(
               ),
               BlocProvider<RealtimeBloc>.value(
                 value: realtimeBloc ?? _defaultRealtimeBloc(),
+              ),
+              BlocProvider<HistoryBloc>.value(
+                value: historyBloc ?? _defaultHistoryBloc(),
               ),
             ],
             child: UrlBar(tabId: tabId, onSave: () {}),
@@ -623,5 +640,144 @@ void main() {
     expect(tester.takeException(), isNull);
 
     await tester.pump(const Duration(seconds: 11));
+  });
+
+  group('URL autocomplete from history + collections (B4)', () {
+    testWidgets(
+      'typing 3+ chars suggests matching history URLs; tapping one '
+      'replaces the whole field and updates the tab',
+      (tester) async {
+        const tab = HttpRequestTabEntity(
+          tabId: 'b4a',
+          config: HttpRequestConfigEntity(id: 'b4a'),
+        );
+        final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+        addTearDown(bloc.close);
+
+        final historyBloc = _defaultHistoryBloc(const [
+          HttpRequestConfigEntity(id: 'h1', url: 'https://api.dev/users'),
+          HttpRequestConfigEntity(id: 'h2', url: 'https://api.dev/orders'),
+        ]);
+
+        await _pump(tester, bloc, 'b4a', historyBloc: historyBloc);
+
+        await tester.enterText(find.byKey(const ValueKey('url_field')), 'api');
+        await tester.pumpAndSettle();
+
+        expect(find.text('https://api.dev/users'), findsOneWidget);
+        expect(find.text('https://api.dev/orders'), findsOneWidget);
+
+        await tester.tap(find.text('https://api.dev/users'));
+        await tester.pumpAndSettle();
+
+        final field = tester.widget<TextField>(
+          find.byKey(const ValueKey('url_field')),
+        );
+        expect(field.controller!.text, 'https://api.dev/users');
+        expect(
+          bloc.state.tabs.byId('b4a')!.config.url,
+          'https://api.dev/users',
+          reason: 'accepting must dispatch UpdateTab with the full URL',
+        );
+
+        await tester.pump(const Duration(seconds: 11));
+      },
+    );
+
+    testWidgets('saved collection request URLs are suggested too', (
+      tester,
+    ) async {
+      const tab = HttpRequestTabEntity(
+        tabId: 'b4b',
+        config: HttpRequestConfigEntity(id: 'b4b'),
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      const folder = CollectionNodeEntity(
+        id: 'f1',
+        name: 'Folder',
+        children: [
+          CollectionNodeEntity(
+            id: 'r1',
+            name: 'Req',
+            isFolder: false,
+            config: HttpRequestConfigEntity(
+              id: 'r1',
+              url: 'https://saved.dev/items',
+            ),
+          ),
+        ],
+      );
+      final collectionsBloc = MockCollectionsBloc();
+      when(
+        () => collectionsBloc.state,
+      ).thenReturn(CollectionsState(collections: const [folder]));
+      when(
+        () => collectionsBloc.stream,
+      ).thenAnswer((_) => const Stream.empty());
+
+      await _pump(tester, bloc, 'b4b', collectionsBloc: collectionsBloc);
+
+      await tester.enterText(find.byKey(const ValueKey('url_field')), 'saved');
+      await tester.pumpAndSettle();
+
+      expect(find.text('https://saved.dev/items'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 11));
+    });
+
+    testWidgets('a {{ token keeps variable mode — no URL rows', (
+      tester,
+    ) async {
+      const tab = HttpRequestTabEntity(
+        tabId: 'b4c',
+        config: HttpRequestConfigEntity(id: 'b4c'),
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      final historyBloc = _defaultHistoryBloc(const [
+        HttpRequestConfigEntity(id: 'h1', url: 'https://guid.dev/api'),
+      ]);
+
+      await _pump(tester, bloc, 'b4c', historyBloc: historyBloc);
+
+      await tester.enterText(find.byKey(const ValueKey('url_field')), '{{gu');
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(r'$guid'),
+        findsOneWidget,
+        reason: 'variable mode (dynamic built-ins) must win inside {{',
+      );
+      expect(find.text('https://guid.dev/api'), findsNothing);
+
+      await tester.pump(const Duration(seconds: 11));
+    });
+
+    testWidgets('under 3 typed chars there are no URL suggestions', (
+      tester,
+    ) async {
+      const tab = HttpRequestTabEntity(
+        tabId: 'b4d',
+        config: HttpRequestConfigEntity(id: 'b4d'),
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      final historyBloc = _defaultHistoryBloc(const [
+        HttpRequestConfigEntity(id: 'h1', url: 'https://api.dev/users'),
+      ]);
+
+      await _pump(tester, bloc, 'b4d', historyBloc: historyBloc);
+
+      await tester.enterText(find.byKey(const ValueKey('url_field')), 'ap');
+      await tester.pumpAndSettle();
+
+      expect(find.text('https://api.dev/users'), findsNothing);
+
+      await tester.pump(const Duration(seconds: 11));
+    });
   });
 }

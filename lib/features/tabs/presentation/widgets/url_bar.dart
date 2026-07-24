@@ -1,5 +1,7 @@
 // The URL input row of a request tab: request-kind/method selector +
-// {{variable}}-highlighted URL field with autocomplete + code-export/save
+// {{variable}}-highlighted URL field with autocomplete ({{var}} names plus
+// B4 URL suggestions merged from history + saved collection requests;
+// selecting a URL replaces the whole field) + code-export/save
 // buttons + SEND/CANCEL (or CONNECT for WS/SSE/MCP). Plain Enter in the
 // focused URL field sends too (HTTP only). Resolves env vars via
 // RequestVariableResolver/ActiveEnvironmentHelper at press time, not build
@@ -25,6 +27,7 @@ import 'package:getman/core/ui/widgets/variable_hover_popover.dart';
 import 'package:getman/core/utils/curl_utils.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/core/utils/request_variable_resolver.dart';
+import 'package:getman/core/utils/url_suggestion_source.dart';
 import 'package:getman/core/utils/variable_resolution_helper.dart';
 import 'package:getman/core/utils/variable_suggestions.dart';
 import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
@@ -33,6 +36,7 @@ import 'package:getman/features/collections/presentation/bloc/collections_state.
 import 'package:getman/features/environments/domain/logic/active_environment_helper.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
+import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/mcp/presentation/widgets/mcp_connect_button.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
@@ -183,6 +187,37 @@ class _UrlBarState extends State<UrlBar> {
     );
   }
 
+  // B4: collection request URLs for the URL-suggestion mode, recomputed only
+  // when the CollectionsState instance changes (identity check —
+  // state.configById is memoized per instance, so a recompute is one flat
+  // map walk per tree change, not per keystroke).
+  CollectionsState? _collectionUrlsSource;
+  List<String> _cachedCollectionUrls = const [];
+
+  List<String> _collectionRequestUrls() {
+    final s = context.read<CollectionsBloc>().state;
+    if (!identical(s, _collectionUrlsSource)) {
+      _collectionUrlsSource = s;
+      _cachedCollectionUrls = [
+        for (final config in s.configById.values)
+          if (config.url.trim().isNotEmpty) config.url,
+      ];
+    }
+    return _cachedCollectionUrls;
+  }
+
+  /// URL-mode suggestions (B4): history (already newest-first in
+  /// HistoryState) merged with saved collection request URLs. Reads live
+  /// bloc state at call time, mirroring _layeredContext.
+  List<String> _urlSuggestionsFromHistoryAndCollections(String text) {
+    final history = context.read<HistoryBloc>().state.history;
+    return buildUrlSuggestions(
+      query: text,
+      historyUrls: [for (final config in history) config.url],
+      collectionUrls: _collectionRequestUrls(),
+    );
+  }
+
   // Resolves the full active environment (not just its variables, as
   // _activeVariables does) because the popover needs the name + secretKeys to
   // mask secrets and label the source. Both read live bloc state at call time.
@@ -304,6 +339,8 @@ class _UrlBarState extends State<UrlBar> {
                               controller: _urlController,
                               focusNode: _urlFocusNode,
                               suggestionsFor: _urlSuggestions,
+                              urlSuggestionsFor:
+                                  _urlSuggestionsFromHistoryAndCollections,
                               onAccepted: (value) =>
                                   _handleUrlChanged(context, tab, value),
                               child: TextField(
