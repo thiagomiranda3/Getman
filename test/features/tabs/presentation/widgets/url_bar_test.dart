@@ -362,6 +362,127 @@ void main() {
     await tester.pump(const Duration(seconds: 11));
   });
 
+  testWidgets('pressing Enter in the focused URL field sends the request', (
+    tester,
+  ) async {
+    const tab = HttpRequestTabEntity(
+      tabId: 'u10',
+      config: HttpRequestConfigEntity(id: 'u10', url: 'https://example.com'),
+    );
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+
+    final completer = Completer<HttpResponseEntity>();
+    when(
+      () => sendRequestUseCase.call(
+        config: any(named: 'config'),
+        envVars: any(named: 'envVars'),
+        cancelHandle: any(named: 'cancelHandle'),
+      ),
+    ).thenAnswer((_) => completer.future);
+
+    await _pump(tester, bloc, 'u10');
+
+    // Focus the URL field, then submit it (what Enter does in a single-line
+    // TextField).
+    await tester.tap(find.byKey(const ValueKey('url_field')));
+    await tester.pump();
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+
+    expect(
+      bloc.state.tabs.byId('u10')!.isSending,
+      isTrue,
+      reason: 'Enter in the URL field must dispatch the same send as SEND',
+    );
+
+    completer.completeError(Exception('test-cancel'), StackTrace.current);
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pump(const Duration(seconds: 11));
+  });
+
+  testWidgets('Enter while a send is in flight does not dispatch another', (
+    tester,
+  ) async {
+    const tab = HttpRequestTabEntity(
+      tabId: 'u11',
+      config: HttpRequestConfigEntity(id: 'u11', url: 'https://example.com'),
+    );
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+
+    final completer = Completer<HttpResponseEntity>();
+    when(
+      () => sendRequestUseCase.call(
+        config: any(named: 'config'),
+        envVars: any(named: 'envVars'),
+        cancelHandle: any(named: 'cancelHandle'),
+      ),
+    ).thenAnswer((_) => completer.future);
+
+    await _pump(tester, bloc, 'u11');
+
+    await tester.tap(find.byKey(const ValueKey('url_field')));
+    await tester.pump();
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    expect(bloc.state.tabs.byId('u11')!.isSending, isTrue);
+
+    // A second Enter mid-send must be a no-op (not a cancel, not a re-send).
+    await tester.tap(find.byKey(const ValueKey('url_field')));
+    await tester.pump();
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+
+    verify(
+      () => sendRequestUseCase.call(
+        config: any(named: 'config'),
+        envVars: any(named: 'envVars'),
+        cancelHandle: any(named: 'cancelHandle'),
+      ),
+    ).called(1);
+    expect(bloc.state.tabs.byId('u11')!.isSending, isTrue);
+
+    completer.completeError(Exception('test-cancel'), StackTrace.current);
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pump(const Duration(seconds: 11));
+  });
+
+  testWidgets('Enter in the URL field of a WS tab does not send', (
+    tester,
+  ) async {
+    const tab = HttpRequestTabEntity(
+      tabId: 'u12',
+      config: HttpRequestConfigEntity(
+        id: 'u12',
+        url: 'wss://example.com/socket',
+        kind: RequestKind.webSocket,
+      ),
+    );
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+
+    await _pump(tester, bloc, 'u12');
+
+    await tester.tap(find.byKey(const ValueKey('url_field')));
+    await tester.pump();
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+
+    verifyNever(
+      () => sendRequestUseCase.call(
+        config: any(named: 'config'),
+        envVars: any(named: 'envVars'),
+        cancelHandle: any(named: 'cancelHandle'),
+      ),
+    );
+    expect(bloc.state.tabs.byId('u12')!.isSending, isFalse);
+
+    await tester.pump(const Duration(seconds: 11));
+  });
+
   testWidgets('in-flight spinner drops its track ring (animation visible)', (
     tester,
   ) async {

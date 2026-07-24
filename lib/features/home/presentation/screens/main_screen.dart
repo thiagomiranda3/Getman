@@ -35,6 +35,7 @@ import 'package:getman/features/home/presentation/widgets/request_tab_chip.dart'
 import 'package:getman/features/home/presentation/widgets/side_menu.dart';
 import 'package:getman/features/home/presentation/widgets/tab_chip.dart';
 import 'package:getman/features/home/presentation/widgets/tab_content_stack.dart';
+import 'package:getman/features/home/presentation/widgets/tab_strip_double_click.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
@@ -568,45 +569,56 @@ class _MainScreenState extends State<MainScreen> {
           Expanded(
             child: context.useTabSwitcher
                 ? TabChip(onRequestClose: _requestCloseConfirmation)
-                : Listener(
-                    onPointerSignal: _handleTabBarPointerSignal,
-                    child: Scrollbar(
-                      controller: _tabScrollController,
-                      thumbVisibility: true,
-                      // Pin the horizontal scrollbar to the bottom edge of the
-                      // tab strip so it never paints over the top of the tabs.
-                      scrollbarOrientation: ScrollbarOrientation.bottom,
-                      thickness: 4,
-                      radius: const Radius.circular(2),
-                      child: ReorderableListView.builder(
-                        scrollController: _tabScrollController,
-                        scrollDirection: Axis.horizontal,
-                        itemCount: tabs.length,
-                        buildDefaultDragHandles: false,
-                        onReorderItem: (oldIndex, newIndex) => context
-                            .read<TabsBloc>()
-                            .add(ReorderTabs(oldIndex, newIndex)),
-                        proxyDecorator: (child, index, animation) => Material(
-                          color: theme.scaffoldBackgroundColor,
-                          elevation: 4,
-                          child: child,
-                        ),
-                        itemBuilder: (context, index) {
-                          final tab = tabs[index];
-                          return _ChipEntrance(
-                            key: ValueKey('tab_${tab.tabId}'),
-                            child: RequestTabChip(
-                              tabId: tab.tabId,
-                              index: index,
-                              isActive: activeIndex == index,
-                              onTap: () => context.read<TabsBloc>().add(
-                                SetActiveIndex(index),
+                // Double-click on the strip's empty area = the "+" button
+                // (Postman parity). Chip clicks are excluded via
+                // TabChipHitTarget below.
+                : TabStripDoubleClickDetector(
+                    onNewTab: () =>
+                        context.read<TabsBloc>().add(const AddTab()),
+                    child: Listener(
+                      onPointerSignal: _handleTabBarPointerSignal,
+                      child: Scrollbar(
+                        controller: _tabScrollController,
+                        thumbVisibility: true,
+                        // Pin the horizontal scrollbar to the bottom edge of
+                        // the strip so it never paints over the tabs' top.
+                        scrollbarOrientation: ScrollbarOrientation.bottom,
+                        thickness: 4,
+                        radius: const Radius.circular(2),
+                        child: ReorderableListView.builder(
+                          scrollController: _tabScrollController,
+                          scrollDirection: Axis.horizontal,
+                          itemCount: tabs.length,
+                          buildDefaultDragHandles: false,
+                          onReorderItem: (oldIndex, newIndex) => context
+                              .read<TabsBloc>()
+                              .add(ReorderTabs(oldIndex, newIndex)),
+                          proxyDecorator: (child, index, animation) => Material(
+                            color: theme.scaffoldBackgroundColor,
+                            elevation: 4,
+                            child: child,
+                          ),
+                          itemBuilder: (context, index) {
+                            final tab = tabs[index];
+                            return _ChipEntrance(
+                              key: ValueKey('tab_${tab.tabId}'),
+                              child: TabChipHitTarget(
+                                child: RequestTabChip(
+                                  tabId: tab.tabId,
+                                  index: index,
+                                  isActive: activeIndex == index,
+                                  onTap: () => context.read<TabsBloc>().add(
+                                    SetActiveIndex(index),
+                                  ),
+                                  onClose: () => _requestCloseConfirmation(
+                                    context,
+                                    tab.tabId,
+                                  ),
+                                ),
                               ),
-                              onClose: () =>
-                                  _requestCloseConfirmation(context, tab.tabId),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ),

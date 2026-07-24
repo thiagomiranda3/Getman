@@ -66,7 +66,13 @@ class _CodeFindPanelState extends State<CodeFindPanel> {
   void initState() {
     super.initState();
     _lastSynced = widget.controller.findInputController.text;
-    _query = TextEditingController(text: _lastSynced);
+    _query = TextEditingController(text: _lastSynced)
+      // Mirror find-mode's own select-all of a prefilled query (see
+      // _onFinderTextChanged) when the panel mounts with one already set.
+      ..selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _lastSynced.length,
+      );
     _query.addListener(_onQueryChanged);
     widget.controller.addListener(_update);
     widget.controller.findInputController.addListener(_onFinderTextChanged);
@@ -113,14 +119,17 @@ class _CodeFindPanelState extends State<CodeFindPanel> {
 
   /// The finder's own controller changed from the outside (e.g. find mode
   /// auto-filled the selected text). Mirror it into the visible field without
-  /// re-arming the debounce.
+  /// re-arming the debounce. The mirrored text is fully SELECTED — matching
+  /// findMode's own select-all of the finder controller — so a reflexive
+  /// Cmd/Ctrl+V of the same selection replaces it instead of appending a
+  /// duplicate.
   void _onFinderTextChanged() {
     final finderText = widget.controller.findInputController.text;
     if (finderText == _lastSynced) return; // echo of our own [_flush] write
     _lastSynced = finderText;
     _query.value = TextEditingValue(
       text: finderText,
-      selection: TextSelection.collapsed(offset: finderText.length),
+      selection: TextSelection(baseOffset: 0, extentOffset: finderText.length),
     );
   }
 

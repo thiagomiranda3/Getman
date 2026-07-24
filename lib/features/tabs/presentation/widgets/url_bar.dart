@@ -1,6 +1,7 @@
 // The URL input row of a request tab: request-kind/method selector +
 // {{variable}}-highlighted URL field with autocomplete + code-export/save
-// buttons + SEND/CANCEL (or CONNECT for WS/SSE/MCP). Resolves env vars via
+// buttons + SEND/CANCEL (or CONNECT for WS/SSE/MCP). Plain Enter in the
+// focused URL field sends too (HTTP only). Resolves env vars via
 // RequestVariableResolver/ActiveEnvironmentHelper at press time, not build
 // time.
 //
@@ -327,6 +328,14 @@ class _UrlBarState extends State<UrlBar> {
                                 enableSuggestions: false,
                                 onChanged: (val) =>
                                     _handleUrlChanged(context, tab, val),
+                                // Enter sends right from the URL field (no
+                                // Cmd/Ctrl needed — unlike multi-line editors
+                                // where plain Enter inserts a newline). When
+                                // the {{var}} autocomplete menu is open its
+                                // Enter-to-accept consumes the key first, so
+                                // accepting a suggestion never fires a send.
+                                onSubmitted: (_) =>
+                                    _handleUrlSubmitted(context),
                               ),
                             ),
                           ),
@@ -542,6 +551,24 @@ class _UrlBarState extends State<UrlBar> {
         },
       ),
     );
+  }
+
+  /// Enter pressed while the URL field is focused: send the request — same
+  /// dispatch as the SEND button. HTTP only (WS/SSE/MCP go through their
+  /// connect buttons) and a no-op mid-send (Enter must not cancel like the
+  /// button's CANCEL face would). Re-requests focus because submitting
+  /// unfocuses the field on desktop — repeated Enter re-sends must keep
+  /// working.
+  void _handleUrlSubmitted(BuildContext context) {
+    final tabsBloc = context.read<TabsBloc>();
+    final current = tabsBloc.state.tabs.byId(widget.tabId);
+    if (current == null ||
+        current.isSending ||
+        current.config.kind != RequestKind.http) {
+      return;
+    }
+    tabsBloc.add(_sendEvent(context, current.tabId));
+    _urlFocusNode.requestFocus();
   }
 
   void _handleUrlChanged(
