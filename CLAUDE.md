@@ -198,5 +198,7 @@ file-specific ones in each file's `//` header.
   `CodeLineEditingController`.
 - **Hive regen is not optional** after any `@HiveType`/`@HiveField` change.
 - **Shared chrome atoms, always**: snackbars → `showAppSnackBar(context, …)`
-  (never inline `SnackBar`s); irreversible actions confirm via
-  `ConfirmDialog.show(…)`; single-line text prompts → `NamePromptDialog.show(…)`.
+  (never inline `SnackBar`s); irreversible **or bulk** actions confirm via
+  `ConfirmDialog.show(…)` — single-item deletes are instant with an UNDO
+  snackbar (`actionLabel: 'UNDO'`, 5 s); single-line text prompts →
+  `NamePromptDialog.show(…)`.
