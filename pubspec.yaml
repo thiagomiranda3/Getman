@@ -11,31 +11,31 @@ dependencies:
   collection: ^1.18.0
   csv: ^8.0.0
   cupertino_icons: ^1.0.8
-  dio: ^5.8.0+1
-  equatable: ^2.0.8
-  file_picker: ^11.0.2
+  dio: ^5.10.0
+  equatable: ^2.1.0
+  file_picker: ^12.0.0-beta.7
   flutter:
     sdk: flutter
   flutter_bloc: ^9.1.1
   get_it: ^9.2.1
   go_router: ^17.3.0
-  google_fonts: ^8.1.0
+  google_fonts: ^8.2.0
   hive_ce: ^2.19.3
   hive_ce_flutter: ^2.3.4
   media_kit: ^1.2.6
   media_kit_libs_video: ^1.0.7
   media_kit_video: ^2.0.1
-  package_info_plus: ^9.0.1
+  package_info_plus: ^10.2.1
   path_provider: ^2.1.5
   pdfx: ^2.9.2
   provider: ^6.1.2
-  re_editor: ^0.9.0
+  re_editor: ^0.10.0
   re_highlight: ^0.0.3
   shimmer: ^3.0.0
-  two_dimensional_scrollables: ^0.5.2
+  two_dimensional_scrollables: ^0.5.3
   updat: ^1.4.0
   url_launcher: ^6.3.2
-  uuid: ^4.5.1
+  uuid: ^4.6.0
   web_socket_channel: ^3.0.0
   yaml: ^3.1.3
 
@@ -43,7 +43,7 @@ dev_dependencies:
   bloc_lint: ">=0.3.0 <1.0.0"
   bloc_test: ^10.0.0
   bloc_tools: ">=0.1.0-dev.8 <1.0.0"
-  build_runner: ^2.4.13
+  build_runner: ^2.15.1
   custom_lint: ^0.8.0
   fake_async: ^1.3.3
   flutter_lints: ^6.0.0
@@ -62,7 +62,7 @@ dev_dependencies:
   # (not the full `patrol` package) because patrol's native automation does not
   # support macOS desktop (alpha, no native support); the finder API is all we
   # need and runs under integration_test without a native test harness.
-  patrol_finders: ^3.5.0
+  patrol_finders: ^3.6.0
   plugin_platform_interface: ^2.1.8
   solid_lints: ^0.3.0
   very_good_analysis: ^10.3.0
