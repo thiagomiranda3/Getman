@@ -2,7 +2,10 @@
 // Cmd/Ctrl+Space) opens a keyboard-navigable suggestion menu built from
 // suggestionsFor; accepting inserts the closing `}}` and reports the new
 // text via onAccepted, since a programmatic controller write never fires
-// TextField.onChanged the way a real keystroke does.
+// TextField.onChanged the way a real keystroke does. Optional
+// urlSuggestionsFor (B4) adds a URL mode: whenever the caret is NOT inside
+// a {{ token, whole-URL rows are offered and accepting one replaces the
+// ENTIRE field text (variable mode always wins inside a {{ token).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -66,6 +69,7 @@ class VariableAutocomplete extends StatefulWidget {
     required this.suggestionsFor,
     required this.child,
     this.onAccepted,
+    this.urlSuggestionsFor,
     super.key,
   });
 
@@ -73,6 +77,14 @@ class VariableAutocomplete extends StatefulWidget {
   final FocusNode focusNode;
   final VariableSuggestionsProvider suggestionsFor;
   final ValueChanged<String>? onAccepted;
+
+  /// When non-null, enables the URL-suggestion mode (B4): whenever the caret
+  /// is NOT inside an in-progress `{{` token, the FULL field text is passed
+  /// here and each returned URL is offered as a whole-field replacement.
+  /// Variable mode always wins while the caret is inside a `{{` token. Null
+  /// (the default — VariableTextField and the KV-editor value fields) keeps
+  /// the variable-only behavior.
+  final List<String> Function(String text)? urlSuggestionsFor;
   final Widget child;
 
   @override
@@ -87,6 +99,11 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
   ActiveVariableQuery? _activeQuery;
   bool _dismissed = false; // Esc latch; cleared on the next text change.
   String _lastText = '';
+  List<String> _urlSuggestions = const [];
+  bool _urlMode = false;
+
+  int get _menuLength =>
+      _urlMode ? _urlSuggestions.length : _suggestions.length;
 
   bool get _isOpen => _entry != null;
 
@@ -128,12 +145,30 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
       widget.controller.text,
       sel.baseOffset,
     );
-    if (query == null) return _close();
+    // Variable mode always wins while the caret is inside a {{ token; URL
+    // mode (B4) covers everything else when a provider is wired.
+    if (query == null) return _refreshUrlMode();
     final suggestions = widget.suggestionsFor(query.query);
     if (suggestions.isEmpty) return _close();
+    _urlMode = false;
+    _urlSuggestions = const [];
     _activeQuery = query;
     _suggestions = suggestions;
     _selected = _selected.clamp(0, suggestions.length - 1);
+    _open();
+    _entry!.markNeedsBuild();
+  }
+
+  void _refreshUrlMode() {
+    final provider = widget.urlSuggestionsFor;
+    if (provider == null) return _close();
+    final urls = provider(widget.controller.text);
+    if (urls.isEmpty) return _close();
+    _urlMode = true;
+    _activeQuery = null;
+    _suggestions = const [];
+    _urlSuggestions = urls;
+    _selected = _selected.clamp(0, urls.length - 1);
     _open();
     _entry!.markNeedsBuild();
   }
@@ -151,17 +186,21 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
     _entry = null;
     _activeQuery = null;
     _suggestions = const [];
+    _urlSuggestions = const [];
+    _urlMode = false;
     _selected = 0;
   }
 
   void _moveSelection(int delta) {
-    if (!_isOpen || _suggestions.isEmpty) return;
-    _selected = (_selected + delta) % _suggestions.length;
-    if (_selected < 0) _selected += _suggestions.length;
+    final length = _menuLength;
+    if (!_isOpen || length == 0) return;
+    _selected = (_selected + delta) % length;
+    if (_selected < 0) _selected += length;
     _entry!.markNeedsBuild();
   }
 
   void _acceptAt(int index) {
+    if (_urlMode) return _acceptUrlAt(index);
     final query = _activeQuery;
     if (query == null || index < 0 || index >= _suggestions.length) return;
     final name = _suggestions[index].name;
@@ -175,6 +214,24 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
     widget.controller.value = TextEditingValue(
       text: '$before$insert$after',
       selection: TextSelection.collapsed(offset: caret),
+    );
+    widget.onAccepted?.call(widget.controller.text);
+  }
+
+  /// URL-mode accept: the suggestion replaces the ENTIRE field text. The
+  /// latch bookkeeping is pre-synced BEFORE the programmatic write because
+  /// the controller listener fires synchronously on assignment — without it
+  /// the menu instantly reopens over the just-accepted URL (other candidates
+  /// can still contain it as a substring).
+  void _acceptUrlAt(int index) {
+    if (index < 0 || index >= _urlSuggestions.length) return;
+    final url = _urlSuggestions[index];
+    _close();
+    _lastText = url;
+    _dismissed = true;
+    widget.controller.value = TextEditingValue(
+      text: url,
+      selection: TextSelection.collapsed(offset: url.length),
     );
     widget.onAccepted?.call(widget.controller.text);
   }
@@ -287,9 +344,10 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
                 child: ListView.builder(
                   padding: EdgeInsets.zero,
                   shrinkWrap: true,
-                  itemCount: _suggestions.length,
-                  itemBuilder: (context, i) =>
-                      _row(context, _suggestions[i], i, i == _selected),
+                  itemCount: _menuLength,
+                  itemBuilder: (context, i) => _urlMode
+                      ? _urlRow(context, _urlSuggestions[i], i, i == _selected)
+                      : _row(context, _suggestions[i], i, i == _selected),
                 ),
               ),
             ),
@@ -366,6 +424,35 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _urlRow(BuildContext context, String url, int index, bool selected) {
+    final theme = Theme.of(context);
+    final layout = context.appLayout;
+    return InkWell(
+      // Same as _row: never pull focus off the text field on tap.
+      canRequestFocus: false,
+      onTap: () => _acceptAt(index),
+      child: Container(
+        color: selected
+            ? theme.colorScheme.primary.withValues(alpha: 0.12)
+            : null,
+        padding: EdgeInsets.symmetric(
+          horizontal: layout.isCompact ? 8 : 12,
+          vertical: layout.isCompact ? 6 : 8,
+        ),
+        child: Text(
+          url,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: layout.fontSizeNormal,
+            fontWeight: context.appTypography.titleWeight,
+            color: theme.colorScheme.onSurface,
+          ),
         ),
       ),
     );

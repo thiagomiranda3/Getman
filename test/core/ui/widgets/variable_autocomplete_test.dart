@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/core/ui/widgets/variable_autocomplete.dart';
+import 'package:getman/core/utils/url_suggestion_source.dart';
 import 'package:getman/core/utils/variable_resolution_helper.dart';
 import 'package:getman/core/utils/variable_suggestions.dart';
 
@@ -34,7 +35,10 @@ void main() {
     focusNode.dispose();
   });
 
-  Future<void> pump(WidgetTester tester) {
+  Future<void> pump(
+    WidgetTester tester, {
+    List<String> Function(String text)? urlSuggestionsFor,
+  }) {
     return tester.pumpWidget(
       MaterialApp(
         theme: brutalistTheme(Brightness.light),
@@ -43,6 +47,7 @@ void main() {
             controller: controller,
             focusNode: focusNode,
             suggestionsFor: _suggest,
+            urlSuggestionsFor: urlSuggestionsFor,
             child: TextField(controller: controller, focusNode: focusNode),
           ),
         ),
@@ -302,6 +307,128 @@ void main() {
         matching: find.byType(TextFieldTapRegion),
       ),
       findsOneWidget,
+    );
+  });
+
+  group('URL suggestion mode (B4)', () {
+    List<String> urlSuggest(String text) => buildUrlSuggestions(
+      query: text,
+      historyUrls: const [
+        'https://api.dev/users',
+        'https://api.dev/orders',
+        'https://api.dev/users/all',
+      ],
+      collectionUrls: const ['https://saved.dev/items'],
+    );
+
+    testWidgets('3+ typed chars with no {{ token open URL suggestions', (
+      tester,
+    ) async {
+      await pump(tester, urlSuggestionsFor: urlSuggest);
+      await tester.enterText(find.byType(TextField), 'api');
+      await tester.pumpAndSettle();
+      expect(find.text('https://api.dev/users'), findsOneWidget);
+      expect(find.text('https://api.dev/orders'), findsOneWidget);
+    });
+
+    testWidgets('fewer than 3 chars keep the menu closed', (tester) async {
+      await pump(tester, urlSuggestionsFor: urlSuggest);
+      await tester.enterText(find.byType(TextField), 'ap');
+      await tester.pumpAndSettle();
+      expect(find.text('https://api.dev/users'), findsNothing);
+    });
+
+    testWidgets('variable mode wins while the caret is inside a {{ token', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        urlSuggestionsFor: (_) => const ['https://api.dev/users'],
+      );
+      await tester.enterText(find.byType(TextField), '{{ba');
+      await tester.pumpAndSettle();
+      expect(find.text('baseUrl'), findsOneWidget);
+      expect(find.text('https://api.dev/users'), findsNothing);
+    });
+
+    testWidgets(
+      'Enter replaces the ENTIRE field text with the selected URL and the '
+      'menu does not reopen over the accepted value',
+      (tester) async {
+        await pump(tester, urlSuggestionsFor: urlSuggest);
+        await tester.enterText(find.byType(TextField), 'api');
+        await tester.pumpAndSettle();
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+
+        expect(controller.text, 'https://api.dev/users');
+        expect(
+          controller.selection.baseOffset,
+          'https://api.dev/users'.length,
+        );
+        // 'https://api.dev/users/all' still contains the accepted text — if
+        // the programmatic write re-opened the menu, this row would show.
+        expect(
+          find.text('https://api.dev/users/all'),
+          findsNothing,
+          reason: 'the menu must not reopen over the just-accepted URL',
+        );
+      },
+    );
+
+    testWidgets('ArrowDown then Enter picks the second URL; onAccepted fires', (
+      tester,
+    ) async {
+      String? accepted;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: brutalistTheme(Brightness.light),
+          home: Scaffold(
+            body: VariableAutocomplete(
+              controller: controller,
+              focusNode: focusNode,
+              suggestionsFor: _suggest,
+              urlSuggestionsFor: urlSuggest,
+              onAccepted: (value) => accepted = value,
+              child: TextField(controller: controller, focusNode: focusNode),
+            ),
+          ),
+        ),
+      );
+      await tester.enterText(find.byType(TextField), 'api');
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(controller.text, 'https://api.dev/orders');
+      expect(accepted, 'https://api.dev/orders');
+    });
+
+    testWidgets('tapping a URL row accepts it', (tester) async {
+      await pump(tester, urlSuggestionsFor: urlSuggest);
+      await tester.enterText(find.byType(TextField), 'saved');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('https://saved.dev/items'));
+      await tester.pumpAndSettle();
+      expect(controller.text, 'https://saved.dev/items');
+    });
+
+    testWidgets(
+      'Escape closes URL mode and stays closed until the text changes',
+      (tester) async {
+        await pump(tester, urlSuggestionsFor: urlSuggest);
+        await tester.enterText(find.byType(TextField), 'api');
+        await tester.pumpAndSettle();
+        expect(find.text('https://api.dev/users'), findsOneWidget);
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+        expect(find.text('https://api.dev/users'), findsNothing);
+
+        await tester.enterText(find.byType(TextField), 'api.');
+        await tester.pumpAndSettle();
+        expect(find.text('https://api.dev/users'), findsOneWidget);
+      },
     );
   });
 }
