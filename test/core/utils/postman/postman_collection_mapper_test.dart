@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
+import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/utils/postman/postman_collection_mapper.dart';
@@ -11,9 +12,7 @@ void main() {
   group('PostmanCollectionMapper.toJson', () {
     test('emits v2.1 schema and collection name', () {
       const root = CollectionNodeEntity(id: 'root', name: 'My API');
-      final decoded =
-          jsonDecode(PostmanCollectionMapper.toJson(root))
-              as Map<String, dynamic>;
+      final decoded = jsonDecode(PostmanCollectionMapper.toJson(root)) as Map<String, dynamic>;
       final info = decoded['info'] as Map<String, dynamic>;
       expect(info['name'], 'My API');
       expect(info['schema'], contains('v2.1'));
@@ -36,9 +35,7 @@ void main() {
         name: 'API',
         children: [child],
       );
-      final decoded =
-          jsonDecode(PostmanCollectionMapper.toJson(root))
-              as Map<String, dynamic>;
+      final decoded = jsonDecode(PostmanCollectionMapper.toJson(root)) as Map<String, dynamic>;
       final items = decoded['item'] as List;
       expect(items, hasLength(1));
       final item = items.first as Map<String, dynamic>;
@@ -69,9 +66,7 @@ void main() {
           url: 'https://x.y?a=1&a=2',
         ),
       );
-      final decoded =
-          jsonDecode(PostmanCollectionMapper.toJson(leaf))
-              as Map<String, dynamic>;
+      final decoded = jsonDecode(PostmanCollectionMapper.toJson(leaf)) as Map<String, dynamic>;
       final item = (decoded['item'] as List).first as Map<String, dynamic>;
       final request = item['request'] as Map<String, dynamic>;
       final url = request['url'] as Map<String, dynamic>;
@@ -98,9 +93,7 @@ void main() {
           isFolder: false,
           config: config,
         );
-        final decoded =
-            jsonDecode(PostmanCollectionMapper.toJson(leaf))
-                as Map<String, dynamic>;
+        final decoded = jsonDecode(PostmanCollectionMapper.toJson(leaf)) as Map<String, dynamic>;
         final item = (decoded['item'] as List).first as Map<String, dynamic>;
         final request = item['request'] as Map<String, dynamic>;
         final body = request['body'] as Map<String, dynamic>;
@@ -124,9 +117,7 @@ void main() {
             url: 'https://api.com/x?v=%2520',
           ),
         );
-        final decoded =
-            jsonDecode(PostmanCollectionMapper.toJson(leaf))
-                as Map<String, dynamic>;
+        final decoded = jsonDecode(PostmanCollectionMapper.toJson(leaf)) as Map<String, dynamic>;
         final item = (decoded['item'] as List).first as Map<String, dynamic>;
         final request = item['request'] as Map<String, dynamic>;
         final url = request['url'] as Map<String, dynamic>;
@@ -148,9 +139,7 @@ void main() {
         name: 'My API',
         description: 'Top-level notes.',
       );
-      final decoded =
-          jsonDecode(PostmanCollectionMapper.toJson(root))
-              as Map<String, dynamic>;
+      final decoded = jsonDecode(PostmanCollectionMapper.toJson(root)) as Map<String, dynamic>;
       final info = decoded['info'] as Map<String, dynamic>;
       expect(info['description'], 'Top-level notes.');
     });
@@ -162,12 +151,73 @@ void main() {
         isFolder: false,
         config: HttpRequestConfigEntity(id: 'cfg', url: 'https://example.com'),
       );
-      final decoded =
-          jsonDecode(PostmanCollectionMapper.toJson(leaf))
-              as Map<String, dynamic>;
+      final decoded = jsonDecode(PostmanCollectionMapper.toJson(leaf)) as Map<String, dynamic>;
       final items = decoded['item'] as List;
       expect(items, hasLength(1));
       expect((items.first as Map)['name'], 'Ping');
+    });
+
+    test('exports disabled headers and parked params with disabled:true (B1)', () {
+      const leaf = CollectionNodeEntity(
+        id: 'leaf',
+        name: 'Disabled rows',
+        isFolder: false,
+        config: HttpRequestConfigEntity(
+          id: 'cfg',
+          url: 'https://x.y?a=1&c=3',
+          headers: {'Keep': 'k', 'Skip': 's'},
+          disabledHeaderKeys: {'Skip'},
+          disabledParams: [
+            ParkedParamEntity(key: 'b', value: '2', rowIndex: 1),
+          ],
+        ),
+      );
+      final decoded = jsonDecode(PostmanCollectionMapper.toJson(leaf)) as Map<String, dynamic>;
+      final item = (decoded['item'] as List).first as Map<String, dynamic>;
+      final request = item['request'] as Map<String, dynamic>;
+
+      final headers = (request['header'] as List).cast<Map<String, dynamic>>();
+      expect(
+        headers.firstWhere((h) => h['key'] == 'Skip')['disabled'],
+        isTrue,
+      );
+      expect(
+        headers.firstWhere((h) => h['key'] == 'Keep').containsKey('disabled'),
+        isFalse,
+      );
+
+      final query = (request['url'] as Map<String, dynamic>)['query'] as List;
+      expect(query, [
+        {'key': 'a', 'value': '1'},
+        {'key': 'b', 'value': '2', 'disabled': true},
+        {'key': 'c', 'value': '3'},
+      ]);
+    });
+
+    test('a fully-disabled request round-trips through export + import (B1)', () {
+      const leaf = CollectionNodeEntity(
+        id: 'leaf',
+        name: 'RT',
+        isFolder: false,
+        config: HttpRequestConfigEntity(
+          id: 'cfg',
+          url: 'https://x.y?a=1',
+          headers: {'H': 'v'},
+          disabledHeaderKeys: {'H'},
+          disabledParams: [
+            ParkedParamEntity(key: 'p', value: 'q', rowIndex: 0),
+          ],
+        ),
+      );
+      final back = PostmanCollectionMapper.fromJson(
+        PostmanCollectionMapper.toJson(leaf),
+      ).children.first.config!;
+      expect(back.headers, {'H': 'v'});
+      expect(back.disabledHeaderKeys, {'H'});
+      expect(back.url, 'https://x.y?a=1');
+      expect(back.disabledParams, [
+        const ParkedParamEntity(key: 'p', value: 'q', rowIndex: 0),
+      ]);
     });
   });
 
@@ -285,7 +335,7 @@ void main() {
       expect(config.url, 'https://api.example.com/x');
     });
 
-    test('skips disabled headers and query entries', () {
+    test('preserves disabled headers and query entries as disabled (B1)', () {
       const source = '''
 {
   "info": {"name": "S", "schema": "v2.1.0"},
@@ -313,12 +363,13 @@ void main() {
       final config = PostmanCollectionMapper.fromJson(
         source,
       ).children.first.config!;
-      expect(config.headers, {'A': '1'});
+      expect(config.headers, {'A': '1', 'B': '2'});
+      expect(config.disabledHeaderKeys, {'B'});
       expect(config.url, 'https://x.y?k1=v1');
-      expect(
-        config.params,
-        [const QueryParamEntity(key: 'k1', value: 'v1')],
-      );
+      expect(config.params, [const QueryParamEntity(key: 'k1', value: 'v1')]);
+      expect(config.disabledParams, [
+        const ParkedParamEntity(key: 'k2', value: 'v2', rowIndex: 1),
+      ]);
     });
 
     test('structured url.query takes precedence over url.raw query', () {
@@ -458,17 +509,16 @@ void main() {
     });
 
     test('export then import preserves auth (bearer / basic / api-key)', () {
-      CollectionNodeEntity leafWith(Map<String, String> auth) =>
-          CollectionNodeEntity(
-            id: 'leaf',
-            name: 'R',
-            isFolder: false,
-            config: HttpRequestConfigEntity(
-              id: 'cfg',
-              url: 'https://api.dev/x',
-              auth: auth,
-            ),
-          );
+      CollectionNodeEntity leafWith(Map<String, String> auth) => CollectionNodeEntity(
+        id: 'leaf',
+        name: 'R',
+        isFolder: false,
+        config: HttpRequestConfigEntity(
+          id: 'cfg',
+          url: 'https://api.dev/x',
+          auth: auth,
+        ),
+      );
 
       HttpRequestConfigEntity roundTrip(Map<String, String> auth) =>
           PostmanCollectionMapper.fromJson(

@@ -13,11 +13,17 @@
 // Postman's own convention); import prefers a structured `url.query` when
 // present (percent-decoded before merging back in, else double-encoding
 // results), otherwise keeps the raw URL's query as-is.
+// Disabled rows (B1) map to Postman's native `disabled: true` both ways:
+// export emits it on header entries (key in disabledHeaderKeys) and inserts
+// parked params into `url.query` at their rowIndex; import keeps disabled
+// headers in the map + set and turns disabled query entries into
+// ParkedParamEntity at their array position (previously they were dropped).
 
 import 'dart:convert';
 import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
+import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
@@ -46,9 +52,7 @@ class PostmanCollectionMapper {
         'name': rootNode.name,
         'schema': _schemaV21,
         '_exporter_id': 'getman',
-        if (rootNode.isFolder &&
-            rootDescription != null &&
-            rootDescription.isNotEmpty)
+        if (rootNode.isFolder && rootDescription != null && rootDescription.isNotEmpty)
           'description': rootDescription,
       },
       'item': items,
@@ -128,8 +132,7 @@ class PostmanCollectionMapper {
     if (node.isFolder) {
       final item = <String, dynamic>{
         'name': node.name,
-        if (description != null && description.isNotEmpty)
-          'description': description,
+        if (description != null && description.isNotEmpty) 'description': description,
         'item': node.children.map(_nodeToItem).toList(),
       };
       if (node.variables.isNotEmpty) {
@@ -139,8 +142,7 @@ class PostmanCollectionMapper {
     }
     return {
       'name': node.name,
-      if (description != null && description.isNotEmpty)
-        'description': description,
+      if (description != null && description.isNotEmpty) 'description': description,
       'request': _configToRequest(node.config),
     };
   }
@@ -182,12 +184,37 @@ class PostmanCollectionMapper {
       };
     }
     final headers = config.headers.entries
-        .map((e) => {'key': e.key, 'value': e.value, 'type': 'text'})
+        .map(
+          (e) => {
+            'key': e.key,
+            'value': e.value,
+            'type': 'text',
+            if (config.disabledHeaderKeys.contains(e.key)) 'disabled': true,
+          },
+        )
         .toList();
     final urlObj = <String, dynamic>{'raw': config.url};
     // Emit the structured `query` array so Postman's UI renders rows.
     // Derived from the URL's raw query segments — duplicates preserved.
-    final query = _rawQuery(config.url);
+    // Parked (disabled) params re-enter at their remembered display position
+    // with `disabled: true`, percent-encoded like the raw segments (the
+    // variable-preserving encoder keeps {{var}} tokens intact).
+    final query = <Map<String, dynamic>>[
+      for (final q in _rawQuery(config.url)) <String, dynamic>{...q},
+    ];
+    final sortedParked = config.disabledParams.indexed.toList()
+      ..sort((a, b) {
+        final byRow = a.$2.rowIndex.compareTo(b.$2.rowIndex);
+        return byRow != 0 ? byRow : a.$1.compareTo(b.$1);
+      });
+    for (final (_, p) in sortedParked) {
+      final insertAt = p.rowIndex < 0 ? 0 : (p.rowIndex > query.length ? query.length : p.rowIndex);
+      query.insert(insertAt, <String, dynamic>{
+        'key': UrlQueryUtils.encodeComponent(p.key),
+        'value': UrlQueryUtils.encodeComponent(p.value),
+        'disabled': true,
+      });
+    }
     if (query.isNotEmpty) {
       urlObj['query'] = query;
     }
@@ -249,9 +276,7 @@ class PostmanCollectionMapper {
       case BodyType.raw:
         if (config.body.isEmpty) return null;
         final isJson = config.headers.entries.any(
-          (e) =>
-              e.key.toLowerCase() == 'content-type' &&
-              e.value.toLowerCase().contains('json'),
+          (e) => e.key.toLowerCase() == 'content-type' && e.value.toLowerCase().contains('json'),
         );
         return {
           'mode': 'raw',
@@ -266,8 +291,7 @@ class PostmanCollectionMapper {
           'mode': 'urlencoded',
           'urlencoded': [
             for (final f in config.formFields)
-              if (!f.isFile && f.name.isNotEmpty)
-                {'key': f.name, 'value': f.value},
+              if (!f.isFile && f.name.isNotEmpty) {'key': f.name, 'value': f.value},
           ],
         };
       case BodyType.multipart:
@@ -302,8 +326,9 @@ class PostmanCollectionMapper {
 
   // ---------- import helpers ----------
 
-  static ({Map<String, String> variables, Set<String> secretKeys})
-  _variablesFromPostman(dynamic raw) {
+  static ({Map<String, String> variables, Set<String> secretKeys}) _variablesFromPostman(
+    dynamic raw,
+  ) {
     final variables = <String, String>{};
     final secretKeys = <String>{};
     if (raw is List) {
@@ -372,14 +397,16 @@ class PostmanCollectionMapper {
     // raw URL's query portion. Otherwise keep raw as-is.
     final mergedUrl = structuredQuery == null
         ? rawUrl
-        : UrlQueryUtils.replaceQuery(rawUrl, structuredQuery);
+        : UrlQueryUtils.replaceQuery(rawUrl, structuredQuery.params);
     final headers = _parseHeaders(request['header']);
     final body = _parseBody(request['body']);
     return HttpRequestConfigEntity(
       id: _uuid.v4(),
       method: method,
       url: mergedUrl,
-      headers: headers,
+      headers: headers.headers,
+      disabledHeaderKeys: headers.disabledKeys,
+      disabledParams: structuredQuery?.parked ?? const [],
       auth: _parseAuth(request['auth']),
       body: body.body,
       bodyType: body.bodyType,
@@ -436,12 +463,8 @@ class PostmanCollectionMapper {
       if (raw is String) return raw;
       final host = url['host'];
       final path = url['path'];
-      final hostStr = host is List
-          ? host.join('.')
-          : (host is String ? host : '');
-      final pathStr = path is List
-          ? path.join('/')
-          : (path is String ? path : '');
+      final hostStr = host is List ? host.join('.') : (host is String ? host : '');
+      final pathStr = path is List ? path.join('/') : (path is String ? path : '');
       if (hostStr.isEmpty && pathStr.isEmpty) return '';
       final pathPart = pathStr.isNotEmpty ? '/$pathStr' : '';
       if (hostStr.isEmpty) return pathPart;
@@ -449,13 +472,9 @@ class PostmanCollectionMapper {
       // (default https) instead of dropping the scheme and producing a
       // schemeless, unsendable string.
       final protocol = url['protocol'];
-      final scheme = (protocol is String && protocol.isNotEmpty)
-          ? protocol
-          : 'https';
+      final scheme = (protocol is String && protocol.isNotEmpty) ? protocol : 'https';
       final portRaw = url['port'];
-      final port = (portRaw == null || (portRaw is String && portRaw.isEmpty))
-          ? ''
-          : ':$portRaw';
+      final port = (portRaw == null || (portRaw is String && portRaw.isEmpty)) ? '' : ':$portRaw';
       return '$scheme://$hostStr$port$pathPart';
     }
     return '';
@@ -463,32 +482,44 @@ class PostmanCollectionMapper {
 
   /// Returns null when the Postman payload did not include a structured
   /// `url.query` array at all (caller should keep the raw URL's query intact).
-  /// Returns an empty list when `url.query` was present but empty or fully
-  /// disabled (caller should clear the raw URL's query).
-  static List<QueryParamEntity>? _parseQueryList(dynamic url) {
+  /// Enabled entries land in `params` (merged back into the URL); entries
+  /// marked `disabled: true` land in `parked` carrying their array position
+  /// as rowIndex, so the params tab re-interleaves them in place.
+  static ({List<QueryParamEntity> params, List<ParkedParamEntity> parked})? _parseQueryList(
+    dynamic url,
+  ) {
     if (url is! Map) return null;
     final query = url['query'];
     if (query is! List) return null;
-    final result = <QueryParamEntity>[];
+    final params = <QueryParamEntity>[];
+    final parked = <ParkedParamEntity>[];
+    var display = 0;
     for (final entry in query.whereType<Map<dynamic, dynamic>>()) {
-      if (entry['disabled'] == true) continue;
       final key = entry['key'];
-      final value = entry['value'];
       if (key is! String || key.isEmpty) continue;
+      final value = entry['value'];
       // Postman's structured entries carry the query as it appears in
       // `url.raw`, i.e. still percent-encoded — decode before handing them to
       // replaceQuery (which encodes), or `hello%20world` arrives as
       // `hello%2520world` and the request sends a literal `%20`.
-      result.add(
-        QueryParamEntity(
-          key: _decodeQueryPart(key),
-          value: _decodeQueryPart(
-            value is String ? value : (value?.toString() ?? ''),
-          ),
-        ),
+      final decodedKey = _decodeQueryPart(key);
+      final decodedValue = _decodeQueryPart(
+        value is String ? value : (value?.toString() ?? ''),
       );
+      if (entry['disabled'] == true) {
+        parked.add(
+          ParkedParamEntity(
+            key: decodedKey,
+            value: decodedValue,
+            rowIndex: display,
+          ),
+        );
+      } else {
+        params.add(QueryParamEntity(key: decodedKey, value: decodedValue));
+      }
+      display++;
     }
-    return result;
+    return (params: params, parked: parked);
   }
 
   /// Percent-decodes a structured query key/value; malformed sequences (a
@@ -501,17 +532,22 @@ class PostmanCollectionMapper {
     }
   }
 
-  static Map<String, String> _parseHeaders(dynamic header) {
-    if (header is! List) return {};
+  /// Headers plus which of them Postman marked `disabled: true` — disabled
+  /// entries are KEPT in the map (order preserved) and their keys recorded,
+  /// matching Getman's own disabled-header model.
+  static ({Map<String, String> headers, Set<String> disabledKeys}) _parseHeaders(dynamic header) {
     final result = <String, String>{};
-    for (final entry in header.whereType<Map<dynamic, dynamic>>()) {
-      if (entry['disabled'] == true) continue;
-      final key = entry['key'];
-      final value = entry['value'];
-      if (key is! String || key.isEmpty) continue;
-      result[key] = value is String ? value : (value?.toString() ?? '');
+    final disabled = <String>{};
+    if (header is List) {
+      for (final entry in header.whereType<Map<dynamic, dynamic>>()) {
+        final key = entry['key'];
+        final value = entry['value'];
+        if (key is! String || key.isEmpty) continue;
+        result[key] = value is String ? value : (value?.toString() ?? '');
+        if (entry['disabled'] == true) disabled.add(key);
+      }
     }
-    return result;
+    return (headers: result, disabledKeys: disabled);
   }
 
   /// Reconstructs the body fields from a Postman `body` block. Mirrors the
