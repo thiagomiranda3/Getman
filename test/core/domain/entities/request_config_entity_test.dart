@@ -235,4 +235,33 @@ void main() {
       expect(config.enabledHeaders, {'A': '1'});
     });
   });
+
+  group('equality treats header order as significant (B2 reorder)', () {
+    test('same headers in the same order are equal', () {
+      const a = HttpRequestConfigEntity(
+        id: 'x',
+        headers: {'A': '1', 'B': '2'},
+      );
+      const b = HttpRequestConfigEntity(
+        id: 'x',
+        headers: {'A': '1', 'B': '2'},
+      );
+      expect(a, b);
+    });
+
+    test('same headers in a different order are NOT equal', () {
+      // Equatable's map equality is order-insensitive; without the ordered
+      // key view in props a pure header reorder is an invisible no-op — the
+      // bloc suppresses the equal state and never persists the new order.
+      const a = HttpRequestConfigEntity(
+        id: 'x',
+        headers: {'A': '1', 'B': '2'},
+      );
+      const b = HttpRequestConfigEntity(
+        id: 'x',
+        headers: {'B': '2', 'A': '1'},
+      );
+      expect(a == b, isFalse);
+    });
+  });
 }

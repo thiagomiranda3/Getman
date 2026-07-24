@@ -198,6 +198,11 @@ class HttpRequestConfigEntity extends Equatable {
     method,
     url,
     headers,
+    // Header ORDER is user-visible and user-editable (B2 row reorder).
+    // Equatable's map equality is order-insensitive, so without this ordered
+    // key view a pure reorder compares equal — the bloc suppresses the
+    // emission and the new order is never rendered from state or persisted.
+    headers.keys.toList(),
     body,
     auth,
     bodyType,
