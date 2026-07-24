@@ -388,4 +388,96 @@ void main() {
       await tester.pump(const Duration(seconds: 11));
     },
   );
+
+  group('secret masking (B3)', () {
+    TextField fieldByKey(WidgetTester tester, String key) =>
+        tester.widget<TextField>(find.byKey(ValueKey(key)));
+
+    testWidgets(
+      'bearer TOKEN is obscured by default; the eye toggle reveals and '
+      're-hides without touching the value',
+      (tester) async {
+        final bloc = await _loadedBloc(
+          repository,
+          sendRequestUseCase,
+          tabWithAuth('t', const {'type': 'bearer', 'token': 'sk-secret'}),
+        );
+        addTearDown(bloc.close);
+
+        await _pump(tester, bloc, 't');
+
+        expect(fieldByKey(tester, 'auth_field_TOKEN').obscureText, isTrue);
+
+        await tester.tap(find.byKey(const ValueKey('auth_reveal_TOKEN')));
+        await tester.pump();
+        expect(fieldByKey(tester, 'auth_field_TOKEN').obscureText, isFalse);
+
+        await tester.tap(find.byKey(const ValueKey('auth_reveal_TOKEN')));
+        await tester.pump();
+        expect(fieldByKey(tester, 'auth_field_TOKEN').obscureText, isTrue);
+
+        expect(
+          bloc.state.tabs.byId('t')!.config.auth['token'],
+          'sk-secret',
+          reason: 'reveal toggling must never mutate the stored value',
+        );
+
+        await tester.pump(const Duration(seconds: 11));
+      },
+    );
+
+    testWidgets(
+      'basic PASSWORD is obscured with a reveal toggle; USERNAME stays '
+      'plain',
+      (tester) async {
+        final bloc = await _loadedBloc(
+          repository,
+          sendRequestUseCase,
+          tabWithAuth(
+            't',
+            const {'type': 'basic', 'username': 'u', 'password': 'p'},
+          ),
+        );
+        addTearDown(bloc.close);
+
+        await _pump(tester, bloc, 't');
+
+        expect(fieldByKey(tester, 'auth_field_USERNAME').obscureText, isFalse);
+        expect(fieldByKey(tester, 'auth_field_PASSWORD').obscureText, isTrue);
+        expect(
+          find.byKey(const ValueKey('auth_reveal_USERNAME')),
+          findsNothing,
+        );
+
+        await tester.tap(find.byKey(const ValueKey('auth_reveal_PASSWORD')));
+        await tester.pump();
+        expect(fieldByKey(tester, 'auth_field_PASSWORD').obscureText, isFalse);
+
+        await tester.pump(const Duration(seconds: 11));
+      },
+    );
+
+    testWidgets(
+      'api key VALUE is obscured with a reveal toggle; KEY stays plain',
+      (tester) async {
+        final bloc = await _loadedBloc(
+          repository,
+          sendRequestUseCase,
+          tabWithAuth('t', const {'type': 'apikey', 'key': 'k', 'value': 'v'}),
+        );
+        addTearDown(bloc.close);
+
+        await _pump(tester, bloc, 't');
+
+        expect(fieldByKey(tester, 'auth_field_KEY').obscureText, isFalse);
+        expect(fieldByKey(tester, 'auth_field_VALUE').obscureText, isTrue);
+
+        await tester.tap(find.byKey(const ValueKey('auth_reveal_VALUE')));
+        await tester.pump();
+        expect(fieldByKey(tester, 'auth_field_VALUE').obscureText, isFalse);
+
+        await tester.pump(const Duration(seconds: 11));
+      },
+    );
+  });
 }
