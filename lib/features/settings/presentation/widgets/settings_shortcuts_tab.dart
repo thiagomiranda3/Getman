@@ -1,17 +1,20 @@
-// SHORTCUTS tab of the settings dialog: a static keyboard-shortcut
-// cheat-sheet (sections REQUEST/TABS/PANELS/...), rendered with _KeyCap key
-// caps. Purely informational — changing real bindings happens in
-// main.dart's appShortcuts map.
+// SHORTCUTS tab of the settings dialog: renders the single-source shortcut
+// catalog (lib/core/navigation/shortcut_catalog.dart) as grouped sections
+// with _KeyCap key caps. Purely informational — changing real bindings
+// happens in main.dart's appShortcuts map; adding a shortcut means adding a
+// catalog entry (plus the binding), not editing this widget.
 
 import 'package:flutter/material.dart';
+import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/features/settings/presentation/widgets/settings_pane.dart';
 
 /// A read-only reference of every global keyboard shortcut, grouped by area.
-/// The displayed key glyphs follow the host platform: macOS shows the symbol
-/// keys (⌘ ⇧ ⌃), Windows/Linux spell the modifiers out (Ctrl / Shift). The
-/// bindings themselves mirror `appShortcuts` in `main.dart` — keep them in
-/// sync. Note: Next/Previous tab are Ctrl-only on every platform (no ⌘
+/// Rows come from [shortcutCatalog] — the same source the cheat-sheet
+/// overlay and tooltip hints read — so the surfaces can never drift. The
+/// displayed key glyphs follow the host platform: macOS shows the symbol
+/// keys (⌘ ⇧ ⌥ ⌃), Windows/Linux spell the modifiers out (Ctrl / Shift /
+/// Alt). Note: Next/Previous tab are Ctrl-only on every platform (no ⌘
 /// variant), so they render with the Control glyph even on macOS.
 class SettingsShortcutsTab extends StatelessWidget {
   const SettingsShortcutsTab({super.key});
@@ -19,75 +22,18 @@ class SettingsShortcutsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isMac = Theme.of(context).platform == TargetPlatform.macOS;
-    final mod = isMac ? '⌘' : 'Ctrl';
-    final shift = isMac ? '⇧' : 'Shift';
-    final ctrl = isMac ? '⌃' : 'Ctrl';
-
-    return settingsPane(context, [
-      _shortcutSection(context, 'REQUEST'),
-      _shortcutRow(context, 'Send request', 'Send the active tab’s request', [
-        mod,
-        'Enter',
-      ]),
-      _shortcutRow(context, 'Save request', 'Save the request to its node', [
-        mod,
-        'S',
-      ]),
-      _shortcutRow(context, 'Beautify JSON', 'Format & indent the JSON body', [
-        mod,
-        'B',
-      ]),
-      _shortcutRow(context, 'Focus URL', 'Jump to the active tab’s URL field', [
-        mod,
-        'L',
-      ]),
-      _shortcutRow(
-        context,
-        'Command palette',
-        'Fuzzy-jump to a request, environment, or theme',
-        [mod, 'K'],
-      ),
-      _shortcutRow(
-        context,
-        'Switch environment',
-        'Open the quick environment switcher',
-        [mod, 'E'],
-      ),
-      _shortcutSection(context, 'TABS'),
-      _shortcutRow(context, 'New tab', 'Open a new request tab', [mod, 'N']),
-      _shortcutRow(context, 'Close tab', 'Close the active tab', [mod, 'W']),
-      _shortcutRow(context, 'Next tab', 'Cycle to the next tab', [ctrl, 'Tab']),
-      _shortcutRow(context, 'Previous tab', 'Cycle to the previous tab', [
-        ctrl,
-        shift,
-        'Tab',
-      ]),
-      _shortcutRow(context, 'Jump to tab 1–9', 'Activate the Nth tab', [
-        mod,
-        '1–9',
-      ]),
-      _shortcutSection(context, 'PANELS'),
-      _shortcutRow(context, 'New panel', 'Create a new panel (workspace)', [
-        mod,
-        shift,
-        'N',
-      ]),
-      _shortcutRow(context, 'Next panel', 'Cycle to the next panel', [
-        mod,
-        shift,
-        ']',
-      ]),
-      _shortcutRow(context, 'Previous panel', 'Cycle to the previous panel', [
-        mod,
-        shift,
-        '[',
-      ]),
-      _shortcutRow(context, 'Jump to panel 1–9', 'Activate the Nth panel', [
-        mod,
-        shift,
-        '1–9',
-      ]),
-    ]);
+    final children = <Widget>[];
+    String? section;
+    for (final entry in shortcutCatalog(useMeta: isMac)) {
+      if (entry.section != section) {
+        section = entry.section;
+        children.add(_shortcutSection(context, section));
+      }
+      children.add(
+        _shortcutRow(context, entry.title, entry.description, entry.keyCaps),
+      );
+    }
+    return settingsPane(context, children);
   }
 }
 
