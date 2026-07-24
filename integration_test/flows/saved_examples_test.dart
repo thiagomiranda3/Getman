@@ -79,13 +79,12 @@ void main() {
     await $.pumpAndSettle();
     expect($('Renamed Capture'), findsWidgets);
 
-    // Delete it (confirm).
+    // Delete it — instant delete with UNDO snackbar (A1).
     await $(find.byIcon(Icons.more_vert)).last.tap();
     await $.pumpAndSettle();
     await $('DELETE').tap();
-    expect($('Delete example?'), findsWidgets);
-    await $('DELETE').tap();
     await $.pumpAndSettle();
     expect($('Renamed Capture'), findsNothing);
+    expect($('UNDO'), findsWidgets);
   });
 }
