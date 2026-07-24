@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
+import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/request_kind.dart';
@@ -148,6 +149,57 @@ void main() {
       final ws = config.copyWith(kind: RequestKind.webSocket);
       expect(ws.kind, RequestKind.webSocket);
       expect(ws == config, isFalse);
+    });
+  });
+
+  group('HttpRequestConfigEntity disabled params/headers', () {
+    test('defaults to no parked params and no disabled header keys', () {
+      const config = HttpRequestConfigEntity(id: 'x');
+      expect(config.disabledParams, isEmpty);
+      expect(config.disabledHeaderKeys, isEmpty);
+    });
+
+    test('copyWith sets the new fields and keeps them when omitted', () {
+      const config = HttpRequestConfigEntity(id: 'x');
+      final next = config.copyWith(
+        disabledParams: const [
+          ParkedParamEntity(key: 'debug', value: 'true', rowIndex: 1),
+        ],
+        disabledHeaderKeys: const {'X-Trace'},
+      );
+      expect(next.disabledParams, const [
+        ParkedParamEntity(key: 'debug', value: 'true', rowIndex: 1),
+      ]);
+      expect(next.disabledHeaderKeys, {'X-Trace'});
+      // Omitting the args keeps the existing values.
+      final kept = next.copyWith(method: 'POST');
+      expect(kept.disabledParams, next.disabledParams);
+      expect(kept.disabledHeaderKeys, next.disabledHeaderKeys);
+    });
+
+    test('withId carries both fields onto the duplicate', () {
+      final source = const HttpRequestConfigEntity(id: 'x').copyWith(
+        disabledParams: const [
+          ParkedParamEntity(key: 'a', value: '1', rowIndex: 0),
+        ],
+        disabledHeaderKeys: const {'Accept'},
+      );
+      final dupe = source.withId('y');
+      expect(dupe.id, 'y');
+      expect(dupe.disabledParams, source.disabledParams);
+      expect(dupe.disabledHeaderKeys, source.disabledHeaderKeys);
+    });
+
+    test('props include both fields (drives dirty-tracking)', () {
+      const base = HttpRequestConfigEntity(id: 'x');
+      final parked = base.copyWith(
+        disabledParams: const [
+          ParkedParamEntity(key: 'a', value: '1', rowIndex: 0),
+        ],
+      );
+      final headerOff = base.copyWith(disabledHeaderKeys: const {'Accept'});
+      expect(parked == base, isFalse);
+      expect(headerOff == base, isFalse);
     });
   });
 }
