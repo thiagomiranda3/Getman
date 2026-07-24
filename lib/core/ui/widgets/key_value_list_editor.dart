@@ -12,6 +12,12 @@
 // column (B1, params/headers); flags are seeded from rowEnabled on every
 // controller rebuild and tracked internally between rebuilds so they follow
 // rows through deletes. The trailing auto-blank row never shows a checkbox.
+// Optional onReorder/onDuplicate (B2) add a drag handle + duplicate button
+// per data row (never on the trailing auto-blank row); on drop the editor
+// moves its row controllers FIRST (map-backed hosts echo an
+// order-insensitively-equal value that didUpdateWidget suppresses — the
+// controllers are the only carrier of the new visual order), then reports
+// the move so the host reorders its canonical value.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
@@ -46,6 +52,8 @@ class KeyValueListEditor<T extends Object> extends StatefulWidget {
     this.rowEnabled,
     this.onToggleEnabled,
     this.disabledRowsReadOnly = false,
+    this.onReorder,
+    this.onDuplicate,
   });
   final T items;
   final ValueChanged<T> onChanged;
@@ -96,6 +104,23 @@ class KeyValueListEditor<T extends Object> extends StatefulWidget {
   /// rows live outside the URL, so a free-text edit has nowhere to go).
   /// Headers leave this false — disabled header rows stay editable.
   final bool disabledRowsReadOnly;
+
+  /// When non-null, every row except the trailing auto-blank one shows a
+  /// drag handle ([ReorderableDragStartListener] — immediate, desktop
+  /// friendly, no long-press) and rows can be reordered. Called with
+  /// (oldIndex, newIndex) in decoded-row space AFTER the editor has moved
+  /// its own row controllers; the host must apply the same move to its
+  /// canonical value (list order / insertion-ordered map) and emit it.
+  /// Indices match the host's decoded rows except in the transient state
+  /// where an interior row's key was cleared — hosts must range-guard.
+  final void Function(int oldIndex, int newIndex)? onReorder;
+
+  /// When non-null, every row except the trailing auto-blank one shows a
+  /// duplicate button next to delete. Called with the source row index; the
+  /// editor inserts nothing itself — the host inserts the copy below
+  /// (params: exact copy; map-backed hosts: a '-copy'-suffixed key) and the
+  /// new items arrive as an external change.
+  final void Function(int index)? onDuplicate;
 
   @override
   State<KeyValueListEditor<T>> createState() => _KeyValueListEditorState<T>();
@@ -200,11 +225,40 @@ class _KeyValueListEditorState<T extends Object>
     );
   }
 
+  /// Handles a drop from the ReorderableListView. Wired to `onReorderItem`
+  /// (not the deprecated `onReorder`), which already reports `newIndex` in
+  /// post-removal space — no manual decrement needed. Still clamps/excludes
+  /// around the trailing auto-blank row defensively, moves the row
+  /// controllers (and the aligned enabled-flags) locally, then reports the
+  /// move to the host.
+  void _handleReorder(int oldIndex, int newIndex) {
+    final host = widget.onReorder;
+    if (host == null) return;
+    final blankIndex = _keyControllers.length - 1;
+    if (oldIndex < 0 || oldIndex >= blankIndex) return;
+    var target = newIndex;
+    if (target >= blankIndex) target = blankIndex - 1;
+    if (target < 0) target = 0;
+    if (target == oldIndex) return;
+    setState(() {
+      _keyControllers.insert(target, _keyControllers.removeAt(oldIndex));
+      _valControllers.insert(target, _valControllers.removeAt(oldIndex));
+      _rowEnabledFlags.insert(target, _rowEnabledFlags.removeAt(oldIndex));
+    });
+    host(oldIndex, target);
+  }
+
   @override
   Widget build(BuildContext context) {
     final layout = context.appLayout;
+    final onDuplicate = widget.onDuplicate;
 
-    return ListView.builder(
+    return ReorderableListView.builder(
+      buildDefaultDragHandles: false,
+      // onReorder is deprecated in this Flutter version (superseded by
+      // onReorderItem, which reports newIndex already adjusted for the
+      // removed slot) — see _handleReorder's doc comment.
+      onReorderItem: _handleReorder,
       itemCount: _keyControllers.length,
       itemBuilder: (context, index) {
         final secrets = widget.secretKeys;
@@ -212,6 +266,7 @@ class _KeyValueListEditorState<T extends Object>
         // and the env editor's trimming encode), so an untrimmed compare would
         // mis-flag a key with surrounding whitespace.
         final keyText = _keyControllers[index].text.trim();
+        final isTrailingBlankRow = index == _keyControllers.length - 1;
 
         final showToggles =
             widget.rowEnabled != null && widget.onToggleEnabled != null;
@@ -221,7 +276,7 @@ class _KeyValueListEditorState<T extends Object>
           rowIndex: index,
           showToggleColumn: showToggles,
           // The trailing auto-blank row never shows a checkbox.
-          showCheckbox: showToggles && index != _keyControllers.length - 1,
+          showCheckbox: showToggles && !isTrailingBlankRow,
           isRowEnabled: _rowEnabledFlags[index],
           onToggleEnabled: showToggles ? () => _toggleEnabled(index) : null,
           readOnlyWhenDisabled: widget.disabledRowsReadOnly,
@@ -236,6 +291,10 @@ class _KeyValueListEditorState<T extends Object>
               secrets.contains(keyText),
           onToggleSecret: secrets == null ? null : () => _toggleSecret(index),
           variableContext: widget.variableContext,
+          showDragHandle: widget.onReorder != null && !isTrailingBlankRow,
+          onDuplicate: onDuplicate == null || isTrailingBlankRow
+              ? null
+              : () => onDuplicate(index),
           onKeyChanged: (val) {
             if (index == _keyControllers.length - 1 && val.isNotEmpty) {
               setState(_addEmptyRow);
@@ -285,12 +344,16 @@ class _KeyValueRow extends StatefulWidget {
     this.isRowEnabled = true,
     this.onToggleEnabled,
     this.readOnlyWhenDisabled = false,
+    this.showDragHandle = false,
+    this.onDuplicate,
   });
   final bool showToggleColumn;
   final bool showCheckbox;
   final bool isRowEnabled;
   final VoidCallback? onToggleEnabled;
   final bool readOnlyWhenDisabled;
+  final bool showDragHandle;
+  final VoidCallback? onDuplicate;
   final int rowIndex;
   final String? fieldPrefix;
   final TextEditingController keyController;
@@ -452,6 +515,37 @@ class _KeyValueRowState extends State<_KeyValueRow> {
             ),
           )
         : null;
+    final dragHandle = widget.showDragHandle
+        ? ReorderableDragStartListener(
+            index: widget.rowIndex,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.grab,
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: widget.layout.isCompact ? 2.0 : 4.0,
+                ),
+                child: Icon(
+                  Icons.drag_indicator,
+                  size: widget.layout.isCompact ? 18 : 20,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                ),
+              ),
+            ),
+          )
+        : null;
+    final duplicateButton = widget.onDuplicate == null
+        ? null
+        : context.appDecoration.wrapInteractive(
+            child: IconButton(
+              icon: Icon(
+                Icons.content_copy,
+                size: widget.layout.isCompact ? 20 : 24,
+                color: theme.colorScheme.secondary,
+              ),
+              tooltip: 'Duplicate row',
+              onPressed: widget.onDuplicate,
+            ),
+          );
     final deleteButton = context.appDecoration.wrapInteractive(
       child: IconButton(
         icon: Icon(
@@ -494,9 +588,11 @@ class _KeyValueRowState extends State<_KeyValueRow> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      ?dragHandle,
                       ?enabledToggle,
                       Expanded(child: keyCell),
                       ?secretButton,
+                      ?duplicateButton,
                       deleteButton,
                     ],
                   ),
@@ -506,12 +602,14 @@ class _KeyValueRowState extends State<_KeyValueRow> {
               )
             : Row(
                 children: [
+                  ?dragHandle,
                   ?enabledToggle,
                   Expanded(child: keyCell),
                   SizedBox(width: widget.layout.isCompact ? 8 : 12),
                   Expanded(child: valueCell),
                   SizedBox(width: widget.layout.isCompact ? 4 : 8),
                   ?secretButton,
+                  ?duplicateButton,
                   deleteButton,
                 ],
               ),
