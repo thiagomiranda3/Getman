@@ -4,7 +4,11 @@
 // headers/body/auth plus the last response's columns (responseBody/
 // responseHeaders/statusCode/durationMs — null discriminates "nothing sent
 // yet"), and derives `params` from `url` (the query string is the single
-// source of truth; params are never stored separately).
+// source of truth; params are never stored separately). Also carries
+// row-disabling state: disabledParams (query params parked outside the URL
+// with their row position for re-insertion when re-enabled) and
+// disabledHeaderKeys (header keys flagged as disabled; rows stay in headers
+// to preserve insertion order, but are skipped at send/code-gen).
 //
 // Gotchas: copyWith uses a private `_unset` sentinel to distinguish "leave
 // unchanged" from "explicitly set to null" for the nullable response/body
