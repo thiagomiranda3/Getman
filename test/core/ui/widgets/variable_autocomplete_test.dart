@@ -430,5 +430,44 @@ void main() {
         expect(find.text('https://api.dev/users'), findsOneWidget);
       },
     );
+
+    testWidgets(
+      'dual mode: accepting a {{variable}} whose result matches a URL '
+      'candidate does not reopen URL mode; a real text change re-enables '
+      'it (regression)',
+      (tester) async {
+        // Realistic dual-mode config (the URL bar wires both callbacks):
+        // one history URL is itself a {{var}} template, so the text left
+        // behind by accepting the variable suggestion is a substring of it.
+        List<String> dualModeUrlSuggest(String text) => buildUrlSuggestions(
+          query: text,
+          historyUrls: const ['{{baseUrl}}/users'],
+          collectionUrls: const [],
+        );
+
+        await pump(tester, urlSuggestionsFor: dualModeUrlSuggest);
+        await tester.enterText(find.byType(TextField), '{{');
+        await tester.pumpAndSettle();
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+
+        expect(controller.text, '{{baseUrl}}');
+        expect(
+          find.text('{{baseUrl}}/users'),
+          findsNothing,
+          reason:
+              'accepting a variable suggestion must not instantly reopen '
+              'URL mode even though the resulting text matches a history '
+              'URL — the latch must be pre-synced the same way as '
+              '_acceptUrlAt',
+        );
+
+        // A genuine subsequent text change clears the latch — URL mode can
+        // reopen normally.
+        await tester.enterText(find.byType(TextField), '{{baseUrl}}/');
+        await tester.pumpAndSettle();
+        expect(find.text('{{baseUrl}}/users'), findsOneWidget);
+      },
+    );
   });
 }

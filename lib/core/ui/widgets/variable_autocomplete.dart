@@ -58,6 +58,12 @@ class _GatedAction extends Action<Intent> {
 /// Typing `{{` (or Cmd/Ctrl+Space) opens a keyboard-navigable overlay built
 /// from [suggestionsFor]; accepting inserts `name}}`.
 ///
+/// When [urlSuggestionsFor] is also wired, the same overlay gains a second,
+/// URL-suggestion mode (B4): whenever the caret is NOT inside an in-progress
+/// `{{` token, whole-URL rows are offered and accepting one replaces the
+/// entire field text. Variable mode always wins while the caret is inside a
+/// `{{` token.
+///
 /// [onAccepted] is called with the controller's full text after a suggestion
 /// is accepted (keyboard or tap). Use it to notify listeners that would
 /// otherwise only see programmatic controller mutations via
@@ -199,6 +205,14 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
     _entry!.markNeedsBuild();
   }
 
+  /// Variable-mode accept. The latch bookkeeping is pre-synced BEFORE the
+  /// programmatic write (mirrors [_acceptUrlAt]) because the controller
+  /// listener fires synchronously on assignment — without it, a dual-mode
+  /// field (both [VariableAutocomplete.suggestionsFor] and
+  /// [VariableAutocomplete.urlSuggestionsFor] wired) can instantly reopen the
+  /// URL overlay when the post-accept text happens to match a history/
+  /// collection URL (realistic: URLs can themselves contain `{{var}}`
+  /// templates).
   void _acceptAt(int index) {
     if (_urlMode) return _acceptUrlAt(index);
     final query = _activeQuery;
@@ -210,9 +224,12 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
     final insert = query.hasClosingBraces ? name : '$name}}';
     final caret =
         before.length + insert.length + (query.hasClosingBraces ? 2 : 0);
+    final newText = '$before$insert$after';
     _close();
+    _lastText = newText;
+    _dismissed = true;
     widget.controller.value = TextEditingValue(
-      text: '$before$insert$after',
+      text: newText,
       selection: TextSelection.collapsed(offset: caret),
     );
     widget.onAccepted?.call(widget.controller.text);
