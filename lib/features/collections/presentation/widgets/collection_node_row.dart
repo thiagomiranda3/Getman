@@ -1,8 +1,9 @@
 // A single collection-tree row (folder or request), with hover highlight,
-// long-press action sheet on phone, and desktop drag-and-drop. Expansion is
-// owned by the parent tree coordinator (CollectionsList): this row only
-// reflects `isExpanded` and calls `onToggle` — it never tracks expansion
-// itself (the H2 fix).
+// long-press action sheet on phone, right-click context menu (the same menu
+// as the trailing "⋮" button), and desktop drag-and-drop. Expansion is owned
+// by the parent tree coordinator (CollectionsList): this row only reflects
+// `isExpanded` and calls `onToggle` — it never tracks expansion itself (the
+// H2 fix).
 //
 // Gotchas: drag targets always accept (never reject) so a release over a
 // row doesn't fall through to the list-level root target and move the node
@@ -10,6 +11,8 @@
 // rejected via onWillAcceptWithDetails and separately guarded by the bloc.
 // Drag payload is the typed NodeDragData wrapper, not a bare String, so a
 // dragged tab-strip tab is never highlighted or accepted here (D4/D5).
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/network/request_kind.dart';
@@ -72,6 +75,11 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
     final onLongPress = isPhone
         ? () => NodeActionSheet.show(context, node)
         : null;
+    // Right-click anywhere on the row opens the same menu as the trailing
+    // "⋮" button, at the cursor.
+    void onSecondaryTapDown(TapDownDetails details) => unawaited(
+      showCollectionNodeMenuAt(context, node, details.globalPosition),
+    );
 
     Widget content;
     if (node.isFolder) {
@@ -82,6 +90,7 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
           child: InkWell(
             onTap: widget.onToggle,
             onLongPress: onLongPress,
+            onSecondaryTapDown: onSecondaryTapDown,
             child: MouseRegion(
               onEnter: (_) => setState(() => _isHovered = true),
               onExit: (_) => setState(() => _isHovered = false),
@@ -205,6 +214,7 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
               Scaffold.maybeOf(context)?.closeDrawer();
             },
             onLongPress: onLongPress,
+            onSecondaryTapDown: onSecondaryTapDown,
             child: MouseRegion(
               onEnter: (_) => setState(() => _isHovered = true),
               onExit: (_) => setState(() => _isHovered = false),

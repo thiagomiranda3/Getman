@@ -83,6 +83,95 @@ void main() {
   });
 
   testWidgets(
+    'a query prefilled from the editor selection mounts fully selected, so '
+    'pasting the same text replaces it instead of duplicating it',
+    (tester) async {
+      final editing = CodeLineEditingController();
+      addTearDown(editing.dispose);
+      editing
+        ..text = 'alpha beta gamma'
+        // Select "beta" — a same-line selection is what findMode auto-fills.
+        ..selection = const CodeLineSelection(
+          baseIndex: 0,
+          baseOffset: 6,
+          extentIndex: 0,
+          extentOffset: 10,
+        );
+      final findCtrl = CodeFindController(editing);
+      addTearDown(findCtrl.dispose);
+      // Prefill happens BEFORE the panel mounts (the initState mirror path).
+      findCtrl.findMode();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: classicTheme(Brightness.light),
+          home: Scaffold(
+            appBar: CodeFindPanel(controller: findCtrl, readOnly: true),
+            body: const SizedBox(),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final field = tester.widget<TextField>(find.byType(TextField));
+      expect(field.controller!.text, 'beta');
+      expect(
+        field.controller!.selection,
+        const TextSelection(baseOffset: 0, extentOffset: 4),
+        reason:
+            'the prefilled query must be fully selected so Cmd+V replaces it',
+      );
+    },
+  );
+
+  testWidgets(
+    're-opening find over a new editor selection re-fills the visible field '
+    'with the text fully selected (the mounted-panel mirror path)',
+    (tester) async {
+      final editing = CodeLineEditingController();
+      addTearDown(editing.dispose);
+      editing.text = 'alpha beta gamma';
+      final findCtrl = CodeFindController(editing);
+      addTearDown(findCtrl.dispose);
+      // Open with no editor selection: nothing prefilled.
+      findCtrl.findMode();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: classicTheme(Brightness.light),
+          home: Scaffold(
+            appBar: CodeFindPanel(controller: findCtrl, readOnly: true),
+            body: const SizedBox(),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        isEmpty,
+      );
+
+      // Select "gamma" in the editor and hit find again — the finder's
+      // external write must mirror into the visible field fully selected.
+      editing.selection = const CodeLineSelection(
+        baseIndex: 0,
+        baseOffset: 11,
+        extentIndex: 0,
+        extentOffset: 16,
+      );
+      findCtrl.findMode();
+      await tester.pump();
+
+      final field = tester.widget<TextField>(find.byType(TextField));
+      expect(field.controller!.text, 'gamma');
+      expect(
+        field.controller!.selection,
+        const TextSelection(baseOffset: 0, extentOffset: 5),
+      );
+    },
+  );
+
+  testWidgets(
     'Enter steps to the next match repeatedly; Shift+Enter steps back',
     (tester) async {
       await tester.runAsync(() async {

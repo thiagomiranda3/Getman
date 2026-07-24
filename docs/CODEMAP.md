@@ -137,7 +137,7 @@ widgets + screens). Shared cross-feature code lives under `lib/core/`. See
 |---|---|
 | `lib/features/home/domain/usecases` | `tab_dirty_checker.dart` (unsaved-changes detection). |
 | `lib/features/home/presentation/screens` | `main_screen.dart` (app shell; hosts every keyboard `Action` + tab strip). |
-| `lib/features/home/presentation/widgets` | `side_menu.dart`, `request_tab_chip.dart`, `tab_content_stack.dart`, `tab_chip.dart`, `add_tab_button.dart`, `empty_tabs_placeholder.dart`. |
+| `lib/features/home/presentation/widgets` | `side_menu.dart`, `request_tab_chip.dart`, `tab_content_stack.dart`, `tab_chip.dart`, `add_tab_button.dart`, `tab_strip_double_click.dart`, `empty_tabs_placeholder.dart`. |
 
 ### `mcp` — Model Context Protocol client (bloc-over-service)
 
@@ -267,7 +267,7 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | Snackbars | `lib/core/ui/widgets/app_snack_bar.dart` |
 | Splitters (pane dividers) | `lib/core/ui/widgets/splitter.dart` |
 | SSE (Server-Sent Events) | `lib/core/network/sse_parser.dart`, `lib/core/network/realtime_service.dart` |
-| Tab strip / chips | `lib/features/home/presentation/screens/main_screen.dart`, `lib/features/home/presentation/widgets/request_tab_chip.dart` |
+| Tab strip / chips | `lib/features/home/presentation/screens/main_screen.dart`, `lib/features/home/presentation/widgets/request_tab_chip.dart`, `lib/features/home/presentation/widgets/tab_strip_double_click.dart` |
 | Tabs (request editor) | `lib/features/tabs/presentation/bloc/tabs_bloc.dart`, `lib/features/tabs/domain/entities/request_tab_entity.dart` |
 | Theme accessors (`context.app*`) | `lib/core/theme/extensions/app_theme_access.dart`, `lib/core/theme/app_theme.dart` |
 | Themes + component slots | `lib/core/theme/theme_registry.dart`, `lib/core/theme/extensions/app_components.dart` |

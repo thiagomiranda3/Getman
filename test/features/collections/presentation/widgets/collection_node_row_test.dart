@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -136,6 +137,51 @@ void main() {
       isNot(theme.colorScheme.surface),
       reason: 'star must not match the surface/background color',
     );
+  });
+
+  // Right-click anywhere on a row must open the same context menu as the
+  // trailing "⋮" button (standard desktop QoL), at the cursor.
+  testWidgets('right-clicking a request row opens the node context menu', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(isSelected: false));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.text('GetUser'),
+      buttons: kSecondaryMouseButton,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('RENAME'), findsOneWidget);
+    expect(find.text('DELETE'), findsOneWidget);
+    // Folder-only entries must not appear for a request.
+    expect(find.text('ADD SUBFOLDER'), findsNothing);
+    expect(find.text('VARIABLES'), findsNothing);
+
+    // Selecting an entry routes to the same action as the "⋮" menu: RENAME
+    // opens the name prompt dialog.
+    await tester.tap(find.text('RENAME'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsOneWidget);
+  });
+
+  testWidgets('right-clicking a folder row opens the folder context menu', (
+    tester,
+  ) async {
+    final theme = resolveTheme('brutalist')(Brightness.light, isCompact: false);
+    await tester.pumpWidget(favoriteHost(theme));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.text('Favorites'),
+      buttons: kSecondaryMouseButton,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('ADD SUBFOLDER'), findsOneWidget);
+    expect(find.text('VARIABLES'), findsOneWidget);
+    expect(find.text('UNFAVORITE'), findsOneWidget);
   });
 
   // Regression: leaf request rows had no DragTarget, so dropping a request onto
