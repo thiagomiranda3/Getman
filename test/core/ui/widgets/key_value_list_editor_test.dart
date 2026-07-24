@@ -593,6 +593,69 @@ void main() {
         expect(keyTextAt(tester, 1), 'a-copy');
       },
     );
+
+    testWidgets(
+      'a disabled (parked) row shows neither a drag handle nor a duplicate '
+      'button — only the checkbox and delete stay live',
+      (tester) async {
+        await pump(
+          tester,
+          const _ReorderDuplicateHarness(
+            initial: {'a': '1', 'z': '9', 'b': '2'},
+            disabledKeys: {'z'},
+          ),
+        );
+
+        // 3 data rows: a (enabled), z (disabled/parked), b (enabled).
+        expect(find.byType(Checkbox), findsNWidgets(3));
+        expect(
+          find.byIcon(Icons.drag_indicator),
+          findsNWidgets(2),
+          reason: 'the parked row (z) must not get a drag handle',
+        );
+        expect(
+          find.byIcon(Icons.content_copy),
+          findsNWidgets(2),
+          reason: 'the parked row (z) must not get a duplicate button',
+        );
+
+        // Position-specific: the parked row's own layout Row (nearest Row
+        // ancestor of its key field) has neither affordance; the enabled
+        // neighbour's Row has both.
+        Finder rowOf(String fieldKey) => find
+            .ancestor(
+              of: find.byKey(ValueKey(fieldKey)),
+              matching: find.byType(Row),
+            )
+            .first;
+
+        expect(
+          find.descendant(
+            of: rowOf('kv_key_1'),
+            matching: find.byIcon(Icons.drag_indicator),
+          ),
+          findsNothing,
+          reason: "no drag handle in the parked row's ('z') own layout row",
+        );
+        expect(
+          find.descendant(
+            of: rowOf('kv_key_1'),
+            matching: find.byIcon(Icons.content_copy),
+          ),
+          findsNothing,
+          reason:
+              "no duplicate button in the parked row's ('z') own layout row",
+        );
+        expect(
+          find.descendant(
+            of: rowOf('kv_key_0'),
+            matching: find.byIcon(Icons.drag_indicator),
+          ),
+          findsOneWidget,
+          reason: "the enabled neighbour ('a') keeps its drag handle",
+        );
+      },
+    );
   });
 }
 
@@ -682,16 +745,20 @@ class _ToggleHarnessState extends State<_ToggleHarness> {
 
 /// Harness for the B2 affordances: applies reorder/duplicate to its canonical
 /// map exactly the way a map-backed host (headers/env) does, and records the
-/// callback arguments for assertions.
+/// callback arguments for assertions. Optional [disabledKeys] wires
+/// `rowEnabled`/`onToggleEnabled` too, so a single harness covers the B1+B2
+/// interaction (a disabled row's affordance gating).
 class _ReorderDuplicateHarness extends StatefulWidget {
   const _ReorderDuplicateHarness({
     required this.initial,
     this.onReorderCalls,
     this.onDuplicateCalls,
+    this.disabledKeys,
   });
   final Map<String, String> initial;
   final List<(int, int)>? onReorderCalls;
   final List<int>? onDuplicateCalls;
+  final Set<String>? disabledKeys;
 
   @override
   State<_ReorderDuplicateHarness> createState() =>
@@ -700,9 +767,11 @@ class _ReorderDuplicateHarness extends StatefulWidget {
 
 class _ReorderDuplicateHarnessState extends State<_ReorderDuplicateHarness> {
   late Map<String, String> items = widget.initial;
+  late Set<String> disabled = Set.of(widget.disabledKeys ?? const {});
 
   @override
   Widget build(BuildContext context) {
+    final keys = items.keys.toList();
     return KeyValueListEditor<Map<String, String>>(
       items: items,
       fieldPrefix: 'kv',
@@ -713,6 +782,16 @@ class _ReorderDuplicateHarnessState extends State<_ReorderDuplicateHarness> {
       },
       equals: _mapEquality.equals,
       onChanged: (map) => setState(() => items = map),
+      rowEnabled: widget.disabledKeys == null
+          ? null
+          : (index) => index >= keys.length || !disabled.contains(keys[index]),
+      onToggleEnabled: widget.disabledKeys == null
+          ? null
+          : (index, key, value, enabled) {
+              setState(() {
+                enabled ? disabled.remove(key) : disabled.add(key);
+              });
+            },
       onReorder: (oldIndex, newIndex) {
         widget.onReorderCalls?.add((oldIndex, newIndex));
         final entries = items.entries.toList();

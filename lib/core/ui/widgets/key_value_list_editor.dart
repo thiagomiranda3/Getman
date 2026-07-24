@@ -13,11 +13,30 @@
 // controller rebuild and tracked internally between rebuilds so they follow
 // rows through deletes. The trailing auto-blank row never shows a checkbox.
 // Optional onReorder/onDuplicate (B2) add a drag handle + duplicate button
-// per data row (never on the trailing auto-blank row); on drop the editor
-// moves its row controllers FIRST (map-backed hosts echo an
-// order-insensitively-equal value that didUpdateWidget suppresses — the
-// controllers are the only carrier of the new visual order), then reports
-// the move so the host reorders its canonical value.
+// per data row, gated additionally on rowEnabled (a parked/disabled row gets
+// neither — checkbox and delete stay live). Never shown on the trailing
+// auto-blank row.
+//
+// Enabled-subsequence pre-move (2B.3 review fix): on drop, _handleReorder
+// locally repositions its row controllers BEFORE calling the host — but only
+// within the enabled-row subsequence (_repositionWithinEnabledRows); disabled
+// (e.g. parked) rows stay pinned at their absolute slot. A flat/naive
+// pre-move (moving whatever was dragged straight to the drop slot,
+// disabled rows included) caused a PERSISTENT visual desync: when an enabled
+// row's drag crossed only disabled/parked rows (no net enabled-order
+// change), the naive pre-move still visually reordered the rows, but hosts
+// that virtually exclude disabled rows from their reorder space (params'
+// parked rows ride outside the URL sequence) correctly treated it as a
+// no-op — and a genuine no-op dispatch (byte-identical entity) makes
+// Bloc.emit suppress the state entirely, so didUpdateWidget never runs to
+// correct the wrong visual order. Scoping the pre-move to the enabled
+// subsequence fixes this at the source: when the enabled sequence's relative
+// order doesn't change, this method computes zero movement, so nothing
+// diverges in the first place. didUpdateWidget's existing equals-based
+// resync (see _sameDecodedOrder below) remains a second line of defense for
+// any case the pre-move doesn't cover (e.g. an external replace) — the two
+// mechanisms agree by construction, since both ultimately mirror the host's
+// own display-index composition.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
@@ -171,12 +190,31 @@ class _KeyValueListEditorState<T extends Object>
     if (lastEmitted != null && widget.equals(widget.items, lastEmitted)) {
       return;
     }
-    if (widget.equals(widget.items, oldWidget.items)) {
+    if (widget.equals(widget.items, oldWidget.items) &&
+        _sameDecodedOrder(widget.items, oldWidget.items)) {
       return;
     }
     _disposeControllers();
     _initControllers(widget.decode(widget.items));
     _lastEmitted = null;
+  }
+
+  /// Stricter than `widget.equals`: true only when [a] and [b] decode to
+  /// exactly the same rows in the exact same order. Layered on top of (never
+  /// replacing) `widget.equals` so a genuine reorder is never missed even
+  /// when the caller's own `equals` is order-insensitive (map-backed hosts —
+  /// headers/env vars — pass a plain `MapEquality`, which by design doesn't
+  /// care about key order). A second line of defense alongside the file
+  /// header's "enabled-subsequence pre-move" — the two mechanisms agree by
+  /// construction.
+  bool _sameDecodedOrder(T a, T b) {
+    final rowsA = widget.decode(a);
+    final rowsB = widget.decode(b);
+    if (rowsA.length != rowsB.length) return false;
+    for (var i = 0; i < rowsA.length; i++) {
+      if (rowsA[i] != rowsB[i]) return false;
+    }
+    return true;
   }
 
   void _disposeControllers() {
@@ -227,10 +265,11 @@ class _KeyValueListEditorState<T extends Object>
 
   /// Handles a drop from the ReorderableListView. Wired to `onReorderItem`
   /// (not the deprecated `onReorder`), which already reports `newIndex` in
-  /// post-removal space — no manual decrement needed. Still clamps/excludes
-  /// around the trailing auto-blank row defensively, moves the row
-  /// controllers (and the aligned enabled-flags) locally, then reports the
-  /// move to the host.
+  /// post-removal space — no manual decrement needed. Clamps/excludes around
+  /// the trailing auto-blank row defensively, then locally reflects the move
+  /// (see [_repositionWithinEnabledRows]) before reporting it to the host —
+  /// see the file header's "enabled-subsequence pre-move" gotcha for why this
+  /// is scoped to the enabled rows only rather than a flat splice.
   void _handleReorder(int oldIndex, int newIndex) {
     final host = widget.onReorder;
     if (host == null) return;
@@ -240,12 +279,53 @@ class _KeyValueListEditorState<T extends Object>
     if (target >= blankIndex) target = blankIndex - 1;
     if (target < 0) target = 0;
     if (target == oldIndex) return;
-    setState(() {
-      _keyControllers.insert(target, _keyControllers.removeAt(oldIndex));
-      _valControllers.insert(target, _valControllers.removeAt(oldIndex));
-      _rowEnabledFlags.insert(target, _rowEnabledFlags.removeAt(oldIndex));
-    });
+    _repositionWithinEnabledRows(oldIndex, target, blankIndex);
     host(oldIndex, target);
+  }
+
+  /// Locally reflects a reorder, but ONLY within the enabled-row
+  /// subsequence — disabled (e.g. parked) rows stay pinned at their
+  /// absolute slot, exactly mirroring hosts that virtually exclude disabled
+  /// rows from the reorder space (params' parked rows ride outside the URL
+  /// sequence; see `ParamsTabView.reorder`). When the enabled sequence's
+  /// relative order doesn't actually change — a drag that crosses only
+  /// disabled rows — nothing moves locally either, so a no-op host
+  /// round-trip (or one a caller's own `equals`/`buildWhen` treats as
+  /// unchanged) never diverges from canonical order. The trailing auto-blank
+  /// row (always "enabled") is deliberately excluded via [blankIndex] so it
+  /// can never be pulled into the reshuffle. A disabled row can't itself be
+  /// the drag source (its handle is gated away in `build()`), so
+  /// `_rowEnabledFlags[oldIndex]` is always true in practice; guarded
+  /// defensively anyway.
+  void _repositionWithinEnabledRows(int oldIndex, int target, int blankIndex) {
+    if (!_rowEnabledFlags[oldIndex]) return;
+    final dataFlags = _rowEnabledFlags.sublist(0, blankIndex);
+    final oldEnabledIndex = dataFlags.take(oldIndex).where((e) => e).length;
+    final flagsAfterRemoval = [...dataFlags]..removeAt(oldIndex);
+    final newEnabledIndex = flagsAfterRemoval
+        .take(target)
+        .where((e) => e)
+        .length;
+    if (newEnabledIndex == oldEnabledIndex) return;
+    setState(() {
+      final enabledIndices = [
+        for (var i = 0; i < blankIndex; i++)
+          if (dataFlags[i]) i,
+      ];
+      final movedKey = _keyControllers[oldIndex];
+      final movedVal = _valControllers[oldIndex];
+      final splicedKeys = [for (final i in enabledIndices) _keyControllers[i]]
+        ..remove(movedKey);
+      final splicedVals = [for (final i in enabledIndices) _valControllers[i]]
+        ..remove(movedVal);
+      final insertAt = newEnabledIndex.clamp(0, splicedKeys.length);
+      splicedKeys.insert(insertAt, movedKey);
+      splicedVals.insert(insertAt, movedVal);
+      for (final (slot, i) in enabledIndices.indexed) {
+        _keyControllers[i] = splicedKeys[slot];
+        _valControllers[i] = splicedVals[slot];
+      }
+    });
   }
 
   @override
@@ -291,8 +371,14 @@ class _KeyValueListEditorState<T extends Object>
               secrets.contains(keyText),
           onToggleSecret: secrets == null ? null : () => _toggleSecret(index),
           variableContext: widget.variableContext,
-          showDragHandle: widget.onReorder != null && !isTrailingBlankRow,
-          onDuplicate: onDuplicate == null || isTrailingBlankRow
+          showDragHandle:
+              widget.onReorder != null &&
+              !isTrailingBlankRow &&
+              (widget.rowEnabled?.call(index) ?? true),
+          onDuplicate:
+              onDuplicate == null ||
+                  isTrailingBlankRow ||
+                  !(widget.rowEnabled?.call(index) ?? true)
               ? null
               : () => onDuplicate(index),
           onKeyChanged: (val) {

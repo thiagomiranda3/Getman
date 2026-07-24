@@ -17,6 +17,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/core/ui/widgets/key_value_list_editor.dart';
+import 'package:getman/core/utils/param_row_composer.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
@@ -270,14 +272,16 @@ void main() {
         addTearDown(bloc.close);
         await _pump(tester, bloc, const ParamsTabView(tabId: 'tp'));
 
-        // Drag the last data row (b, index 2) all the way up past the
-        // parked row (z) to land before the first row (a). A large negative
-        // delta (mirroring the "past the trailing blank row clamps" case in
-        // key_value_list_editor_test.dart) reliably lands at the top slot
-        // regardless of live row reflow during the drag.
+        // Drag the last data row (b, display index 2) all the way up past
+        // the parked row (z) to land before the first row (a). The parked
+        // row has no handle of its own (rowEnabled gating), so only 2
+        // handles render — a (icon index 0) and b (icon index 1). A large
+        // negative delta (mirroring the "past the trailing blank row
+        // clamps" case in key_value_list_editor_test.dart) reliably lands
+        // at the top slot regardless of live row reflow during the drag.
         await _dragHandleBy(
           tester,
-          find.byIcon(Icons.drag_indicator).at(2),
+          find.byIcon(Icons.drag_indicator).at(1),
           -1000,
         );
 
@@ -296,18 +300,90 @@ void main() {
     );
 
     testWidgets(
-      'dragging the parked row itself is a no-op — it has no live URL '
-      'position to reorder into',
+      'an enabled-row drag that crosses only the parked row (no net enabled '
+      '/ URL order change) leaves the rendered key order matching canonical '
+      "order — regression test for the editor's persistent visual-desync "
+      'bug (Task 2B.3 review concern)',
       (tester) async {
         final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
         addTearDown(bloc.close);
         await _pump(tester, bloc, const ParamsTabView(tabId: 'tp'));
 
+        final row0 = tester.getCenter(
+          find.byKey(const ValueKey('param_key_0')),
+        );
+        final row1 = tester.getCenter(
+          find.byKey(const ValueKey('param_key_1')),
+        );
+        // Drag 'a' (display index 0, enabled) down past the parked row 'z'
+        // only, landing just before 'b' — the enabled sequence [a, b] is
+        // unchanged (only 'z', a parked row, was conceptually crossed), so
+        // this is a no-op from the canonical (URL + disabledParams)
+        // perspective: Bloc.emit suppresses the state entirely (byte-
+        // identical entity), and the widget never rebuilds.
         await _dragHandleBy(
           tester,
-          find.byIcon(Icons.drag_indicator).at(1),
-          -1000,
+          find.byIcon(Icons.drag_indicator).first,
+          row1.dy - row0.dy + 8,
         );
+
+        final result = bloc.state.tabs.byId('tp')!.config;
+        expect(
+          result.url,
+          'https://x.dev/api?a=1&b=2',
+          reason: 'crossing only the parked row nets no enabled-order change',
+        );
+        expect(result.disabledParams, const [
+          ParkedParamEntity(key: 'z', value: '9', rowIndex: 1),
+        ]);
+
+        // The regression: the editor must not have locally reordered its
+        // row controllers ahead of the (no-op) host round-trip. Rendered
+        // key order must still match canonical display order: a, z, b.
+        String keyTextAt(int index) => tester
+            .widget<TextField>(find.byKey(ValueKey('param_key_$index')))
+            .controller!
+            .text;
+        expect(keyTextAt(0), 'a');
+        expect(keyTextAt(1), 'z');
+        expect(keyTextAt(2), 'b');
+
+        await tester.pump(const Duration(seconds: 11));
+      },
+    );
+
+    testWidgets(
+      'the parked row shows neither a drag handle nor a duplicate button '
+      '(rowEnabled gating) — only the enabled neighbours (a, b) do',
+      (tester) async {
+        final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+        addTearDown(bloc.close);
+        await _pump(tester, bloc, const ParamsTabView(tabId: 'tp'));
+
+        // 3 display rows (a enabled, z parked, b enabled) but only the 2
+        // enabled ones get a handle/duplicate button.
+        expect(find.byIcon(Icons.drag_indicator), findsNWidgets(2));
+        expect(find.byIcon(Icons.content_copy), findsNWidgets(2));
+
+        await tester.pump(const Duration(seconds: 11));
+      },
+    );
+
+    testWidgets(
+      'dragging the parked row itself is a no-op at the host level — it has '
+      'no live URL position to reorder into (defense in depth: the UI can '
+      "no longer trigger this since the row's handle is gated away, but "
+      "ParamsTabView's own reorder() guard is still exercised directly)",
+      (tester) async {
+        final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+        addTearDown(bloc.close);
+        await _pump(tester, bloc, const ParamsTabView(tabId: 'tp'));
+
+        final editor = tester.widget<KeyValueListEditor<List<ParamRow>>>(
+          find.byType(KeyValueListEditor<List<ParamRow>>),
+        );
+        editor.onReorder!(1, 0);
+        await tester.pumpAndSettle();
 
         final result = bloc.state.tabs.byId('tp')!.config;
         expect(result.url, 'https://x.dev/api?a=1&b=2');
@@ -319,24 +395,29 @@ void main() {
       },
     );
 
-    testWidgets('duplicating the parked row is a no-op via this affordance', (
-      tester,
-    ) async {
-      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
-      addTearDown(bloc.close);
-      await _pump(tester, bloc, const ParamsTabView(tabId: 'tp'));
+    testWidgets(
+      'duplicating the parked row is a no-op at the host level (defense in '
+      'depth: same rationale as the reorder no-op above)',
+      (tester) async {
+        final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+        addTearDown(bloc.close);
+        await _pump(tester, bloc, const ParamsTabView(tabId: 'tp'));
 
-      await tester.tap(find.byIcon(Icons.content_copy).at(1));
-      await tester.pumpAndSettle();
+        final editor = tester.widget<KeyValueListEditor<List<ParamRow>>>(
+          find.byType(KeyValueListEditor<List<ParamRow>>),
+        );
+        editor.onDuplicate!(1);
+        await tester.pumpAndSettle();
 
-      final result = bloc.state.tabs.byId('tp')!.config;
-      expect(result.url, 'https://x.dev/api?a=1&b=2');
-      expect(result.disabledParams, const [
-        ParkedParamEntity(key: 'z', value: '9', rowIndex: 1),
-      ]);
+        final result = bloc.state.tabs.byId('tp')!.config;
+        expect(result.url, 'https://x.dev/api?a=1&b=2');
+        expect(result.disabledParams, const [
+          ParkedParamEntity(key: 'z', value: '9', rowIndex: 1),
+        ]);
 
-      await tester.pump(const Duration(seconds: 11));
-    });
+        await tester.pump(const Duration(seconds: 11));
+      },
+    );
   });
 
   group('HeadersTabView (insertion-ordered map)', () {
@@ -373,6 +454,26 @@ void main() {
         reason:
             'requires order-significant equality (Task 2B.2) or the '
             'reordered state emission is suppressed',
+      );
+      // Rendered order must also reflect the swap (2B.3 review fix): with no
+      // disabled rows present, the editor's enabled-subsequence pre-move
+      // reduces to the original flat splice, so this exercises the real
+      // HeadersTabView/TabsBloc wiring end-to-end (not just harness-level
+      // tests) and guards against headers' own buildWhen — order-insensitive
+      // — ever being the sole resync signal.
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('header_key_0')))
+            .controller!
+            .text,
+        'X-One',
+      );
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('header_key_1')))
+            .controller!
+            .text,
+        'Accept',
       );
 
       await tester.pump(const Duration(seconds: 11));
