@@ -39,7 +39,7 @@ widgets + screens). Shared cross-feature code lives under `lib/core/`. See
 | `lib/core/domain/entities` | Shared entities used by >1 feature. | `request_config_entity.dart`, `auth_config.dart`, `body_type.dart`, `multipart_field_entity.dart` |
 | `lib/core/error` | Failure / Exception hierarchy. | `failures.dart`, `exceptions.dart`, `guard.dart` |
 | `lib/core/git` | Abstract `git`/`gh` CLI gateways (+ io/stub impls). | `git_service.dart`, `git_service_io.dart`, `gh_service.dart`, `gh_output_parser.dart` |
-| `lib/core/navigation` | Router + keyboard intents. | `app_router.dart`, `intents.dart`, `url_focus_registry.dart` |
+| `lib/core/navigation` | Router + keyboard intents + shortcut labels. | `app_router.dart`, `intents.dart`, `url_focus_registry.dart`, `shortcut_catalog.dart` |
 | `lib/core/network` | Dio client, cookies, realtime, MCP transport. | `network_service.dart`, `realtime_service.dart`, `mcp_service.dart`, `cookie_interceptor.dart` |
 | `lib/core/storage` | Hive box-name constants + helpers. | `hive_boxes.dart`, `hive_helpers.dart` |
 | `lib/core/theme` | Theme registry + responsive tiers. | `theme_registry.dart`, `theme_ids.dart`, `responsive.dart`, `app_theme.dart` |
@@ -246,7 +246,7 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | HTTP methods list | `lib/core/network/http_methods.dart` |
 | HTTP send / network client | `lib/core/network/network_service.dart` |
 | JSONPath | `lib/core/utils/json_path.dart`, `lib/core/utils/json_path_builder.dart` |
-| Keyboard shortcuts | `lib/main.dart`, `lib/core/navigation/intents.dart`, `lib/features/settings/presentation/widgets/settings_shortcuts_tab.dart` |
+| Keyboard shortcuts | `lib/main.dart`, `lib/core/navigation/intents.dart`, `lib/core/navigation/shortcut_catalog.dart` (single-source labels/hints), `lib/features/settings/presentation/widgets/settings_shortcuts_tab.dart` |
 | Large responses | `lib/core/domain/persistence_limits.dart`, `lib/features/tabs/presentation/widgets/response/response_large_body_view.dart` |
 | MCP (Model Context Protocol) | `lib/core/network/mcp_service.dart`, `lib/features/mcp/presentation/bloc/mcp_bloc.dart` |
 | Media / binary response viewers | `lib/features/tabs/presentation/widgets/response/viewers/response_media_panel.dart` |
