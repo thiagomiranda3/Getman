@@ -234,4 +234,94 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('drag-reorder persists the new variable order (B2)', (
+    tester,
+  ) async {
+    final env = EnvironmentEntity(
+      id: 'e1',
+      name: 'Dev',
+      variables: const {'A': '1', 'B': '2'},
+    );
+    final bloc = _makeBloc(repo, [env]);
+    addTearDown(bloc.close);
+
+    await _pump(tester, bloc: bloc, environment: env);
+
+    final row0 = tester.getCenter(find.byKey(const ValueKey('env_var_key_0')));
+    final row1 = tester.getCenter(find.byKey(const ValueKey('env_var_key_1')));
+    final dy = row1.dy - row0.dy + 8;
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byIcon(Icons.drag_indicator).first),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+    await gesture.moveBy(Offset(0, dy / 2));
+    await tester.pump(const Duration(milliseconds: 20));
+    await gesture.moveBy(Offset(0, dy / 2));
+    await tester.pump(const Duration(milliseconds: 20));
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    await untilCalled(() => repo.putEnvironment(any()));
+
+    expect(
+      bloc.state.environments.first.variables.keys.toList(),
+      ['B', 'A'],
+      reason:
+          'requires order-significant EnvironmentEntity equality '
+          '(Task 2B.2) or the reordered state emission is suppressed',
+    );
+
+    // Rendered-order assertion (carried from the headers-tab regression,
+    // commit c66c211): content-only equality is not enough proof — this
+    // catches the case where canonical order is already right but an
+    // order-insensitive equals/buildWhen somewhere upstream suppressed the
+    // re-render, leaving stale row controllers on screen.
+    String keyTextAt(int index) => tester
+        .widget<TextField>(find.byKey(ValueKey('env_var_key_$index')))
+        .controller!
+        .text;
+    expect(
+      [keyTextAt(0), keyTextAt(1)],
+      ['B', 'A'],
+      reason: 'rendered row order must track canonical order',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    "duplicate adds '<key>-copy' below with the same value and inherits "
+    'the secret flag (B2)',
+    (tester) async {
+      final env = EnvironmentEntity(
+        id: 'e1',
+        name: 'Dev',
+        variables: const {'TOKEN': 'abc', 'HOST': 'x.dev'},
+        secretKeys: const {'TOKEN'},
+      );
+      final bloc = _makeBloc(repo, [env]);
+      addTearDown(bloc.close);
+
+      await _pump(tester, bloc: bloc, environment: env);
+
+      // TOKEN row is index 0 — its duplicate button is the first one.
+      await tester.tap(find.byIcon(Icons.content_copy).first);
+      await tester.pump(const Duration(milliseconds: 50));
+
+      await untilCalled(() => repo.putEnvironment(any()));
+
+      final updated = bloc.state.environments.first;
+      expect(
+        updated.variables.keys.toList(),
+        ['TOKEN', 'TOKEN-copy', 'HOST'],
+      );
+      expect(updated.variables['TOKEN-copy'], 'abc');
+      expect(
+        updated.secretKeys,
+        containsAll(<String>{'TOKEN', 'TOKEN-copy'}),
+        reason: 'a copy of a secret variable must not render unmasked',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
