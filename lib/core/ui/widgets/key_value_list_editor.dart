@@ -8,6 +8,10 @@
 // BLoC round-trip (a matching echo does NOT reset the row controllers).
 // Optional secretKeys/onSecretKeysChanged adds the per-row lock+reveal
 // affordance; wired only by the env editor, left null for params/headers.
+// Optional rowEnabled/onToggleEnabled adds a leading enable/disable checkbox
+// column (B1, params/headers); flags are seeded from rowEnabled on every
+// controller rebuild and tracked internally between rebuilds so they follow
+// rows through deletes. The trailing auto-blank row never shows a checkbox.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
@@ -39,6 +43,9 @@ class KeyValueListEditor<T extends Object> extends StatefulWidget {
     this.onSecretKeysChanged,
     this.variableContext,
     this.fieldPrefix,
+    this.rowEnabled,
+    this.onToggleEnabled,
+    this.disabledRowsReadOnly = false,
   });
   final T items;
   final ValueChanged<T> onChanged;
@@ -68,6 +75,28 @@ class KeyValueListEditor<T extends Object> extends StatefulWidget {
   /// env vars all use this widget). Null (the default) leaves fields unkeyed.
   final String? fieldPrefix;
 
+  /// Seed-time enabled flag per decoded row index. When this and
+  /// [onToggleEnabled] are both non-null every row (except the trailing
+  /// auto-blank) shows a leading enable/disable checkbox. Flags are re-seeded
+  /// from this callback whenever the controllers are rebuilt from [items];
+  /// between rebuilds the editor tracks them itself (toggle flips, delete
+  /// removes, new rows default to enabled) so they stay aligned with rows.
+  final bool Function(int index)? rowEnabled;
+
+  /// Called after a checkbox toggle with the row's display index, its current
+  /// key/value text, and the new enabled state. The host owns canonical state
+  /// (URL park/unpark, disabled-header-key set) and echoes it back via
+  /// [items]. Positional `enabled` matches the natural (index, key, value,
+  /// enabled) call-site shape this contract is built around (see task brief).
+  // ignore: avoid_positional_boolean_parameters
+  final void Function(int index, String key, String value, bool enabled)?
+  onToggleEnabled;
+
+  /// When true, rows whose checkbox is off render read-only (params: parked
+  /// rows live outside the URL, so a free-text edit has nowhere to go).
+  /// Headers leave this false — disabled header rows stay editable.
+  final bool disabledRowsReadOnly;
+
   @override
   State<KeyValueListEditor<T>> createState() => _KeyValueListEditorState<T>();
 }
@@ -76,6 +105,7 @@ class _KeyValueListEditorState<T extends Object>
     extends State<KeyValueListEditor<T>> {
   late List<TextEditingController> _keyControllers;
   late List<TextEditingController> _valControllers;
+  late List<bool> _rowEnabledFlags;
   T? _lastEmitted;
 
   @override
@@ -97,12 +127,16 @@ class _KeyValueListEditorState<T extends Object>
     _valControllers = [
       for (final (_, value) in rows) _newValueController(value),
     ];
+    _rowEnabledFlags = [
+      for (var i = 0; i < rows.length; i++) widget.rowEnabled?.call(i) ?? true,
+    ];
     _addEmptyRow();
   }
 
   void _addEmptyRow() {
     _keyControllers.add(TextEditingController());
     _valControllers.add(_newValueController(''));
+    _rowEnabledFlags.add(true);
   }
 
   @override
@@ -155,6 +189,17 @@ class _KeyValueListEditorState<T extends Object>
     widget.onSecretKeysChanged?.call(next);
   }
 
+  void _toggleEnabled(int index) {
+    final next = !_rowEnabledFlags[index];
+    setState(() => _rowEnabledFlags[index] = next);
+    widget.onToggleEnabled?.call(
+      index,
+      _keyControllers[index].text,
+      _valControllers[index].text,
+      next,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final layout = context.appLayout;
@@ -168,9 +213,18 @@ class _KeyValueListEditorState<T extends Object>
         // mis-flag a key with surrounding whitespace.
         final keyText = _keyControllers[index].text.trim();
 
+        final showToggles =
+            widget.rowEnabled != null && widget.onToggleEnabled != null;
+
         return _KeyValueRow(
           key: ValueKey(_keyControllers[index]),
           rowIndex: index,
+          showToggleColumn: showToggles,
+          // The trailing auto-blank row never shows a checkbox.
+          showCheckbox: showToggles && index != _keyControllers.length - 1,
+          isRowEnabled: _rowEnabledFlags[index],
+          onToggleEnabled: showToggles ? () => _toggleEnabled(index) : null,
+          readOnlyWhenDisabled: widget.disabledRowsReadOnly,
           fieldPrefix: widget.fieldPrefix,
           keyController: _keyControllers[index],
           valController: _valControllers[index],
@@ -193,6 +247,7 @@ class _KeyValueListEditorState<T extends Object>
             setState(() {
               _keyControllers.removeAt(index).dispose();
               _valControllers.removeAt(index).dispose();
+              _rowEnabledFlags.removeAt(index);
               // Re-add a blank row whenever the list is now empty OR the new
               // last row has a non-empty key — otherwise deleting a trailing
               // blank row (leaving e.g. [a=1]) would strand the editor with
@@ -225,7 +280,17 @@ class _KeyValueRow extends StatefulWidget {
     this.isSecret = false,
     this.onToggleSecret,
     this.variableContext,
+    this.showToggleColumn = false,
+    this.showCheckbox = false,
+    this.isRowEnabled = true,
+    this.onToggleEnabled,
+    this.readOnlyWhenDisabled = false,
   });
+  final bool showToggleColumn;
+  final bool showCheckbox;
+  final bool isRowEnabled;
+  final VoidCallback? onToggleEnabled;
+  final bool readOnlyWhenDisabled;
   final int rowIndex;
   final String? fieldPrefix;
   final TextEditingController keyController;
@@ -341,6 +406,37 @@ class _KeyValueRowState extends State<_KeyValueRow> {
             style: textStyle,
           );
 
+    final enabledToggle = widget.showToggleColumn
+        ? SizedBox(
+            width: widget.layout.kvToggleSlotWidth,
+            child: widget.showCheckbox
+                ? Checkbox(
+                    key: widget.fieldPrefix == null
+                        ? null
+                        : ValueKey(
+                            '${widget.fieldPrefix}_enabled_${widget.rowIndex}',
+                          ),
+                    value: widget.isRowEnabled,
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onChanged: (_) => widget.onToggleEnabled?.call(),
+                  )
+                : null,
+          )
+        : null;
+
+    // Disabled rows dim; with readOnlyWhenDisabled they also stop accepting
+    // pointer/focus input (checkbox + delete stay live — they sit outside).
+    Widget dim(Widget child) => widget.isRowEnabled
+        ? child
+        : Opacity(opacity: widget.layout.kvDisabledRowOpacity, child: child);
+    Widget lockIfReadOnly(Widget child) =>
+        widget.isRowEnabled || !widget.readOnlyWhenDisabled
+        ? child
+        : ExcludeFocus(child: IgnorePointer(child: child));
+    final keyCell = dim(lockIfReadOnly(keyField));
+    final valueCell = dim(lockIfReadOnly(valueFieldWithAutocomplete));
+
     final secretButton = widget.showSecretToggle
         ? context.appDecoration.wrapInteractive(
             child: IconButton(
@@ -398,20 +494,22 @@ class _KeyValueRowState extends State<_KeyValueRow> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: keyField),
+                      ?enabledToggle,
+                      Expanded(child: keyCell),
                       ?secretButton,
                       deleteButton,
                     ],
                   ),
                   SizedBox(height: widget.layout.tabSpacing),
-                  valueFieldWithAutocomplete,
+                  valueCell,
                 ],
               )
             : Row(
                 children: [
-                  Expanded(child: keyField),
+                  ?enabledToggle,
+                  Expanded(child: keyCell),
                   SizedBox(width: widget.layout.isCompact ? 8 : 12),
-                  Expanded(child: valueFieldWithAutocomplete),
+                  Expanded(child: valueCell),
                   SizedBox(width: widget.layout.isCompact ? 4 : 8),
                   ?secretButton,
                   deleteButton,

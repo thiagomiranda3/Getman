@@ -334,6 +334,140 @@ void main() {
       );
     },
   );
+
+  group('per-row enable checkbox (B1)', () {
+    testWidgets('no checkbox column when rowEnabled/onToggleEnabled are null', (
+      tester,
+    ) async {
+      await pump(tester, const _EchoHarness(initial: {'Accept': '*/*'}));
+      expect(find.byType(Checkbox), findsNothing);
+    });
+
+    testWidgets('one checkbox per row, none on the trailing blank row', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        const _ToggleHarness(
+          initial: {'A': '1', 'B': '2'},
+          initiallyDisabled: {},
+        ),
+      );
+      // 3 rows rendered (A, B, trailing blank) but only 2 checkboxes.
+      expect(find.widgetWithText(TextField, 'KEY'), findsNWidgets(3));
+      expect(find.byType(Checkbox), findsNWidgets(2));
+    });
+
+    testWidgets('toggling reports index, key, value and the new state', (
+      tester,
+    ) async {
+      (int, String, String, bool)? reported;
+      await pump(
+        tester,
+        _ToggleHarness(
+          initial: const {'A': '1', 'B': '2'},
+          initiallyDisabled: const {},
+          onToggle: (index, key, value, enabled) =>
+              reported = (index, key, value, enabled),
+        ),
+      );
+
+      await tester.tap(find.byType(Checkbox).first);
+      await tester.pump();
+
+      expect(reported, (0, 'A', '1', false));
+      final checkbox = tester.widget<Checkbox>(find.byType(Checkbox).first);
+      expect(checkbox.value, isFalse);
+    });
+
+    testWidgets('a disabled row renders dimmed (key and value cells)', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        const _ToggleHarness(
+          initial: {'A': '1', 'B': '2'},
+          initiallyDisabled: {0},
+        ),
+      );
+      expect(
+        find.byWidgetPredicate((w) => w is Opacity && w.opacity < 1.0),
+        findsNWidgets(2),
+        reason: 'the disabled row dims its key cell and its value cell',
+      );
+    });
+
+    testWidgets(
+      'disabledRowsReadOnly makes disabled row fields non-interactive',
+      (tester) async {
+        await pump(
+          tester,
+          const _ToggleHarness(
+            initial: {'A': '1', 'B': '2'},
+            initiallyDisabled: {0},
+            readOnlyWhenDisabled: true,
+          ),
+        );
+        expect(
+          find.byWidgetPredicate((w) => w is IgnorePointer && w.ignoring),
+          findsNWidgets(2),
+          reason: 'key + value cells of the disabled row are pointer-blocked',
+        );
+      },
+    );
+
+    testWidgets(
+      'a headers-style toggle (items unchanged) keeps controllers alive',
+      (tester) async {
+        await pump(
+          tester,
+          const _ToggleHarness(
+            initial: {'A': '1', 'B': '2'},
+            initiallyDisabled: {},
+          ),
+        );
+        final controllerBefore = tester
+            .widget<TextField>(keyFieldAt(0))
+            .controller;
+
+        await tester.tap(find.byType(Checkbox).first);
+        await tester.pump();
+
+        final controllerAfter = tester
+            .widget<TextField>(keyFieldAt(0))
+            .controller;
+        expect(
+          identical(controllerBefore, controllerAfter),
+          isTrue,
+          reason: 'toggling must not rebuild rows when items are unchanged',
+        );
+      },
+    );
+
+    testWidgets('deleting a row keeps flags aligned with remaining rows', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        const _ToggleHarness(
+          initial: {'A': '1', 'B': '2', 'C': '3'},
+          initiallyDisabled: {1},
+        ),
+      );
+      // Delete row 0 (A). B's disabled flag must follow B to index 0.
+      await tester.tap(find.byIcon(Icons.delete_outline).first);
+      await tester.pump();
+
+      final firstCheckbox = tester.widget<Checkbox>(
+        find.byType(Checkbox).at(0),
+      );
+      final secondCheckbox = tester.widget<Checkbox>(
+        find.byType(Checkbox).at(1),
+      );
+      expect(firstCheckbox.value, isFalse, reason: 'B stays disabled');
+      expect(secondCheckbox.value, isTrue, reason: 'C stays enabled');
+    });
+  });
 }
 
 class _SecretHarness extends StatefulWidget {
@@ -370,6 +504,52 @@ class _SecretHarnessState extends State<_SecretHarness> {
         widget.onSecrets?.call(s);
         setState(() => secrets = s);
       },
+    );
+  }
+}
+
+class _ToggleHarness extends StatefulWidget {
+  const _ToggleHarness({
+    required this.initial,
+    required this.initiallyDisabled,
+    this.readOnlyWhenDisabled = false,
+    this.onToggle,
+  });
+  final Map<String, String> initial;
+  final Set<int> initiallyDisabled;
+  final bool readOnlyWhenDisabled;
+  // Positional `enabled` mirrors the widget's onToggleEnabled contract.
+  // ignore: avoid_positional_boolean_parameters
+  final void Function(int index, String key, String value, bool enabled)?
+  onToggle;
+
+  @override
+  State<_ToggleHarness> createState() => _ToggleHarnessState();
+}
+
+class _ToggleHarnessState extends State<_ToggleHarness> {
+  late Map<String, String> items = widget.initial;
+  late Set<int> disabled = Set.of(widget.initiallyDisabled);
+
+  @override
+  Widget build(BuildContext context) {
+    return KeyValueListEditor<Map<String, String>>(
+      items: items,
+      decode: (map) => [for (final e in map.entries) (e.key, e.value)],
+      encode: (rows) => {
+        for (final (key, value) in rows)
+          if (key.isNotEmpty) key: value,
+      },
+      equals: _mapEquality.equals,
+      rowEnabled: (index) => !disabled.contains(index),
+      onToggleEnabled: (index, key, value, enabled) {
+        widget.onToggle?.call(index, key, value, enabled);
+        setState(() {
+          enabled ? disabled.remove(index) : disabled.add(index);
+        });
+      },
+      disabledRowsReadOnly: widget.readOnlyWhenDisabled,
+      onChanged: (map) => setState(() => items = map),
     );
   }
 }
