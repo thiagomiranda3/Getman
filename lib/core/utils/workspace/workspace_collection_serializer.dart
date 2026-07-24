@@ -4,6 +4,7 @@
 
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
+import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
@@ -19,6 +20,10 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 /// Saved examples are likewise OMITTED: they carry captured responses (same
 /// leak/churn concern) and are a local convenience, not a git-tracked artifact.
 /// `requestFromJson` therefore reconstructs leaves with no examples.
+///
+/// B1 disabled-row state (`disabledParams`, `disabledHeaderKeys`) IS
+/// round-tripped — it is request-shaping user intent, not response cache —
+/// with empty values omitted so pre-B1 files do not churn.
 class WorkspaceCollectionSerializer {
   WorkspaceCollectionSerializer._();
 
@@ -140,6 +145,16 @@ class WorkspaceCollectionSerializer {
           },
       ],
     if (c.bodyFilePath != null) 'bodyFilePath': c.bodyFilePath,
+    // B1 per-row disable state; omitted when empty so pre-B1 request files
+    // do not churn. disabledHeaderKeys is sorted for deterministic diffs
+    // (same convention as folder secretKeys).
+    if (c.disabledParams.isNotEmpty)
+      'disabledParams': [
+        for (final p in c.disabledParams)
+          {'key': p.key, 'value': p.value, 'rowIndex': p.rowIndex},
+      ],
+    if (c.disabledHeaderKeys.isNotEmpty)
+      'disabledHeaderKeys': c.disabledHeaderKeys.toList()..sort(),
   };
 
   static HttpRequestConfigEntity _configFromJson(Map<String, dynamic> json) {
@@ -169,6 +184,19 @@ class WorkspaceCollectionSerializer {
           ),
       ],
       bodyFilePath: json['bodyFilePath'] as String?,
+      disabledParams: [
+        for (final Map<String, dynamic> m
+            in ((json['disabledParams'] as List?) ?? const [])
+                .cast<Map<String, dynamic>>())
+          ParkedParamEntity(
+            key: (m['key'] as String?) ?? '',
+            value: (m['value'] as String?) ?? '',
+            rowIndex: (m['rowIndex'] as num?)?.toInt() ?? 0,
+          ),
+      ],
+      disabledHeaderKeys: ((json['disabledHeaderKeys'] as List?) ?? const [])
+          .map((e) => '$e')
+          .toSet(),
       // response cache fields intentionally not persisted → null on read.
     );
   }

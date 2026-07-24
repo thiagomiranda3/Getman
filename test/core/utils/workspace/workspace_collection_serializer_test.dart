@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
+import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/utils/workspace/workspace_collection_serializer.dart';
@@ -111,6 +112,73 @@ void main() {
 
       final back = WorkspaceCollectionSerializer.requestFromJson(json);
       expect(back.examples, isEmpty);
+    });
+
+    test('round-trips disabledParams and disabledHeaderKeys (B1)', () {
+      const withDisabled = CollectionNodeEntity(
+        id: 'node-d',
+        name: 'Disabled rows',
+        isFolder: false,
+        config: HttpRequestConfigEntity(
+          id: 'cfg-d',
+          url: 'https://api.dev/x?a=1',
+          headers: {'Keep': 'k', 'Skip': 's'},
+          disabledHeaderKeys: {'Skip'},
+          disabledParams: [
+            ParkedParamEntity(key: 'b', value: '2', rowIndex: 1),
+            ParkedParamEntity(key: 'z', value: '9', rowIndex: 3),
+          ],
+        ),
+      );
+      final back = WorkspaceCollectionSerializer.requestFromJson(
+        WorkspaceCollectionSerializer.requestToJson(withDisabled),
+      );
+      final c = back.config!;
+      expect(c.disabledHeaderKeys, {'Skip'});
+      expect(c.disabledParams, const [
+        ParkedParamEntity(key: 'b', value: '2', rowIndex: 1),
+        ParkedParamEntity(key: 'z', value: '9', rowIndex: 3),
+      ]);
+      expect(c.headers, {'Keep': 'k', 'Skip': 's'});
+    });
+
+    test('omits the disabled-row keys when empty (no churny git diffs)', () {
+      final json = WorkspaceCollectionSerializer.requestToJson(leaf);
+      final request = json['request'] as Map<String, dynamic>;
+      expect(request.containsKey('disabledParams'), isFalse);
+      expect(request.containsKey('disabledHeaderKeys'), isFalse);
+    });
+
+    test('disabledHeaderKeys serializes sorted for deterministic diffs', () {
+      const node = CollectionNodeEntity(
+        id: 'node-s',
+        name: 'Sorted',
+        isFolder: false,
+        config: HttpRequestConfigEntity(
+          id: 'cfg-s',
+          headers: {'b': '1', 'a': '2', 'c': '3'},
+          disabledHeaderKeys: {'c', 'a', 'b'},
+        ),
+      );
+      final request =
+          WorkspaceCollectionSerializer.requestToJson(node)['request']
+              as Map<String, dynamic>;
+      expect(request['disabledHeaderKeys'], ['a', 'b', 'c']);
+    });
+
+    test('legacy request JSON without the new keys reads back as defaults', () {
+      final json = WorkspaceCollectionSerializer.requestToJson(leaf)
+        ..['request'] = Map<String, dynamic>.from(
+          WorkspaceCollectionSerializer.requestToJson(leaf)['request']
+              as Map<String, dynamic>,
+        );
+      // Simulate a pre-B1 file: strip the keys if present.
+      (json['request'] as Map<String, dynamic>)
+        ..remove('disabledParams')
+        ..remove('disabledHeaderKeys');
+      final back = WorkspaceCollectionSerializer.requestFromJson(json);
+      expect(back.config!.disabledParams, isEmpty);
+      expect(back.config!.disabledHeaderKeys, isEmpty);
     });
   });
 
