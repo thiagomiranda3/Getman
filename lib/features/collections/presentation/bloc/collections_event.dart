@@ -1,6 +1,7 @@
 // CollectionsBloc events: CRUD on the collection tree (folders/requests,
 // description, collection-scoped variables, favorites, saved examples),
-// plus move/import/replace-whole-tree. Identity-addressed by node id
+// plus move/import/replace-whole-tree and RestoreNodeSubtree/RestoreExample
+// (the undo side of DeleteNode/DeleteExample). Identity-addressed by node id
 // (id/nodeId), not position.
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
@@ -145,4 +146,39 @@ class ReplaceCollections extends CollectionsEvent {
   final List<CollectionNodeEntity> rootNodes;
   @override
   List<Object?> get props => [rootNodes];
+}
+
+/// Re-inserts a previously deleted node — with its full subtree, saved
+/// examples, and collection variables — at its original position. The UNDO
+/// side of [DeleteNode]. [ancestorIds] is the node's ancestor-folder chain
+/// (root first, nearest parent last) captured at delete time: the handler
+/// restores under the NEAREST SURVIVING ancestor, falling back to root when
+/// none survive (never crashes). No-op when the node id already exists.
+class RestoreNodeSubtree extends CollectionsEvent {
+  const RestoreNodeSubtree({
+    required this.node,
+    required this.ancestorIds,
+    required this.siblingIndex,
+  });
+  final CollectionNodeEntity node;
+  final List<String> ancestorIds;
+  final int siblingIndex;
+  @override
+  List<Object?> get props => [node, ancestorIds, siblingIndex];
+}
+
+/// Re-inserts a previously deleted saved example at its original index — the
+/// UNDO side of [DeleteExample]. No-op when the owning node is gone (an
+/// example cannot outlive its request node).
+class RestoreExample extends CollectionsEvent {
+  const RestoreExample({
+    required this.nodeId,
+    required this.example,
+    required this.exampleIndex,
+  });
+  final String nodeId;
+  final SavedExampleEntity example;
+  final int exampleIndex;
+  @override
+  List<Object?> get props => [nodeId, example, exampleIndex];
 }

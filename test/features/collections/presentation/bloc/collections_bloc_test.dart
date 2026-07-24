@@ -385,4 +385,286 @@ void main() {
       );
     });
   });
+
+  group('undo restore (A1)', () {
+    test('DeleteNode then RestoreNodeSubtree puts the leaf back under its '
+        'parent, deep-equal', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      await seed(bloc, [
+        folder(
+          'f1',
+          'Auth',
+          children: [leaf('r1', 'Login'), leaf('r2', 'Logout')],
+        ),
+      ]);
+      final captured = CollectionsTreeHelper.findNode(
+        bloc.state.collections,
+        'r1',
+      )!;
+      final ancestors = CollectionsTreeHelper.ancestorFolderIds(
+        bloc.state.collections,
+        'r1',
+      );
+      final index = CollectionsTreeHelper.siblingIndexOf(
+        bloc.state.collections,
+        'r1',
+      );
+
+      bloc.add(const DeleteNode('r1'));
+      await bloc.stream.first;
+      expect(
+        CollectionsTreeHelper.findNode(bloc.state.collections, 'r1'),
+        isNull,
+      );
+
+      bloc.add(
+        RestoreNodeSubtree(
+          node: captured,
+          ancestorIds: ancestors,
+          siblingIndex: index,
+        ),
+      );
+      await bloc.stream.first;
+
+      final restored = CollectionsTreeHelper.findNode(
+        bloc.state.collections,
+        'r1',
+      );
+      expect(restored, captured); // Equatable deep-equal (config included)
+      expect(
+        CollectionsTreeHelper.parentIdOf(bloc.state.collections, 'r1'),
+        'f1',
+      );
+    });
+
+    test('RestoreNodeSubtree restores a folder with subtree + examples + '
+        'variables intact', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      final example = SavedExampleEntity(
+        id: 'ex1',
+        name: 'Example',
+        capturedAt: DateTime(2026),
+        config: const HttpRequestConfigEntity(id: 'ex1'),
+      );
+      final subtree = CollectionNodeEntity(
+        id: 'f2',
+        name: 'Users',
+        variables: const {'base': 'https://api.dev'},
+        secretKeys: const {'base'},
+        children: [
+          CollectionNodeEntity(
+            id: 'r1',
+            name: 'GetUser',
+            isFolder: false,
+            config: const HttpRequestConfigEntity(id: 'r1'),
+            examples: [example],
+          ),
+        ],
+      );
+      await seed(bloc, [
+        folder('f1', 'Root', children: [subtree]),
+      ]);
+      final captured = CollectionsTreeHelper.findNode(
+        bloc.state.collections,
+        'f2',
+      )!;
+
+      bloc.add(const DeleteNode('f2'));
+      await bloc.stream.first;
+
+      bloc.add(
+        RestoreNodeSubtree(
+          node: captured,
+          ancestorIds: const ['f1'],
+          siblingIndex: 0,
+        ),
+      );
+      await bloc.stream.first;
+
+      final restored = CollectionsTreeHelper.findNode(
+        bloc.state.collections,
+        'f2',
+      )!;
+      expect(restored, captured);
+      expect(restored.variables, {'base': 'https://api.dev'});
+      expect(restored.secretKeys, {'base'});
+      expect(restored.children.single.examples.single.id, 'ex1');
+    });
+
+    test('restore falls back to the nearest surviving ancestor when the '
+        'parent vanished', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      await seed(bloc, [
+        folder(
+          'g',
+          'Grand',
+          children: [
+            folder('f', 'Parent', children: [leaf('r1', 'Req')]),
+          ],
+        ),
+      ]);
+      final captured = CollectionsTreeHelper.findNode(
+        bloc.state.collections,
+        'r1',
+      )!;
+
+      bloc.add(const DeleteNode('r1'));
+      await bloc.stream.first;
+      bloc.add(const DeleteNode('f')); // parent gone too
+      await bloc.stream.first;
+
+      bloc.add(
+        RestoreNodeSubtree(
+          node: captured,
+          ancestorIds: const ['g', 'f'],
+          siblingIndex: 0,
+        ),
+      );
+      await bloc.stream.first;
+
+      expect(
+        CollectionsTreeHelper.parentIdOf(bloc.state.collections, 'r1'),
+        'g',
+      );
+    });
+
+    test('restore falls back to root when no ancestor survives — never '
+        'crashes', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      await seed(bloc, [
+        folder(
+          'g',
+          'Grand',
+          children: [
+            folder('f', 'Parent', children: [leaf('r1', 'Req')]),
+          ],
+        ),
+      ]);
+      final captured = CollectionsTreeHelper.findNode(
+        bloc.state.collections,
+        'r1',
+      )!;
+
+      bloc.add(const DeleteNode('r1'));
+      await bloc.stream.first;
+      bloc.add(const DeleteNode('g'));
+      await bloc.stream.first;
+
+      bloc.add(
+        RestoreNodeSubtree(
+          node: captured,
+          ancestorIds: const ['g', 'f'],
+          siblingIndex: 3,
+        ),
+      );
+      await bloc.stream.first;
+
+      expect(
+        CollectionsTreeHelper.findNode(bloc.state.collections, 'r1'),
+        isNotNull,
+      );
+      expect(
+        CollectionsTreeHelper.parentIdOf(bloc.state.collections, 'r1'),
+        isNull,
+      ); // root level
+    });
+
+    test(
+      'RestoreNodeSubtree is a no-op when the node id already exists',
+      () async {
+        final bloc = build();
+        addTearDown(bloc.close);
+        await seed(bloc, [leaf('r1', 'Req')]);
+        final captured = CollectionsTreeHelper.findNode(
+          bloc.state.collections,
+          'r1',
+        )!;
+
+        bloc
+          ..add(
+            RestoreNodeSubtree(
+              node: captured,
+              ancestorIds: const [],
+              siblingIndex: 0,
+            ),
+          )
+          // No emission expected; poke another event to prove liveness.
+          ..add(const AddFolder('After'));
+        await bloc.stream.first;
+
+        expect(
+          bloc.state.collections.where((n) => n.id == 'r1'),
+          hasLength(1),
+          reason: 'double-restore must not duplicate the node',
+        );
+      },
+    );
+
+    test(
+      'DeleteExample then RestoreExample re-inserts at the original index',
+      () async {
+        final bloc = build();
+        addTearDown(bloc.close);
+        final ex1 = SavedExampleEntity(
+          id: 'e1',
+          name: 'One',
+          capturedAt: DateTime(2026),
+          config: const HttpRequestConfigEntity(id: 'e1'),
+        );
+        final ex2 = SavedExampleEntity(
+          id: 'e2',
+          name: 'Two',
+          capturedAt: DateTime(2026),
+          config: const HttpRequestConfigEntity(id: 'e2'),
+        );
+        await seed(bloc, [
+          CollectionNodeEntity(
+            id: 'r1',
+            name: 'Req',
+            isFolder: false,
+            config: const HttpRequestConfigEntity(id: 'r1'),
+            examples: [ex1, ex2],
+          ),
+        ]);
+
+        bloc.add(const DeleteExample('r1', 'e1'));
+        await bloc.stream.first;
+
+        bloc.add(RestoreExample(nodeId: 'r1', example: ex1, exampleIndex: 0));
+        await bloc.stream.first;
+
+        final node = CollectionsTreeHelper.findNode(
+          bloc.state.collections,
+          'r1',
+        )!;
+        expect(node.examples.map((e) => e.id).toList(), ['e1', 'e2']);
+      },
+    );
+
+    test('RestoreExample is a no-op when the owning node is gone', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      await seed(bloc, [leaf('other', 'Other')]);
+      final ex = SavedExampleEntity(
+        id: 'e1',
+        name: 'One',
+        capturedAt: DateTime(2026),
+        config: const HttpRequestConfigEntity(id: 'e1'),
+      );
+
+      bloc
+        ..add(RestoreExample(nodeId: 'ghost', example: ex, exampleIndex: 0))
+        ..add(const AddFolder('After'));
+      await bloc.stream.first;
+
+      expect(
+        CollectionsTreeHelper.findNode(bloc.state.collections, 'ghost'),
+        isNull,
+      );
+    });
+  });
 }
