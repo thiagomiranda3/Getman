@@ -91,4 +91,55 @@ void main() {
       expect(BulkKvCodec.parse(BulkKvCodec.serialize(rows)), rows);
     });
   });
+
+  group('BulkKvCodec.serializeRows / parseRows — // disabled rows (B1)', () {
+    test('a disabled row serializes with a leading //', () {
+      final text = BulkKvCodec.serializeRows(const [
+        (key: 'A', value: '1', disabled: false),
+        (key: 'B', value: '2', disabled: true),
+      ]);
+      expect(text, 'A: 1\n//B: 2');
+    });
+
+    test('a leading // parses as a disabled row, prefix stripped', () {
+      expect(BulkKvCodec.parseRows('A: 1\n//B: 2'), const [
+        (key: 'A', value: '1', disabled: false),
+        (key: 'B', value: '2', disabled: true),
+      ]);
+    });
+
+    test('whitespace after // is tolerated', () {
+      expect(BulkKvCodec.parseRows('//  B : 2 '), const [
+        (key: 'B', value: '2', disabled: true),
+      ]);
+    });
+
+    test('a bare // line or //-only key is dropped', () {
+      expect(BulkKvCodec.parseRows('//'), isEmpty);
+      expect(BulkKvCodec.parseRows('//: v'), isEmpty);
+    });
+
+    test('a disabled line with no colon keeps an empty value', () {
+      expect(BulkKvCodec.parseRows('//JustKey'), const [
+        (key: 'JustKey', value: '', disabled: true),
+      ]);
+    });
+
+    test('round-trip preserves disabled flags and order', () {
+      const rows = [
+        (key: 'A', value: '1', disabled: false),
+        (key: 'B', value: '2', disabled: true),
+        (key: 'tag', value: 'x', disabled: true),
+        (key: 'tag', value: 'y', disabled: false),
+      ];
+      expect(
+        BulkKvCodec.parseRows(BulkKvCodec.serializeRows(rows)),
+        rows,
+      );
+    });
+
+    test('legacy parse strips // and keeps the row (enabled-only view)', () {
+      expect(BulkKvCodec.parse('//B: 2'), const [('B', '2')]);
+    });
+  });
 }

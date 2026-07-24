@@ -116,6 +116,22 @@ class _HeadersTabViewState extends State<HeadersTabView> {
           );
         }
 
+        void emitBulk(Map<String, String> map, Set<String> disabled) {
+          final bloc = context.read<TabsBloc>();
+          final current = bloc.state.tabs.byId(tabId);
+          if (current == null) return;
+          bloc.add(
+            UpdateTab(
+              current.copyWith(
+                config: current.config.copyWith(
+                  headers: map,
+                  disabledHeaderKeys: disabled,
+                ),
+              ),
+            ),
+          );
+        }
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -127,13 +143,27 @@ class _HeadersTabViewState extends State<HeadersTabView> {
               child: _bulk
                   ? BulkKvEditor(
                       fieldPrefix: 'header',
-                      initialText: BulkKvCodec.serialize(
-                        decode(tab.config.headers),
+                      initialText: BulkKvCodec.serializeRows([
+                        for (final e in tab.config.headers.entries)
+                          (
+                            key: e.key,
+                            value: e.value,
+                            disabled: disabledKeys.contains(e.key),
+                          ),
+                      ]),
+                      canonicalize: (raw) => BulkKvCodec.serializeRows(
+                        BulkKvCodec.parseRows(raw),
                       ),
-                      canonicalize: (raw) =>
-                          BulkKvCodec.serialize(BulkKvCodec.parse(raw)),
-                      onChanged: (text) =>
-                          emit(encode(BulkKvCodec.parse(text))),
+                      onChanged: (text) {
+                        final rows = BulkKvCodec.parseRows(text);
+                        emitBulk(
+                          {for (final r in rows) r.key: r.value},
+                          {
+                            for (final r in rows)
+                              if (r.disabled) r.key,
+                          },
+                        );
+                      },
                     )
                   : TabVariableContextBuilder(
                       tabId: tab.tabId,

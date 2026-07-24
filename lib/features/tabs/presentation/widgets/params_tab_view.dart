@@ -143,11 +143,21 @@ class _ParamsTabViewState extends State<ParamsTabView> {
               child: _bulk
                   ? BulkKvEditor(
                       fieldPrefix: 'param',
-                      initialText: BulkKvCodec.serialize(decode(composed)),
-                      canonicalize: (raw) =>
-                          BulkKvCodec.serialize(BulkKvCodec.parse(raw)),
-                      onChanged: (text) =>
-                          emit(encode(BulkKvCodec.parse(text))),
+                      initialText: BulkKvCodec.serializeRows([
+                        for (final r in composed)
+                          (key: r.key, value: r.value, disabled: !r.enabled),
+                      ]),
+                      canonicalize: (raw) => BulkKvCodec.serializeRows(
+                        BulkKvCodec.parseRows(raw),
+                      ),
+                      onChanged: (text) => emit([
+                        for (final r in BulkKvCodec.parseRows(text))
+                          ParamRow(
+                            key: r.key,
+                            value: r.value,
+                            enabled: !r.disabled,
+                          ),
+                      ]),
                     )
                   : TabVariableContextBuilder(
                       tabId: tab.tabId,
