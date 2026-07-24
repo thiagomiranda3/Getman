@@ -497,4 +497,73 @@ void main() {
       },
     );
   });
+
+  group('HeadersTabView with a disabled row interleaved', () {
+    // Insertion order: A(0, enabled), Z(1, disabled via disabledHeaderKeys),
+    // B(2, enabled). Unlike params' parked rows, a disabled header row stays
+    // inline as a regular map member (position is orthogonal to
+    // disabledHeaderKeys — see the file header), so HeadersTabView.reorder
+    // splices the FULL entries list, disabled rows included.
+    const tab = HttpRequestTabEntity(
+      tabId: 'hd',
+      config: HttpRequestConfigEntity(
+        id: 'hd',
+        headers: {'A': '1', 'Z': '2', 'B': '3'},
+        disabledHeaderKeys: {'Z'},
+      ),
+    );
+
+    testWidgets(
+      'dragging an enabled row across a disabled row updates BOTH the '
+      'canonical map order and the rendered row order — regression test '
+      "for HeadersTabView's order-insensitive buildWhen/equals (Task 2B.3 "
+      'follow-up): with a disabled row present, a reorder-only UpdateTab '
+      'silently never reaches the screen even though the canonical map is '
+      'already correctly reordered',
+      (tester) async {
+        final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+        addTearDown(bloc.close);
+        await _pump(tester, bloc, const HeadersTabView(tabId: 'hd'));
+
+        // Z (index 1) has no drag handle of its own (rowEnabled gating), so
+        // only A (icon index 0) and B (icon index 1) render one. Drag A down
+        // by roughly one row's height to land just past Z, before B.
+        final row0 = tester.getCenter(
+          find.byKey(const ValueKey('header_key_0')),
+        );
+        final row1 = tester.getCenter(
+          find.byKey(const ValueKey('header_key_1')),
+        );
+        await _dragHandleBy(
+          tester,
+          find.byIcon(Icons.drag_indicator).first,
+          row1.dy - row0.dy + 8,
+        );
+
+        final headers = bloc.state.tabs.byId('hd')!.config.headers;
+        expect(
+          headers.keys.toList(),
+          ['Z', 'A', 'B'],
+          reason:
+              'canonical map order is already order-significant at the '
+              'entity level (Task 2B.2) regardless of this bug',
+        );
+
+        String keyTextAt(int index) => tester
+            .widget<TextField>(find.byKey(ValueKey('header_key_$index')))
+            .controller!
+            .text;
+        expect(
+          [keyTextAt(0), keyTextAt(1), keyTextAt(2)],
+          ['Z', 'A', 'B'],
+          reason:
+              'the rendered order must track canonical order — this is '
+              'the assertion that fails while buildWhen/equals stay '
+              'order-insensitive',
+        );
+
+        await tester.pump(const Duration(seconds: 11));
+      },
+    );
+  });
 }

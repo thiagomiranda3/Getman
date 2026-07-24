@@ -11,6 +11,18 @@
 // inline in the same map (position is orthogonal to disabledHeaderKeys, a
 // key set), so neither operation needs B1-specific handling — both route
 // through emit(), which already keeps disabledHeaderKeys in lockstep.
+//
+// 2B.3 follow-up fix: buildWhen and the `equals:` handed to
+// KeyValueListEditor are order-SIGNIFICANT (`_orderedHeadersEqual`, layering
+// a key-order ListEquality on top of the plain content MapEquality) — a
+// plain MapEquality doesn't care about key order, so with a disabled row
+// present a reorder-only UpdateTab (unequal at the entity level since 2B.2)
+// would compare equal here, buildWhen would never let the rebuild through,
+// and KeyValueListEditor would never see fresh `items` to resync its rows
+// from. Concretely: the editor's own enabled-subsequence pre-move (see that
+// file's header) computes zero local movement whenever dragging an enabled
+// row only crosses disabled ones, so without this fix the canonical map
+// silently diverges from the screen forever.
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -26,6 +38,16 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/bulk_mode_toggle.dart';
 
 const SetEquality<String> _stringSetEquality = SetEquality<String>();
+const ListEquality<String> _stringListEquality = ListEquality<String>();
+
+/// Order-SIGNIFICANT map equality: same key/value content is not enough —
+/// the key SEQUENCE must match too. Header order is user-visible/editable
+/// (drag reorder, B2), so a pure reorder must compare unequal — see the
+/// file header's "2B.3 follow-up fix" note for why a plain `MapEquality`
+/// here is the actual root cause of the order-desync bug.
+bool _orderedHeadersEqual(Map<String, String> a, Map<String, String> b) =>
+    stringMapEquality.equals(a, b) &&
+    _stringListEquality.equals(a.keys.toList(), b.keys.toList());
 
 /// Header editor keyed as `Map<String, String>` — duplicates are not a real
 /// concern for headers in this UI; last-write-wins is fine.
@@ -49,6 +71,10 @@ class _HeadersTabViewState extends State<HeadersTabView> {
         final p = prev.tabs.byId(tabId)?.config;
         final n = next.tabs.byId(tabId)?.config;
         return !stringMapEquality.equals(p?.headers, n?.headers) ||
+            !_stringListEquality.equals(
+              p?.headers.keys.toList(),
+              n?.headers.keys.toList(),
+            ) ||
             !_stringSetEquality.equals(
               p?.disabledHeaderKeys,
               n?.disabledHeaderKeys,
@@ -215,7 +241,7 @@ class _HeadersTabViewState extends State<HeadersTabView> {
                             fieldPrefix: 'header',
                             decode: decode,
                             encode: encode,
-                            equals: stringMapEquality.equals,
+                            equals: _orderedHeadersEqual,
                             rowEnabled: (index) =>
                                 index >= headerKeys.length ||
                                 !disabledKeys.contains(headerKeys[index]),
