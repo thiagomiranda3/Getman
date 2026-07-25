@@ -67,6 +67,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     on<SetActiveIndex>(_onSetActiveIndex);
     on<ReorderTabs>(_onReorderTabs);
     on<UpdateTab>(_onUpdateTab);
+    on<RevertTab>(_onRevertTab);
     on<CloseOtherTabs>(_onCloseOtherTabs);
     on<CloseTabsToTheRight>(_onCloseTabsToTheRight);
     on<CloseTabsToTheLeft>(_onCloseTabsToTheLeft);
@@ -439,6 +440,21 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     if (_findTab(event.tab.tabId) == null) return;
     emit(_derive(_replaceTabAcrossPanels(event.tab), state.activePanelId));
     _dirtyTabIds.add(event.tab.tabId);
+    _scheduleSave();
+  }
+
+  /// A4 revert: swap the config back to the saved baseline, keep everything
+  /// else (response, timeline, link). Persists via the normal debounce.
+  void _onRevertTab(RevertTab event, Emitter<TabsState> emit) {
+    final tab = _findTab(event.tabId);
+    if (tab == null || tab.collectionNodeId == null) return;
+    emit(
+      _derive(
+        _replaceTabAcrossPanels(tab.copyWith(config: event.savedConfig)),
+        state.activePanelId,
+      ),
+    );
+    _dirtyTabIds.add(event.tabId);
     _scheduleSave();
   }
 

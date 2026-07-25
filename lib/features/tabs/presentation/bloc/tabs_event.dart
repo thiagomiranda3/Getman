@@ -222,3 +222,17 @@ class CloseSavedTabs extends TabsEvent {
   @override
   List<Object?> get props => [panelId, savedConfigs];
 }
+
+/// Reverts a dirty LINKED tab's config to [savedConfig] — the saved node's
+/// config, i.e. the exact baseline TabDirtyChecker compares against. The
+/// dispatcher resolves it from CollectionsState.configById (the bloc holds
+/// no collections reference — same pattern as [SendRequest.envVars]). The
+/// displayed response and the time-travel history are untouched. No-op for
+/// unlinked or missing tabs.
+class RevertTab extends TabsEvent {
+  const RevertTab({required this.tabId, required this.savedConfig});
+  final String tabId;
+  final HttpRequestConfigEntity savedConfig;
+  @override
+  List<Object?> get props => [tabId, savedConfig];
+}
