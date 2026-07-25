@@ -222,4 +222,80 @@ void main() {
       expect(row.isSelected, isTrue);
     },
   );
+
+  testWidgets('tree search matches the request method (case-insensitive)', (
+    tester,
+  ) async {
+    final bloc = build();
+    addTearDown(bloc.close);
+    final tabs = MockTabsBloc();
+    addTearDown(tabs.close);
+
+    const getReq = CollectionNodeEntity(
+      id: 'g',
+      name: 'FetchUsers',
+      isFolder: false,
+      config: HttpRequestConfigEntity(id: 'g', url: 'https://api.dev/users'),
+    );
+    const postReq = CollectionNodeEntity(
+      id: 'p',
+      name: 'CreateUser',
+      isFolder: false,
+      config: HttpRequestConfigEntity(
+        id: 'p',
+        method: 'POST',
+        url: 'https://api.dev/users',
+      ),
+    );
+
+    bloc.add(const ReplaceCollections([getReq, postReq]));
+    await bloc.stream.first;
+
+    await tester.pumpWidget(host(bloc, tabs));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'post');
+    // Past the search Debouncer.
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.text('CreateUser'), findsOneWidget);
+    expect(find.text('FetchUsers'), findsNothing);
+  });
+
+  testWidgets('collapse-all button collapses every expanded folder', (
+    tester,
+  ) async {
+    final bloc = build();
+    addTearDown(bloc.close);
+    final tabs = MockTabsBloc();
+    addTearDown(tabs.close);
+
+    const child = CollectionNodeEntity(
+      id: 'C2',
+      name: 'NestedReq',
+      isFolder: false,
+      config: HttpRequestConfigEntity(id: 'C2'),
+    );
+    const folder = CollectionNodeEntity(
+      id: 'F2',
+      name: 'ApiFolder2',
+      children: [child],
+    );
+
+    bloc.add(const ReplaceCollections([folder]));
+    await bloc.stream.first;
+
+    await tester.pumpWidget(host(bloc, tabs));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('ApiFolder2'));
+    await tester.pumpAndSettle();
+    expect(find.text('NestedReq'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('collections_collapse_all')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('NestedReq'), findsNothing);
+  });
 }
