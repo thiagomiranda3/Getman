@@ -28,6 +28,16 @@ class _AcceptSuggestionIntent extends Intent {
   const _AcceptSuggestionIntent();
 }
 
+// FIX I4: Enter has its own intent, distinct from Tab's _AcceptSuggestionIntent
+// — in URL-suggestion mode, Enter only accepts once the user has actively
+// arrow-navigated the popup (see _EnterAcceptIntent's _GatedAction below);
+// otherwise it falls through to send. Tab always accepts when the menu is
+// open, in both modes. Variable mode is unaffected: Enter always accepts
+// there, same as before.
+class _EnterAcceptIntent extends Intent {
+  const _EnterAcceptIntent();
+}
+
 class _DismissSuggestionIntent extends Intent {
   const _DismissSuggestionIntent();
 }
@@ -108,6 +118,13 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
   List<String> _urlSuggestions = const [];
   bool _urlMode = false;
 
+  // FIX I4: whether the user has pressed ↓/↑ at least once for the
+  // CURRENT url-suggestion set. Reset whenever that set changes (a keystroke
+  // re-queries the provider) or the menu closes; set on every _moveSelection
+  // call. Gates Enter-accept in URL mode only — Tab and variable-mode Enter
+  // are unaffected.
+  bool _urlModeNavigated = false;
+
   int get _menuLength =>
       _urlMode ? _urlSuggestions.length : _suggestions.length;
 
@@ -175,6 +192,9 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
     _suggestions = const [];
     _urlSuggestions = urls;
     _selected = _selected.clamp(0, urls.length - 1);
+    // FIX I4: a new query (keystroke) means a new suggestion set — the user
+    // must arrow-navigate THIS set before Enter will accept from it.
+    _urlModeNavigated = false;
     _open();
     _entry!.markNeedsBuild();
   }
@@ -195,6 +215,7 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
     _urlSuggestions = const [];
     _urlMode = false;
     _selected = 0;
+    _urlModeNavigated = false;
   }
 
   void _moveSelection(int delta) {
@@ -202,6 +223,8 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
     if (!_isOpen || length == 0) return;
     _selected = (_selected + delta) % length;
     if (_selected < 0) _selected += length;
+    // FIX I4: explicit ↓/↑ engagement — from here on Enter may accept.
+    _urlModeNavigated = true;
     _entry!.markNeedsBuild();
   }
 
@@ -295,7 +318,7 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
           SingleActivator(LogicalKeyboardKey.arrowDown):
               _NextSuggestionIntent(),
           SingleActivator(LogicalKeyboardKey.arrowUp): _PrevSuggestionIntent(),
-          SingleActivator(LogicalKeyboardKey.enter): _AcceptSuggestionIntent(),
+          SingleActivator(LogicalKeyboardKey.enter): _EnterAcceptIntent(),
           SingleActivator(LogicalKeyboardKey.tab): _AcceptSuggestionIntent(),
           SingleActivator(LogicalKeyboardKey.escape):
               _DismissSuggestionIntent(),
@@ -316,6 +339,16 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
             ),
             _AcceptSuggestionIntent: _GatedAction(
               isEnabledCallback: () => _isOpen,
+              onInvoke: () => _acceptAt(_selected),
+            ),
+            // FIX I4: in URL mode, Enter only accepts once the user has
+            // arrow-navigated the current suggestion set; otherwise it's
+            // left unconsumed so it falls through to the field's own
+            // onSubmitted (Enter-to-send). Variable mode (_urlMode false)
+            // behaves exactly like _AcceptSuggestionIntent above.
+            _EnterAcceptIntent: _GatedAction(
+              isEnabledCallback: () =>
+                  _isOpen && (!_urlMode || _urlModeNavigated),
               onInvoke: () => _acceptAt(_selected),
             ),
             _DismissSuggestionIntent: _GatedAction(

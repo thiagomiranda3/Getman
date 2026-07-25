@@ -401,9 +401,18 @@ class _UrlBarState extends State<UrlBar> {
                                 // Enter sends right from the URL field (no
                                 // Cmd/Ctrl needed — unlike multi-line editors
                                 // where plain Enter inserts a newline). When
-                                // the {{var}} autocomplete menu is open its
-                                // Enter-to-accept consumes the key first, so
-                                // accepting a suggestion never fires a send.
+                                // the {{var}} autocomplete menu is open in
+                                // VARIABLE mode, its Enter-to-accept always
+                                // consumes the key first, so accepting a
+                                // suggestion never fires a send. In URL
+                                // mode (whole-URL history/collection
+                                // suggestions), Enter only accepts once the
+                                // user has arrow-navigated the popup (FIX
+                                // I4) — otherwise it's left unconsumed and
+                                // sends, so typing a full URL that happens to
+                                // prefix another suggestion still sends on
+                                // Enter instead of silently rewriting the
+                                // field.
                                 onSubmitted: (_) =>
                                     _handleUrlSubmitted(context),
                               ),

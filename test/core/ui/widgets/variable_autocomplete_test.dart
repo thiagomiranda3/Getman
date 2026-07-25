@@ -352,8 +352,19 @@ void main() {
     });
 
     testWidgets(
-      'Enter replaces the ENTIRE field text with the selected URL and the '
-      'menu does not reopen over the accepted value',
+      // FIX I4: plain Enter (no arrow-navigation) in URL mode must NOT
+      // accept a suggestion — the _EnterAcceptIntent action must report
+      // itself disabled so Flutter's Actions/Shortcuts leaves the key
+      // event unconsumed (per _GatedAction's contract, exercised
+      // identically by every other gated intent in this widget; the
+      // engine-level "does it then reach onSubmitted" hop is untestable
+      // via sendKeyEvent — see EditableText.onSubmitted's own testing
+      // note — so this asserts the proxy the widget actually controls:
+      // no accept happened, the menu is still open). Regression guard for
+      // the reviewer's exact trap: typing a URL that happens to prefix
+      // another history entry must not have it silently rewritten.
+      'Enter with no arrow-navigation does not accept — text and menu '
+      'unchanged',
       (tester) async {
         await pump(tester, urlSuggestionsFor: urlSuggest);
         await tester.enterText(find.byType(TextField), 'api');
@@ -361,48 +372,62 @@ void main() {
         await tester.sendKeyEvent(LogicalKeyboardKey.enter);
         await tester.pumpAndSettle();
 
-        expect(controller.text, 'https://api.dev/users');
         expect(
-          controller.selection.baseOffset,
-          'https://api.dev/users'.length,
+          controller.text,
+          'api',
+          reason: 'an unnavigated Enter must not rewrite the field',
         );
-        // 'https://api.dev/users/all' still contains the accepted text — if
-        // the programmatic write re-opened the menu, this row would show.
         expect(
-          find.text('https://api.dev/users/all'),
-          findsNothing,
-          reason: 'the menu must not reopen over the just-accepted URL',
+          find.text('https://api.dev/users'),
+          findsOneWidget,
+          reason: 'the menu must still be open — Enter was not consumed',
         );
       },
     );
 
-    testWidgets('ArrowDown then Enter picks the second URL; onAccepted fires', (
-      tester,
-    ) async {
-      String? accepted;
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: brutalistTheme(Brightness.light),
-          home: Scaffold(
-            body: VariableAutocomplete(
-              controller: controller,
-              focusNode: focusNode,
-              suggestionsFor: _suggest,
-              urlSuggestionsFor: urlSuggest,
-              onAccepted: (value) => accepted = value,
-              child: TextField(controller: controller, focusNode: focusNode),
+    testWidgets(
+      'ArrowDown then Enter picks the second URL and onAccepted fires — '
+      'FIX I4 (navigated Enter still accepts)',
+      (tester) async {
+        String? accepted;
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: brutalistTheme(Brightness.light),
+            home: Scaffold(
+              body: VariableAutocomplete(
+                controller: controller,
+                focusNode: focusNode,
+                suggestionsFor: _suggest,
+                urlSuggestionsFor: urlSuggest,
+                onAccepted: (value) => accepted = value,
+                child: TextField(controller: controller, focusNode: focusNode),
+              ),
             ),
           ),
-        ),
-      );
-      await tester.enterText(find.byType(TextField), 'api');
-      await tester.pumpAndSettle();
-      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-      await tester.pumpAndSettle();
-      expect(controller.text, 'https://api.dev/orders');
-      expect(accepted, 'https://api.dev/orders');
-    });
+        );
+        await tester.enterText(find.byType(TextField), 'api');
+        await tester.pumpAndSettle();
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        expect(controller.text, 'https://api.dev/orders');
+        expect(accepted, 'https://api.dev/orders');
+      },
+    );
+
+    testWidgets(
+      'Tab still accepts a URL suggestion with no navigation required — '
+      'only Enter is gated (FIX I4)',
+      (tester) async {
+        await pump(tester, urlSuggestionsFor: urlSuggest);
+        await tester.enterText(find.byType(TextField), 'api');
+        await tester.pumpAndSettle();
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pumpAndSettle();
+
+        expect(controller.text, 'https://api.dev/users');
+      },
+    );
 
     testWidgets('tapping a URL row accepts it', (tester) async {
       await pump(tester, urlSuggestionsFor: urlSuggest);
