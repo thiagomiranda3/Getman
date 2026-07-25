@@ -1,11 +1,13 @@
 // The URL input row of a request tab: request-kind/method selector +
 // {{variable}}-highlighted URL field with autocomplete ({{var}} names plus
 // B4 URL suggestions merged from history + saved collection requests;
-// selecting a URL replaces the whole field) + code-export/save
+// selecting a URL replaces the whole field) + code-export/revert/save
 // buttons + SEND/CANCEL (or CONNECT for WS/SSE/MCP). Plain Enter in the
 // focused URL field sends too (HTTP only). Resolves env vars via
 // RequestVariableResolver/ActiveEnvironmentHelper at press time, not build
-// time.
+// time. Wide layout only: RevertTabButton (A4) sits beside the save button
+// for dirty linked tabs; compact/narrow layouts cover revert via the
+// tab-chip context menu instead (see url_overflow_menu.dart).
 //
 // Gotchas: push text into _urlController ONLY via
 // _setControllerPreservingEnd — anything else jumps the cursor mid-echo.
@@ -48,6 +50,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/code_export_dialog.dart';
 import 'package:getman/features/tabs/presentation/widgets/realtime_button.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_kind_method_selector.dart';
+import 'package:getman/features/tabs/presentation/widgets/revert_tab_button.dart';
 import 'package:getman/features/tabs/presentation/widgets/url_overflow_menu.dart';
 
 void _setControllerPreservingEnd(
@@ -538,6 +541,11 @@ class _UrlBarState extends State<UrlBar> {
                             ),
                           ] else ...[
                             SizedBox(width: gap),
+                            RevertTabButton(
+                              tabId: widget.tabId,
+                              iconSize: iconSize,
+                              gap: smallGap,
+                            ),
                             context.appDecoration.wrapInteractive(
                               child: IconButton(
                                 key: const ValueKey('save_request_button'),
