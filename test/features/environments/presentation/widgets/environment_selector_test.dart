@@ -3,9 +3,11 @@
 // UpdateActiveEnvironmentId(id); selecting "No Environment" dispatches
 // UpdateActiveEnvironmentId(null).
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 import 'package:getman/features/environments/domain/repositories/environments_repository.dart';
@@ -190,5 +192,30 @@ void main() {
     expect(find.text('No Environment'), findsWidgets);
     expect(find.text('Production'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('tooltip carries the env-switcher shortcut hint', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+
+    final repo = MockEnvironmentsRepository();
+    final envsBloc = _makeEnvsBloc(repo, []);
+    final settingsBloc = _makeSettingsBloc(MockSaveSettingsUseCase());
+    addTearDown(envsBloc.close);
+    addTearDown(settingsBloc.close);
+
+    await _pump(tester, envsBloc: envsBloc, settingsBloc: settingsBloc);
+    // Reset within the body: the testWidgets invariant check runs before
+    // addTearDown, and it forbids a leaked foundation debug override.
+    debugDefaultTargetPlatformOverride = null;
+
+    expect(
+      find.byTooltip(
+        'Environment · No Environment — '
+        '${shortcutHint(AppShortcutAction.envSwitcher, useMeta: true)}',
+      ),
+      findsOneWidget,
+    );
   });
 }

@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
@@ -62,9 +63,16 @@ class _SelectorButton extends StatelessWidget {
     // Drop the active-env label on the narrowest viewports so the hamburger
     // + tab chip + + button + env selector all fit on a phone tab bar.
     final iconOnly = context.useTabSwitcher;
+    // E2: tooltip hint from the one platform-aware source (same predicate as
+    // buildAppShortcuts — never Theme.of(context).platform). Extracted so the
+    // tooltip string doesn't push its line past 80 columns.
+    final envSwitcherHint = shortcutHint(
+      AppShortcutAction.envSwitcher,
+      useMeta: useMetaShortcuts,
+    );
     return PopupMenuButton<String>(
       key: const ValueKey('environment_selector'),
-      tooltip: 'Environment · ${_activeLabel()}',
+      tooltip: 'Environment · ${_activeLabel()} — $envSwitcherHint',
       position: PopupMenuPosition.under,
       color: theme.colorScheme.surface,
       onSelected: (value) => _onSelected(context, value),

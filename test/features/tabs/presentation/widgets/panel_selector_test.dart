@@ -1,8 +1,10 @@
 import 'package:bloc_test/bloc_test.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/theme/theme_registry.dart';
 import 'package:getman/features/collections/presentation/widgets/node_drag_data.dart';
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
@@ -353,4 +355,25 @@ void main() {
       );
     },
   );
+
+  testWidgets('new-panel footer tooltip carries the shortcut hint', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+
+    await tester.pumpWidget(_host(bloc));
+    await tester.tap(find.byKey(const ValueKey('panel_selector_button')));
+    await tester.pumpAndSettle();
+    // Reset within the body: the testWidgets invariant check runs before
+    // addTearDown, and it forbids a leaked foundation debug override.
+    debugDefaultTargetPlatformOverride = null;
+
+    expect(
+      find.byTooltip(
+        'New Panel — '
+        '${shortcutHint(AppShortcutAction.newPanel, useMeta: true)}',
+      ),
+      findsOneWidget,
+    );
+  });
 }

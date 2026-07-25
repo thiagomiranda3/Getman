@@ -16,6 +16,7 @@ import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
@@ -602,41 +603,51 @@ class _AddPanelFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
+    // E2: tooltip hint from the one platform-aware source (same predicate as
+    // buildAppShortcuts — never Theme.of(context).platform). Extracted so the
+    // tooltip string doesn't push its line past 80 columns.
+    final newPanelHint = shortcutHint(
+      AppShortcutAction.newPanel,
+      useMeta: useMetaShortcuts,
+    );
 
-    return InkWell(
-      key: const ValueKey('panel_add_button'),
-      onTap: () {
-        final bloc = context.read<TabsBloc>();
-        final tabId = droppedTabId;
-        if (tabId != null) {
-          bloc.add(MoveTabToNewPanel(tabId));
-        } else {
-          bloc.add(const AddPanel());
-        }
-        onDismiss();
-      },
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: layout.inputPadding,
-          vertical: layout.inputPaddingVertical,
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.add,
-              size: layout.smallIconSize,
-              color: theme.colorScheme.onSurface,
-            ),
-            SizedBox(width: layout.tabSpacing),
-            Text(
-              'New panel',
-              style: TextStyle(
-                fontSize: layout.fontSizeNormal,
-                fontWeight: context.appTypography.titleWeight,
+    return Tooltip(
+      message: 'New Panel — $newPanelHint',
+      child: InkWell(
+        key: const ValueKey('panel_add_button'),
+        onTap: () {
+          final bloc = context.read<TabsBloc>();
+          final tabId = droppedTabId;
+          if (tabId != null) {
+            bloc.add(MoveTabToNewPanel(tabId));
+          } else {
+            bloc.add(const AddPanel());
+          }
+          onDismiss();
+        },
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: layout.inputPadding,
+            vertical: layout.inputPaddingVertical,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.add,
+                size: layout.smallIconSize,
                 color: theme.colorScheme.onSurface,
               ),
-            ),
-          ],
+              SizedBox(width: layout.tabSpacing),
+              Text(
+                'New panel',
+                style: TextStyle(
+                  fontSize: layout.fontSizeNormal,
+                  fontWeight: context.appTypography.titleWeight,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
