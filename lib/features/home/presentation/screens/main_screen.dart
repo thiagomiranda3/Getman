@@ -47,6 +47,7 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
+import 'package:getman/features/tabs/presentation/widgets/open_tabs_dropdown.dart';
 import 'package:getman/features/tabs/presentation/widgets/panel_selector.dart';
 import 'package:getman/features/tabs/presentation/widgets/save_all_coordinator.dart';
 import 'package:getman/features/updates/presentation/update_gate.dart';
@@ -648,6 +649,9 @@ class _MainScreenState extends State<MainScreen> {
                   ),
           ),
           const AddTabButton(),
+          // D1: open-tabs list — desktop/tablet only; compact-phone keeps the
+          // TabSwitcherSheet.
+          if (!context.useTabSwitcher) const OpenTabsDropdown(),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: layout.tabSpacing),
             child: const PanelSelector(),
