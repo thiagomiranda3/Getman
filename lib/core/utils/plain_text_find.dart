@@ -114,6 +114,27 @@ PlainTextFindWindow buildPlainTextFindWindow({
     if (start < 0) start = 0;
   }
 
+  // Nudge start/end off UTF-16 surrogate pair boundaries.
+  // If start lands on a LOW surrogate (0xDC00–0xDFFF), move back to include
+  // the HIGH surrogate. If end lands between a HIGH (0xD800–0xDBFF) and its
+  // LOW pair, move forward to skip the incomplete pair.
+  if (start > 0 && start < length) {
+    final codeUnit = haystack.codeUnitAt(start);
+    // LOW surrogate: must move back to include the HIGH surrogate.
+    if (codeUnit >= 0xDC00 && codeUnit <= 0xDFFF) {
+      start--;
+    }
+  }
+  if (end > 0 && end < length) {
+    final codeUnit = haystack.codeUnitAt(end - 1);
+    // HIGH surrogate: move forward to skip the LOW surrogate.
+    if (codeUnit >= 0xD800 && codeUnit <= 0xDBFF) {
+      end++;
+    }
+  }
+  // Clamp end to haystack length if adjustment pushed it past.
+  if (end > length) end = length;
+
   final text = haystack.substring(start, end);
   final highlights = <TextRange>[];
   var active = 0;

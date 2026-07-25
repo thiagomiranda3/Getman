@@ -151,4 +151,91 @@ void main() {
       expect((spans.single as TextSpan).text, 'abc');
     });
   });
+
+  group('UTF-16 surrogate boundary safety', () {
+    test(
+      'window start landing on LOW surrogate is nudged off boundary',
+      () {
+        // Repro: emoji at position 500 (code units 500–501,
+        // high=0xD83D low=0xDE00). If windowStart is computed to land on the
+        // LOW surrogate (501), the window must be shifted to avoid slicing
+        // mid-emoji.
+        const emoji = '😀'; // 2 code units: D83D DE00
+        final haystack = 'x' * 500 + emoji + 'y' * 5000;
+        const offset = 500; // The emoji starts here
+        final w = buildPlainTextFindWindow(
+          haystack: haystack,
+          offsets: [offset],
+          currentMatch: 0,
+          matchLength: emoji.length,
+          windowChars: 256, // Small enough to force boundary case
+        );
+        // Assert: window.text never starts with a lone LOW surrogate.
+        if (w.text.isNotEmpty) {
+          final firstCodeUnit = w.text.codeUnitAt(0);
+          expect(
+            firstCodeUnit < 0xDC00 || firstCodeUnit > 0xDFFF,
+            isTrue,
+            reason: 'window.text[0] must not be a lone LOW surrogate',
+          );
+        }
+        // Assert: window.text never ends with a lone HIGH surrogate.
+        if (w.text.isNotEmpty) {
+          final lastCodeUnit = w.text.codeUnitAt(w.text.length - 1);
+          expect(
+            lastCodeUnit < 0xD800 || lastCodeUnit > 0xDBFF,
+            isTrue,
+            reason: 'window.text[-1] must not be a lone HIGH surrogate',
+          );
+        }
+        // Assert: the highlight text still matches the true match.
+        if (w.highlights.isNotEmpty) {
+          final h = w.highlights.first;
+          final highlightText = w.text.substring(h.start, h.end);
+          expect(highlightText, emoji);
+        }
+      },
+    );
+
+    test(
+      'emoji-dense haystack: all windows stay off surrogate boundaries',
+      () {
+        // Build haystack with emoji at regular intervals.
+        const emoji = '🎉'; // 2 code units each
+        const pattern = 'ab🎉';
+        final haystackBuffer = StringBuffer();
+        final offsets = <int>[];
+        for (var i = 0; i < 50; i++) {
+          offsets.add(haystackBuffer.length + 2); // Mark emoji start
+          haystackBuffer.write(pattern);
+        }
+        final haystack = haystackBuffer.toString();
+        // Test several match positions to ensure boundary safety everywhere.
+        for (var idx = 0; idx < offsets.length; idx += 5) {
+          final w = buildPlainTextFindWindow(
+            haystack: haystack,
+            offsets: offsets,
+            currentMatch: idx,
+            matchLength: emoji.length,
+            windowChars: 128,
+          );
+          // Assert no lone surrogates at window boundaries.
+          if (w.text.isNotEmpty) {
+            final firstCodeUnit = w.text.codeUnitAt(0);
+            expect(
+              firstCodeUnit < 0xDC00 || firstCodeUnit > 0xDFFF,
+              isTrue,
+              reason: 'Match $idx: window.text[0] is a lone LOW surrogate',
+            );
+            final lastCodeUnit = w.text.codeUnitAt(w.text.length - 1);
+            expect(
+              lastCodeUnit < 0xD800 || lastCodeUnit > 0xDBFF,
+              isTrue,
+              reason: 'Match $idx: window.text[-1] is a lone HIGH surrogate',
+            );
+          }
+        }
+      },
+    );
+  });
 }
