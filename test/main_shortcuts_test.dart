@@ -90,6 +90,7 @@ void main() {
     single<NewPanelIntent>(LogicalKeyboardKey.keyN, shift: true);
     single<NextPanelIntent>(LogicalKeyboardKey.bracketRight, shift: true);
     single<PrevPanelIntent>(LogicalKeyboardKey.bracketLeft, shift: true);
+    single<ShowShortcutsIntent>(LogicalKeyboardKey.slash);
   }
 
   group('appShortcuts (macOS / useMeta: true)', () {
@@ -222,6 +223,7 @@ void main() {
       single<NewPanelIntent>(LogicalKeyboardKey.keyN, shift: true);
       single<NextPanelIntent>(LogicalKeyboardKey.bracketRight, shift: true);
       single<PrevPanelIntent>(LogicalKeyboardKey.bracketLeft, shift: true);
+      single<ShowShortcutsIntent>(LogicalKeyboardKey.slash);
     });
 
     test('Ctrl+S saves off macOS', () {
@@ -274,17 +276,18 @@ void main() {
     });
   });
 
-  test('each platform map has exactly 33 single-modifier bindings', () {
-    // 8 primary (N,W,S,Enter,B,K,E,L) + 2 tab-switch (Ctrl+Tab, Ctrl+Shift+Tab)
-    // + 9 jump-to-tab + 3 panel (Shift+N, Shift+], Shift+[) + 9 jump-to-panel
-    // + 2 Wave 3 (Shift+T reopen closed tab, Alt+S save all).
-    expect(buildAppShortcuts(useMeta: true).length, 33);
-    expect(buildAppShortcuts(useMeta: false).length, 33);
+  test('each platform map has exactly 34 single-modifier bindings', () {
+    // 8 primary (N,W,S,Enter,B,K,E,L) + reopen-tab (Shift+T) + save-all
+    // (Alt+S) + shortcuts-help (/) + 2 tab-switch (Ctrl+Tab, Ctrl+Shift+Tab)
+    // + 9 jump-to-tab + 3 panel (Shift+N, Shift+], Shift+[)
+    // + 9 jump-to-panel.
+    expect(buildAppShortcuts(useMeta: true).length, 34);
+    expect(buildAppShortcuts(useMeta: false).length, 34);
   });
 
   test('runtime appShortcuts is non-empty (built for the host platform)', () {
     expect(appShortcuts, isNotEmpty);
-    expect(appShortcuts.length, 33);
+    expect(appShortcuts.length, 34);
   });
 
   group(

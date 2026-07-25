@@ -148,6 +148,7 @@ Map<ShortcutActivator, Intent> buildAppShortcuts({required bool useMeta}) {
     primary(LogicalKeyboardKey.keyK): const CommandPaletteIntent(),
     primary(LogicalKeyboardKey.keyE): const SwitchEnvironmentIntent(),
     primary(LogicalKeyboardKey.keyL): const FocusUrlIntent(),
+    primary(LogicalKeyboardKey.slash): const ShowShortcutsIntent(),
     primary(LogicalKeyboardKey.keyT, shift: true):
         const ReopenClosedTabIntent(),
     primary(LogicalKeyboardKey.keyS, alt: true): const SaveAllTabsIntent(),

@@ -91,3 +91,10 @@ class ReopenClosedTabIntent extends Intent {
 class SaveAllTabsIntent extends Intent {
   const SaveAllTabsIntent();
 }
+
+/// Open the keyboard-shortcuts cheat sheet (Cmd/Ctrl+/) — or, when invoked
+/// from INSIDE the open dialog (whose local Actions maps it to pop), close
+/// it again: the same chord toggles.
+class ShowShortcutsIntent extends Intent {
+  const ShowShortcutsIntent();
+}
