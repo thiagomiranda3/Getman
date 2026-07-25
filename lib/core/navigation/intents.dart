@@ -1,7 +1,7 @@
 // Intent classes for every global keyboard shortcut wired in main.dart's
 // appShortcuts map (new/close/send/save/beautify tab, command palette,
 // environment switcher, tab/panel navigation + jump-to-index, focus URL,
-// reopen closed tab, save all).
+// reopen closed tab, save all, shortcuts help).
 // Pure markers with no logic; the matching Actions live in MainScreen or
 // deeper, wherever their dependencies are reachable (see
 // docs/architecture/app-shell.md).
