@@ -637,24 +637,93 @@ void main() {
       expect(item.enabled, isFalse);
     });
 
-    testWidgets('CLOSE SAVED TABS dispatches CloseSavedTabs for the active '
-        'panel', (tester) async {
-      await pumpTab(tester, _linkedTab());
-      await openContextMenu(tester);
+    testWidgets(
+      'CLOSE SAVED TABS dispatches CloseSavedTabs for the active panel — '
+      'closes the clean tab onto the reopen stack and keeps the dirty one',
+      (tester) async {
+        // Two tabs in the SAME panel: `dirty` (_linkedTab, linked to node1
+        // with no matching saved node → DIRTY) and `clean` (_emptyTab,
+        // unlinked → matches the pristine default config → CLEAN). This is
+        // discriminating: a single-dirty-tab panel passes
+        // `hasLength(1)` whether CLOSE SAVED TABS actually ran, used the
+        // wrong panelId, or was never dispatched at all — a second, closable
+        // tab is required to prove the dispatch actually reached the bloc.
+        final dirty = _linkedTab();
+        final clean = _emptyTab();
+        when(() => tabsRepo.getPanels()).thenAnswer(
+          (_) async => [
+            PanelEntity(
+              id: 'p1',
+              name: 'Panel 1',
+              tabs: [dirty, clean],
+              activeTabId: dirty.tabId,
+            ),
+          ],
+        );
+        when(() => tabsRepo.getActivePanelId()).thenAnswer((_) async => 'p1');
 
-      await tester.tap(find.text('CLOSE SAVED TABS'));
-      await tester.pumpAndSettle();
+        final tabsBloc = TabsBloc(
+          repository: tabsRepo,
+          sendRequestUseCase: sendUseCase,
+        )..add(const LoadTabs());
+        await tabsBloc.stream.firstWhere(
+          (s) => !s.isLoading && s.tabs.length == 2,
+        );
 
-      // _linkedTab's config matches no saved node (configById is empty), so
-      // it is DIRTY → kept. The event must still have been dispatched with
-      // the active panel id. Assert via bloc state: nothing closed.
-      // (pumpTab returns void in the harness; read the bloc from the tree.)
-      final chip = tester.state<State<RequestTabChip>>(
-        find.byType(RequestTabChip),
-      );
-      final tabsBloc = chip.context.read<TabsBloc>();
-      expect(tabsBloc.state.tabs, hasLength(1), reason: 'dirty tab kept');
-    });
+        final collectionsBloc = CollectionsBloc(
+          getCollectionsUseCase: GetCollectionsUseCase(collectionsRepo),
+          saveCollectionsUseCase: SaveCollectionsUseCase(collectionsRepo),
+          saveDebounce: const Duration(milliseconds: 5),
+        )..add(const ReplaceCollections([]));
+        await collectionsBloc.stream.first;
+
+        addTearDown(tabsBloc.close);
+        addTearDown(collectionsBloc.close);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: brutalistTheme(Brightness.light),
+            home: Scaffold(
+              body: MultiBlocProvider(
+                providers: [
+                  BlocProvider.value(value: tabsBloc),
+                  BlocProvider.value(value: collectionsBloc),
+                ],
+                child: RepositoryProvider<TabDirtyChecker>.value(
+                  value: const TabDirtyChecker(),
+                  child: Center(
+                    child: RequestTabChip(
+                      tabId: dirty.tabId,
+                      index: 0,
+                      isActive: true,
+                      onTap: () {},
+                      onClose: () async => true,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await openContextMenu(tester);
+
+        await tester.tap(find.text('CLOSE SAVED TABS'));
+        await tester.pumpAndSettle();
+
+        expect(
+          tabsBloc.state.tabs.map((t) => t.tabId),
+          [dirty.tabId],
+          reason: 'the clean tab closed; the dirty tab was kept',
+        );
+        expect(
+          tabsBloc.canReopenClosedTab,
+          isTrue,
+          reason: 'the closed clean tab landed on the reopen stack',
+        );
+      },
+    );
 
     testWidgets('REVERT CHANGES appears only for a DIRTY linked tab, confirms, '
         'and reverts', (tester) async {
