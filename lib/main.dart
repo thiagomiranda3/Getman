@@ -132,8 +132,17 @@ bool get _useMetaPrimary => defaultTargetPlatform == TargetPlatform.macOS;
 /// `debugDefaultTargetPlatformOverride` dance.
 @visibleForTesting
 Map<ShortcutActivator, Intent> buildAppShortcuts({required bool useMeta}) {
-  SingleActivator primary(LogicalKeyboardKey key, {bool shift = false}) =>
-      SingleActivator(key, control: !useMeta, meta: useMeta, shift: shift);
+  SingleActivator primary(
+    LogicalKeyboardKey key, {
+    bool shift = false,
+    bool alt = false,
+  }) => SingleActivator(
+    key,
+    control: !useMeta,
+    meta: useMeta,
+    shift: shift,
+    alt: alt,
+  );
 
   return {
     primary(LogicalKeyboardKey.keyN): const NewTabIntent(),
@@ -144,6 +153,9 @@ Map<ShortcutActivator, Intent> buildAppShortcuts({required bool useMeta}) {
     primary(LogicalKeyboardKey.keyK): const CommandPaletteIntent(),
     primary(LogicalKeyboardKey.keyE): const SwitchEnvironmentIntent(),
     primary(LogicalKeyboardKey.keyL): const FocusUrlIntent(),
+    primary(LogicalKeyboardKey.keyT, shift: true):
+        const ReopenClosedTabIntent(),
+    primary(LogicalKeyboardKey.keyS, alt: true): const SaveAllTabsIntent(),
     // Tab-switch stays Ctrl on every platform (⌘+Tab is the OS app switcher).
     const SingleActivator(LogicalKeyboardKey.tab, control: true):
         const NextTabIntent(),

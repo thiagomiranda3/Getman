@@ -14,6 +14,7 @@ void main() {
     bool control = false,
     bool meta = false,
     bool shift = false,
+    bool alt = false,
   }) => map.entries.any(
     (e) =>
         e.key is SingleActivator &&
@@ -21,6 +22,7 @@ void main() {
         (e.key as SingleActivator).control == control &&
         (e.key as SingleActivator).meta == meta &&
         (e.key as SingleActivator).shift == shift &&
+        (e.key as SingleActivator).alt == alt &&
         e.value is T,
   );
 
@@ -151,6 +153,46 @@ void main() {
         );
       }
     });
+
+    test('⌘⇧T reopens closed tab; ⌘⌥S saves all (Wave 3)', () {
+      expect(
+        hasBinding<ReopenClosedTabIntent>(
+          map,
+          LogicalKeyboardKey.keyT,
+          meta: true,
+          shift: true,
+        ),
+        true,
+      );
+      expect(
+        hasBinding<SaveAllTabsIntent>(
+          map,
+          LogicalKeyboardKey.keyS,
+          meta: true,
+          alt: true,
+        ),
+        true,
+      );
+      // ⌘S (no alt) must still be plain save — not save-all.
+      expect(
+        hasBinding<SaveRequestIntent>(map, LogicalKeyboardKey.keyS, meta: true),
+        true,
+      );
+      expect(
+        hasBinding<SaveAllTabsIntent>(map, LogicalKeyboardKey.keyS, meta: true),
+        false,
+      );
+      // No Ctrl variants on macOS.
+      expect(
+        hasBinding<ReopenClosedTabIntent>(
+          map,
+          LogicalKeyboardKey.keyT,
+          control: true,
+          shift: true,
+        ),
+        false,
+      );
+    });
   });
 
   group('appShortcuts (Windows/Linux / useMeta: false)', () {
@@ -199,18 +241,50 @@ void main() {
         expect(jumpIndexFor(map, digitKeys[i], control: true, shift: true), i);
       }
     });
+
+    test('Ctrl+Shift+T reopens closed tab; Ctrl+Alt+S saves all (Wave 3)', () {
+      expect(
+        hasBinding<ReopenClosedTabIntent>(
+          map,
+          LogicalKeyboardKey.keyT,
+          control: true,
+          shift: true,
+        ),
+        true,
+      );
+      expect(
+        hasBinding<SaveAllTabsIntent>(
+          map,
+          LogicalKeyboardKey.keyS,
+          control: true,
+          alt: true,
+        ),
+        true,
+      );
+      expect(
+        hasBinding<SaveAllTabsIntent>(
+          map,
+          LogicalKeyboardKey.keyS,
+          meta: true,
+          alt: true,
+        ),
+        false,
+        reason: 'must NOT bind ⌘ off macOS',
+      );
+    });
   });
 
-  test('each platform map has exactly 31 single-modifier bindings', () {
+  test('each platform map has exactly 33 single-modifier bindings', () {
     // 8 primary (N,W,S,Enter,B,K,E,L) + 2 tab-switch (Ctrl+Tab, Ctrl+Shift+Tab)
-    // + 9 jump-to-tab + 3 panel (Shift+N, Shift+], Shift+[) + 9 jump-to-panel.
-    expect(buildAppShortcuts(useMeta: true).length, 31);
-    expect(buildAppShortcuts(useMeta: false).length, 31);
+    // + 9 jump-to-tab + 3 panel (Shift+N, Shift+], Shift+[) + 9 jump-to-panel
+    // + 2 Wave 3 (Shift+T reopen closed tab, Alt+S save all).
+    expect(buildAppShortcuts(useMeta: true).length, 33);
+    expect(buildAppShortcuts(useMeta: false).length, 33);
   });
 
   test('runtime appShortcuts is non-empty (built for the host platform)', () {
     expect(appShortcuts, isNotEmpty);
-    expect(appShortcuts.length, 31);
+    expect(appShortcuts.length, 33);
   });
 
   group(
