@@ -3,6 +3,9 @@
 // {{var}}. flattenVisibleJsonTree is a pure, unit-testable flatten pass; the
 // widget only caches the expanded-paths set, so callers that want expansion
 // to survive rebuilds must keep passing the same `data` instance.
+// The C2 toolbar (filter + expand/collapse-all) lives in _buildToolbar;
+// filtering unions filter.ancestorPaths into the effective expansion without
+// mutating the user's own _expanded set.
 import 'dart:async';
 import 'dart:convert';
 
@@ -20,13 +23,22 @@ import 'package:getman/features/tabs/presentation/widgets/response/json_tree_fil
 /// [onExtract] (optional) adds an "Extract to {{var}}" action carrying the
 /// node's JSONPath — wired by the response pane to the chaining rules.
 class JsonTreeView extends StatefulWidget {
-  const JsonTreeView({required this.data, this.onExtract, super.key});
+  const JsonTreeView({
+    required this.data,
+    this.onExtract,
+    this.filterFocusNode,
+    super.key,
+  });
 
   /// Already-decoded JSON (object / array / scalar).
   final Object? data;
 
   /// Called with a node's JSONPath when the user picks "Extract to {{var}}".
   final void Function(String jsonPath)? onExtract;
+
+  /// Focus node for the TREE filter field. C1's find button focuses it when
+  /// the body mode is TREE. Owned (created/disposed) by the caller.
+  final FocusNode? filterFocusNode;
 
   @override
   State<JsonTreeView> createState() => _JsonTreeViewState();
@@ -150,14 +162,29 @@ List<JsonTreeNode> flattenVisibleJsonTree({
 class _JsonTreeViewState extends State<JsonTreeView> {
   final Set<String> _expanded = {};
 
-  // Cached flattened rows; invalidated only when data or expansion changes —
-  // not on theme/hover-driven rebuilds.
+  // Cached flattened rows; invalidated only when data, expansion, or the
+  // filter changes — not on theme/hover-driven rebuilds.
   List<JsonTreeNode>? _flat;
+
+  // C2 filter state. The filter walk is recomputed synchronously on each
+  // keystroke — TREE only exists under kLargeResponseViewerChars, so the walk
+  // is bounded. While a filter is active, its ancestorPaths are unioned into
+  // the effective expansion (a transient lens; the user's own expansion set
+  // is restored untouched when the filter clears).
+  final TextEditingController _filterQuery = TextEditingController();
+  JsonTreeFilterResult? _filter;
 
   @override
   void initState() {
     super.initState();
+    _filterQuery.addListener(_onFilterChanged);
     _seedExpansion();
+  }
+
+  @override
+  void dispose() {
+    _filterQuery.dispose();
+    super.dispose();
   }
 
   @override
@@ -167,7 +194,40 @@ class _JsonTreeViewState extends State<JsonTreeView> {
       _expanded.clear();
       _flat = null;
       _seedExpansion();
+      // Re-run the live filter against the new data instance.
+      _filter = _filterQuery.text.trim().isEmpty
+          ? null
+          : filterJsonTree(data: widget.data, query: _filterQuery.text);
     }
+  }
+
+  void _onFilterChanged() {
+    setState(() {
+      _filter = _filterQuery.text.trim().isEmpty
+          ? null
+          : filterJsonTree(data: widget.data, query: _filterQuery.text);
+      _flat = null;
+    });
+  }
+
+  void _expandAll() {
+    final plan = planExpandAll(data: widget.data);
+    setState(() {
+      _expanded
+        ..clear()
+        ..addAll(plan.containerPaths);
+      _flat = null;
+    });
+    if (plan.limitedToDepth) {
+      showAppSnackBar(context, 'Large tree — expanded to depth 3');
+    }
+  }
+
+  void _collapseAll() {
+    setState(() {
+      _expanded.clear();
+      _flat = null;
+    });
   }
 
   /// Expand the root's direct container children so the first level is open.
@@ -224,27 +284,107 @@ class _JsonTreeViewState extends State<JsonTreeView> {
   @override
   Widget build(BuildContext context) {
     final palette = context.appPalette;
+    final layout = context.appLayout;
+    final theme = Theme.of(context);
+    final filter = _filter;
+    final effectiveExpanded = filter == null
+        ? _expanded
+        : {..._expanded, ...filter.ancestorPaths};
     final nodes = _flat ??= flattenVisibleJsonTree(
       data: widget.data,
-      expanded: _expanded,
+      expanded: effectiveExpanded,
+      filter: filter,
     );
 
     return ColoredBox(
       color: palette.codeBackground,
-      child: ListView.builder(
-        primary: false,
-        padding: EdgeInsets.symmetric(vertical: context.appLayout.tabSpacing),
-        itemCount: nodes.length,
-        itemBuilder: (context, i) => _TreeRow(
-          node: nodes[i],
-          expanded: _expanded.contains(nodes[i].path),
-          onToggle: () => _toggle(nodes[i].path),
-          onCopyValue: () => _copyValue(nodes[i]),
-          onCopyPath: () => _copyPath(nodes[i]),
-          onExtract: widget.onExtract == null
-              ? null
-              : () => widget.onExtract!(nodes[i].path),
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildToolbar(context),
+          if (filter != null && filter.truncated)
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: layout.pagePadding),
+              child: Text(
+                'Refine filter to see more',
+                key: const ValueKey('tree_filter_truncated'),
+                style: TextStyle(
+                  fontSize: layout.fontSizeSmall,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+            ),
+          Expanded(
+            child: ListView.builder(
+              primary: false,
+              padding: EdgeInsets.symmetric(vertical: layout.tabSpacing),
+              itemCount: nodes.length,
+              itemBuilder: (context, i) => _TreeRow(
+                node: nodes[i],
+                expanded: effectiveExpanded.contains(nodes[i].path),
+                onToggle: () => _toggle(nodes[i].path),
+                onCopyValue: () => _copyValue(nodes[i]),
+                onCopyPath: () => _copyPath(nodes[i]),
+                onExtract: widget.onExtract == null
+                    ? null
+                    : () => widget.onExtract!(nodes[i].path),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// C2 toolbar: filter field (+ match count suffix) and expand/collapse-all.
+  Widget _buildToolbar(BuildContext context) {
+    final layout = context.appLayout;
+    final filter = _filter;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        layout.pagePadding,
+        layout.tabSpacing,
+        layout.pagePadding,
+        0,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              key: const ValueKey('tree_filter_field'),
+              controller: _filterQuery,
+              focusNode: widget.filterFocusNode,
+              decoration: InputDecoration(
+                hintText: 'FILTER...',
+                isDense: true,
+                prefixIcon: Icon(Icons.search, size: layout.iconSize),
+                suffixText: filter == null
+                    ? null
+                    : (filter.matchCount == 1
+                          ? '1 MATCH'
+                          : '${filter.matchCount} MATCHES'),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            key: const ValueKey('tree_expand_all'),
+            tooltip: 'Expand all',
+            visualDensity: VisualDensity.compact,
+            icon: Icon(Icons.unfold_more, size: layout.iconSize),
+            onPressed: _expandAll,
+          ),
+          IconButton(
+            key: const ValueKey('tree_collapse_all'),
+            tooltip: 'Collapse all',
+            visualDensity: VisualDensity.compact,
+            icon: Icon(Icons.unfold_less, size: layout.iconSize),
+            onPressed: _collapseAll,
+          ),
+        ],
       ),
     );
   }
