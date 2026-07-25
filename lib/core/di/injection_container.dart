@@ -188,9 +188,19 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
       SettingsLocalDataSourceImpl.new,
     )
     // Features - History
-    ..registerLazySingleton(() => HistoryBloc(watchHistoryUseCase: sl()))
+    ..registerLazySingleton(
+      () => HistoryBloc(
+        watchHistoryUseCase: sl(),
+        deleteHistoryEntryUseCase: sl(),
+        clearHistoryUseCase: sl(),
+        restoreHistoryEntriesUseCase: sl(),
+      ),
+    )
     ..registerLazySingleton(() => AddToHistoryUseCase(sl()))
     ..registerLazySingleton(() => WatchHistoryUseCase(sl()))
+    ..registerLazySingleton(() => DeleteHistoryEntryUseCase(sl()))
+    ..registerLazySingleton(() => ClearHistoryUseCase(sl()))
+    ..registerLazySingleton(() => RestoreHistoryEntriesUseCase(sl()))
     ..registerLazySingleton<HistoryRepository>(
       () => HistoryRepositoryImpl(sl()),
     )

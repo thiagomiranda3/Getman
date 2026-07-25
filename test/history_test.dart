@@ -13,8 +13,14 @@ void main() {
   late MockHistoryRepository mockRepository;
   late StreamController<List<HttpRequestConfigEntity>> watchController;
 
-  HistoryBloc buildBloc() =>
-      HistoryBloc(watchHistoryUseCase: WatchHistoryUseCase(mockRepository));
+  HistoryBloc buildBloc() => HistoryBloc(
+    watchHistoryUseCase: WatchHistoryUseCase(mockRepository),
+    deleteHistoryEntryUseCase: DeleteHistoryEntryUseCase(mockRepository),
+    clearHistoryUseCase: ClearHistoryUseCase(mockRepository),
+    restoreHistoryEntriesUseCase: RestoreHistoryEntriesUseCase(
+      mockRepository,
+    ),
+  );
 
   setUp(() {
     mockRepository = MockHistoryRepository();
