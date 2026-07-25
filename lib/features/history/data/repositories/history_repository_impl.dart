@@ -65,6 +65,23 @@ class HistoryRepositoryImpl implements HistoryRepository {
       });
 
   @override
+  Future<void> deleteHistoryEntry(String id) =>
+      guardPersistence(() => localDataSource.deleteFromHistory(id));
+
+  @override
+  Future<void> clearHistory() => guardPersistence(localDataSource.clearHistory);
+
+  @override
+  Future<void> restoreHistoryEntries(List<HttpRequestConfigEntity> entries) =>
+      guardPersistence(() async {
+        // fromEntity preserves the snapshot's sentAt — restore must NOT
+        // re-stamp, or the undone entry would jump to the top as "just sent".
+        await localDataSource.restoreToHistory(
+          entries.map(HttpRequestConfig.fromEntity).toList(),
+        );
+      });
+
+  @override
   Stream<List<HttpRequestConfigEntity>> watchHistory() {
     StreamSubscription<void>? sub;
     Timer? debounce;

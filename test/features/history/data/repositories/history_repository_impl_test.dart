@@ -28,6 +28,25 @@ class _FakeHistoryDataSource implements HistoryLocalDataSource {
 
   @override
   Stream<void> watch() => controller.stream;
+
+  final List<String> deletedIds = [];
+  bool cleared = false;
+  final List<HttpRequestConfig> restored = [];
+
+  @override
+  Future<void> deleteFromHistory(String id) async {
+    deletedIds.add(id);
+  }
+
+  @override
+  Future<void> clearHistory() async {
+    cleared = true;
+  }
+
+  @override
+  Future<void> restoreToHistory(List<HttpRequestConfig> configs) async {
+    restored.addAll(configs);
+  }
 }
 
 void main() {
@@ -97,6 +116,30 @@ void main() {
 
       final list = await repo.watchHistory().first;
       expect(list.map((e) => e.id), ['new', 'old', 'legacy']);
+    },
+  );
+
+  test(
+    'deleteHistoryEntry / clearHistory / restoreHistoryEntries delegate to '
+    'the data source; restore preserves the snapshot sentAt (no re-stamp)',
+    () async {
+      final ds = _FakeHistoryDataSource();
+      final repo = HistoryRepositoryImpl(ds);
+
+      await repo.deleteHistoryEntry('id-1');
+      expect(ds.deletedIds, ['id-1']);
+
+      await repo.clearHistory();
+      expect(ds.cleared, isTrue);
+
+      final snapshot = HttpRequestConfigEntity(
+        id: 'r',
+        url: 'https://r.dev',
+        sentAt: DateTime(2026, 7, 20),
+      );
+      await repo.restoreHistoryEntries([snapshot]);
+      expect(ds.restored.single.id, 'r');
+      expect(ds.restored.single.sentAt, DateTime(2026, 7, 20));
     },
   );
 }

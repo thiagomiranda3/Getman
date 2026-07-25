@@ -1,5 +1,6 @@
 // Thin use-case wrappers over HistoryRepository: append one config (respecting
-// a size limit) and subscribe to the newest-first watch stream.
+// a size limit), delete one entry, clear all, restore deleted snapshots
+// (undo), and subscribe to the newest-first watch stream.
 
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/history/domain/repositories/history_repository.dart';
@@ -15,4 +16,23 @@ class WatchHistoryUseCase {
   WatchHistoryUseCase(this.repository);
   final HistoryRepository repository;
   Stream<List<HttpRequestConfigEntity>> call() => repository.watchHistory();
+}
+
+class DeleteHistoryEntryUseCase {
+  DeleteHistoryEntryUseCase(this.repository);
+  final HistoryRepository repository;
+  Future<void> call(String id) => repository.deleteHistoryEntry(id);
+}
+
+class ClearHistoryUseCase {
+  ClearHistoryUseCase(this.repository);
+  final HistoryRepository repository;
+  Future<void> call() => repository.clearHistory();
+}
+
+class RestoreHistoryEntriesUseCase {
+  RestoreHistoryEntriesUseCase(this.repository);
+  final HistoryRepository repository;
+  Future<void> call(List<HttpRequestConfigEntity> entries) =>
+      repository.restoreHistoryEntries(entries);
 }

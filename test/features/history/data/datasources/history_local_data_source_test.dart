@@ -184,4 +184,71 @@ void main() {
       expect(history.any((c) => c.url == 'https://old-0.com'), isFalse);
     });
   });
+
+  group('deleteFromHistory / clearHistory / restoreToHistory (D3)', () {
+    test(
+      'deleteFromHistory removes only the entry with the given id',
+      () async {
+        final a = makeConfig(url: 'https://a.com');
+        final b = makeConfig(url: 'https://b.com');
+        await dataSource.addToHistory(a, 10);
+        await dataSource.addToHistory(b, 10);
+
+        await dataSource.deleteFromHistory(a.id);
+
+        final history = await dataSource.getHistory();
+        expect(history, hasLength(1));
+        expect(history.single.url, 'https://b.com');
+      },
+    );
+
+    test('deleteFromHistory with an unknown id is a no-op', () async {
+      await dataSource.addToHistory(makeConfig(url: 'https://a.com'), 10);
+      await dataSource.deleteFromHistory('no-such-id');
+      expect(await dataSource.getHistory(), hasLength(1));
+    });
+
+    test(
+      'dedup index stays consistent after a delete (re-add works)',
+      () async {
+        final a = makeConfig(url: 'https://a.com');
+        await dataSource.addToHistory(a, 10);
+        await dataSource.deleteFromHistory(a.id);
+        // Re-adding the same signature must not trip a stale index entry.
+        await dataSource.addToHistory(makeConfig(url: 'https://a.com'), 10);
+        expect(await dataSource.getHistory(), hasLength(1));
+      },
+    );
+
+    test('clearHistory empties the box and later adds still work', () async {
+      await dataSource.addToHistory(makeConfig(url: 'https://a.com'), 10);
+      await dataSource.addToHistory(makeConfig(url: 'https://b.com'), 10);
+
+      await dataSource.clearHistory();
+      expect(await dataSource.getHistory(), isEmpty);
+
+      await dataSource.addToHistory(makeConfig(url: 'https://c.com'), 10);
+      expect((await dataSource.getHistory()).single.url, 'https://c.com');
+    });
+
+    test(
+      'restoreToHistory re-inserts records, skipping signature duplicates',
+      () async {
+        final kept = makeConfig(url: 'https://kept.com');
+        await dataSource.addToHistory(kept, 10);
+
+        final deleted = makeConfig(url: 'https://deleted.com');
+        final duplicateOfKept = makeConfig(url: 'https://kept.com');
+
+        await dataSource.restoreToHistory([deleted, duplicateOfKept]);
+
+        final history = await dataSource.getHistory();
+        expect(history, hasLength(2));
+        expect(
+          history.map((c) => c.url),
+          containsAll(['https://kept.com', 'https://deleted.com']),
+        );
+      },
+    );
+  });
 }
