@@ -1,12 +1,14 @@
 // Widget tests for BodyTabView: the body-type selector switches the active
 // editor and form rows round-trip into config.formFields.
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
@@ -345,5 +347,32 @@ void main() {
     expect(find.text('VARIABLES (JSON)'), findsOneWidget);
     // Two code editors: query + variables.
     expect(find.byType(CodeEditor), findsNWidgets(2));
+  });
+
+  testWidgets('beautify tooltip carries the platform shortcut hint', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+
+    final bloc = await _loadedBloc(
+      repository,
+      sendRequestUseCase,
+      tab(BodyType.raw),
+    );
+    addTearDown(bloc.close);
+
+    final controller = await _pump(tester, bloc, 't');
+    addTearDown(controller.dispose);
+    // Reset within the body: the testWidgets invariant check runs before
+    // addTearDown, and it forbids a leaked foundation debug override.
+    debugDefaultTargetPlatformOverride = null;
+
+    expect(
+      find.byTooltip(
+        'Beautify JSON — '
+        '${shortcutHint(AppShortcutAction.beautifyJson, useMeta: true)}',
+      ),
+      findsOneWidget,
+    );
   });
 }

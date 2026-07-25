@@ -20,6 +20,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -330,6 +331,34 @@ class _UrlBarState extends State<UrlBar> {
                           ? 2.0
                           : (layout.isCompact ? 4.0 : 8.0);
 
+                      // E2: tooltip hints from the one platform-aware source
+                      // (same predicate as buildAppShortcuts — never
+                      // Theme.of(context).platform).
+                      final sendHint = shortcutHint(
+                        AppShortcutAction.send,
+                        useMeta: useMetaShortcuts,
+                      );
+                      final saveHint = shortcutHint(
+                        AppShortcutAction.save,
+                        useMeta: useMetaShortcuts,
+                      );
+                      // Extracted (rather than inlined in the CANCEL Row
+                      // below) so the extra Tooltip nesting doesn't push its
+                      // lines past 80 columns.
+                      final sendingSpinner = SizedBox(
+                        width: layout.smallIconSize,
+                        height: layout.smallIconSize,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: theme.colorScheme.onError,
+                          // Drop the track ring: some themes (AURIS) set a
+                          // circularTrackColor nearly identical to onError,
+                          // so the moving arc blends in and reads as a
+                          // static ring.
+                          backgroundColor: Colors.transparent,
+                        ),
+                      );
+
                       return Row(
                         children: [
                           RequestKindMethodSelector(
@@ -411,88 +440,78 @@ class _UrlBarState extends State<UrlBar> {
                             SizedBox(width: smallGap),
                           ],
                           if (tab.config.kind == RequestKind.http)
-                            context.appDecoration.wrapInteractive(
-                              child: ElevatedButton(
-                                onPressed: tab.isSending
-                                    ? () => context.read<TabsBloc>().add(
-                                        CancelRequest(tab.tabId),
-                                      )
-                                    : () => context.read<TabsBloc>().add(
-                                        _sendEvent(context, tab.tabId),
-                                      ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: tab.isSending
-                                      ? theme.colorScheme.error
-                                      : null,
-                                  foregroundColor: tab.isSending
-                                      ? theme.colorScheme.onError
-                                      : null,
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: isNarrow
-                                        ? 12
-                                        : layout.buttonPaddingHorizontal,
-                                    vertical: isNarrow
-                                        ? 10
-                                        : layout.buttonPaddingVertical,
-                                  ),
-                                  minimumSize: Size.zero,
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 300),
-                                  transitionBuilder: (child, animation) =>
-                                      ScaleTransition(
-                                        scale: animation,
-                                        child: FadeTransition(
-                                          opacity: animation,
-                                          child: child,
-                                        ),
-                                      ),
-                                  child: tab.isSending
-                                      ? Row(
-                                          key: const ValueKey('cancel'),
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            SizedBox(
-                                              width: layout.smallIconSize,
-                                              height: layout.smallIconSize,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color:
-                                                    theme.colorScheme.onError,
-                                                // Drop the track ring: some
-                                                // themes (AURIS) set a
-                                                // circularTrackColor nearly
-                                                // identical to onError, so the
-                                                // moving arc blends in and
-                                                // reads as a static ring.
-                                                backgroundColor:
-                                                    Colors.transparent,
-                                              ),
-                                            ),
-                                            SizedBox(width: isNarrow ? 4 : 8),
-                                            Text(
-                                              isNarrow ? 'STOP' : 'CANCEL',
-                                              style: TextStyle(
-                                                fontSize: layout.fontSizeTitle,
-                                                fontWeight: context
-                                                    .appTypography
-                                                    .displayWeight,
-                                              ),
-                                            ),
-                                          ],
+                            Tooltip(
+                              message: tab.isSending
+                                  ? 'Cancel request'
+                                  : 'Send — $sendHint',
+                              child: context.appDecoration.wrapInteractive(
+                                child: ElevatedButton(
+                                  onPressed: tab.isSending
+                                      ? () => context.read<TabsBloc>().add(
+                                          CancelRequest(tab.tabId),
                                         )
-                                      : Text(
-                                          'SEND',
-                                          key: const ValueKey('send'),
-                                          style: TextStyle(
-                                            fontSize: layout.fontSizeTitle,
-                                            fontWeight: context
-                                                .appTypography
-                                                .displayWeight,
+                                      : () => context.read<TabsBloc>().add(
+                                          _sendEvent(context, tab.tabId),
+                                        ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: tab.isSending
+                                        ? theme.colorScheme.error
+                                        : null,
+                                    foregroundColor: tab.isSending
+                                        ? theme.colorScheme.onError
+                                        : null,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: isNarrow
+                                          ? 12
+                                          : layout.buttonPaddingHorizontal,
+                                      vertical: isNarrow
+                                          ? 10
+                                          : layout.buttonPaddingVertical,
+                                    ),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 300),
+                                    transitionBuilder: (child, animation) =>
+                                        ScaleTransition(
+                                          scale: animation,
+                                          child: FadeTransition(
+                                            opacity: animation,
+                                            child: child,
                                           ),
                                         ),
+                                    child: tab.isSending
+                                        ? Row(
+                                            key: const ValueKey('cancel'),
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              sendingSpinner,
+                                              SizedBox(width: isNarrow ? 4 : 8),
+                                              Text(
+                                                isNarrow ? 'STOP' : 'CANCEL',
+                                                style: TextStyle(
+                                                  fontSize:
+                                                      layout.fontSizeTitle,
+                                                  fontWeight: context
+                                                      .appTypography
+                                                      .displayWeight,
+                                                ),
+                                              ),
+                                            ],
+                                          )
+                                        : Text(
+                                            'SEND',
+                                            key: const ValueKey('send'),
+                                            style: TextStyle(
+                                              fontSize: layout.fontSizeTitle,
+                                              fontWeight: context
+                                                  .appTypography
+                                                  .displayWeight,
+                                            ),
+                                          ),
+                                  ),
                                 ),
                               ),
                             )
@@ -557,8 +576,8 @@ class _UrlBarState extends State<UrlBar> {
                                   size: iconSize,
                                 ),
                                 tooltip: tab.collectionNodeId != null
-                                    ? 'Update Request'
-                                    : 'Save to Collection',
+                                    ? 'Update Request — $saveHint'
+                                    : 'Save to Collection — $saveHint',
                                 onPressed: widget.onSave,
                               ),
                             ),

@@ -6,10 +6,12 @@
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/network/request_kind.dart';
@@ -780,4 +782,75 @@ void main() {
       await tester.pump(const Duration(seconds: 11));
     });
   });
+
+  testWidgets(
+    'SEND and save tooltips carry platform shortcut hints (macOS)',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+
+      const tab = HttpRequestTabEntity(
+        tabId: 'tt1',
+        collectionNodeId: 'node-1', // linked → "Update Request" face
+        config: HttpRequestConfigEntity(id: 'tt1', url: 'https://x.dev'),
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      await _pump(tester, bloc, 'tt1');
+      // Reset within the body: the testWidgets invariant check runs before
+      // addTearDown, and it forbids a leaked foundation debug override.
+      debugDefaultTargetPlatformOverride = null;
+
+      expect(
+        find.byTooltip(
+          'Send — ${shortcutHint(AppShortcutAction.send, useMeta: true)}',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byTooltip(
+          'Update Request — '
+          '${shortcutHint(AppShortcutAction.save, useMeta: true)}',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
+
+  testWidgets(
+    'save tooltip spells Ctrl on non-macOS and unlinked face persists',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+
+      const tab = HttpRequestTabEntity(
+        tabId: 'tt2',
+        config: HttpRequestConfigEntity(id: 'tt2', url: 'https://x.dev'),
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      await _pump(tester, bloc, 'tt2');
+      // Reset within the body: the testWidgets invariant check runs before
+      // addTearDown, and it forbids a leaked foundation debug override.
+      debugDefaultTargetPlatformOverride = null;
+
+      expect(
+        find.byTooltip(
+          'Send — ${shortcutHint(AppShortcutAction.send, useMeta: false)}',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byTooltip(
+          'Save to Collection — '
+          '${shortcutHint(AppShortcutAction.save, useMeta: false)}',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
 }

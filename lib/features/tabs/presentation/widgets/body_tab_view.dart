@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
+import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/tab_variable_context_builder.dart';
@@ -220,6 +221,10 @@ class _RawBodyEditorState extends State<_RawBodyEditor> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
+    final beautifyHint = shortcutHint(
+      AppShortcutAction.beautifyJson,
+      useMeta: useMetaShortcuts,
+    );
     return Stack(
       children: [
         // The variable context rebuilds on env/collection change, recreating
@@ -251,7 +256,7 @@ class _RawBodyEditorState extends State<_RawBodyEditor> {
                 color: theme.colorScheme.secondary,
                 size: layout.isCompact ? 20 : 24,
               ),
-              tooltip: 'Beautify JSON',
+              tooltip: 'Beautify JSON — $beautifyHint',
               onPressed: () async {
                 final messenger = ScaffoldMessenger.of(context);
                 final original = widget.controller.text;
