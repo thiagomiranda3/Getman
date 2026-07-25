@@ -305,24 +305,42 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
     );
   }
 
+  /// Environments keep the ConfirmDialog (bulk destruction of a variable set)
+  /// and gain a 5s UNDO snackbar after (A1). The captured entity is complete
+  /// (variables + secretKeys), so AddEnvironment IS the restore — the bloc's
+  /// name-sorted insert puts it back in place. If the deleted environment was
+  /// active, UNDO also re-activates it.
   void _deleteEnvironment(BuildContext context, EnvironmentEntity env) {
+    final envsBloc = context.read<EnvironmentsBloc>();
+    final settingsBloc = context.read<SettingsBloc>();
+    final messenger = ScaffoldMessenger.of(context);
     unawaited(
       ConfirmDialog.show(
         context,
         title: 'Delete environment?',
-        message:
-            'Deletes "${env.name}" and its variables. This cannot be undone.',
+        message: 'Deletes "${env.name}" and its variables.',
         onConfirm: () {
-          final envsBloc = context.read<EnvironmentsBloc>();
-          final settingsBloc = context.read<SettingsBloc>();
+          final wasActive =
+              settingsBloc.state.settings.activeEnvironmentId == env.id;
           envsBloc.add(DeleteEnvironment(env.id));
-          if (settingsBloc.state.settings.activeEnvironmentId == env.id) {
+          if (wasActive) {
             settingsBloc.add(const UpdateActiveEnvironmentId(null));
           }
           if (_selectedId == env.id) {
             setState(() => _selectedId = null);
           }
-          showAppSnackBar(context, 'Deleted "${env.name}"');
+          showAppSnackBarVia(
+            messenger,
+            'Deleted "${env.name}"',
+            actionLabel: 'UNDO',
+            duration: const Duration(seconds: 5),
+            onAction: () {
+              envsBloc.add(AddEnvironment(env));
+              if (wasActive) {
+                settingsBloc.add(UpdateActiveEnvironmentId(env.id));
+              }
+            },
+          );
         },
       ),
     );

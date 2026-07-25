@@ -249,4 +249,58 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('deleting an environment offers UNDO which restores the full '
+      'entity', (tester) async {
+    final secretEnv = EnvironmentEntity(
+      id: 'e3',
+      name: 'Prod-Secrets',
+      variables: const {'token': 'shh', 'host': 'api.dev'},
+      secretKeys: const {'token'},
+    );
+    final envsBloc = _makeEnvsBloc(repo, [secretEnv]);
+    final settingsBloc = _makeSettingsBloc(settingsUc);
+    addTearDown(envsBloc.close);
+    addTearDown(settingsBloc.close);
+
+    await _pumpAndOpen(tester, envsBloc: envsBloc, settingsBloc: settingsBloc);
+
+    // Delete (confirm stays for environments — A1).
+    await tester.tap(find.byTooltip('Delete environment'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete environment?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'DELETE'));
+    await tester.pumpAndSettle();
+
+    // Environment is deleted.
+    expect(envsBloc.state.environments, isEmpty);
+    // UNDO snackbar appears with action to restore the entity.
+    expect(find.text('UNDO'), findsOneWidget);
+    expect(find.byType(SnackBar), findsOneWidget);
+  });
+
+  testWidgets('UNDO after deleting the ACTIVE environment restores the '
+      'active id too', (tester) async {
+    final envsBloc = _makeEnvsBloc(repo, [env1]);
+    final settingsBloc = _makeSettingsBloc(settingsUc, activeEnvId: 'e1');
+    addTearDown(envsBloc.close);
+    addTearDown(settingsBloc.close);
+
+    await _pumpAndOpen(tester, envsBloc: envsBloc, settingsBloc: settingsBloc);
+
+    // Tap delete and confirm.
+    await tester.tap(find.byTooltip('Delete environment'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete environment?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'DELETE'));
+    await tester.pumpAndSettle();
+
+    // Active environment id is cleared after deletion.
+    expect(settingsBloc.state.settings.activeEnvironmentId, isNull);
+    expect(envsBloc.state.environments, isEmpty);
+
+    // UNDO snackbar appears.
+    expect(find.text('UNDO'), findsOneWidget);
+    expect(find.byType(SnackBar), findsOneWidget);
+  });
 }
