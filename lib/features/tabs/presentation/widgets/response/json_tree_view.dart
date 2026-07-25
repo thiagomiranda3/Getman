@@ -12,6 +12,7 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/utils/json_path.dart';
 import 'package:getman/core/utils/json_path_builder.dart';
+import 'package:getman/features/tabs/presentation/widgets/response/json_tree_filter.dart';
 
 /// A collapsible, virtualized tree view of decoded JSON. Each node offers
 /// copy-value and copy-path (JSONPath) actions; container rows toggle on tap.
@@ -61,15 +62,34 @@ class JsonTreeNode {
 /// Pure (no widget/state deps) so it is unit-testable and benchmarkable, and so
 /// the view can memoize its result across rebuilds that don't change
 /// data/expansion. Paths use [JsonPathBuilder] grammar.
+///
+/// When [filter] is non-null, only kept rows are emitted: matched nodes, their
+/// ancestors, and descendants of matched nodes (so an expanded matched
+/// container still shows its children).
 List<JsonTreeNode> flattenVisibleJsonTree({
   required Object? data,
   required Set<String> expanded,
+  JsonTreeFilterResult? filter,
 }) {
   final out = <JsonTreeNode>[];
 
-  void flatten(Object? value, String path, String label, int depth) {
+  void flatten(
+    Object? value,
+    String path,
+    String label,
+    int depth, {
+    required bool underMatch,
+  }) {
+    final kept =
+        filter == null ||
+        underMatch ||
+        filter.matchedPaths.contains(path) ||
+        filter.ancestorPaths.contains(path);
+    if (!kept) return;
     out.add(JsonTreeNode(path: path, label: label, value: value, depth: depth));
     if (!expanded.contains(path)) return;
+    final childUnderMatch =
+        underMatch || (filter?.matchedPaths.contains(path) ?? false);
     if (value is Map) {
       for (final e in value.entries) {
         flatten(
@@ -77,6 +97,7 @@ List<JsonTreeNode> flattenVisibleJsonTree({
           JsonPathBuilder.appendKey(path, e.key.toString()),
           e.key.toString(),
           depth + 1,
+          underMatch: childUnderMatch,
         );
       }
     } else if (value is List) {
@@ -86,6 +107,7 @@ List<JsonTreeNode> flattenVisibleJsonTree({
           JsonPathBuilder.appendIndex(path, i),
           '[$i]',
           depth + 1,
+          underMatch: childUnderMatch,
         );
       }
     }
@@ -98,6 +120,7 @@ List<JsonTreeNode> flattenVisibleJsonTree({
         JsonPathBuilder.appendKey(JsonPathBuilder.root, e.key.toString()),
         e.key.toString(),
         0,
+        underMatch: false,
       );
     }
   } else if (data is List) {
@@ -107,9 +130,11 @@ List<JsonTreeNode> flattenVisibleJsonTree({
         JsonPathBuilder.appendIndex(JsonPathBuilder.root, i),
         '[$i]',
         0,
+        underMatch: false,
       );
     }
-  } else {
+  } else if (filter == null ||
+      filter.matchedPaths.contains(JsonPathBuilder.root)) {
     out.add(
       JsonTreeNode(
         path: JsonPathBuilder.root,
