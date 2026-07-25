@@ -2,7 +2,9 @@
 // the data source's raw Box.watch() events (a single addToHistory can fire up
 // to ~3 mutations) within an 80ms coalescing window so subscribers see one
 // re-read + emission per burst, not one per mutation; the emitted list is
-// always newest-first (models.reversed).
+// ordered by a stable mergeSort on sentAt descending (nulls/legacy rows
+// last), with the pre-sort `.reversed` (box insertion order) acting as the
+// tie-break for entries with equal or missing timestamps.
 
 import 'dart:async';
 

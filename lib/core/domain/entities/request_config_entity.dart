@@ -8,7 +8,10 @@
 // row-disabling state: disabledParams (query params parked outside the URL
 // with their row position for re-insertion when re-enabled) and
 // disabledHeaderKeys (header keys flagged as disabled; rows stay in headers
-// to preserve insertion order, but are skipped at send/code-gen).
+// to preserve insertion order, but are skipped at send/code-gen). `sentAt`
+// (nullable) is stamped by the history repository at send time and drives
+// the HISTORY tab's day-group headers (D3); it's null for tab/collection
+// configs and for history records persisted before the field existed.
 //
 // Gotchas: copyWith uses a private `_unset` sentinel to distinguish "leave
 // unchanged" from "explicitly set to null" for the nullable response/body
