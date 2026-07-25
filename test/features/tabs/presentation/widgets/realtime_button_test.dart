@@ -316,6 +316,49 @@ void main() {
     },
   );
 
+  testWidgets(
+    'CONNECT excludes disabled headers from the handshake — FIX I2',
+    (tester) async {
+      const tabId = 'rt7';
+      const config = HttpRequestConfigEntity(
+        id: tabId,
+        url: 'ws://example.com',
+        kind: RequestKind.webSocket,
+        headers: {'X-Enabled': '1', 'X-Disabled': '2'},
+        disabledHeaderKeys: {'X-Disabled'},
+      );
+      const tab = HttpRequestTabEntity(tabId: tabId, config: config);
+      final tabsBloc = await _loadedTabsBloc(
+        repository,
+        sendRequestUseCase,
+        tab,
+      );
+      addTearDown(tabsBloc.close);
+
+      final realtimeBloc = _buildRealtimeBloc(tabId: tabId);
+
+      await _pump(
+        tester,
+        tabsBloc: tabsBloc,
+        realtimeBloc: realtimeBloc,
+        tabId: tabId,
+        config: config,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('realtime_connect_button')));
+      await tester.pumpAndSettle();
+
+      final captured = verify(() => realtimeBloc.add(captureAny())).captured;
+      final connectEvent = captured.whereType<Connect>().first;
+      expect(
+        connectEvent.headers.containsKey('X-Disabled'),
+        isFalse,
+        reason: 'a disabled header row must not go out on the handshake',
+      );
+      expect(connectEvent.headers, {'X-Enabled': '1'});
+    },
+  );
+
   testWidgets('no overflow', (tester) async {
     const tabId = 'rt5';
     const config = HttpRequestConfigEntity(

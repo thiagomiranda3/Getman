@@ -245,4 +245,47 @@ void main() {
       );
     },
   );
+
+  testWidgets(
+    'CONNECT excludes disabled headers from the handshake — FIX I2',
+    (tester) async {
+      const tabId = 'mc4';
+      const config = HttpRequestConfigEntity(
+        id: tabId,
+        url: 'https://mcp.dev/',
+        kind: RequestKind.mcp,
+        headers: {'X-Enabled': '1', 'X-Disabled': '2'},
+        disabledHeaderKeys: {'X-Disabled'},
+      );
+      const tab = HttpRequestTabEntity(tabId: tabId, config: config);
+      final tabsBloc = await _loadedTabsBloc(
+        repository,
+        sendRequestUseCase,
+        tab,
+      );
+      addTearDown(tabsBloc.close);
+
+      final mcpBloc = _buildMcpBloc(tabId: tabId);
+
+      await _pump(
+        tester,
+        tabsBloc: tabsBloc,
+        mcpBloc: mcpBloc,
+        tabId: tabId,
+        config: config,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('mcp_connect_button')));
+      await tester.pump();
+
+      final captured = verify(() => mcpBloc.add(captureAny())).captured;
+      final connectEvent = captured.whereType<McpConnectRequested>().first;
+      expect(
+        connectEvent.headers.containsKey('X-Disabled'),
+        isFalse,
+        reason: 'a disabled header row must not go out on the handshake',
+      );
+      expect(connectEvent.headers, {'X-Enabled': '1'});
+    },
+  );
 }

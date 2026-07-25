@@ -62,8 +62,12 @@ class RealtimeButton extends StatelessWidget {
                   tabId: tabId,
                   kind: current.kind,
                   url: EnvironmentResolver.resolve(current.url, vars),
+                  // FIX I2: enabledHeaders (not headers) skips B1's
+                  // user-disabled rows — HTTP send + code-gen already use
+                  // it; the realtime handshake was the one consumer that
+                  // still sent disabled headers unfiltered.
                   headers: EnvironmentResolver.resolveMap(
-                    current.headers,
+                    current.enabledHeaders,
                     vars,
                   ),
                 ),
