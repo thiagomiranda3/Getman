@@ -25,6 +25,10 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/widgets/unresolved_vars_chip.dart';
 import 'package:mocktail/mocktail.dart';
 
+// FIX I3: UnresolvedVarsChip.debounceDuration must match the debounce window
+// used for the keystroke-burst recompute (see the widget's own class doc).
+Duration get _debounce => UnresolvedVarsChip.debounceDuration;
+
 class MockTabsRepository extends Mock implements TabsRepository {}
 
 class MockSendRequestUseCase extends Mock implements SendRequestUseCase {}
@@ -218,4 +222,88 @@ void main() {
     expect(find.text('{{var10}}'), findsNothing);
     expect(find.text('+2 more'), findsOneWidget);
   });
+
+  testWidgets(
+    'shows the count immediately on first mount (no debounce lag for an '
+    'already-unresolved tab)',
+    (tester) async {
+      const tab = HttpRequestTabEntity(
+        tabId: 'v6',
+        config: HttpRequestConfigEntity(id: 'v6', url: '{{base}}/users'),
+      );
+      final bloc = await _loadedBloc(repository, tab);
+      addTearDown(bloc.close);
+
+      await _pump(tester, bloc, 'v6');
+
+      expect(
+        find.byKey(_chipKey),
+        findsOneWidget,
+        reason: 'the very first render must not wait out the debounce',
+      );
+    },
+  );
+
+  testWidgets(
+    'FIX I3: recompute off a keystroke-style config change is debounced — '
+    'the chip lags briefly, then catches up; never blocks/crashes',
+    (tester) async {
+      const tab = HttpRequestTabEntity(
+        tabId: 'v7',
+        config: HttpRequestConfigEntity(
+          id: 'v7',
+          url: 'https://ok.example.com',
+        ),
+      );
+      final bloc = await _loadedBloc(repository, tab);
+      addTearDown(bloc.close);
+
+      await _pump(tester, bloc, 'v7');
+      expect(find.byKey(_chipKey), findsNothing);
+
+      // Simulate a keystroke editing the URL to add an unresolved var.
+      final updated = tab.copyWith(
+        config: tab.config.copyWith(
+          url: 'https://ok.example.com/{{token}}',
+        ),
+      );
+      bloc.add(UpdateTab(updated));
+      await tester.pump(); // let TabsBloc emit; no debounce time has elapsed
+
+      expect(
+        find.byKey(_chipKey),
+        findsNothing,
+        reason:
+            'the collector scan must not run synchronously on the '
+            'keystroke frame — this is the E3 hot-path regression',
+      );
+
+      // Advance past the debounce window in small steps, not one big jump:
+      // AutomatedTestWidgetsFlutterBinding.pump(duration) elapses fake time
+      // BEFORE building any pending frame that arms the timer, so a single
+      // big pump can "use up" the whole window before the debounced
+      // callback ever runs. Small steps let the already-armed timer fire
+      // mid-elapse on a later step and get built within that same step.
+      // (pumpAndSettle doesn't help here either — it stops as soon as one
+      // step schedules no further frame, which is exactly what happens
+      // while a debounce Timer is still ticking in the background.)
+      const step = Duration(milliseconds: 50);
+      var elapsed = Duration.zero;
+      while (elapsed < _debounce + const Duration(milliseconds: 100)) {
+        await tester.pump(step);
+        elapsed += step;
+      }
+
+      expect(
+        find.byKey(_chipKey),
+        findsOneWidget,
+        reason: 'the chip must catch up once typing quiets down',
+      );
+
+      // Flush TabsBloc's own autosave debounce Timer (_scheduleSave, ~10s)
+      // so it doesn't trip the "no pending timers" test invariant — same
+      // flush other tests in this suite perform after an UpdateTab.
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
 }
