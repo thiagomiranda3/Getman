@@ -6,6 +6,23 @@
 // this dialog holds both blocs, so it is the coordinator (bloc-to-bloc
 // coupling is deliberately avoided). AddEnvironment's entity is built here
 // so its id is known before the bloc processes the event.
+//
+// The delete-UNDO snackbar (_deleteEnvironment) is shown via a
+// ScaffoldMessenger hosted INSIDE this dialog's own widget tree (see
+// build() below), never the base page's. This dialog stays open (modal)
+// after a delete, and its modal barrier sits on top of the Overlay entry
+// the base page's Scaffold uses to paint ITS ScaffoldMessenger's snackbars
+// -- so a snackbar shown through the outer/page messenger is visually
+// present but unreachable: taps land on the barrier's render chain, not the
+// snackbar (confirmed by hit-testing; not an animation/timing issue, so
+// extra pumping/dispatch flags never help). Hosting the messenger locally
+// puts the snackbar inside this dialog's OWN overlay entry, above its own
+// barrier, so it stays tappable while the dialog remains open. The wide
+// (AlertDialog) path has no Scaffold of its own, so build() adds a
+// transparent one purely to give the messenger something to paint into --
+// AlertDialog self-centers via Align regardless of that ancestor's size, so
+// there is no visual change. The narrow (fullscreen) path already has its
+// own Scaffold and reuses it directly.
 
 import 'dart:async';
 
@@ -56,32 +73,47 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<EnvironmentsBloc, EnvironmentsState>(
-      buildWhen: (p, n) => p.environments != n.environments,
-      builder: (context, state) {
-        final environments = state.environments;
-        // Reconcile selection with the live list.
-        if (_selectedId != null &&
-            environments.every((e) => e.id != _selectedId)) {
-          _selectedId = null;
-        }
-        final isFullscreen = context.isDialogFullscreen;
-        // Wide: auto-select first so the editor pane shows something.
-        // Narrow: start at the list page; don't auto-push to detail.
-        if (!isFullscreen) {
-          _selectedId ??= environments.isNotEmpty
-              ? environments.first.id
-              : null;
-        }
-        final selected = environments.firstWhereOrNull(
-          (e) => e.id == _selectedId,
-        );
+    // Dialog-local ScaffoldMessenger -- see the file header for why this
+    // exists. `Builder` re-derives `context` below the messenger so every
+    // descendant (including `_deleteEnvironment`'s `ScaffoldMessenger.of`
+    // lookup) resolves THIS messenger, not the base page's.
+    return ScaffoldMessenger(
+      child: Builder(
+        builder: (context) => BlocBuilder<EnvironmentsBloc, EnvironmentsState>(
+          buildWhen: (p, n) => p.environments != n.environments,
+          builder: (context, state) {
+            final environments = state.environments;
+            // Reconcile selection with the live list.
+            if (_selectedId != null &&
+                environments.every((e) => e.id != _selectedId)) {
+              _selectedId = null;
+            }
+            final isFullscreen = context.isDialogFullscreen;
+            // Wide: auto-select first so the editor pane shows something.
+            // Narrow: start at the list page; don't auto-push to detail.
+            if (!isFullscreen) {
+              _selectedId ??= environments.isNotEmpty
+                  ? environments.first.id
+                  : null;
+            }
+            final selected = environments.firstWhereOrNull(
+              (e) => e.id == _selectedId,
+            );
 
-        if (isFullscreen) {
-          return _buildNarrow(context, environments, selected);
-        }
-        return _buildWide(context, environments, selected);
-      },
+            if (isFullscreen) {
+              // Already Scaffold-rooted; that Scaffold is what the
+              // ScaffoldMessenger above needs to host the snackbar.
+              return _buildNarrow(context, environments, selected);
+            }
+            // Bare AlertDialog -- wrap in a transparent Scaffold purely so
+            // the messenger has somewhere to paint (no visual change).
+            return Scaffold(
+              backgroundColor: Colors.transparent,
+              body: _buildWide(context, environments, selected),
+            );
+          },
+        ),
+      ),
     );
   }
 

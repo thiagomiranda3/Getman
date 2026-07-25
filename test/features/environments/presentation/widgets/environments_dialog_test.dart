@@ -4,7 +4,13 @@
 //   a full EnvironmentEntity (not just a name);
 // - deleting the active environment confirms via ConfirmDialog then dispatches
 //   UpdateActiveEnvironmentId(null) on SettingsBloc;
-// - deleting a non-active env does NOT touch the active id.
+// - deleting a non-active env does NOT touch the active id;
+// - deleting any environment offers a real, TAPPABLE UNDO snackbar (while
+//   the dialog stays open) that restores the full entity (incl. secretKeys)
+//   and re-activates it when it was active -- these tap `find.text('UNDO')`
+//   with a plain tester.tap (no warnIfMissed/retargeting), which is the
+//   regression coverage for the dialog-barrier-swallows-the-tap defect;
+// - closing the dialog with a snackbar still pending does not crash.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -272,11 +278,18 @@ void main() {
     await tester.tap(find.widgetWithText(TextButton, 'DELETE'));
     await tester.pumpAndSettle();
 
-    // Environment is deleted.
+    // Environment is deleted; UNDO snackbar appears with an action to
+    // restore the entity. The dialog stays open (modal) throughout — the
+    // snackbar must be hosted so this tap actually lands (regression for the
+    // dialog-barrier-swallows-the-tap defect).
     expect(envsBloc.state.environments, isEmpty);
-    // UNDO snackbar appears with action to restore the entity.
     expect(find.text('UNDO'), findsOneWidget);
-    expect(find.byType(SnackBar), findsOneWidget);
+
+    await tester.tap(find.text('UNDO'));
+    await tester.pumpAndSettle();
+
+    expect(envsBloc.state.environments.single, secretEnv);
+    expect(envsBloc.state.environments.single.secretKeys, {'token'});
   });
 
   testWidgets('UNDO after deleting the ACTIVE environment restores the '
@@ -299,8 +312,72 @@ void main() {
     expect(settingsBloc.state.settings.activeEnvironmentId, isNull);
     expect(envsBloc.state.environments, isEmpty);
 
-    // UNDO snackbar appears.
-    expect(find.text('UNDO'), findsOneWidget);
-    expect(find.byType(SnackBar), findsOneWidget);
+    await tester.tap(find.text('UNDO'));
+    await tester.pumpAndSettle();
+
+    expect(envsBloc.state.environments.single.id, 'e1');
+    expect(settingsBloc.state.settings.activeEnvironmentId, 'e1');
   });
+
+  testWidgets(
+    'delete shows the UNDO snackbar hosted INSIDE the still-open dialog '
+    '(not behind its modal barrier)',
+    (tester) async {
+      final envsBloc = _makeEnvsBloc(repo, [env1]);
+      final settingsBloc = _makeSettingsBloc(settingsUc);
+      addTearDown(envsBloc.close);
+      addTearDown(settingsBloc.close);
+
+      await _pumpAndOpen(
+        tester,
+        envsBloc: envsBloc,
+        settingsBloc: settingsBloc,
+      );
+
+      await tester.tap(find.byTooltip('Delete environment'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'DELETE'));
+      await tester.pumpAndSettle();
+
+      // The dialog is still open (its title/CLOSE action are present) AND
+      // the snackbar is visible — both must be true simultaneously for the
+      // snackbar to be reachable at all.
+      expect(find.text('ENVIRONMENTS'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, 'CLOSE'), findsOneWidget);
+      expect(find.text('UNDO'), findsOneWidget);
+      expect(find.byType(SnackBar), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'closing the dialog right after a delete does not crash while the UNDO '
+    'snackbar is still pending',
+    (tester) async {
+      final envsBloc = _makeEnvsBloc(repo, [env1]);
+      final settingsBloc = _makeSettingsBloc(settingsUc);
+      addTearDown(envsBloc.close);
+      addTearDown(settingsBloc.close);
+
+      await _pumpAndOpen(
+        tester,
+        envsBloc: envsBloc,
+        settingsBloc: settingsBloc,
+      );
+
+      await tester.tap(find.byTooltip('Delete environment'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'DELETE'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('UNDO'), findsOneWidget);
+
+      // Close the dialog (its own ScaffoldMessenger + pending snackbar
+      // timer get disposed with it) well before the 5s snackbar duration
+      // elapses.
+      await tester.tap(find.widgetWithText(TextButton, 'CLOSE'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
