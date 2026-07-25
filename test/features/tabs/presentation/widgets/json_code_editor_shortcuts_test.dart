@@ -1,3 +1,5 @@
+import 'dart:isolate';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,13 +30,40 @@ void main() {
     test(
       'CANARY: re_editor default DOES bind the chord to singleLineComment '
       '(if this fails after an upgrade, the strip below is obsolete)',
-      () {
-        // macOS: Meta+/
-        debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      () async {
+        // re_editor's DefaultCodeShortcutsActivatorsBuilder picks its map
+        // via a top-level `kIsMacOS` (re_editor's `_consts.dart`) that
+        // memoizes on first read for the lifetime of the isolate — once any
+        // earlier call in THIS isolate has resolved it (e.g. the `copy` test
+        // above), flipping debugDefaultTargetPlatformOverride and calling
+        // `defaults.build` again keeps returning the first-resolved
+        // platform's map. Each platform check below runs in its own fresh
+        // `Isolate.run`, which gets a pristine, correctly-resolved cache, so
+        // both platforms are genuinely exercised.
+        final macActivators = await Isolate.run(() {
+          debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+          return const DefaultCodeShortcutsActivatorsBuilder().build(
+            CodeShortcutType.singleLineComment,
+          );
+        });
         expect(
-          defaults.build(CodeShortcutType.singleLineComment),
-          isNotEmpty,
-          reason: 'defaults should include slash bindings on macOS',
+          macActivators,
+          contains(
+            const SingleActivator(LogicalKeyboardKey.slash, meta: true),
+          ),
+        );
+
+        final winActivators = await Isolate.run(() {
+          debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+          return const DefaultCodeShortcutsActivatorsBuilder().build(
+            CodeShortcutType.singleLineComment,
+          );
+        });
+        expect(
+          winActivators,
+          contains(
+            const SingleActivator(LogicalKeyboardKey.slash, control: true),
+          ),
         );
       },
     );
