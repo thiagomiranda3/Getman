@@ -32,6 +32,8 @@ AppPalette aurisPalette(AurisScheme scheme) {
     variableResolved: scheme.successBright,
     variableUnresolved: scheme.dangerBright,
     selectorActive: scheme.primaryActive,
+    findMatchHighlight: scheme.primaryActive.withValues(alpha: 0.3),
+    findMatchActiveHighlight: scheme.primaryActive.withValues(alpha: 0.65),
     diffAddedBackground: scheme.success.withValues(alpha: 0.12),
     diffAddedForeground: scheme.successBright,
     diffRemovedBackground: scheme.danger.withValues(alpha: 0.12),

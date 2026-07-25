@@ -20,6 +20,8 @@ void main() {
     variableResolved: Color(0xFF16A34A),
     variableUnresolved: Color(0xFFDC2626),
     selectorActive: Color(0xFF6D28D9),
+    findMatchHighlight: Color(0x4D6D28D9),
+    findMatchActiveHighlight: Color(0xA66D28D9),
     diffAddedBackground: Color(0x2216A34A),
     diffAddedForeground: Color(0xFF16A34A),
     diffRemovedBackground: Color(0x22DC2626),
@@ -125,6 +127,31 @@ void main() {
       expect(end.diffRemovedForeground, const Color(0xFF000000));
       expect(end.diffAddedBackground, const Color(0xFF000000));
       expect(end.diffRemovedBackground, const Color(0xFF000000));
+    });
+
+    test('copyWith preserves and overrides find-match colors', () {
+      final preserved = palette.copyWith(
+        codeBackground: const Color(0xFF222222),
+      );
+      expect(preserved.findMatchHighlight, const Color(0x4D6D28D9));
+      expect(preserved.findMatchActiveHighlight, const Color(0xA66D28D9));
+
+      final overridden = palette.copyWith(
+        findMatchHighlight: const Color(0x3300FF00),
+        findMatchActiveHighlight: const Color(0xAA00FF00),
+      );
+      expect(overridden.findMatchHighlight, const Color(0x3300FF00));
+      expect(overridden.findMatchActiveHighlight, const Color(0xAA00FF00));
+    });
+
+    test('lerp interpolates the find-match colors', () {
+      final other = palette.copyWith(
+        findMatchHighlight: const Color(0xFF000000),
+        findMatchActiveHighlight: const Color(0xFF000000),
+      );
+      final end = palette.lerp(other, 1);
+      expect(end.findMatchHighlight, const Color(0xFF000000));
+      expect(end.findMatchActiveHighlight, const Color(0xFF000000));
     });
   });
 }

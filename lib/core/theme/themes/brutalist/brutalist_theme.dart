@@ -103,6 +103,12 @@ ThemeData brutalistTheme(
     selectorActive: isDark
         ? BrutalistPalette.secondaryDark
         : BrutalistPalette.secondary,
+    findMatchHighlight:
+        (isDark ? BrutalistPalette.secondaryDark : BrutalistPalette.secondary)
+            .withValues(alpha: 0.3),
+    findMatchActiveHighlight:
+        (isDark ? BrutalistPalette.secondaryDark : BrutalistPalette.secondary)
+            .withValues(alpha: 0.65),
     diffAddedForeground: Colors.green.shade700,
     diffAddedBackground: Colors.green.shade700.withValues(alpha: 0.14),
     diffRemovedForeground: Colors.red.shade700,

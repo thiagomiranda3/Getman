@@ -97,6 +97,8 @@ ThemeData editorialTheme(
     variableResolved: EditorialPalette.statusAccentSuccess,
     variableUnresolved: EditorialPalette.statusAccentError,
     selectorActive: EditorialPalette.accent,
+    findMatchHighlight: EditorialPalette.accent.withValues(alpha: 0.3),
+    findMatchActiveHighlight: EditorialPalette.accent.withValues(alpha: 0.65),
     diffAddedForeground: EditorialPalette.statusSuccess,
     diffAddedBackground: EditorialPalette.statusSuccess.withValues(alpha: 0.12),
     diffRemovedForeground: EditorialPalette.statusError,

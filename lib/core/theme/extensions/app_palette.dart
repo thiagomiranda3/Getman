@@ -18,6 +18,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.variableResolved,
     required this.variableUnresolved,
     required this.selectorActive,
+    required this.findMatchHighlight,
+    required this.findMatchActiveHighlight,
     required this.diffAddedBackground,
     required this.diffAddedForeground,
     required this.diffRemovedBackground,
@@ -40,6 +42,15 @@ class AppPalette extends ThemeExtension<AppPalette> {
   /// Pair with [Color]-derived contrast text via
   /// `ThemeData.estimateBrightnessForColor`.
   final Color selectorActive;
+
+  /// Background tint behind a find/filter match in the windowed plain-text
+  /// find view (large responses). Derived from the same accent as
+  /// [selectorActive], at low alpha, in every theme.
+  final Color findMatchHighlight;
+
+  /// Stronger background tint behind the *current* find match — the one the
+  /// n/N counter points at. Same hue as [findMatchHighlight], higher alpha.
+  final Color findMatchActiveHighlight;
 
   /// Subtle tint behind a line that is present only on the diff target (added).
   final Color diffAddedBackground;
@@ -98,6 +109,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? variableResolved,
     Color? variableUnresolved,
     Color? selectorActive,
+    Color? findMatchHighlight,
+    Color? findMatchActiveHighlight,
     Color? diffAddedBackground,
     Color? diffAddedForeground,
     Color? diffRemovedBackground,
@@ -116,6 +129,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
       variableResolved: variableResolved ?? this.variableResolved,
       variableUnresolved: variableUnresolved ?? this.variableUnresolved,
       selectorActive: selectorActive ?? this.selectorActive,
+      findMatchHighlight: findMatchHighlight ?? this.findMatchHighlight,
+      findMatchActiveHighlight:
+          findMatchActiveHighlight ?? this.findMatchActiveHighlight,
       diffAddedBackground: diffAddedBackground ?? this.diffAddedBackground,
       diffAddedForeground: diffAddedForeground ?? this.diffAddedForeground,
       diffRemovedBackground:
@@ -161,6 +177,16 @@ class AppPalette extends ThemeExtension<AppPalette> {
         t,
       )!,
       selectorActive: Color.lerp(selectorActive, other.selectorActive, t)!,
+      findMatchHighlight: Color.lerp(
+        findMatchHighlight,
+        other.findMatchHighlight,
+        t,
+      )!,
+      findMatchActiveHighlight: Color.lerp(
+        findMatchActiveHighlight,
+        other.findMatchActiveHighlight,
+        t,
+      )!,
       diffAddedBackground: Color.lerp(
         diffAddedBackground,
         other.diffAddedBackground,

@@ -121,6 +121,8 @@ ThemeData rpgTheme(
     variableResolved: RpgPalette.statusSuccess,
     variableUnresolved: RpgPalette.statusError,
     selectorActive: RpgPalette.gold,
+    findMatchHighlight: RpgPalette.gold.withValues(alpha: 0.3),
+    findMatchActiveHighlight: RpgPalette.gold.withValues(alpha: 0.65),
     diffAddedForeground: RpgPalette.statusSuccess,
     diffAddedBackground: RpgPalette.statusSuccess.withValues(alpha: 0.16),
     diffRemovedForeground: RpgPalette.statusError,

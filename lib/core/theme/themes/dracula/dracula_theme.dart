@@ -125,6 +125,8 @@ ThemeData draculaTheme(
         ? DraculaPalette.variableUnresolvedDark
         : DraculaPalette.variableUnresolvedLight,
     selectorActive: currentPrimary,
+    findMatchHighlight: currentPrimary.withValues(alpha: 0.3),
+    findMatchActiveHighlight: currentPrimary.withValues(alpha: 0.65),
     diffAddedForeground: isDark
         ? DraculaPalette.statusSuccessDark
         : DraculaPalette.statusSuccessLight,
