@@ -386,8 +386,12 @@ class _CollectionsListState extends State<CollectionsList> {
                           size: layout.iconSize,
                           color: theme.colorScheme.onSurface,
                         ),
-                        tooltip: 'Collapse all',
-                        onPressed: _collapseAll,
+                        tooltip: _searchController.text.isNotEmpty
+                            ? 'Collapse all (clear search first)'
+                            : 'Collapse all',
+                        onPressed: _searchController.text.isNotEmpty
+                            ? null
+                            : _collapseAll,
                       ),
                     ),
                   ],
