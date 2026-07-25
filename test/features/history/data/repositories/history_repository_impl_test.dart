@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/features/history/data/datasources/history_local_data_source.dart';
 import 'package:getman/features/history/data/models/request_config_model.dart';
 import 'package:getman/features/history/data/repositories/history_repository_impl.dart';
+import 'package:hive_ce/hive.dart';
 
 class _FakeHistoryDataSource implements HistoryLocalDataSource {
   // Test-only broadcast controller; each test cancels its subscription or uses
@@ -140,6 +143,107 @@ void main() {
       await repo.restoreHistoryEntries([snapshot]);
       expect(ds.restored.single.id, 'r');
       expect(ds.restored.single.sentAt, DateTime(2026, 7, 20));
+    },
+  );
+
+  group(
+    'D3 critical fix: unique id per history record (delete targets exactly '
+    'one row) — real Hive-backed data source, not the fake',
+    () {
+      late Directory tempDir;
+      late HistoryLocalDataSourceImpl realDataSource;
+
+      setUp(() async {
+        tempDir = await Directory.systemTemp.createTemp(
+          'getman_history_repo_id_test',
+        );
+        Hive.init(tempDir.path);
+        if (!Hive.isAdapterRegistered(1)) {
+          Hive.registerAdapter(HttpRequestConfigAdapter());
+        }
+        await Hive.openBox<HttpRequestConfig>(HiveBoxes.history);
+        realDataSource = HistoryLocalDataSourceImpl();
+      });
+
+      tearDown(() async {
+        await Hive.deleteFromDisk();
+        if (tempDir.existsSync()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      test(
+        'two addToHistory calls from the SAME source id (a tab '
+        'edited-and-resent — different urls) produce rows with DISTINCT '
+        'minted ids, and both survive',
+        () async {
+          final repo = HistoryRepositoryImpl(realDataSource);
+
+          await repo.addToHistory(
+            const HttpRequestConfigEntity(id: 'tab-1', url: 'https://a.dev'),
+            10,
+          );
+          await repo.addToHistory(
+            const HttpRequestConfigEntity(id: 'tab-1', url: 'https://b.dev'),
+            10,
+          );
+
+          final stored = await realDataSource.getHistory();
+          expect(stored, hasLength(2));
+          expect(stored[0].id, isNot(stored[1].id));
+        },
+      );
+
+      test(
+        'deleteHistoryEntry(rowB.id) removes exactly rowB — the sibling '
+        'row minted from the same source id is untouched',
+        () async {
+          final repo = HistoryRepositoryImpl(realDataSource);
+
+          await repo.addToHistory(
+            const HttpRequestConfigEntity(id: 'tab-1', url: 'https://a.dev'),
+            10,
+          );
+          await repo.addToHistory(
+            const HttpRequestConfigEntity(id: 'tab-1', url: 'https://b.dev'),
+            10,
+          );
+
+          final rowB = (await realDataSource.getHistory()).firstWhere(
+            (c) => c.url == 'https://b.dev',
+          );
+
+          await repo.deleteHistoryEntry(rowB.id);
+
+          final remaining = await realDataSource.getHistory();
+          expect(remaining, hasLength(1));
+          expect(remaining.single.url, 'https://a.dev');
+        },
+      );
+
+      test(
+        'restoreHistoryEntries keeps the captured id verbatim — undo must '
+        'reinsert the exact deleted record, not a re-minted one',
+        () async {
+          final repo = HistoryRepositoryImpl(realDataSource);
+
+          await repo.addToHistory(
+            const HttpRequestConfigEntity(id: 'tab-1', url: 'https://a.dev'),
+            10,
+          );
+          final before = await realDataSource.getHistory();
+          final mintedId = before.single.id;
+          final snapshot = before.single.toEntity();
+
+          await repo.deleteHistoryEntry(mintedId);
+          expect(await realDataSource.getHistory(), isEmpty);
+
+          await repo.restoreHistoryEntries([snapshot]);
+
+          final restored = await realDataSource.getHistory();
+          expect(restored.single.id, mintedId);
+        },
+      );
     },
   );
 }

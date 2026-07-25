@@ -19,6 +19,13 @@ abstract class HistoryLocalDataSource {
   Future<void> addToHistory(HttpRequestConfig config, int limit);
 
   /// Deletes the record whose model `id` equals [id]. No-op if absent.
+  ///
+  /// `id` is unique across the box: every stored row is minted a fresh id
+  /// at write time by `HistoryRepositoryImpl.addToHistory` (never the
+  /// source entity's id — a resent tab would otherwise share its id across
+  /// every row), so at most one record can ever match. restoreToHistory is
+  /// the one path that reinstates a caller-supplied id verbatim (an UNDO
+  /// must reinsert the exact deleted record).
   Future<void> deleteFromHistory(String id);
 
   /// Removes every record.

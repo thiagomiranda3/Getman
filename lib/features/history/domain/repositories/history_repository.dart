@@ -8,7 +8,10 @@ abstract class HistoryRepository {
   Future<void> addToHistory(HttpRequestConfigEntity config, int limit);
 
   /// Deletes the entry whose config id equals [id] (instant delete; UNDO
-  /// re-inserts via [restoreHistoryEntries]).
+  /// re-inserts via [restoreHistoryEntries]). [id] must be the id of a
+  /// STORED history entry (as returned by [watchHistory]), not the
+  /// originating tab/request id — addToHistory mints a fresh, row-unique id
+  /// for every persisted record, so this deletes exactly one row.
   Future<void> deleteHistoryEntry(String id);
 
   /// Removes the entire history (CLEAR ALL).
