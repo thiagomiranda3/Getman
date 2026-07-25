@@ -23,6 +23,9 @@
 //   is unsupported on web.
 // - Closed-tab reopen stack (_closedTabs) is in-memory only (max 10) — never
 //   persist it.
+// - CloseSavedTabs (A3) bulk-closes every non-dirty tab of a panel via
+//   TabDirtyChecker against the event-carried savedConfigs index, pushing
+//   each onto the same reopen stack.
 import 'dart:async';
 import 'dart:developer';
 
@@ -41,6 +44,7 @@ import 'package:getman/core/utils/perf_trace.dart';
 import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';
 import 'package:getman/features/chaining/domain/logic/rules_runner.dart';
 import 'package:getman/features/chaining/domain/usecases/request_rules_usecases.dart';
+import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/entities/response_history_entry.dart';
@@ -66,6 +70,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     on<CloseOtherTabs>(_onCloseOtherTabs);
     on<CloseTabsToTheRight>(_onCloseTabsToTheRight);
     on<CloseTabsToTheLeft>(_onCloseTabsToTheLeft);
+    on<CloseSavedTabs>(_onCloseSavedTabs);
     on<DuplicateTab>(_onDuplicateTab);
     on<ReopenClosedTab>(_onReopenClosedTab);
     on<SendRequest>(_onSendRequest);
@@ -87,6 +92,10 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   final GetRequestRulesUseCase? _getRequestRulesUseCase;
 
   final RequestManager _requests = RequestManager();
+
+  /// Pure dirtiness check for CloseSavedTabs (same class the widgets read via
+  /// RepositoryProvider — const, no state).
+  static const TabDirtyChecker _dirtyChecker = TabDirtyChecker();
 
   /// Tabs edited since the last flush. The debounce timer persists only these
   /// (via `putTab`), never the whole list — full rewrites serialize every
@@ -504,6 +513,43 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final updated = active.copyWith(
       tabs: kept,
       activeTabId: activeKept ? active.activeTabId : kept.first.tabId,
+    );
+    emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
+    _dirtyTabIds.removeAll(removedIds);
+    await _guardWrite(() => _repository.deleteTabs(removedIds));
+    await _persistPanel(updated);
+  }
+
+  /// "CLOSE SAVED TABS": close every non-dirty tab of the panel, in one pass,
+  /// pushing each onto the reopen stack with its visual index. Dirty tabs are
+  /// untouched; if the active tab closes, the first kept tab takes over.
+  Future<void> _onCloseSavedTabs(
+    CloseSavedTabs event,
+    Emitter<TabsState> emit,
+  ) async {
+    final panel = state.panels.byId(event.panelId);
+    if (panel == null || panel.tabs.isEmpty) return;
+
+    final kept = <HttpRequestTabEntity>[];
+    final removedIds = <String>[];
+    for (var i = 0; i < panel.tabs.length; i++) {
+      final t = panel.tabs[i];
+      if (_dirtyChecker(tab: t, savedConfigs: event.savedConfigs)) {
+        kept.add(t);
+        continue;
+      }
+      _pushClosedTab(t, panel.id, i);
+      _requests.cancelAndFinish(t.tabId);
+      removedIds.add(t.tabId);
+    }
+    if (removedIds.isEmpty) return;
+
+    final activeKept = kept.any((t) => t.tabId == panel.activeTabId);
+    final updated = panel.copyWith(
+      tabs: kept,
+      activeTabId: kept.isEmpty
+          ? ''
+          : (activeKept ? panel.activeTabId : kept.first.tabId),
     );
     emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     _dirtyTabIds.removeAll(removedIds);

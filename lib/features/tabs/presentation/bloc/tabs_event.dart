@@ -3,6 +3,7 @@
 // Identity-addressed by tabId/panelId except SetActiveIndex/ReorderTabs
 // (position is the operation) — see tabs_bloc.dart for the invariants.
 // ReopenClosedTab (no payload) pops TabsBloc's in-memory closed-tab stack.
+// CloseSavedTabs bulk-closes every non-dirty tab of a panel onto that stack.
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/http_response.dart';
@@ -208,4 +209,16 @@ class MoveTabToNewPanel extends TabsEvent {
 /// to Cmd/Ctrl+Shift+T and the tab-chip context menu.
 class ReopenClosedTab extends TabsEvent {
   const ReopenClosedTab();
+}
+
+/// Closes every NON-dirty tab in [panelId] ("CLOSE SAVED TABS" — A3). Never
+/// prompts; each closed tab is pushed onto the reopen stack. [savedConfigs]
+/// is the dispatcher-resolved id→config index from CollectionsState — the
+/// bloc holds no collections reference, same pattern as [SendRequest.envVars].
+class CloseSavedTabs extends TabsEvent {
+  const CloseSavedTabs({required this.panelId, required this.savedConfigs});
+  final String panelId;
+  final Map<String, HttpRequestConfigEntity> savedConfigs;
+  @override
+  List<Object?> get props => [panelId, savedConfigs];
 }
