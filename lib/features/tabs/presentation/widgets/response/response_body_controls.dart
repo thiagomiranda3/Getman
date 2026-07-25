@@ -1,10 +1,11 @@
-// The response-body action-button row (Find / Copy / Save-to-file / Compare /
-// Save-as-example), shared by the small and large body views. Find (C1) only
-// renders when the caller passes `onFind` — the parent owns per-mode dispatch
-// (editor CodeFindPanel / TREE filter focus / windowed large-body find).
-// Compare builds its candidate list from saved examples, matching history,
-// and this tab's own response time-travel; Save-as-example only appears once
-// the tab is linked to a collection node and a response exists to capture.
+// The response-body action-button row (Find / Copy / Copy-as-bug-report /
+// Save-to-file / Compare / Save-as-example), shared by the small and large
+// body views. Find (C1) only renders when the caller passes `onFind` — the
+// parent owns per-mode dispatch (editor CodeFindPanel / TREE filter focus /
+// windowed large-body find). Compare builds its candidate list from saved
+// examples, matching history, and this tab's own response time-travel;
+// Save-as-example only appears once the tab is linked to a collection node
+// and a response exists to capture.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -16,6 +17,7 @@ import 'package:getman/core/ui/widgets/compare_target_picker.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/ui/widgets/response_diff_view.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
+import 'package:getman/core/utils/bug_report_composer.dart';
 import 'package:getman/core/utils/json_file_io.dart';
 import 'package:getman/core/utils/response_diff_builder.dart';
 import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
@@ -23,15 +25,19 @@ import 'package:getman/features/collections/domain/logic/collections_tree_helper
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
+import 'package:getman/features/environments/domain/logic/active_environment_helper.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/history/presentation/bloc/history_state.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:uuid/uuid.dart';
 
 /// The action-button cluster shown in both the small and large response-body
-/// views: find (optional), copy, save-to-file, compare, and save-as-example.
+/// views: find (optional), copy, copy-as-bug-report, save-to-file, compare,
+/// and save-as-example.
 ///
 /// Each conditional button keeps its existing `BlocBuilder` + `buildWhen` gate
 /// — these gates are load-bearing for performance and must not be widened or
@@ -138,6 +144,68 @@ class ResponseBodyControls extends StatelessWidget {
       icon: Icon(Icons.copy_all_outlined, size: context.appLayout.iconSize),
       onPressed: copyEnabled ? () => _copyBody(context) : null,
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Copy as bug report (C5)
+  // ---------------------------------------------------------------------------
+
+  /// Rendered only when a response exists; the payload is composed at click
+  /// time from live bloc state (config, response, and the active environment
+  /// chain — env overlays collection, same layering as url_bar).
+  Widget _bugReportButton(BuildContext context) {
+    return BlocBuilder<TabsBloc, TabsState>(
+      buildWhen: (prev, next) =>
+          (prev.tabs.byId(tabId)?.response == null) !=
+          (next.tabs.byId(tabId)?.response == null),
+      builder: (context, state) {
+        if (state.tabs.byId(tabId)?.response == null) {
+          return const SizedBox.shrink();
+        }
+        return IconButton(
+          key: const ValueKey('copy_bug_report_button'),
+          tooltip: 'Copy as bug report',
+          visualDensity: VisualDensity.compact,
+          icon: Icon(
+            Icons.bug_report_outlined,
+            size: context.appLayout.iconSize,
+          ),
+          onPressed: () => _copyBugReport(context),
+        );
+      },
+    );
+  }
+
+  Future<void> _copyBugReport(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    // Re-read at press time so the bundle matches what is on screen.
+    final tab = context.read<TabsBloc>().state.tabs.byId(tabId);
+    final response = tab?.response;
+    if (tab == null || response == null) return;
+
+    final envState = context.read<EnvironmentsBloc>().state;
+    final settings = context.read<SettingsBloc>().state.settings;
+    final env = ActiveEnvironmentHelper.activeEnvironment(
+      envState.environments,
+      settings.activeEnvironmentId,
+    );
+    final nodeId = tab.collectionNodeId;
+    final collected = nodeId == null
+        ? (variables: const <String, String>{}, secretKeys: const <String>{})
+        : CollectionsTreeHelper.collectVariables(
+            context.read<CollectionsBloc>().state.collections,
+            nodeId,
+          );
+
+    final report = BugReportComposer.compose(
+      config: tab.config,
+      response: response,
+      // Environment overlays collection (env wins) — same layering as send.
+      variables: {...collected.variables, ...env?.variables ?? const {}},
+      secretKeys: {...collected.secretKeys, ...env?.secretKeys ?? const {}},
+    );
+    await Clipboard.setData(ClipboardData(text: report));
+    showAppSnackBarVia(messenger, 'Bug report copied');
   }
 
   // ---------------------------------------------------------------------------
@@ -424,6 +492,7 @@ class ResponseBodyControls extends StatelessWidget {
         if (onFind != null) _findButton(context),
         if (onToggleWordWrap != null) _wrapToggleButton(context),
         _copyButton(context),
+        _bugReportButton(context),
         _saveButton(context),
         _compareButton(context),
         _saveAsExampleButton(context),
