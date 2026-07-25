@@ -218,4 +218,51 @@ void main() {
       });
     },
   );
+
+  group('C3: copy affordance under every theme dataRow override', () {
+    const overridingThemes = [
+      kBrutalistThemeId,
+      kEditorialThemeId,
+      kRpgThemeId,
+      kDraculaThemeId,
+      kGlassThemeId,
+      kAurisThemeId,
+    ];
+
+    for (final themeId in overridingThemes) {
+      testWidgets('hover copy copies the header value under $themeId', (
+        tester,
+      ) async {
+        final clips = _mockClipboard(tester);
+        await _pumpHeaders(
+          tester,
+          headers: {'content-type': 'application/json'},
+          themeId: themeId,
+        );
+        await _hoverAndCopyFirstRow(tester);
+        expect(clips, ['application/json'], reason: 'theme: $themeId');
+      });
+    }
+
+    // AURIS delegates to the external AurisDataRow kit widget, so the
+    // selectability contract is only asserted for the in-repo bespoke rows.
+    for (final themeId in overridingThemes.where(
+      (id) => id != kAurisThemeId,
+    )) {
+      testWidgets('label and value are selectable under $themeId', (
+        tester,
+      ) async {
+        await _pumpHeaders(
+          tester,
+          headers: {'content-type': 'application/json'},
+          themeId: themeId,
+        );
+        expect(
+          find.byType(SelectableText),
+          findsNWidgets(2),
+          reason: 'theme: $themeId',
+        );
+      });
+    }
+  });
 }

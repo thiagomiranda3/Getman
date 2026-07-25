@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/extensions/app_components.dart';
 import 'package:getman/core/theme/extensions/app_components_defaults.dart';
+import 'package:getman/core/ui/widgets/hover_copy_row.dart';
 
 AppComponents brutalistComponents({bool reduceEffects = false}) {
   return defaultAppComponents().copyWith(
@@ -390,7 +391,7 @@ class _FanfoldRow extends StatelessWidget {
   }
 }
 
-// --- printed data row ----------------------------------------------------
+// --- dataRow: printed row (wrapped in HoverCopyRow for C3 copy) ----------
 class BrutalPrintedRow extends StatelessWidget {
   const BrutalPrintedRow({
     required this.label,
@@ -405,52 +406,55 @@ class BrutalPrintedRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: theme.dividerColor,
-            width: layout.borderThin,
+    return HoverCopyRow(
+      value: value,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: theme.dividerColor,
+              width: layout.borderThin,
+            ),
           ),
         ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: theme.primaryColor,
-              border: Border.all(
-                color: theme.dividerColor,
-                width: layout.borderThin,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: theme.primaryColor,
+                border: Border.all(
+                  color: theme.dividerColor,
+                  width: layout.borderThin,
+                ),
+              ),
+              child: SelectableText(
+                label,
+                style: TextStyle(
+                  color: theme.colorScheme.onPrimary,
+                  fontWeight: context.appTypography.titleWeight,
+                  fontSize: layout.fontSizeSmall,
+                ),
               ),
             ),
-            child: Text(
-              label,
-              style: TextStyle(
-                color: theme.colorScheme.onPrimary,
-                fontWeight: context.appTypography.titleWeight,
-                fontSize: layout.fontSizeSmall,
+            Expanded(
+              child: SelectableText(
+                value,
+                style: TextStyle(
+                  fontFamily: context.appTypography.codeFontFamily,
+                  fontSize: layout.fontSizeNormal,
+                  fontWeight: highlight
+                      ? context.appTypography.titleWeight
+                      : null,
+                  color: theme.colorScheme.onSurface,
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: SelectableText(
-              value,
-              style: TextStyle(
-                fontFamily: context.appTypography.codeFontFamily,
-                fontSize: layout.fontSizeNormal,
-                fontWeight: highlight
-                    ? context.appTypography.titleWeight
-                    : null,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

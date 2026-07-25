@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/extensions/app_components.dart';
 import 'package:getman/core/theme/extensions/app_components_defaults.dart';
+import 'package:getman/core/ui/widgets/hover_copy_row.dart';
 
 AppComponents editorialComponents() {
   return defaultAppComponents().copyWith(
@@ -393,7 +394,7 @@ class _DispatchRow extends StatelessWidget {
   }
 }
 
-// --- dataRow: reference row ------------------------------------------------
+// --- dataRow: reference row (wrapped in HoverCopyRow for C3 copy) ---------
 // A small-caps key + readable value, with a hairline rule between rows.
 
 class ReferenceRow extends StatelessWidget {
@@ -411,46 +412,49 @@ class ReferenceRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: theme.dividerColor.withValues(alpha: 0.3),
-            width: layout.borderThin,
+    return HoverCopyRow(
+      value: value,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: theme.dividerColor.withValues(alpha: 0.3),
+              width: layout.borderThin,
+            ),
           ),
         ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              fontFamily: context.appTypography.codeFontFamily,
-              color: theme.colorScheme.secondary,
-              fontSize: layout.fontSizeSmall,
-              fontWeight: context.appTypography.bodyWeight,
-              letterSpacing: 1.5,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: SelectableText(
-              value,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SelectableText(
+              label.toUpperCase(),
               style: TextStyle(
                 fontFamily: context.appTypography.codeFontFamily,
-                fontSize: layout.fontSizeNormal,
-                fontWeight: highlight
-                    ? context.appTypography.titleWeight
-                    : null,
-                color: highlight
-                    ? theme.primaryColor
-                    : theme.colorScheme.onSurface,
+                color: theme.colorScheme.secondary,
+                fontSize: layout.fontSizeSmall,
+                fontWeight: context.appTypography.bodyWeight,
+                letterSpacing: 1.5,
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: SelectableText(
+                value,
+                style: TextStyle(
+                  fontFamily: context.appTypography.codeFontFamily,
+                  fontSize: layout.fontSizeNormal,
+                  fontWeight: highlight
+                      ? context.appTypography.titleWeight
+                      : null,
+                  color: highlight
+                      ? theme.primaryColor
+                      : theme.colorScheme.onSurface,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

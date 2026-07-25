@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/extensions/app_components.dart';
 import 'package:getman/core/theme/extensions/app_components_defaults.dart';
+import 'package:getman/core/ui/widgets/hover_copy_row.dart';
 
 /// True when an [AurisScheme] is present on the active theme. Every `Auris*`
 /// widget force-unwraps `Theme.of(context).extension<AurisScheme>()!`, so the
@@ -367,7 +368,7 @@ Widget _aurisLogView(
 }
 
 // ---------------------------------------------------------------------------
-// dataRow  →  AurisDataRow
+// dataRow  →  AurisDataRow (wrapped in HoverCopyRow for C3 copy)
 // ---------------------------------------------------------------------------
 
 Widget _aurisDataRow(
@@ -376,7 +377,12 @@ Widget _aurisDataRow(
   required String value,
   bool highlight = false,
 }) {
-  return AurisDataRow(label: label, value: value, highlight: highlight);
+  // AurisDataRow is an external kit widget — the C3 copy affordance wraps it
+  // (fallback path already carries it via the default slot).
+  return HoverCopyRow(
+    value: value,
+    child: AurisDataRow(label: label, value: value, highlight: highlight),
+  );
 }
 
 // ---------------------------------------------------------------------------
