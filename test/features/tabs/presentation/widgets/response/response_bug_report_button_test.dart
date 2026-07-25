@@ -6,6 +6,7 @@ import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/theme/theme_ids.dart';
 import 'package:getman/core/theme/theme_registry.dart';
+import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
@@ -70,6 +71,7 @@ HttpRequestTabEntity _tabWith({HttpResponseEntity? response}) {
 Future<void> _pump(
   WidgetTester tester, {
   required HttpRequestTabEntity tab,
+  List<CollectionNodeEntity> collections = const [],
 }) async {
   final env = EnvironmentEntity(
     id: 'env-1',
@@ -87,7 +89,8 @@ Future<void> _pump(
           create: (_) => _FakeTabsBloc(TabsState(tabs: [tab])),
         ),
         BlocProvider<CollectionsBloc>(
-          create: (_) => _FakeCollectionsBloc(CollectionsState()),
+          create: (_) =>
+              _FakeCollectionsBloc(CollectionsState(collections: collections)),
         ),
         BlocProvider<HistoryBloc>(
           create: (_) => _FakeHistoryBloc(const HistoryState()),
@@ -186,4 +189,67 @@ void main() {
     expect(find.text('Bug report copied'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3));
   });
+
+  testWidgets(
+    'collection-only secret (absent from the env) stays masked in the bundle',
+    (tester) async {
+      final clips = _mockClipboard(tester);
+      const tab = HttpRequestTabEntity(
+        tabId: _tabId,
+        collectionNodeId: 'req-1',
+        config: HttpRequestConfigEntity(
+          id: 'cfg-bug-collection',
+          url: 'https://{{host}}/login',
+          headers: {
+            'X-Token': 'Bearer {{token}}',
+            'X-Api-Key': '{{apiKey}}',
+          },
+        ),
+        response: HttpResponseEntity(
+          statusCode: 200,
+          body: '{"ok":true}',
+          headers: {'content-type': 'application/json'},
+          durationMs: 34,
+        ),
+      );
+      await _pump(
+        tester,
+        tab: tab,
+        collections: const [
+          CollectionNodeEntity(
+            id: 'folder-1',
+            name: 'Collection',
+            // apiKey is collection-scoped and secret-flagged; it is NOT
+            // present in the active environment at all — so this exercises
+            // collectVariables' secretKeys union in isolation.
+            variables: {'apiKey': 'collection-secret-value'},
+            secretKeys: {'apiKey'},
+            children: [
+              CollectionNodeEntity(
+                id: 'req-1',
+                name: 'Login',
+                isFolder: false,
+                config: HttpRequestConfigEntity(id: 'req-1'),
+              ),
+            ],
+          ),
+        ],
+      );
+
+      expect(buttonFinder, findsOneWidget);
+      await tester.tap(buttonFinder);
+      await tester.pump();
+
+      expect(clips, hasLength(1));
+      final report = clips.single;
+      expect(report, contains('X-Api-Key: •••'));
+      expect(report, isNot(contains('collection-secret-value')));
+      // The env-sourced secret is still masked too (env layers over
+      // collection, but both layers must mask their own secrets).
+      expect(report, contains('X-Token: Bearer •••'));
+      expect(report, isNot(contains('super-secret-token')));
+
+      await tester.pump(const Duration(seconds: 3));
+    },
+  );
 }
