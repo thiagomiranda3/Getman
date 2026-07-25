@@ -18,6 +18,8 @@
 // (CodeFindController — this widget creates/disposes it, matching
 // JsonCodeEditor's caller-owned findController contract). `_findActive`
 // resets on every new body so a stale find session never survives a re-send.
+// Word-wrap is a per-tab session override (_wordWrapOverride) layered over
+// the mode default.
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show compute;
@@ -133,6 +135,18 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
   String? _largeBody;
   bool _showFullPreview = false;
   bool _highlightingOptedIn = false;
+
+  // C4: per-tab session word-wrap override. null = mode default (wrap ON for
+  // normal responses, OFF for the opted-in large editor — today's forced
+  // behavior). Session-only: never persisted, survives re-sends while this
+  // tab's view state is alive.
+  bool? _wordWrapOverride;
+
+  bool get _effectiveWordWrap => _wordWrapOverride ?? !_highlightingOptedIn;
+
+  void _toggleWordWrap() {
+    setState(() => _wordWrapOverride = !_effectiveWordWrap);
+  }
 
   // C1 find-everywhere state. _editorFindController drives the editor's
   // CodeFindPanel (PRETTY/RAW/opted-in large; caller-owned per
@@ -470,6 +484,11 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
               tabId: widget.tabId,
               getCopyableText: _copyableText,
               onFind: _onFindPressed,
+              // Text modes only — TREE has no wrapping concept.
+              wordWrap: _mode == _BodyMode.tree ? null : _effectiveWordWrap,
+              onToggleWordWrap: _mode == _BodyMode.tree
+                  ? null
+                  : _toggleWordWrap,
             ),
           ],
         ),
@@ -494,7 +513,7 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
       child: JsonCodeEditor(
         controller: widget.responseController,
         readOnly: true,
-        wordWrap: !_highlightingOptedIn,
+        wordWrap: _effectiveWordWrap,
         findController: _editorFindController,
       ),
     );
@@ -520,6 +539,10 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
             tabId: widget.tabId,
             getCopyableText: _copyableText,
             onFind: _onFindPressed,
+            // Only the opted-in editor wraps; the plain SelectableText view
+            // always soft-wraps, so the toggle is hidden there.
+            wordWrap: _highlightingOptedIn ? _effectiveWordWrap : null,
+            onToggleWordWrap: _highlightingOptedIn ? _toggleWordWrap : null,
           ),
         ),
         // Body — editor when opted-in, plain text otherwise. Kept here so the

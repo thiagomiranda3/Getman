@@ -45,6 +45,8 @@ class ResponseBodyControls extends StatelessWidget {
     required this.tabId,
     required this.getCopyableText,
     this.onFind,
+    this.wordWrap,
+    this.onToggleWordWrap,
     super.key,
   });
 
@@ -58,6 +60,14 @@ class ResponseBodyControls extends StatelessWidget {
   /// CodeFindPanel / TREE filter focus / windowed large-body find).
   final VoidCallback? onFind;
 
+  /// Current word-wrap state shown by the toggle. Only meaningful when
+  /// [onToggleWordWrap] is non-null.
+  final bool? wordWrap;
+
+  /// Toggles word wrap in the host's editor. Null hides the toggle entirely
+  /// (non-text modes: TREE, large plain-text, media without an editor).
+  final VoidCallback? onToggleWordWrap;
+
   // ---------------------------------------------------------------------------
   // Find (C1)
   // ---------------------------------------------------------------------------
@@ -69,6 +79,22 @@ class ResponseBodyControls extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       icon: Icon(Icons.search, size: context.appLayout.iconSize),
       onPressed: onFind,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Word wrap (C4) — session-only view option owned by the host view.
+  // ---------------------------------------------------------------------------
+
+  Widget _wrapToggleButton(BuildContext context) {
+    final wrapOn = wordWrap ?? true;
+    return IconButton(
+      key: const ValueKey('word_wrap_toggle_button'),
+      tooltip: wrapOn ? 'Word wrap: on' : 'Word wrap: off',
+      visualDensity: VisualDensity.compact,
+      isSelected: wrapOn,
+      icon: Icon(Icons.wrap_text, size: context.appLayout.iconSize),
+      onPressed: onToggleWordWrap,
     );
   }
 
@@ -369,6 +395,7 @@ class ResponseBodyControls extends StatelessWidget {
     return Wrap(
       children: [
         if (onFind != null) _findButton(context),
+        if (onToggleWordWrap != null) _wrapToggleButton(context),
         _copyButton(context),
         _saveButton(context),
         _compareButton(context),
