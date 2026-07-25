@@ -21,6 +21,8 @@
 // - Keeps a narrowly-scoped `flutter/foundation.dart` import (justified
 //   `// ignore: avoid_flutter_imports`) only for `compute`, since Isolate.run
 //   is unsupported on web.
+// - Closed-tab reopen stack (_closedTabs) is in-memory only (max 10) — never
+//   persist it.
 import 'dart:async';
 import 'dart:developer';
 
@@ -65,6 +67,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     on<CloseTabsToTheRight>(_onCloseTabsToTheRight);
     on<CloseTabsToTheLeft>(_onCloseTabsToTheLeft);
     on<DuplicateTab>(_onDuplicateTab);
+    on<ReopenClosedTab>(_onReopenClosedTab);
     on<SendRequest>(_onSendRequest);
     on<ViewResponseHistoryEntry>(_onViewResponseHistoryEntry);
     on<CancelRequest>(_onCancelRequest);
@@ -93,6 +96,38 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   static const Uuid _uuid = Uuid();
 
   static const _saveDebounce = Duration(seconds: 10);
+
+  /// LIFO stack of recently closed tabs (A2 reopen). In-memory ONLY — lost on
+  /// quit by design (session restore already preserves open tabs across
+  /// restarts; this covers the in-session "oops"). Never persisted.
+  final List<({HttpRequestTabEntity tab, String panelId, int stripIndex})>
+  _closedTabs = [];
+
+  static const int _closedTabsMax = 10;
+
+  /// Whether ⌘⇧T / the REOPEN CLOSED TAB menu entry has anything to restore.
+  // Read-only menu-enablement query, not a bloc mutation entry point — the
+  // rule's "notify via add" guidance doesn't apply to a plain state read.
+  // ignore: avoid_public_bloc_methods
+  bool get canReopenClosedTab => _closedTabs.isNotEmpty;
+
+  /// Push a just-closed tab (with its stored strip position). Dirty tabs
+  /// closed via DISCARD arrive with their dirty content — pushed as-is; that
+  /// is the point. isSending is sanitized: no request survives the close.
+  void _pushClosedTab(
+    HttpRequestTabEntity tab,
+    String panelId,
+    int stripIndex,
+  ) {
+    _closedTabs.add((
+      tab: tab.isSending ? tab.copyWith(isSending: false) : tab,
+      panelId: panelId,
+      stripIndex: stripIndex,
+    ));
+    if (_closedTabs.length > _closedTabsMax) {
+      _closedTabs.removeAt(0);
+    }
+  }
 
   /// Bodies at or below this run the post-response rules inline; larger bodies
   /// decode + evaluate on a background isolate (`compute`). The threshold sits
@@ -336,6 +371,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     _requests.cancelAndFinish(event.tabId);
 
     final removedIdx = owner.tabs.indexWhere((t) => t.tabId == event.tabId);
+    _pushClosedTab(owner.tabs[removedIdx], owner.id, removedIdx);
     final remaining = [...owner.tabs]..removeAt(removedIdx);
     var updated = owner.copyWith(tabs: remaining);
     // Re-point activeTabId only when the closed tab was active. An emptied
@@ -406,12 +442,14 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     if (active.tabs.length <= 1) return;
     final keep = active.tabs.byId(event.tabId);
     if (keep == null) return;
-    final removedIds =
-        active.tabs
-            .where((t) => t.tabId != event.tabId)
-            .map((t) => t.tabId)
-            .toList(growable: false)
-          ..forEach(_requests.cancelAndFinish);
+    final removedIds = <String>[];
+    for (var i = 0; i < active.tabs.length; i++) {
+      final t = active.tabs[i];
+      if (t.tabId == event.tabId) continue;
+      _pushClosedTab(t, active.id, i);
+      _requests.cancelAndFinish(t.tabId);
+      removedIds.add(t.tabId);
+    }
     final updated = active.copyWith(tabs: [keep], activeTabId: keep.tabId);
     emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     _dirtyTabIds.removeAll(removedIds);
@@ -428,12 +466,13 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final index = active.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index == -1 || index >= active.tabs.length - 1) return;
     final kept = active.tabs.sublist(0, index + 1);
-    final removedIds =
-        active.tabs
-            .sublist(index + 1)
-            .map((t) => t.tabId)
-            .toList(growable: false)
-          ..forEach(_requests.cancelAndFinish);
+    final removedIds = <String>[];
+    for (var i = index + 1; i < active.tabs.length; i++) {
+      final t = active.tabs[i];
+      _pushClosedTab(t, active.id, i);
+      _requests.cancelAndFinish(t.tabId);
+      removedIds.add(t.tabId);
+    }
     final activeKept = kept.any((t) => t.tabId == active.activeTabId);
     final updated = active.copyWith(
       tabs: kept,
@@ -454,12 +493,13 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final index = active.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index <= 0) return;
     final kept = active.tabs.sublist(index);
-    final removedIds =
-        active.tabs
-            .sublist(0, index)
-            .map((t) => t.tabId)
-            .toList(growable: false)
-          ..forEach(_requests.cancelAndFinish);
+    final removedIds = <String>[];
+    for (var i = 0; i < index; i++) {
+      final t = active.tabs[i];
+      _pushClosedTab(t, active.id, i);
+      _requests.cancelAndFinish(t.tabId);
+      removedIds.add(t.tabId);
+    }
     final activeKept = kept.any((t) => t.tabId == active.activeTabId);
     final updated = active.copyWith(
       tabs: kept,
@@ -491,6 +531,45 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     await _guardWrite(() => _repository.putTab(dup));
     await _persistPanel(updated);
+  }
+
+  /// Pop the reopen stack: restore into the original panel if it still
+  /// exists, else the active panel; clamp the stored index; make it the
+  /// active tab AND activate the owning panel (a reopen the user can't see
+  /// isn't a reopen). Linked-node dedup mirrors _onAddTab. Empty stack is a
+  /// bloc no-op — the dispatcher (MainScreen action / menu enablement)
+  /// handles the "Nothing to reopen" surface; no Flutter imports here.
+  Future<void> _onReopenClosedTab(
+    ReopenClosedTab event,
+    Emitter<TabsState> emit,
+  ) async {
+    if (_closedTabs.isEmpty || state.panels.isEmpty) return;
+    final record = _closedTabs.removeLast();
+
+    final nodeId = record.tab.collectionNodeId;
+    if (nodeId != null) {
+      for (final p in state.panels) {
+        final existing = p.tabs.firstWhereOrNull(
+          (t) => t.collectionNodeId == nodeId,
+        );
+        if (existing != null) {
+          final updated = p.copyWith(activeTabId: existing.tabId);
+          emit(_derive(_replacePanel(state.panels, updated), p.id));
+          await _persistPanel(updated);
+          await _persistPanelMeta();
+          return;
+        }
+      }
+    }
+
+    final target = state.panels.byId(record.panelId) ?? _activePanel;
+    final index = record.stripIndex.clamp(0, target.tabs.length);
+    final tabs = [...target.tabs]..insert(index, record.tab);
+    final updated = target.copyWith(tabs: tabs, activeTabId: record.tab.tabId);
+    emit(_derive(_replacePanel(state.panels, updated), updated.id));
+    await _guardWrite(() => _repository.putTab(record.tab));
+    await _persistPanel(updated);
+    await _persistPanelMeta();
   }
 
   Future<void> _onSendRequest(
@@ -734,7 +813,9 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final idx = state.panels.indexWhere((p) => p.id == event.panelId);
     if (idx == -1) return;
     final removed = state.panels[idx];
-    for (final t in removed.tabs) {
+    for (var i = 0; i < removed.tabs.length; i++) {
+      final t = removed.tabs[i];
+      _pushClosedTab(t, removed.id, i); // visual order
       _requests.cancelAndFinish(t.tabId);
       _dirtyTabIds.remove(t.tabId);
     }

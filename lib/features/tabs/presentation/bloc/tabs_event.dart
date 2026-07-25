@@ -2,6 +2,7 @@
 // variants), send/cancel, response time-travel, and panel CRUD/move events.
 // Identity-addressed by tabId/panelId except SetActiveIndex/ReorderTabs
 // (position is the operation) — see tabs_bloc.dart for the invariants.
+// ReopenClosedTab (no payload) pops TabsBloc's in-memory closed-tab stack.
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/http_response.dart';
@@ -200,4 +201,11 @@ class MoveTabToNewPanel extends TabsEvent {
   final String? name;
   @override
   List<Object?> get props => [tabId, name];
+}
+
+/// Restores the most recently closed tab (LIFO, in-memory, max 10 — see
+/// TabsBloc._closedTabs). No payload: the stack itself is the state. Bound
+/// to Cmd/Ctrl+Shift+T and the tab-chip context menu.
+class ReopenClosedTab extends TabsEvent {
+  const ReopenClosedTab();
 }

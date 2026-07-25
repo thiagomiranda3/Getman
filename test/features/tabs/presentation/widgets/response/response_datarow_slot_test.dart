@@ -15,6 +15,9 @@ import 'package:getman/features/tabs/presentation/widgets/response/response_head
 // Lightweight fake — only exposes `state`.
 class _FakeTabsBloc extends Bloc<TabsEvent, TabsState> implements TabsBloc {
   _FakeTabsBloc(super.initialState);
+
+  @override
+  bool get canReopenClosedTab => false;
 }
 
 const _kTabId = 'tab-test';
