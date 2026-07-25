@@ -1,8 +1,10 @@
-// The response-body action-button row (Copy / Save-to-file / Compare /
-// Save-as-example), shared by the small and large body views. Compare builds
-// its candidate list from saved examples, matching history, and this tab's
-// own response time-travel; Save-as-example only appears once the tab is
-// linked to a collection node and a response exists to capture.
+// The response-body action-button row (Find / Copy / Save-to-file / Compare /
+// Save-as-example), shared by the small and large body views. Find (C1) only
+// renders when the caller passes `onFind` — the parent owns per-mode dispatch
+// (editor CodeFindPanel / TREE filter focus / windowed large-body find).
+// Compare builds its candidate list from saved examples, matching history,
+// and this tab's own response time-travel; Save-as-example only appears once
+// the tab is linked to a collection node and a response exists to capture.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -29,7 +31,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:uuid/uuid.dart';
 
 /// The action-button cluster shown in both the small and large response-body
-/// views: copy, save-to-file, compare, and save-as-example.
+/// views: find (optional), copy, save-to-file, compare, and save-as-example.
 ///
 /// Each conditional button keeps its existing `BlocBuilder` + `buildWhen` gate
 /// — these gates are load-bearing for performance and must not be widened or
@@ -42,6 +44,7 @@ class ResponseBodyControls extends StatelessWidget {
   const ResponseBodyControls({
     required this.tabId,
     required this.getCopyableText,
+    this.onFind,
     super.key,
   });
 
@@ -49,6 +52,25 @@ class ResponseBodyControls extends StatelessWidget {
 
   /// Returns the text that Copy and Save-to-file should use.
   final String Function() getCopyableText;
+
+  /// C1 find-everywhere hook: when non-null, a magnifier button leads the
+  /// cluster and invokes it. The parent dispatches per body mode (editor
+  /// CodeFindPanel / TREE filter focus / windowed large-body find).
+  final VoidCallback? onFind;
+
+  // ---------------------------------------------------------------------------
+  // Find (C1)
+  // ---------------------------------------------------------------------------
+
+  Widget _findButton(BuildContext context) {
+    return IconButton(
+      key: const ValueKey('response_find_button'),
+      tooltip: 'Find in response',
+      visualDensity: VisualDensity.compact,
+      icon: Icon(Icons.search, size: context.appLayout.iconSize),
+      onPressed: onFind,
+    );
+  }
 
   // ---------------------------------------------------------------------------
   // Copy
@@ -346,6 +368,7 @@ class ResponseBodyControls extends StatelessWidget {
     // overflowing when the response pane is dragged very narrow.
     return Wrap(
       children: [
+        if (onFind != null) _findButton(context),
         _copyButton(context),
         _saveButton(context),
         _compareButton(context),
