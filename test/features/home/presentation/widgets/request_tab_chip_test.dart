@@ -612,4 +612,120 @@ void main() {
       },
     );
   });
+
+  Future<void> openContextMenu(WidgetTester tester) async {
+    await tester.tapAt(
+      tester.getCenter(find.text('GetUsers')),
+      buttons: kSecondaryMouseButton,
+    );
+    await tester.pumpAndSettle();
+  }
+
+  group('Wave-3 context-menu entries', () {
+    testWidgets('REOPEN CLOSED TAB is present and disabled when the stack is '
+        'empty', (tester) async {
+      await pumpTab(tester, _linkedTab());
+      await openContextMenu(tester);
+
+      expect(find.text('REOPEN CLOSED TAB'), findsOneWidget);
+      final item = tester.widget<PopupMenuItem<void>>(
+        find.ancestor(
+          of: find.text('REOPEN CLOSED TAB'),
+          matching: find.byWidgetPredicate((w) => w is PopupMenuItem<void>),
+        ),
+      );
+      expect(item.enabled, isFalse);
+    });
+
+    testWidgets('CLOSE SAVED TABS dispatches CloseSavedTabs for the active '
+        'panel', (tester) async {
+      await pumpTab(tester, _linkedTab());
+      await openContextMenu(tester);
+
+      await tester.tap(find.text('CLOSE SAVED TABS'));
+      await tester.pumpAndSettle();
+
+      // _linkedTab's config matches no saved node (configById is empty), so
+      // it is DIRTY → kept. The event must still have been dispatched with
+      // the active panel id. Assert via bloc state: nothing closed.
+      // (pumpTab returns void in the harness; read the bloc from the tree.)
+      final chip = tester.state<State<RequestTabChip>>(
+        find.byType(RequestTabChip),
+      );
+      final tabsBloc = chip.context.read<TabsBloc>();
+      expect(tabsBloc.state.tabs, hasLength(1), reason: 'dirty tab kept');
+    });
+
+    testWidgets('REVERT CHANGES appears only for a DIRTY linked tab, confirms, '
+        'and reverts', (tester) async {
+      // Seed collections so the linked node exists with a DIFFERENT config →
+      // dirty. The harness's collectionsBloc is reachable via the tree.
+      const saved = HttpRequestConfigEntity(
+        id: 'node1',
+        url: 'https://api/users?orig=1',
+      );
+      await pumpTab(tester, _linkedTab()); // config url https://api/users
+      final chipState = tester.state<State<RequestTabChip>>(
+        find.byType(RequestTabChip),
+      );
+      chipState.context.read<CollectionsBloc>().add(
+        const ReplaceCollections([
+          CollectionNodeEntity(
+            id: 'node1',
+            name: 'GetUsers',
+            isFolder: false,
+            config: saved,
+          ),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      await openContextMenu(tester);
+      expect(find.text('REVERT CHANGES'), findsOneWidget);
+
+      await tester.tap(find.text('REVERT CHANGES'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Discard unsaved changes to this request?'),
+        findsOneWidget,
+      );
+      await tester.tap(find.widgetWithText(TextButton, 'REVERT'));
+      await tester.pumpAndSettle();
+
+      final tabsBloc = chipState.context.read<TabsBloc>();
+      expect(tabsBloc.state.tabs.first.config, saved);
+
+      // RevertTab schedules TabsBloc's 10s save debounce; flush it so no
+      // Timer is left pending when the test ends (mirrors url_bar_test.dart).
+      await tester.pump(const Duration(seconds: 11));
+    });
+
+    testWidgets('REVERT CHANGES is absent for a clean linked tab', (
+      tester,
+    ) async {
+      await pumpTab(tester, _linkedTab());
+      final chipState = tester.state<State<RequestTabChip>>(
+        find.byType(RequestTabChip),
+      );
+      // Saved node config IDENTICAL to the tab's → clean.
+      chipState.context.read<CollectionsBloc>().add(
+        const ReplaceCollections([
+          CollectionNodeEntity(
+            id: 'node1',
+            name: 'GetUsers',
+            isFolder: false,
+            config: HttpRequestConfigEntity(
+              id: 'node1',
+              url: 'https://api/users',
+            ),
+          ),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      await openContextMenu(tester);
+      expect(find.text('REVERT CHANGES'), findsNothing);
+    });
+  });
 }

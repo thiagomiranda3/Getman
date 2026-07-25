@@ -3,7 +3,10 @@
 // Hover shows a delayed tooltip card with the full title/URL. Right-click (or
 // two-finger tap) opens a context menu with CLOSE / CLOSE OTHERS / CLOSE TO
 // THE LEFT|RIGHT (each gated behind an unsaved-changes confirm when any
-// affected tab is dirty) / DUPLICATE / COPY URL / MOVE TO PANEL.
+// affected tab is dirty) / CLOSE SAVED TABS (bulk-closes non-dirty tabs onto
+// the reopen stack, never prompts) / REOPEN CLOSED TAB (disabled when the
+// stack is empty) / DUPLICATE / COPY URL / REVERT CHANGES (dirty linked tabs
+// only, confirms before discarding) / MOVE TO PANEL.
 
 import 'dart:async';
 
@@ -487,6 +490,13 @@ class _RequestTabChipState extends State<RequestTabChip>
     final theme = Theme.of(context);
     final layout = context.appLayout;
     final tabsBloc = context.read<TabsBloc>();
+    final savedConfig = tab.collectionNodeId == null
+        ? null
+        : context
+              .read<CollectionsBloc>()
+              .state
+              .configById[tab.collectionNodeId];
+    final canRevert = savedConfig != null && tab.config != savedConfig;
 
     unawaited(
       showMenu<void>(
@@ -550,6 +560,37 @@ class _RequestTabChipState extends State<RequestTabChip>
               'CLOSE TO THE RIGHT',
             ),
           ),
+          PopupMenuItem(
+            key: const ValueKey('tab_context_close_saved'),
+            onTap: () {
+              final savedConfigs = context
+                  .read<CollectionsBloc>()
+                  .state
+                  .configById;
+              tabsBloc.add(
+                CloseSavedTabs(
+                  panelId: tabsBloc.state.activePanelId,
+                  savedConfigs: savedConfigs,
+                ),
+              );
+            },
+            child: _buildMenuItem(
+              context,
+              Icons.done_all,
+              'CLOSE SAVED TABS',
+            ),
+          ),
+          PopupMenuItem(
+            key: const ValueKey('tab_context_reopen_closed'),
+            enabled: tabsBloc.canReopenClosedTab,
+            onTap: () => tabsBloc.add(const ReopenClosedTab()),
+            child: _buildMenuItem(
+              context,
+              Icons.restore_page_outlined,
+              'REOPEN CLOSED TAB',
+              enabled: tabsBloc.canReopenClosedTab,
+            ),
+          ),
           const PopupMenuDivider(),
           PopupMenuItem(
             onTap: () {
@@ -565,6 +606,34 @@ class _RequestTabChipState extends State<RequestTabChip>
             },
             child: _buildMenuItem(context, Icons.link, 'COPY URL'),
           ),
+          if (canRevert)
+            PopupMenuItem(
+              key: const ValueKey('tab_context_revert'),
+              onTap: () {
+                // showMenu closes this menu's route before onTap returns;
+                // defer so the dialog opens after dismissal (same pattern as
+                // _bulkClose / MOVE TO PANEL).
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
+                  unawaited(
+                    ConfirmDialog.show(
+                      context,
+                      title: 'REVERT CHANGES?',
+                      message: 'Discard unsaved changes to this request?',
+                      confirmLabel: 'REVERT',
+                      onConfirm: () => tabsBloc.add(
+                        RevertTab(tabId: tab.tabId, savedConfig: savedConfig),
+                      ),
+                    ),
+                  );
+                });
+              },
+              child: _buildMenuItem(
+                context,
+                Icons.settings_backup_restore,
+                'REVERT CHANGES',
+              ),
+            ),
           if (tabsBloc.state.panels.length > 1)
             PopupMenuItem(
               key: const ValueKey('tab_context_move_to_panel'),
@@ -651,15 +720,22 @@ class _RequestTabChipState extends State<RequestTabChip>
     );
   }
 
-  Widget _buildMenuItem(BuildContext context, IconData icon, String text) {
+  Widget _buildMenuItem(
+    BuildContext context,
+    IconData icon,
+    String text, {
+    bool enabled = true,
+  }) {
     final theme = Theme.of(context);
+    final color = enabled ? theme.colorScheme.onSurface : theme.disabledColor;
     return Row(
       children: [
-        Icon(icon, size: 18, color: theme.colorScheme.onSurface),
+        Icon(icon, size: 18, color: color),
         const SizedBox(width: 12),
         Text(
           text,
           style: TextStyle(
+            color: color,
             fontWeight: context.appTypography.displayWeight,
             fontSize: context.appLayout.fontSizeNormal,
           ),
