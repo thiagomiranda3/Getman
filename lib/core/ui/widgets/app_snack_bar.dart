@@ -66,6 +66,17 @@ void _showVia(
 }) {
   final theme = Theme.of(themeContext);
   final layout = themeContext.appLayout;
+  // FIX I1: ScaffoldMessenger queues by default, so a burst of action
+  // snackbars (e.g. rapid deletes) would otherwise stay live serially for
+  // their full duration — the spec (and undo-on-delete UX generally) says
+  // only the LATEST snackbar is undoable; earlier ones are accepted loss.
+  // Remove (not hide) any current snackbar first so the new one replaces it
+  // instantly rather than queuing behind an exit animation. Scoped to
+  // action-carrying snackbars — plain toasts have no undo state to protect
+  // and are left to the default queueing behavior.
+  if (actionLabel != null && onAction != null) {
+    messenger.removeCurrentSnackBar();
+  }
   messenger.showSnackBar(
     SnackBar(
       backgroundColor: backgroundColor ?? theme.primaryColor,

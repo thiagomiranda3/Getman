@@ -119,6 +119,70 @@ void main() {
     expect(find.byType(SnackBarAction), findsNothing);
   });
 
+  testWidgets(
+    // FIX I1: ScaffoldMessenger queues by default — two quick deletes would
+    // otherwise show two 5s snackbars serially, keeping the first UNDO live
+    // well past the point the spec says "earlier deletes are accepted
+    // loss". Only the latest action-carrying snackbar may be undoable.
+    'two rapid action snackbars: the second REPLACES the first instantly '
+    '(only the latest UNDO exists)',
+    (tester) async {
+      final theme = brutalistTheme(Brightness.light);
+      var firstUndone = false;
+      var secondUndone = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => Column(
+                children: [
+                  ElevatedButton(
+                    onPressed: () => showAppSnackBar(
+                      context,
+                      'First deleted',
+                      actionLabel: 'UNDO',
+                      onAction: () => firstUndone = true,
+                    ),
+                    child: const Text('FIRST'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => showAppSnackBar(
+                      context,
+                      'Second deleted',
+                      actionLabel: 'UNDO',
+                      onAction: () => secondUndone = true,
+                    ),
+                    child: const Text('SECOND'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('FIRST'));
+      await tester.pump();
+      await tester.tap(find.text('SECOND'));
+      await tester.pump();
+
+      expect(
+        find.text('First deleted'),
+        findsNothing,
+        reason: 'the first snackbar must be gone, not queued behind',
+      );
+      expect(find.text('Second deleted'), findsOneWidget);
+      expect(find.byType(SnackBar), findsOneWidget);
+
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('UNDO'));
+      await tester.pumpAndSettle();
+      expect(secondUndone, isTrue);
+      expect(firstUndone, isFalse);
+    },
+  );
+
   testWidgets('showAppSnackBarVia also renders the action', (tester) async {
     final theme = brutalistTheme(Brightness.light);
     var undone = false;
