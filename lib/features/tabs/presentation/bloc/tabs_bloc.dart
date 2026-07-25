@@ -614,7 +614,13 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         final existing = p.tabs.firstWhereOrNull(
           (t) => t.collectionNodeId == nodeId,
         );
-        if (existing != null) {
+        // FIX I5: only dedup-activate when the popped snapshot's config
+        // still matches the node's currently-open tab. A mismatch means the
+        // snapshot was a DISCARDed dirty edit (the feature's entire point) —
+        // just activating the existing (now-different) tab would silently
+        // drop that content with no way to recover it, so fall through to
+        // the normal restore-as-a-new-tab path below instead.
+        if (existing != null && existing.config == record.tab.config) {
           final updated = p.copyWith(activeTabId: existing.tabId);
           emit(_derive(_replacePanel(state.panels, updated), p.id));
           await _persistPanel(updated);

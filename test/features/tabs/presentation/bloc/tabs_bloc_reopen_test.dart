@@ -212,40 +212,100 @@ void main() {
       expect(bloc.canReopenClosedTab, isFalse);
     });
 
-    test('reopening a linked tab whose node is already open elsewhere '
-        'activates the existing tab instead of duplicating', () async {
-      const linked = HttpRequestTabEntity(
-        tabId: 'tL',
-        config: HttpRequestConfigEntity(id: 'cfgL'),
-        collectionNodeId: 'node1',
-        collectionName: 'GetUsers',
-      );
-      final bloc = await buildSeededBloc([
-        panel('p1', [tab('t1'), linked]),
-      ]);
-      addTearDown(bloc.close);
-
-      bloc.add(const RemoveTab('tL'));
-      await bloc.stream.firstWhere((s) => s.tabs.length == 1);
-
-      // The user re-opens the same node from the tree meanwhile.
-      bloc.add(
-        const AddTab(
+    test(
+      'CLEAN reopen: reopening a linked tab whose node is already open '
+      'elsewhere with the SAME config activates the existing tab instead '
+      'of duplicating (FIX I5 — dedup still fires when nothing diverged)',
+      () async {
+        const linked = HttpRequestTabEntity(
+          tabId: 'tL',
+          config: HttpRequestConfigEntity(id: 'cfgL'),
           collectionNodeId: 'node1',
           collectionName: 'GetUsers',
-        ),
-      );
-      await bloc.stream.firstWhere((s) => s.tabs.length == 2);
+        );
+        final bloc = await buildSeededBloc([
+          panel('p1', [tab('t1'), linked]),
+        ]);
+        addTearDown(bloc.close);
 
-      bloc.add(const ReopenClosedTab());
-      await Future<void>.delayed(Duration.zero);
+        bloc.add(const RemoveTab('tL'));
+        await bloc.stream.firstWhere((s) => s.tabs.length == 1);
 
-      expect(
-        bloc.state.tabs.where((t) => t.collectionNodeId == 'node1'),
-        hasLength(1),
-        reason: 'mirrors AddTab dedup — no duplicate linked tab',
-      );
-    });
+        // The user re-opens the SAME saved request from the tree meanwhile
+        // — production always passes the node's own config (stable id), so
+        // this carries the identical config the closed tab had.
+        bloc.add(
+          const AddTab(
+            config: HttpRequestConfigEntity(id: 'cfgL'),
+            collectionNodeId: 'node1',
+            collectionName: 'GetUsers',
+          ),
+        );
+        await bloc.stream.firstWhere((s) => s.tabs.length == 2);
+
+        bloc.add(const ReopenClosedTab());
+        await Future<void>.delayed(Duration.zero);
+
+        expect(
+          bloc.state.tabs.where((t) => t.collectionNodeId == 'node1'),
+          hasLength(1),
+          reason: 'mirrors AddTab dedup — no duplicate linked tab',
+        );
+      },
+    );
+
+    test(
+      'DIRTY reopen: a DISCARDed dirty snapshot restores as its own tab '
+      'instead of being silently swallowed by the clean tab reopened '
+      'meanwhile (FIX I5)',
+      () async {
+        // Closed with edited (dirty) content — this is what DISCARD pushes.
+        const dirty = HttpRequestTabEntity(
+          tabId: 'tL',
+          config: HttpRequestConfigEntity(id: 'cfgL', url: 'https://edited'),
+          collectionNodeId: 'node1',
+          collectionName: 'GetUsers',
+        );
+        final bloc = await buildSeededBloc([
+          panel('p1', [tab('t1'), dirty]),
+        ]);
+        addTearDown(bloc.close);
+
+        bloc.add(const RemoveTab('tL'));
+        await bloc.stream.firstWhere((s) => s.tabs.length == 1);
+
+        // The user re-opens the same node from the tree — clean, unedited
+        // config (same id, but the ORIGINAL url, not the discarded edit).
+        bloc.add(
+          const AddTab(
+            config: HttpRequestConfigEntity(id: 'cfgL'),
+            collectionNodeId: 'node1',
+            collectionName: 'GetUsers',
+          ),
+        );
+        await bloc.stream.firstWhere((s) => s.tabs.length == 2);
+
+        bloc.add(const ReopenClosedTab());
+        await bloc.stream.firstWhere((s) => s.tabs.length == 3);
+
+        final forNode = bloc.state.tabs.where(
+          (t) => t.collectionNodeId == 'node1',
+        );
+        expect(
+          forNode,
+          hasLength(2),
+          reason:
+              'the dirty snapshot must restore as ITS OWN tab, not '
+              'silently dedup into the clean one — that would destroy the '
+              'discarded edit with no way to recover it',
+        );
+        expect(
+          forNode.map((t) => t.config.url),
+          containsAll(<String>['https://edited', '']),
+          reason: 'both the dirty content and the clean tab must survive',
+        );
+      },
+    );
   });
 
   // The stack is intentionally NOT persisted (in-memory only, lost on quit —
