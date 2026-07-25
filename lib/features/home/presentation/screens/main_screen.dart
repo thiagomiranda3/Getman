@@ -36,6 +36,7 @@ import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/home/presentation/widgets/add_tab_button.dart';
 import 'package:getman/features/home/presentation/widgets/empty_tabs_placeholder.dart';
 import 'package:getman/features/home/presentation/widgets/request_tab_chip.dart';
+import 'package:getman/features/home/presentation/widgets/shortcuts_help_dialog.dart';
 import 'package:getman/features/home/presentation/widgets/side_menu.dart';
 import 'package:getman/features/home/presentation/widgets/tab_chip.dart';
 import 'package:getman/features/home/presentation/widgets/tab_content_stack.dart';
@@ -262,6 +263,17 @@ class _MainScreenState extends State<MainScreen> {
                         return null;
                       },
                     ),
+                // Cmd/Ctrl+/ cheat sheet — OPEN half only. The CLOSE half
+                // lives inside ShortcutsHelpDialog: while it is up this
+                // Actions is an unreachable sibling route (D8), but the root
+                // Shortcuts map still fires the intent and the dialog's own
+                // Actions pops it, so the same chord toggles.
+                ShowShortcutsIntent: CallbackAction<ShowShortcutsIntent>(
+                  onInvoke: (_) {
+                    unawaited(ShortcutsHelpDialog.show(context));
+                    return null;
+                  },
+                ),
                 CloseTabIntent: CallbackAction<CloseTabIntent>(
                   onInvoke: (_) {
                     if (activeIndex < 0 || activeIndex >= tabs.length) {

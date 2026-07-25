@@ -26,7 +26,9 @@ The hand-written `Hive.registerAdapter(...)` calls also live in `injection_conta
 
 The global activator→intent map is `appShortcuts` in `main.dart` — a **computed** map (not a `const` literal; the digit→`JumpToTabIntent`/`JumpToPanelIntent` bindings are generated in a loop) built by `buildAppShortcuts({required bool useMeta})` and `@visibleForTesting`. The map is platform-exclusive: Meta on macOS, Control elsewhere (`Ctrl+Tab` / `Ctrl+Shift+Tab` stay cross-platform).
 
-Bindings: **Ctrl/Cmd+N** new tab, **+W** close tab, **+S** save, **+Enter** send, **+B** beautify JSON, **+K** command palette, **+L** focus URL, **+E** switch environment, **Ctrl+Tab / Ctrl+Shift+Tab** next/prev tab, **Cmd/Ctrl+1–9** jump to tab, **+Shift+N** new panel, **+Shift+] / +Shift+[** next/prev panel, **+Shift+1–9** jump to panel.
+Bindings: **Ctrl/Cmd+N** new tab, **+W** close tab, **+S** save, **+Enter** send, **+B** beautify JSON, **+K** command palette, **+L** focus URL, **+E** switch environment, **+/** keyboard-shortcuts cheat sheet, **Ctrl+Tab / Ctrl+Shift+Tab** next/prev tab, **Cmd/Ctrl+1–9** jump to tab, **+Shift+N** new panel, **+Shift+] / +Shift+[** next/prev panel, **+Shift+1–9** jump to panel.
+
+**Cmd/Ctrl+/** is a two-halves toggle, not a single open action: `MainScreen` maps `ShowShortcutsIntent` to `ShortcutsHelpDialog.show`, and `ShortcutsHelpDialog` itself carries a local `Actions` mapping the *same* intent to `Navigator.pop`. This works with zero shared open/closed state because of the root-`Actions` trap below (the D8 fix) — the root `Shortcuts` map above `MaterialApp` is an ancestor of the dialog's focused subtree, so ⌘/ still resolves to `ShowShortcutsIntent` while the dialog is up and the dialog's own `Actions` pops it; meanwhile `MainScreen`'s `Actions` is an unreachable sibling route for that same moment, so the OPEN half can't double-fire. Esc closes for free via stock dialog dismissal.
 
 ### The root-`Actions` trap (the D8 fix)
 
@@ -34,7 +36,7 @@ Only the `Shortcuts` **map** lives at the root — `main.dart` has **no** root `
 
 `Action`s are split by where their dependencies live:
 
-- **`MainScreen`** hosts `NewTabIntent`, `CloseTabIntent`, `SendRequestIntent`, `NextTabIntent`/`PrevTabIntent`/`JumpToTabIntent`, the panel intents `NewPanelIntent`/`NextPanelIntent`/`PrevPanelIntent`/`JumpToPanelIntent`, `FocusUrlIntent`, **and the dialog-openers `CommandPaletteIntent` (+K) / `SwitchEnvironmentIntent` (+E)**. These need `activeIndex`/`tabs`/`UrlFocusRegistry`/env-resolution, or — for the dialog-openers — a context below `MaterialApp`+`Navigator` so `showDialog` finds `MaterialLocalizations`.
+- **`MainScreen`** hosts `NewTabIntent`, `CloseTabIntent`, `SendRequestIntent`, `NextTabIntent`/`PrevTabIntent`/`JumpToTabIntent`, the panel intents `NewPanelIntent`/`NextPanelIntent`/`PrevPanelIntent`/`JumpToPanelIntent`, `FocusUrlIntent`, **and the dialog-openers `CommandPaletteIntent` (+K) / `SwitchEnvironmentIntent` (+E) / `ShowShortcutsIntent` (+/, OPEN half only — see the toggle note above)**. These need `activeIndex`/`tabs`/`UrlFocusRegistry`/env-resolution, or — for the dialog-openers — a context below `MaterialApp`+`Navigator` so `showDialog` finds `MaterialLocalizations`.
 - **`RequestView`** hosts `SaveRequestIntent` and `BeautifyJsonIntent`.
 
 Put intents where `context.read<TabsBloc>()` is reachable — and dialog-opening ones *below* `MaterialApp`.
