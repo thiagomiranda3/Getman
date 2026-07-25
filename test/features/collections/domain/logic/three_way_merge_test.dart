@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
+import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/logic/three_way_merge.dart';
@@ -18,6 +19,8 @@ CollectionNodeEntity _leaf({
   List<MultipartFieldEntity> formFields = const [],
   String? bodyFilePath,
   String graphqlVariables = '',
+  List<ParkedParamEntity> disabledParams = const [],
+  Set<String> disabledHeaderKeys = const {},
 }) => CollectionNodeEntity(
   id: id,
   name: name,
@@ -34,6 +37,8 @@ CollectionNodeEntity _leaf({
     formFields: formFields,
     bodyFilePath: bodyFilePath,
     graphqlVariables: graphqlVariables,
+    disabledParams: disabledParams,
+    disabledHeaderKeys: disabledHeaderKeys,
   ),
 );
 
@@ -196,6 +201,107 @@ void main() {
       expect(r.conflicts.single.incoming, isNull);
       expect(r.conflicts.single.yours, isNull);
     });
+  });
+
+  group('ThreeWayMerge.mergeRequest — B1 disabled-row fields (FIX C1)', () {
+    test(
+      'C1 regression: park a param locally + edit body remotely -> merged '
+      'keeps BOTH (the park survives, not silently dropped)',
+      () {
+        final base = _leaf(url: 'https://api.dev?X=1', body: 'old');
+        // Remote (incoming) edited the body only; url/disabledParams
+        // untouched.
+        final incoming = _leaf(url: 'https://api.dev?X=1', body: 'new');
+        // Local (yours) parked param X: removed from the url and recorded
+        // in disabledParams.
+        final yours = _leaf(
+          url: 'https://api.dev',
+          body: 'old',
+          disabledParams: const [
+            ParkedParamEntity(key: 'X', value: '1', rowIndex: 0),
+          ],
+        );
+        final r = ThreeWayMerge.mergeRequest(base, incoming, yours);
+        expect(r.conflicts, isEmpty);
+        expect(r.merged.config!.body, 'new', reason: 'remote body edit kept');
+        expect(
+          r.merged.config!.url,
+          'https://api.dev',
+          reason: 'local park removed X from the url',
+        );
+        expect(
+          r.merged.config!.disabledParams,
+          const [ParkedParamEntity(key: 'X', value: '1', rowIndex: 0)],
+          reason: 'the park itself must survive — this is the C1 data loss',
+        );
+      },
+    );
+
+    test(
+      'disabledParams auto-merges when only one side parked (no conflict)',
+      () {
+        final base = _leaf();
+        final incoming = _leaf();
+        final yours = _leaf(
+          disabledParams: const [
+            ParkedParamEntity(key: 'a', value: '1', rowIndex: 0),
+          ],
+        );
+        final r = ThreeWayMerge.mergeRequest(base, incoming, yours);
+        expect(r.conflicts, isEmpty);
+        expect(r.merged.config!.disabledParams, yours.config!.disabledParams);
+      },
+    );
+
+    test(
+      'disabledParams conflict when both sides parked differently '
+      '(whole-field, like form fields)',
+      () {
+        final base = _leaf();
+        final incoming = _leaf(
+          disabledParams: const [
+            ParkedParamEntity(key: 'a', value: '1', rowIndex: 0),
+          ],
+        );
+        final yours = _leaf(
+          disabledParams: const [
+            ParkedParamEntity(key: 'b', value: '2', rowIndex: 0),
+          ],
+        );
+        final r = ThreeWayMerge.mergeRequest(base, incoming, yours);
+        expect(r.conflicts.map((c) => c.field), ['disabled params']);
+        expect(r.conflicts.single.kind, FieldConflictKind.list);
+        expect(r.conflicts.single.incoming, isNull);
+        expect(r.conflicts.single.yours, isNull);
+      },
+    );
+
+    test(
+      'disabledHeaderKeys auto-merges when only one side disabled a header',
+      () {
+        final base = _leaf();
+        final incoming = _leaf();
+        final yours = _leaf(disabledHeaderKeys: const {'X-Api'});
+        final r = ThreeWayMerge.mergeRequest(base, incoming, yours);
+        expect(r.conflicts, isEmpty);
+        expect(r.merged.config!.disabledHeaderKeys, const {'X-Api'});
+      },
+    );
+
+    test(
+      'both sides park different headers is a conflict (whole-field, like '
+      'secret keys — its sibling by type)',
+      () {
+        final base = _leaf();
+        final incoming = _leaf(disabledHeaderKeys: const {'B'});
+        final yours = _leaf(disabledHeaderKeys: const {'A'});
+        final r = ThreeWayMerge.mergeRequest(base, incoming, yours);
+        expect(r.conflicts.map((c) => c.field), ['disabled headers']);
+        expect(r.conflicts.single.kind, FieldConflictKind.list);
+        expect(r.conflicts.single.incoming, isNull);
+        expect(r.conflicts.single.yours, isNull);
+      },
+    );
   });
 
   group('ThreeWayMerge.mergeRequest — add/add (base null)', () {
