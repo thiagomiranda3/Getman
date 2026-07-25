@@ -1,5 +1,9 @@
 // Widget tests for HistoryList: renders entries, tap opens a tab, search
-// filters results, empty state shows the placeholder.
+// filters results, day-header grouping/ordering (TODAY/YESTERDAY), hover
+// delete + UNDO tap-through (restores the captured record via
+// RestoreHistoryEntries), CLEAR ALL confirm + UNDO tap-through (restores the
+// captured list), and the two distinct empty states — first-run guidance
+// ('NO REQUESTS SENT YET') vs. a search miss ('NO RESULTS FOUND').
 
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/gestures.dart';
