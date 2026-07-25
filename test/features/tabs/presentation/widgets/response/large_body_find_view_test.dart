@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/theme_ids.dart';
@@ -10,6 +11,15 @@ import 'package:getman/features/tabs/presentation/widgets/response/large_body_fi
 /// by a distinctive C-region so window recentering is observable.
 final String kBigBody =
     '${'A' * 600000}needle${'B' * 500000}needle${'C' * 100}';
+
+/// A second >1 MiB fixture whose single "needle" match sits at offset
+/// 300000 — far from kBigBody's first match at offset 600000, and
+/// surrounded by 'D' filler instead of 'A'/'B'/'C'. If a body swap ever
+/// renders a window using kBigBody's stale offset(s) sliced into this
+/// body's text, offset 600000 lands deep in the pure-'D' region (no
+/// "needle" anywhere near it) — exposing the stale-highlight bug without
+/// crashing (the offset is still in-bounds).
+final String kOtherBigBody = '${'C' * 300000}needle${'D' * 500000}';
 
 Future<void> _pump(
   WidgetTester tester, {
@@ -130,4 +140,71 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('large_find_close')));
     expect(closed, isTrue);
   });
+
+  testWidgets(
+    'body swap clears stale offsets before any stale-highlight window '
+    'can render over the new text',
+    (tester) async {
+      await _pump(tester, body: kBigBody);
+      await _search(tester, 'needle');
+      expect(find.text('1/2'), findsOneWidget); // sanity: matches on body A
+
+      // Swap to a different >1 MiB body while the same query is still
+      // active. Deliberately do NOT runAsync yet — this is the exact
+      // synchronous frame during which the rescan's compute() is pending,
+      // where the stale-highlight bug would show through.
+      await _pump(tester, body: kOtherBigBody);
+
+      expect(
+        find.byKey(const ValueKey('large_find_window_text')),
+        findsNothing,
+        reason:
+            'offsets must be cleared synchronously on body change so the '
+            'window never renders a stale match position over new text',
+      );
+      expect(find.text('FALLBACK_VIEW'), findsOneWidget);
+
+      // Let the rescan against the new body land, then verify it finds the
+      // new body's own (correctly positioned) match.
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 400)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('1/1'), findsOneWidget);
+      final selectable = tester.widget<SelectableText>(
+        find.byKey(const ValueKey('large_find_window_text')),
+      );
+      expect(selectable.textSpan!.toPlainText(), contains('needle'));
+    },
+  );
+
+  testWidgets(
+    'Enter navigates to the next match, Shift+Enter to the previous',
+    (tester) async {
+      await _pump(tester, body: kBigBody);
+      await _search(tester, 'needle');
+      expect(find.text('1/2'), findsOneWidget);
+
+      Future<void> enter({bool shift = false}) async {
+        if (shift) {
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+        }
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter, platform: 'macos');
+        if (shift) {
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+        }
+        await tester.pump();
+      }
+
+      // Enter (no shift) steps forward through the Focus onKeyEvent path,
+      // not a button tap.
+      await enter();
+      expect(find.text('2/2'), findsOneWidget);
+
+      // Shift+Enter steps back.
+      await enter(shift: true);
+      expect(find.text('1/2'), findsOneWidget);
+    },
+  );
 }

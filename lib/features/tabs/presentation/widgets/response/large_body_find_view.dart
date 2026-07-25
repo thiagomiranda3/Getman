@@ -85,8 +85,19 @@ class _LargeBodyFindViewState extends State<LargeBodyFindView> {
   void didUpdateWidget(covariant LargeBodyFindView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.body != widget.body) {
-      // New response body: rescan the current query against it.
+      // New response body: the old offsets point into a body that no
+      // longer exists. Clear them synchronously — mirroring _scan's
+      // empty-query branch — BEFORE kicking off the rescan, so this
+      // frame's build() falls back to [widget.fallback] instead of
+      // momentarily slicing a highlight window at stale match positions
+      // out of the new text (bounds-clamped, so no crash — just wrong
+      // highlighted content until the fresh offsets land).
       _debounce?.cancel();
+      setState(() {
+        _offsets = const [];
+        _current = 0;
+        _matchLength = 0;
+      });
       unawaited(_scan());
     }
   }
