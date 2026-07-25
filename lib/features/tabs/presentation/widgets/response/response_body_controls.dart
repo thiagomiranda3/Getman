@@ -47,6 +47,10 @@ class ResponseBodyControls extends StatelessWidget {
     this.onFind,
     this.wordWrap,
     this.onToggleWordWrap,
+    this.copyEnabled = true,
+    this.copyDisabledTooltip,
+    this.saveEnabled = true,
+    this.onSaveToFile,
     super.key,
   });
 
@@ -67,6 +71,21 @@ class ResponseBodyControls extends StatelessWidget {
   /// Toggles word wrap in the host's editor. Null hides the toggle entirely
   /// (non-text modes: TREE, large plain-text, media without an editor).
   final VoidCallback? onToggleWordWrap;
+
+  /// When false the Copy button renders disabled showing
+  /// [copyDisabledTooltip] (C4: media copy is text-ish only).
+  final bool copyEnabled;
+
+  /// Tooltip for the disabled Copy button.
+  final String? copyDisabledTooltip;
+
+  /// When false the Save button renders disabled (media bytes gone —
+  /// captured bytes are never persisted, so a restored tab has none).
+  final bool saveEnabled;
+
+  /// Overrides the default text save — the media panel saves raw bytes
+  /// with the media extension instead of the copyable text.
+  final Future<void> Function()? onSaveToFile;
 
   // ---------------------------------------------------------------------------
   // Find (C1)
@@ -112,10 +131,12 @@ class ResponseBodyControls extends StatelessWidget {
 
   Widget _copyButton(BuildContext context) {
     return IconButton(
-      tooltip: 'Copy response',
+      tooltip: copyEnabled
+          ? 'Copy response'
+          : (copyDisabledTooltip ?? 'Copy unavailable'),
       visualDensity: VisualDensity.compact,
       icon: Icon(Icons.copy_all_outlined, size: context.appLayout.iconSize),
-      onPressed: () => _copyBody(context),
+      onPressed: copyEnabled ? () => _copyBody(context) : null,
     );
   }
 
@@ -125,7 +146,13 @@ class ResponseBodyControls extends StatelessWidget {
 
   /// Writes the verbatim response body (the same text Copy uses, incl. the
   /// large-body cache) to a user-chosen file. JSON default, txt allowed.
+  /// [onSaveToFile] overrides this entirely (media panel saves raw bytes).
   Future<void> _saveBody(BuildContext context) async {
+    final override = onSaveToFile;
+    if (override != null) {
+      await override();
+      return;
+    }
     final text = getCopyableText();
     if (text.isEmpty) return;
     await saveJsonFileWithFeedback(
@@ -142,7 +169,7 @@ class ResponseBodyControls extends StatelessWidget {
       tooltip: 'Save response to file',
       visualDensity: VisualDensity.compact,
       icon: Icon(Icons.save_outlined, size: context.appLayout.iconSize),
-      onPressed: () => _saveBody(context),
+      onPressed: saveEnabled ? () => _saveBody(context) : null,
     );
   }
 
