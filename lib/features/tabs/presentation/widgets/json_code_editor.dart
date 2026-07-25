@@ -8,9 +8,10 @@
 // controller's spanBuilder — never set CodeEditorStyle.codeTheme, re_editor's
 // isolate highlighter never delivers colored results here and it silently
 // reverts to single-colour. AppCodeShortcutsActivatorsBuilder strips the
-// `save` activator (so the app's own Cmd/Ctrl+S fires) and the Cmd/Ctrl+Enter
-// chord from `newLine` (so SendRequestIntent fires) while this editor has
-// focus. The editor is keyed by GlobalObjectKey(controller) so a theme
+// `save` activator (so the app's own Cmd/Ctrl+S fires), the Cmd/Ctrl+Enter
+// chord from `newLine` (so SendRequestIntent fires), and the Cmd/Ctrl+/
+// chord from `singleLineComment` (so ShowShortcutsIntent fires) while this
+// editor has focus. The editor is keyed by GlobalObjectKey(controller) so a theme
 // switch toggling the glass frost wrapper reparents the element instead of
 // disposing/remounting it (remounting while the old element is still
 // subscribed crashes re_editor).
@@ -25,7 +26,7 @@ import 'package:re_highlight/re_highlight.dart';
 import 'package:re_highlight/styles/atom-one-dark.dart';
 import 'package:re_highlight/styles/atom-one-light.dart';
 
-/// Adapts re_editor's default shortcut map so two chords the editor would
+/// Adapts re_editor's default shortcut map so three chords the editor would
 /// otherwise *consume* bubble up to the app's global shortcuts instead:
 ///
 /// * **Cmd/Ctrl+S** — re_editor binds it to a no-op `save` action and swallows
@@ -36,6 +37,9 @@ import 'package:re_highlight/styles/atom-one-light.dart';
 ///   editor held focus the app's `SendRequestIntent` never fired (the chord
 ///   just inserted a newline). We strip that one activator from `newLine` while
 ///   keeping plain Enter / Shift+Enter / numpad-Enter for normal newlines.
+/// * **Cmd/Ctrl+/** — re_editor binds it to `singleLineComment`, which is
+///   meaningless for JSON and swallowed the app's shortcuts-cheat-sheet
+///   chord (`ShowShortcutsIntent`). We drop the activator entirely.
 @visibleForTesting
 class AppCodeShortcutsActivatorsBuilder extends CodeShortcutsActivatorsBuilder {
   const AppCodeShortcutsActivatorsBuilder();
@@ -45,6 +49,12 @@ class AppCodeShortcutsActivatorsBuilder extends CodeShortcutsActivatorsBuilder {
   @override
   List<ShortcutActivator>? build(CodeShortcutType type) {
     if (type == CodeShortcutType.save) return null;
+    // Cmd/Ctrl+/ is bound to singleLineComment; JSON has no comment syntax
+    // and the app binds the chord to the shortcuts cheat sheet
+    // (ShowShortcutsIntent), so drop the activator entirely — same treatment
+    // as `save`. Cmd/Ctrl+Shift+/ (multiLineComment) is not an app shortcut
+    // and is left alone.
+    if (type == CodeShortcutType.singleLineComment) return null;
     final activators = _defaults.build(type);
     if (type == CodeShortcutType.newLine && activators != null) {
       return activators.where((a) => !_isSendRequestChord(a)).toList();

@@ -43,7 +43,7 @@ Put intents where `context.read<TabsBloc>()` is reachable — and dialog-opening
 
 ### Editor shortcut pass-through
 
-`re_editor` would otherwise **consume** two chords while a code editor holds focus. `AppCodeShortcutsActivatorsBuilder` (`json_code_editor.dart`, `@visibleForTesting`) strips them so the app's global shortcuts fire instead: it drops the `save` activator entirely (so **Cmd/Ctrl+S** → `SaveRequestIntent`) and removes the **Cmd/Ctrl+Enter** chord from `newLine` (so `SendRequestIntent` fires) while keeping plain / Shift / numpad Enter for real newlines.
+`re_editor` would otherwise **consume** three chords while a code editor holds focus. `AppCodeShortcutsActivatorsBuilder` (`json_code_editor.dart`, `@visibleForTesting`) strips them so the app's global shortcuts fire instead: it drops the `save` activator entirely (so **Cmd/Ctrl+S** → `SaveRequestIntent`), removes the **Cmd/Ctrl+Enter** chord from `newLine` (so `SendRequestIntent` fires) while keeping plain / Shift / numpad Enter for real newlines, and drops the **Cmd/Ctrl+/** chord from `singleLineComment` (so `ShowShortcutsIntent` fires for the cheat sheet).
 
 ## Error model (`core/error/`)
 

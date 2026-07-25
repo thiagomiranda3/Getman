@@ -24,6 +24,34 @@ void main() {
     );
   });
 
+  group('Cmd/Ctrl+/ pass-through for the shortcuts cheat sheet (E1)', () {
+    test(
+      'CANARY: re_editor default DOES bind the chord to singleLineComment '
+      '(if this fails after an upgrade, the strip below is obsolete)',
+      () {
+        // macOS: Meta+/
+        debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+        expect(
+          defaults.build(CodeShortcutType.singleLineComment),
+          isNotEmpty,
+          reason: 'defaults should include slash bindings on macOS',
+        );
+      },
+    );
+
+    test('drops singleLineComment so ShowShortcutsIntent can fire', () {
+      expect(builder.build(CodeShortcutType.singleLineComment), isNull);
+    });
+
+    test('multiLineComment (Cmd/Ctrl+Shift+/) is untouched', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      expect(
+        builder.build(CodeShortcutType.multiLineComment),
+        equals(defaults.build(CodeShortcutType.multiLineComment)),
+      );
+    });
+  });
+
   group('newLine strips the platform send-request chord (Cmd/Ctrl+Enter)', () {
     test('macOS: Cmd+Enter is removed, plain Enter stays', () {
       debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
