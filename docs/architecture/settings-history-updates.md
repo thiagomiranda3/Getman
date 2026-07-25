@@ -8,6 +8,7 @@
 - Every `Update*` event both saves and emits in the handler — settings (and collections) persist immediately.
 - `SettingsBloc` has one handler per `Update*` event and holds no cross-feature references (e.g. the response-history limits ride on the `SendRequest` event, computed at dispatch — see docs/architecture/tabs-and-panels.md).
 - UI is `settings_dialog.dart` (5 tabs: GENERAL / APPEARANCE / NETWORK / WORKSPACE, plus the shortcuts reference in `settings_shortcuts_tab.dart`); network changes reach the live client via `network_settings_listener.dart`.
+- The SHORTCUTS tab and the Cmd/Ctrl+/ cheat-sheet dialog (`ShortcutsHelpDialog`, docs/architecture/app-shell.md) render from one shared `ShortcutReferenceTable` (`lib/core/ui/widgets/shortcut_reference_table.dart`) over `shortcutCatalog()` (`lib/core/navigation/shortcut_catalog.dart`) — the single source of truth for shortcut **labels** (title/description/key caps), so the two surfaces can never drift apart. The **bindings** themselves still live in `main.dart`'s `buildAppShortcuts`; adding a shortcut means updating both. `useMetaShortcuts` (also in `shortcut_catalog.dart`) is the one macOS-vs-everything-else predicate every platform-aware surface — including the E2 tooltip hints on SEND/save/beautify/env-selector/new-tab/new-panel — reads; never re-derive it from `Theme.of(context).platform`.
 
 ## History
 

@@ -214,10 +214,12 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | Beautify / prettify JSON | `lib/core/utils/json_utils.dart` |
 | Body types (raw/urlencoded/multipart/binary/graphql) | `lib/core/domain/entities/body_type.dart`, `lib/features/tabs/presentation/widgets/body_tab_view.dart` |
 | Boot / dependency injection | `lib/main.dart`, `lib/core/di/injection_container.dart` |
+| Bug report (COPY AS BUG REPORT) | `lib/core/utils/bug_report_composer.dart`, `lib/features/tabs/presentation/widgets/response/response_body_controls.dart` |
 | Bulk edit (key/value) | `lib/core/ui/widgets/bulk_kv_editor.dart`, `lib/core/utils/bulk_kv_codec.dart`, `lib/features/tabs/presentation/widgets/bulk_mode_toggle.dart` |
 | Byte size / response size | `lib/core/utils/byte_format.dart` |
 | Cancel request | `lib/core/network/cancel_handle.dart`, `lib/features/tabs/presentation/bloc/request_manager.dart` |
 | Chaining / extraction | `lib/features/chaining/domain/logic/extraction_engine.dart`, `lib/features/chaining/domain/logic/rules_runner.dart` |
+| Closed-tab reopen stack | `lib/features/tabs/presentation/bloc/tabs_bloc.dart` (in-memory LIFO, max 10, never persisted), `lib/core/navigation/intents.dart` (`ReopenClosedTabIntent`) |
 | Code generation (cURL/JS/Python/Go/Java) | `lib/core/utils/code_gen_service.dart`, `lib/features/tabs/presentation/widgets/code_export_dialog.dart` |
 | Collection-scoped variables | `lib/core/utils/request_variable_resolver.dart`, `lib/features/collections/presentation/widgets/collection_variables_dialog.dart` |
 | Collections tree | `lib/features/collections/presentation/widgets/collections_list.dart`, `lib/features/collections/domain/logic/collections_tree_helper.dart` |
@@ -229,12 +231,14 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | Cookies (jar + interceptor) | `lib/core/network/cookie_interceptor.dart`, `lib/core/network/in_memory_cookie_store.dart`, `lib/features/cookies/data/hive_cookie_persistence.dart`, `lib/features/cookies/presentation/widgets/cookie_manager_dialog.dart` |
 | cURL parse / paste | `lib/core/utils/curl_utils.dart`, `lib/features/tabs/presentation/widgets/url_bar.dart` |
 | Debounce | `lib/core/utils/debouncer.dart` |
+| Delete-with-undo (collections tree + examples) | `lib/features/collections/presentation/widgets/delete_node_with_undo.dart`, `lib/features/collections/presentation/bloc/collections_event.dart` (`RestoreNodeSubtree`/`RestoreExample`) |
 | Dirty tracking | `lib/features/home/domain/usecases/tab_dirty_checker.dart` |
 | Drag-and-drop (tree/tabs) | `lib/features/collections/presentation/widgets/node_drag_data.dart`, `lib/features/collections/presentation/widgets/collection_node_row.dart`, `lib/features/tabs/presentation/widgets/tab_drag_data.dart` |
 | Dynamic variables (`{{$guid}}`…) | `lib/core/utils/environment_resolver.dart` |
 | Environments | `lib/features/environments/presentation/bloc/environments_bloc.dart`, `lib/core/utils/environment_resolver.dart` |
 | Error model (Failure/Exception) | `lib/core/error/failures.dart`, `lib/core/error/exceptions.dart`, `lib/core/error/guard.dart` |
 | Examples (saved) | `lib/features/collections/domain/entities/saved_example_entity.dart`, `lib/features/collections/presentation/widgets/example_row.dart` |
+| Find in response (find-everywhere) | `lib/core/utils/plain_text_find.dart`, `lib/features/tabs/presentation/widgets/response/large_body_find_view.dart`, `lib/features/tabs/presentation/widgets/response/json_tree_filter.dart`, `lib/features/tabs/presentation/widgets/response/response_row_filter_bar.dart` |
 | Form data / multipart | `lib/features/tabs/presentation/widgets/form_data_editor.dart`, `lib/core/domain/entities/multipart_field_entity.dart` |
 | Fuzzy matching | `lib/core/utils/fuzzy_matcher.dart` |
 | Git — branches / stash / sync | `lib/core/git/git_service.dart`, `lib/features/collections/data/services/git_branch_service.dart` |
@@ -243,7 +247,9 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | Git — review changes | `lib/features/collections/data/services/workspace_review_service.dart`, `lib/features/collections/presentation/widgets/review_changes_dialog.dart` |
 | GraphQL | `lib/core/domain/entities/body_type.dart`, `lib/features/tabs/data/request_serializer.dart`, `lib/features/tabs/presentation/widgets/body_tab_view.dart` |
 | History + dedup | `lib/features/history/data/datasources/history_local_data_source.dart` |
+| History day grouping (TODAY/YESTERDAY headers) | `lib/features/history/domain/logic/history_day_grouper.dart`, `lib/features/history/presentation/widgets/history_list.dart` |
 | Hive boxes / storage | `lib/core/storage/hive_boxes.dart`, `lib/core/storage/hive_helpers.dart` |
+| Hover copy (data rows) | `lib/core/ui/widgets/hover_copy_row.dart` |
 | HTTP methods list | `lib/core/network/http_methods.dart` |
 | HTTP send / network client | `lib/core/network/network_service.dart` |
 | JSONPath | `lib/core/utils/json_path.dart`, `lib/core/utils/json_path_builder.dart` |
@@ -254,16 +260,19 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | Method colors / badge | `lib/core/theme/extensions/app_palette.dart`, `lib/core/ui/widgets/method_badge.dart` |
 | mTLS / client certificates | `lib/core/network/dio_adapter_config_io.dart`, `lib/features/settings/presentation/widgets/client_certificate_tile.dart` |
 | Name prompt dialog | `lib/core/ui/widgets/name_prompt_dialog.dart` |
+| Open-tabs dropdown (desktop) | `lib/features/tabs/presentation/widgets/open_tabs_dropdown.dart`, `lib/features/tabs/presentation/widgets/open_tab_groups.dart` |
 | OpenAPI / Swagger import | `lib/core/utils/openapi/spec_normalizer.dart`, `lib/core/utils/openapi/collection_builder.dart`, `lib/features/collections/presentation/widgets/spec_import_dialog.dart` |
 | Panels (virtual desktops) | `lib/features/tabs/data/models/panel_model.dart`, `lib/features/tabs/presentation/widgets/panel_selector.dart`, `lib/features/tabs/presentation/bloc/tabs_bloc.dart` |
-| Per-row enable/disable (params/headers) | `lib/core/utils/param_row_composer.dart`, `lib/features/tabs/presentation/widgets/params_tab_view.dart`, `lib/features/tabs/presentation/widgets/headers_tab_view.dart` |
+| Per-row enable/disable (params/headers) | `lib/core/domain/entities/parked_param_entity.dart`, `lib/features/tabs/data/models/parked_param_model.dart`, `lib/core/utils/param_row_composer.dart`, `lib/features/tabs/presentation/widgets/params_tab_view.dart`, `lib/features/tabs/presentation/widgets/headers_tab_view.dart` |
 | Postman import / export | `lib/core/utils/postman/postman_collection_mapper.dart`, `lib/core/utils/postman/postman_environment_mapper.dart`, `lib/core/utils/json_file_io.dart` |
 | Proxy | `lib/core/network/dio_adapter_config_io.dart`, `lib/core/network/network_config.dart` |
 | Redirects (manual loop) | `lib/core/network/network_service.dart` |
 | Request config entity | `lib/core/domain/entities/request_config_entity.dart` |
 | Response time-travel | `lib/features/tabs/domain/entities/response_history_entry.dart`, `lib/features/tabs/presentation/widgets/response/response_history_timeline.dart` |
 | Responsive layout tiers | `lib/core/theme/responsive.dart` |
+| Revert changes (dirty tab) | `lib/features/tabs/presentation/widgets/revert_tab_button.dart`, `lib/features/tabs/presentation/bloc/tabs_event.dart` (`RevertTab`) |
 | Routing | `lib/core/navigation/app_router.dart` |
+| Save all tabs | `lib/features/tabs/presentation/widgets/save_all_coordinator.dart` |
 | Secret variables | `lib/core/ui/widgets/key_value_list_editor.dart`, `lib/features/environments/domain/entities/environment_entity.dart` |
 | Settings | `lib/features/settings/presentation/bloc/settings_bloc.dart`, `lib/features/settings/domain/entities/settings_entity.dart`, `lib/features/settings/presentation/widgets/settings_dialog.dart` |
 | Snackbars | `lib/core/ui/widgets/app_snack_bar.dart` |
@@ -273,9 +282,10 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | Tabs (request editor) | `lib/features/tabs/presentation/bloc/tabs_bloc.dart`, `lib/features/tabs/domain/entities/request_tab_entity.dart` |
 | Theme accessors (`context.app*`) | `lib/core/theme/extensions/app_theme_access.dart`, `lib/core/theme/app_theme.dart` |
 | Themes + component slots | `lib/core/theme/theme_registry.dart`, `lib/core/theme/extensions/app_components.dart` |
-| Tree view (JSON TREE mode) | `lib/features/tabs/presentation/widgets/response/json_tree_view.dart`, `lib/core/utils/json_path_builder.dart` |
+| Tree view (JSON TREE mode) | `lib/features/tabs/presentation/widgets/response/json_tree_view.dart`, `lib/features/tabs/presentation/widgets/response/json_tree_filter.dart`, `lib/core/utils/json_path_builder.dart` |
 | Unresolved-variable warning (pre-send chip) | `lib/core/utils/unresolved_variable_collector.dart`, `lib/features/tabs/presentation/widgets/unresolved_vars_chip.dart` |
 | URL query parsing | `lib/core/utils/url_query_utils.dart` |
+| URL suggestions (history + collections autocomplete) | `lib/core/utils/url_suggestion_source.dart`, `lib/core/ui/widgets/variable_autocomplete.dart` |
 | Variable highlighting | `lib/core/ui/widgets/variable_highlight_controller.dart` |
 | Variable hover popover | `lib/core/ui/widgets/variable_hover_popover.dart` |
 | WebSocket | `lib/core/network/realtime_service.dart`, `lib/features/realtime/presentation/bloc/realtime_bloc.dart`, `lib/features/realtime/presentation/widgets/realtime_panel.dart` |

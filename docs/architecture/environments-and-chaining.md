@@ -34,7 +34,7 @@ The `SendRequest` event carries `tabId` plus `Map<String, String> envVars`. Disp
 
 ### Secret variables
 
-`EnvironmentEntity.secretKeys` (a `Set<String>` of variable names; `EnvironmentModel` stores it as a `List<String>` at `HiveField(3)`). `KeyValueListEditor` takes an optional `secretKeys` + `onSecretKeysChanged` — when non-null, each row shows a lock toggle and secret rows obscure their value with a reveal toggle. Params/headers pass neither, so their behavior is unchanged. The env editor prunes stale secret flags on rename/delete (intersect with the live keys). Postman export masks secret values (empty value, `type: 'secret'`); **send-time resolution is unaffected** (secrets resolve like any other variable).
+`EnvironmentEntity.secretKeys` (a `Set<String>` of variable names; `EnvironmentModel` stores it as a `List<String>` at `HiveField(3)`). `KeyValueListEditor` takes an optional `secretKeys` + `onSecretKeysChanged` — when non-null, each row shows a lock toggle and secret rows obscure their value with a reveal toggle. Params/headers pass neither, so their behavior is unchanged. The env editor prunes stale secret flags on rename/delete (intersect with the live keys). Postman export masks secret values (empty value, `type: 'secret'`); **send-time resolution is unaffected** (secrets resolve like any other variable). The C5 bug-report bundle (`BugReportComposer`, docs/architecture/tabs-and-panels.md) applies the same masking to both env and collection-scoped secret keys before resolving `{{var}}` into the copied markdown.
 
 ### Add / delete gotchas
 
