@@ -1,10 +1,12 @@
 // Unit tests for UnresolvedVariableCollector: every scanned source (URL,
 // header keys+values, parked disabled params, raw/graphql bodies + graphql
-// variables, auth values), body-type gating, resolved/dynamic exclusion,
-// and cross-source dedup with first-occurrence order.
+// variables, form-field name+value for urlencoded/multipart, auth values),
+// body-type gating, resolved/dynamic exclusion, and cross-source dedup with
+// first-occurrence order.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
+import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/utils/unresolved_variable_collector.dart';
@@ -112,6 +114,73 @@ void main() {
         ),
       ),
       ['tok'],
+    );
+  });
+
+  test('scans form-field names for urlencoded/multipart bodies', () {
+    for (final type in [BodyType.urlencoded, BodyType.multipart]) {
+      expect(
+        collect(
+          HttpRequestConfigEntity(
+            id: 'c',
+            bodyType: type,
+            formFields: const [MultipartFieldEntity(name: '{{fname}}')],
+          ),
+        ),
+        ['fname'],
+        reason: '$type form-field names must be scanned',
+      );
+    }
+  });
+
+  test('scans form-field values for urlencoded/multipart bodies', () {
+    for (final type in [BodyType.urlencoded, BodyType.multipart]) {
+      expect(
+        collect(
+          HttpRequestConfigEntity(
+            id: 'c',
+            bodyType: type,
+            formFields: const [
+              MultipartFieldEntity(name: 'key', value: '{{fval}}'),
+            ],
+          ),
+        ),
+        ['fval'],
+        reason: '$type form-field values must be scanned',
+      );
+    }
+  });
+
+  test(
+    'form-field vars dedupe with other sources, first-occurrence order',
+    () {
+      expect(
+        collect(
+          const HttpRequestConfigEntity(
+            id: 'c',
+            url: '{{shared}}/x',
+            bodyType: BodyType.multipart,
+            formFields: [
+              MultipartFieldEntity(name: '{{shared}}', value: '{{fonly}}'),
+            ],
+          ),
+        ),
+        ['shared', 'fonly'],
+      );
+    },
+  );
+
+  test("a binary body's bodyFilePath is never scanned (not a formField)", () {
+    expect(
+      collect(
+        const HttpRequestConfigEntity(
+          id: 'c',
+          bodyType: BodyType.binary,
+          bodyFilePath: '{{path}}/file.bin',
+        ),
+      ),
+      isEmpty,
+      reason: 'binary bodyFilePath is never resolved, so never scanned',
     );
   });
 

@@ -853,4 +853,32 @@ void main() {
       await tester.pump(const Duration(seconds: 11));
     },
   );
+
+  testWidgets(
+    'unresolved-vars chip appears in the URL bar and SEND stays enabled',
+    (tester) async {
+      const tab = HttpRequestTabEntity(
+        tabId: 'uv1',
+        config: HttpRequestConfigEntity(id: 'uv1', url: '{{nope}}/x'),
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      await _pump(tester, bloc, 'uv1');
+
+      expect(
+        find.byKey(const ValueKey('unresolved_vars_chip')),
+        findsOneWidget,
+      );
+      final send = tester.widget<ElevatedButton>(
+        find.ancestor(
+          of: find.byKey(const ValueKey('send')),
+          matching: find.byType(ElevatedButton),
+        ),
+      );
+      expect(send.onPressed, isNotNull, reason: 'chip must never block SEND');
+
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
 }

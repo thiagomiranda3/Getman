@@ -274,6 +274,7 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | Theme accessors (`context.app*`) | `lib/core/theme/extensions/app_theme_access.dart`, `lib/core/theme/app_theme.dart` |
 | Themes + component slots | `lib/core/theme/theme_registry.dart`, `lib/core/theme/extensions/app_components.dart` |
 | Tree view (JSON TREE mode) | `lib/features/tabs/presentation/widgets/response/json_tree_view.dart`, `lib/core/utils/json_path_builder.dart` |
+| Unresolved-variable warning (pre-send chip) | `lib/core/utils/unresolved_variable_collector.dart`, `lib/features/tabs/presentation/widgets/unresolved_vars_chip.dart` |
 | URL query parsing | `lib/core/utils/url_query_utils.dart` |
 | Variable highlighting | `lib/core/ui/widgets/variable_highlight_controller.dart` |
 | Variable hover popover | `lib/core/ui/widgets/variable_hover_popover.dart` |

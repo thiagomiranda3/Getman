@@ -52,6 +52,7 @@ import 'package:getman/features/tabs/presentation/widgets/code_export_dialog.dar
 import 'package:getman/features/tabs/presentation/widgets/realtime_button.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_kind_method_selector.dart';
 import 'package:getman/features/tabs/presentation/widgets/revert_tab_button.dart';
+import 'package:getman/features/tabs/presentation/widgets/unresolved_vars_chip.dart';
 import 'package:getman/features/tabs/presentation/widgets/url_overflow_menu.dart';
 
 void _setControllerPreservingEnd(
@@ -439,6 +440,11 @@ class _UrlBarState extends State<UrlBar> {
                             ),
                             SizedBox(width: smallGap),
                           ],
+                          // E3: pre-send unresolved-{{var}} warning. Advisory
+                          // only — SEND stays enabled regardless. The chip
+                          // (not this builder) watches config edits; it
+                          // renders nothing when every var resolves.
+                          UnresolvedVarsChip(tabId: widget.tabId),
                           if (tab.config.kind == RequestKind.http)
                             Tooltip(
                               message: tab.isSending
