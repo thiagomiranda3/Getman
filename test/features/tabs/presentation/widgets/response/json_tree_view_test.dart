@@ -9,6 +9,15 @@ Widget _host(Object? data) => MaterialApp(
   home: Scaffold(body: JsonTreeView(data: data)),
 );
 
+/// A row-text lookup scoped to the tree's row list. Plain `find.text()` also
+/// matches `EditableText` (see flutter_test's `_MatchTextFinder`: "the
+/// pattern is always compared to the current value of the
+/// EditableText.controller"), so whenever the currently-typed filter query
+/// happens to equal a row's label, an unscoped `find.text()` would find both
+/// the filter field itself and the row — this scopes to just the rows.
+Finder _row(String text) =>
+    find.descendant(of: find.byType(ListView), matching: find.text(text));
+
 void main() {
   group('JsonTreeView', () {
     testWidgets('renders top-level keys with nested objects expanded', (
@@ -166,14 +175,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Scoped to the row list: the typed query itself echoes as "zip" in
-      // the filter field's own EditableText, which find.text() also matches
-      // (it compares against EditableText.controller.text, not just Text
-      // widgets) — so an unscoped lookup would find 2.
-      expect(
-        find.descendant(of: find.byType(ListView), matching: find.text('zip')),
-        findsOneWidget,
-      );
+      // _row(): the typed query itself echoes as "zip" in the filter
+      // field's own EditableText, which find.text() also matches — so an
+      // unscoped lookup would find 2 (see _row's doc comment above).
+      expect(_row('zip'), findsOneWidget);
       expect(find.text('user'), findsOneWidget, reason: 'ancestor stays');
       expect(find.text('other'), findsNothing);
       expect(find.text('flag'), findsNothing);
@@ -202,6 +207,83 @@ void main() {
       expect(find.text('other'), findsOneWidget);
       expect(find.text('flag'), findsOneWidget);
     });
+
+    testWidgets(
+      'tapping a filter-ancestor-only row does not leak into the persisted '
+      'expansion set',
+      (tester) async {
+        await tester.pumpWidget(
+          _host({
+            'a': {
+              'b': {'c': 1},
+            },
+          }),
+        );
+        // Pre-filter: seeded expansion opens 'a' only.
+        expect(find.text('b'), findsOneWidget);
+        expect(find.text('c'), findsNothing);
+
+        await tester.enterText(
+          find.byKey(const ValueKey('tree_filter_field')),
+          'c',
+        );
+        await tester.pumpAndSettle();
+        // 'b' is auto-expanded only because the filter revealed it as an
+        // ancestor of the 'c' match — it was never manually toggled. (Query
+        // is 'c', so 'c' lookups are scoped via _row(); see its doc comment.)
+        expect(_row('c'), findsOneWidget);
+
+        await tester.tap(find.text('b'));
+        await tester.pumpAndSettle();
+        expect(
+          _row('c'),
+          findsNothing,
+          reason: 'collapsed in the filtered view',
+        );
+
+        await tester.enterText(
+          find.byKey(const ValueKey('tree_filter_field')),
+          '',
+        );
+        await tester.pumpAndSettle();
+
+        // Clearing the filter must restore exactly the pre-filter state:
+        // 'a' expanded (seed), 'b' visible but collapsed (never manually
+        // expanded), so 'c' stays hidden. Before the fix, tapping 'b' while
+        // it was filter-expanded added it to the persisted `_expanded` set,
+        // so 'c' would incorrectly reappear here.
+        expect(find.text('b'), findsOneWidget);
+        expect(find.text('c'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'tapping a filter-ancestor row toggles back open within the same '
+      'filter session',
+      (tester) async {
+        await tester.pumpWidget(
+          _host({
+            'a': {
+              'b': {'c': 1},
+            },
+          }),
+        );
+        await tester.enterText(
+          find.byKey(const ValueKey('tree_filter_field')),
+          'c',
+        );
+        await tester.pumpAndSettle();
+        expect(_row('c'), findsOneWidget);
+
+        await tester.tap(find.text('b')); // collapse
+        await tester.pumpAndSettle();
+        expect(_row('c'), findsNothing);
+
+        await tester.tap(find.text('b')); // re-expand, filter still active
+        await tester.pumpAndSettle();
+        expect(_row('c'), findsOneWidget);
+      },
+    );
 
     testWidgets('collapse-all hides children; expand-all reveals deep rows', (
       tester,

@@ -171,8 +171,23 @@ class _JsonTreeViewState extends State<JsonTreeView> {
   // is bounded. While a filter is active, its ancestorPaths are unioned into
   // the effective expansion (a transient lens; the user's own expansion set
   // is restored untouched when the filter clears).
+  //
+  // Toggling is always relative to the *effective* expansion, but only paths
+  // that are effectively expanded via `_expanded` itself get persisted there.
+  // A path that's effectively expanded ONLY because it's a filter ancestor
+  // never touches `_expanded` when toggled — collapsing/re-expanding it is
+  // recorded in `_filterCollapsedOverrides` instead, a session-visual layer
+  // scoped to the current filter. Without this split, tapping a
+  // filter-revealed ancestor to collapse it would find it absent from
+  // `_expanded` and *add* it (toggle sees "not expanded" -> "expand"),
+  // silently persisting an expansion the user never asked for — so clearing
+  // the filter would leave that node (and its children) visible when they
+  // shouldn't be. Overrides are cleared whenever the filter clears or the
+  // data changes, so "clear filter restores exactly the pre-filter expansion"
+  // holds.
   final TextEditingController _filterQuery = TextEditingController();
   JsonTreeFilterResult? _filter;
+  final Set<String> _filterCollapsedOverrides = {};
 
   @override
   void initState() {
@@ -192,6 +207,7 @@ class _JsonTreeViewState extends State<JsonTreeView> {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.data, widget.data)) {
       _expanded.clear();
+      _filterCollapsedOverrides.clear();
       _flat = null;
       _seedExpansion();
       // Re-run the live filter against the new data instance.
@@ -203,9 +219,14 @@ class _JsonTreeViewState extends State<JsonTreeView> {
 
   void _onFilterChanged() {
     setState(() {
-      _filter = _filterQuery.text.trim().isEmpty
+      final next = _filterQuery.text.trim().isEmpty
           ? null
           : filterJsonTree(data: widget.data, query: _filterQuery.text);
+      // The override layer is scoped to "a filter is active"; once it clears
+      // there is nothing left to override and stale entries must not leak
+      // into the next filter session.
+      if (next == null) _filterCollapsedOverrides.clear();
+      _filter = next;
       _flat = null;
     });
   }
@@ -216,6 +237,7 @@ class _JsonTreeViewState extends State<JsonTreeView> {
       _expanded
         ..clear()
         ..addAll(plan.containerPaths);
+      _filterCollapsedOverrides.clear();
       _flat = null;
     });
     if (plan.limitedToDepth) {
@@ -226,6 +248,7 @@ class _JsonTreeViewState extends State<JsonTreeView> {
   void _collapseAll() {
     setState(() {
       _expanded.clear();
+      _filterCollapsedOverrides.clear();
       _flat = null;
     });
   }
@@ -256,7 +279,17 @@ class _JsonTreeViewState extends State<JsonTreeView> {
 
   void _toggle(String path) {
     setState(() {
-      if (!_expanded.remove(path)) _expanded.add(path);
+      final filter = _filter;
+      if (filter != null && filter.ancestorPaths.contains(path)) {
+        // This node is open only because the active filter auto-expanded it
+        // as an ancestor of a match — never persist a toggle of it into
+        // `_expanded` (see the field-doc comment above `_filter`).
+        if (!_filterCollapsedOverrides.remove(path)) {
+          _filterCollapsedOverrides.add(path);
+        }
+      } else {
+        if (!_expanded.remove(path)) _expanded.add(path);
+      }
       _flat = null;
     });
   }
@@ -289,7 +322,8 @@ class _JsonTreeViewState extends State<JsonTreeView> {
     final filter = _filter;
     final effectiveExpanded = filter == null
         ? _expanded
-        : {..._expanded, ...filter.ancestorPaths};
+        : ({..._expanded, ...filter.ancestorPaths}
+            ..removeAll(_filterCollapsedOverrides));
     final nodes = _flat ??= flattenVisibleJsonTree(
       data: widget.data,
       expanded: effectiveExpanded,
@@ -363,9 +397,9 @@ class _JsonTreeViewState extends State<JsonTreeView> {
                     : (filter.matchCount == 1
                           ? '1 MATCH'
                           : '${filter.matchCount} MATCHES'),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: layout.inputPadding,
+                  vertical: layout.inputPaddingVertical,
                 ),
               ),
             ),
