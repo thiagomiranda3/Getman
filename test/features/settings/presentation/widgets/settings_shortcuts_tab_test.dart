@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
@@ -9,6 +10,8 @@ Widget _host(ThemeData theme) => MaterialApp(
 );
 
 void main() {
+  tearDown(() => debugDefaultTargetPlatformOverride = null);
+
   testWidgets('renders every catalog entry, new shortcuts included', (
     tester,
   ) async {
@@ -46,10 +49,12 @@ void main() {
   testWidgets('uses mac glyph key caps when platform is macOS', (
     tester,
   ) async {
-    final theme = brutalistTheme(
-      Brightness.light,
-    ).copyWith(platform: TargetPlatform.macOS);
-    await tester.pumpWidget(_host(theme));
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    await tester.pumpWidget(_host(brutalistTheme(Brightness.light)));
+    // Reset within the body: the testWidgets invariant check runs before
+    // tearDown, and it forbids a leaked foundation debug override.
+    debugDefaultTargetPlatformOverride = null;
+
     expect(find.text('⌘'), findsWidgets);
     expect(find.text('⌥'), findsWidgets);
     // Next/Previous tab render the Control glyph, never spelled Ctrl.

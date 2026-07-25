@@ -2,7 +2,19 @@
 // displays a shortcut (settings SHORTCUTS tab, the ⌘/ cheat-sheet overlay,
 // tooltip hints) reads shortcutCatalog()/shortcutHint() so they can never
 // drift. The BINDINGS themselves live in main.dart's buildAppShortcuts —
-// adding a shortcut means adding it in both places. Pure Dart, no imports.
+// adding a shortcut means adding it in both places. Also home to
+// useMetaShortcuts, the single macOS-vs-everything-else predicate every
+// platform-aware surface reads.
+
+import 'package:flutter/foundation.dart';
+
+/// Whether shortcuts use ⌘ (meta) as the primary modifier — true only on
+/// macOS (web on a Mac reports TargetPlatform.macOS too). THE single
+/// platform predicate: buildAppShortcuts(useMeta:) in main.dart, every E2
+/// tooltip hint, and the shortcut reference table/dialog all read this
+/// getter — never re-derive from Theme.of(context).platform or
+/// Platform.isMacOS.
+bool get useMetaShortcuts => defaultTargetPlatform == TargetPlatform.macOS;
 
 /// Every user-facing keyboard action Getman advertises. `reopenClosedTab`,
 /// `saveAll`, and `shortcutsHelp` are cataloged ahead of their intents

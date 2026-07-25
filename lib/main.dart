@@ -13,13 +13,13 @@
 // focused widgets inside every modal dialog (dialogs push onto the same
 // root Navigator) — that's how Cmd/Ctrl+N used to stack invisible tabs
 // behind an open dialog.
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/di/injection_container.dart' as di;
 import 'package:getman/core/navigation/app_router.dart';
 import 'package:getman/core/navigation/intents.dart';
+import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/network_service.dart';
@@ -114,11 +114,6 @@ const List<LogicalKeyboardKey> _tabDigitKeys = [
   LogicalKeyboardKey.digit9,
 ];
 
-/// Whether the primary shortcut modifier is ⌘ (meta) — true only on macOS,
-/// where every app uses Cmd; Ctrl is the primary modifier everywhere else.
-/// (Web on a Mac reports `TargetPlatform.macOS`, so browser builds match too.)
-bool get _useMetaPrimary => defaultTargetPlatform == TargetPlatform.macOS;
-
 /// Builds the global keyboard-shortcut map for one platform convention.
 ///
 /// [useMeta] picks the *primary* modifier: ⌘ on macOS, Ctrl on Windows/Linux.
@@ -179,7 +174,7 @@ Map<ShortcutActivator, Intent> buildAppShortcuts({required bool useMeta}) {
 /// (tab/send/save/focus).
 @visibleForTesting
 final Map<ShortcutActivator, Intent> appShortcuts = buildAppShortcuts(
-  useMeta: _useMetaPrimary,
+  useMeta: useMetaShortcuts,
 );
 
 class MyApp extends StatelessWidget {
