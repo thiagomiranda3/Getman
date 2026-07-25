@@ -11,7 +11,8 @@
 
 ## History
 
-- History is **read-only from the UI**: writes happen only inside `SendRequestUseCase`. `HistoryBloc` has a single (internal) `HistoryUpdated` event and subscribes to `watchHistory()` on construction; the data source uses `Hive.Box.watch()` and emits on every box change. Don't add UI-dispatched history events without wiring real UI to them.
+- History **appends** happen only inside `SendRequestUseCase`; since D3 (qol-wave-2) the UI also manages entries: `HistoryBloc` handles `DeleteHistoryEntry(id)` / `ClearHistory` (both optimistic emits — the debounced watch emission confirms) and `RestoreHistoryEntries(entries)` (the UNDO path — no optimistic emit; the repository's sentAt ordering places restored entries). The internal `HistoryUpdated` event still mirrors `watchHistory()` (subscribed on construction; the data source uses `Hive.Box.watch()`).
+- Each record carries a `DateTime? sentAt` (`HiveField(18)`, stamped by `HistoryRepositoryImpl.addToHistory`, excluded from the dedup signature). Reads stable-sort newest-first by `sentAt` (legacy `null` entries last); the HISTORY tab groups rows via `groupHistoryByDay` (`lib/features/history/domain/logic/history_day_grouper.dart`) under TODAY / YESTERDAY / `'MON, JUL 20'` / EARLIER headers.
 - **Dedup** in `HistoryLocalDataSourceImpl.addToHistory` is by request signature: `method + url + body` **plus the body-shape fields** `bodyType`, `graphqlVariables`, `bodyFilePath`, and `formFields` (so two GraphQL sends differing only in variables, or two different file uploads, are distinct history entries). Headers differences do not dedupe.
 - **Trim** uses a `while` loop so lowering `historyLimit` actually shrinks the box.
 - Ordering: the data source returns `box.values` in insertion order; the repository reverses so the UI gets newest-first.
