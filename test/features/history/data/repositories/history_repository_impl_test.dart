@@ -13,6 +13,7 @@ class _FakeHistoryDataSource implements HistoryLocalDataSource {
   final StreamController<void> controller = StreamController<void>.broadcast();
   int reads = 0;
   List<HttpRequestConfig> data = [];
+  final List<HttpRequestConfig> added = [];
 
   @override
   Future<List<HttpRequestConfig>> getHistory() async {
@@ -21,7 +22,9 @@ class _FakeHistoryDataSource implements HistoryLocalDataSource {
   }
 
   @override
-  Future<void> addToHistory(HttpRequestConfig config, int limit) async {}
+  Future<void> addToHistory(HttpRequestConfig config, int limit) async {
+    added.add(config);
+  }
 
   @override
   Stream<void> watch() => controller.stream;
@@ -64,4 +67,36 @@ void main() {
     final first = await repo.watchHistory().first;
     expect(first.single.url, 'https://a.dev');
   });
+
+  test('addToHistory stamps sentAt with the injected clock', () async {
+    final ds = _FakeHistoryDataSource();
+    final fixed = DateTime(2026, 7, 24, 9);
+    final repo = HistoryRepositoryImpl(ds, now: () => fixed);
+
+    await repo.addToHistory(
+      const HttpRequestConfigEntity(id: 'a', url: 'https://a.dev'),
+      10,
+    );
+
+    expect(ds.added, hasLength(1));
+    expect(ds.added.single.sentAt, fixed);
+  });
+
+  test(
+    'watchHistory sorts newest-first by sentAt with legacy (null) entries last',
+    () async {
+      final ds = _FakeHistoryDataSource()
+        ..data = [
+          HttpRequestConfig(id: 'legacy', url: 'https://legacy.dev'),
+          HttpRequestConfig(id: 'old', url: 'https://old.dev')
+            ..sentAt = DateTime(2026, 7, 20),
+          HttpRequestConfig(id: 'new', url: 'https://new.dev')
+            ..sentAt = DateTime(2026, 7, 24),
+        ];
+      final repo = HistoryRepositoryImpl(ds);
+
+      final list = await repo.watchHistory().first;
+      expect(list.map((e) => e.id), ['new', 'old', 'legacy']);
+    },
+  );
 }

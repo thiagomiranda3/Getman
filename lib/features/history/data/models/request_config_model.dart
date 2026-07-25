@@ -40,6 +40,7 @@ class HttpRequestConfig extends HiveObject {
     this.responseHeaders,
     this.statusCode,
     this.durationMs,
+    this.sentAt,
     this.disabledParams,
     this.disabledHeaderKeys,
   }) : id = id ?? const Uuid().v4(),
@@ -74,6 +75,7 @@ class HttpRequestConfig extends HiveObject {
         responseHeaders: entity.responseHeaders,
         statusCode: entity.statusCode,
         durationMs: entity.durationMs,
+        sentAt: entity.sentAt,
         disabledParams: entity.disabledParams
             .map(ParkedParamModel.fromEntity)
             .toList(),
@@ -133,6 +135,13 @@ class HttpRequestConfig extends HiveObject {
   @HiveField(15, defaultValue: '')
   String graphqlVariables;
 
+  // sentAt is deliberately NOT part of ==/hashCode below: dedup is
+  // signature-only, and a re-send of the same request must still dedup (the
+  // fresh record simply carries the newer stamp). Field indices 16/17 are
+  // taken by B1's disabledParams/disabledHeaderKeys.
+  @HiveField(18)
+  DateTime? sentAt;
+
   // B1 per-row disable. Nullable + defaultValue so records persisted before
   // this migration read back as "nothing disabled" — exactly today's
   // behavior. The disabled header rows themselves STAY in [headers]
@@ -170,6 +179,7 @@ class HttpRequestConfig extends HiveObject {
       responseHeaders: responseHeaders,
       statusCode: statusCode,
       durationMs: durationMs,
+      sentAt: sentAt,
       disabledParams: (disabledParams ?? const [])
           .map((p) => p.toEntity())
           .toList(),

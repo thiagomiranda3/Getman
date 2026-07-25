@@ -9,7 +9,7 @@ Persistence is `hive_ce` + `hive_ce_flutter` (the community Hive fork — binary
 | typeId | Model | Box name | Notes |
 |---|---|---|---|
 | 0 | `SettingsModel` | `settings` | Single key `'current'`; loaded synchronously in `main()` |
-| 1 | `HttpRequestConfig` | `history` | Shared between history and collection nodes; `List<ParkedParamModel>? disabledParams` at `HiveField(16)` + `List<String>? disabledHeaderKeys` at `HiveField(17)` (B1 per-row disable; next free: 18) |
+| 1 | `HttpRequestConfig` | `history` | Shared between history and collection nodes; `List<ParkedParamModel>? disabledParams` at `HiveField(16)` + `List<String>? disabledHeaderKeys` at `HiveField(17)` (B1 per-row disable); `DateTime? sentAt` at `HiveField(18)` (nullable — stamped by the history repository at send time, drives the HISTORY day-group headers, excluded from the dedup `==`/`hashCode`) (next free: 19) |
 | 2 | `HttpRequestTabModel` | `tabs` | Tab state including response cache; `List<StoredResponseModel> responseHistory` at `HiveField(9)` — time-travel history (next free: 10) |
 | 3 | `CollectionNode` | `collections` | Nested (children list stored as `HiveField(3)`); `String? description` at `HiveField(6)`; `List<SavedExampleModel> examples` at `HiveField(7)`; `Map<String,String> variables` at `HiveField(8)`; `List<String> secretKeys` at `HiveField(9)` (next free: 10) |
 | 4 | `EnvironmentModel` | `environments` | Flat list; `variables` is `Map<String, String>` at `HiveField(2)`; `List<String> secretKeys` at `HiveField(3)` (next free: 4) |

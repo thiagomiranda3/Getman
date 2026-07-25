@@ -6,6 +6,7 @@
 
 import 'dart:async';
 
+import 'package:collection/collection.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/error/guard.dart';
 import 'package:getman/features/history/data/datasources/history_local_data_source.dart';
@@ -13,8 +14,12 @@ import 'package:getman/features/history/data/models/request_config_model.dart';
 import 'package:getman/features/history/domain/repositories/history_repository.dart';
 
 class HistoryRepositoryImpl implements HistoryRepository {
-  HistoryRepositoryImpl(this.localDataSource);
+  HistoryRepositoryImpl(this.localDataSource, {DateTime Function()? now})
+    : _now = now ?? DateTime.now;
   final HistoryLocalDataSource localDataSource;
+
+  /// Injectable clock so tests can pin the sentAt stamp.
+  final DateTime Function() _now;
 
   /// One `addToHistory` performs up to ~3 box mutations (dedup delete + add +
   /// batched trim), each firing a watch event. Coalescing within this window
@@ -23,15 +28,36 @@ class HistoryRepositoryImpl implements HistoryRepository {
 
   Future<List<HttpRequestConfigEntity>> _read() => guardPersistence(() async {
     final models = await localDataSource.getHistory();
-    // Newest first: the UI always wants this ordering.
-    return models.reversed.map((m) => m.toEntity()).toList();
+    // Newest first. Reversed box insertion order is the tie-break baseline; a
+    // STABLE mergeSort by sentAt then overlays chronological order so
+    // restored entries (appended at the box tail by an UNDO) land back at
+    // their original slot. Legacy records without sentAt sink below all
+    // dated ones (they group under the EARLIER day header).
+    final entities = models.reversed.map((m) => m.toEntity()).toList();
+    mergeSort<HttpRequestConfigEntity>(entities, compare: _bySentAtDesc);
+    return entities;
   });
+
+  static int _bySentAtDesc(
+    HttpRequestConfigEntity a,
+    HttpRequestConfigEntity b,
+  ) {
+    final at = a.sentAt;
+    final bt = b.sentAt;
+    if (at == null && bt == null) return 0;
+    if (at == null) return 1;
+    if (bt == null) return -1;
+    return bt.compareTo(at);
+  }
 
   @override
   Future<void> addToHistory(HttpRequestConfigEntity config, int limit) =>
       guardPersistence(() async {
         await localDataSource.addToHistory(
-          HttpRequestConfig.fromEntity(config),
+          // Stamp the send time here (the data layer owns wall-clock
+          // concerns). Dedup ignores sentAt by design, so a re-send of the
+          // same request refreshes the stamp.
+          HttpRequestConfig.fromEntity(config)..sentAt = _now(),
           limit,
         );
       });

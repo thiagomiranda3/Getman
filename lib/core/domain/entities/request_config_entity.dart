@@ -51,6 +51,7 @@ class HttpRequestConfigEntity extends Equatable {
     this.responseHeaders,
     this.statusCode,
     this.durationMs,
+    this.sentAt,
     this.disabledParams = const [],
     this.disabledHeaderKeys = const {},
   });
@@ -81,6 +82,12 @@ class HttpRequestConfigEntity extends Equatable {
   final Map<String, String>? responseHeaders;
   final int? statusCode;
   final int? durationMs;
+
+  /// When this config was recorded into history (stamped by the history
+  /// repository at send time). Null for tab/collection configs and for
+  /// history records persisted before the field existed. Drives the HISTORY
+  /// tab's day-group headers (D3).
+  final DateTime? sentAt;
 
   /// Query params currently disabled in the params editor: removed from
   /// [url] (which only ever carries *enabled* params) and parked here with
@@ -129,6 +136,7 @@ class HttpRequestConfigEntity extends Equatable {
     Object? responseHeaders = _unset,
     Object? statusCode = _unset,
     Object? durationMs = _unset,
+    Object? sentAt = _unset,
     List<ParkedParamEntity>? disabledParams,
     Set<String>? disabledHeaderKeys,
   }) {
@@ -163,6 +171,7 @@ class HttpRequestConfigEntity extends Equatable {
       durationMs: identical(durationMs, _unset)
           ? this.durationMs
           : durationMs as int?,
+      sentAt: identical(sentAt, _unset) ? this.sentAt : sentAt as DateTime?,
       disabledParams: disabledParams ?? this.disabledParams,
       disabledHeaderKeys: disabledHeaderKeys ?? this.disabledHeaderKeys,
     );
@@ -188,6 +197,7 @@ class HttpRequestConfigEntity extends Equatable {
     responseHeaders: responseHeaders,
     statusCode: statusCode,
     durationMs: durationMs,
+    sentAt: sentAt,
     disabledParams: disabledParams,
     disabledHeaderKeys: disabledHeaderKeys,
   );
@@ -214,6 +224,7 @@ class HttpRequestConfigEntity extends Equatable {
     responseHeaders,
     statusCode,
     durationMs,
+    sentAt,
     disabledParams,
     disabledHeaderKeys,
   ];

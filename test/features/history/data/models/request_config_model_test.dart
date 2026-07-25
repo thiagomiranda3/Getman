@@ -314,4 +314,37 @@ void main() {
       expect(a == b, isTrue);
     });
   });
+
+  group('sentAt (D3 day grouping)', () {
+    test('fromEntity/toEntity round-trips sentAt', () {
+      final sentAt = DateTime(2026, 7, 24, 10, 30);
+      final entity = HttpRequestConfigEntity(
+        id: 'x',
+        url: 'https://a.dev',
+        sentAt: sentAt,
+      );
+      final model = HttpRequestConfig.fromEntity(entity);
+      expect(model.sentAt, sentAt);
+      expect(model.toEntity().sentAt, sentAt);
+    });
+
+    test('== and hashCode ignore sentAt (dedup is signature-only)', () {
+      final a = HttpRequestConfig(url: 'https://a.dev')
+        ..sentAt = DateTime(2026, 7, 23);
+      final b = HttpRequestConfig(url: 'https://a.dev')
+        ..sentAt = DateTime(2026, 7, 24);
+      expect(a == b, isTrue);
+      expect(a.hashCode, b.hashCode);
+    });
+
+    test('entity copyWith preserves sentAt and clears it via the sentinel', () {
+      final entity = HttpRequestConfigEntity(
+        id: 'x',
+        sentAt: DateTime(2026, 7, 24),
+      );
+      expect(entity.copyWith(method: 'POST').sentAt, DateTime(2026, 7, 24));
+      expect(entity.copyWith(sentAt: null).sentAt, isNull);
+      expect(entity.withId('y').sentAt, DateTime(2026, 7, 24));
+    });
+  });
 }
