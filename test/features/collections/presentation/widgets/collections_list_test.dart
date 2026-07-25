@@ -419,9 +419,13 @@ void main() {
 
       expect(find.text('NestedReq'), findsNothing);
 
-      // Verify it stays collapsed by triggering a rebuild (e.g., switching
-      // themes) — _preSearchExpandedIds doesn't resurrect the old state.
-      bloc.add(const ReplaceCollections([folder]));
+      // Verify it stays collapsed by triggering a rebuild via an unrelated
+      // tree mutation — not a no-op ReplaceCollections. Bloc.emit() skips
+      // emitting a state that equals the current one (bloc_base.dart), so
+      // re-adding the identical `folder` value would never complete
+      // `bloc.stream.first`. _preSearchExpandedIds must not resurrect the old
+      // expansion on this rebuild.
+      bloc.add(const RenameNode('F4', 'ApiFolderRenamed'));
       await bloc.stream.first;
       await tester.pumpAndSettle();
 
@@ -439,7 +443,9 @@ void main() {
 
       const nested = CollectionNodeEntity(
         id: 'DEEP',
-        name: 'PostCreateUser',
+        // Deliberately no "post" substring in the name — this must match by
+        // config.method alone, not piggyback on a name match.
+        name: 'CreateUserRecord',
         isFolder: false,
         config: HttpRequestConfigEntity(
           id: 'DEEP',
@@ -464,9 +470,13 @@ void main() {
       await tester.pumpWidget(host(bloc, tabs));
       await tester.pumpAndSettle();
 
-      // Both ancestor folders are collapsed.
-      expect(find.text('Users'), findsOneWidget);
-      expect(find.text('PostCreateUser'), findsNothing);
+      // Both ancestor folders are collapsed: the root folder always renders
+      // (TreeView roots are active regardless of expansion), but its child
+      // folder — and the doubly-nested request — are inactive until an
+      // ancestor expands.
+      expect(find.text('Api'), findsOneWidget);
+      expect(find.text('Users'), findsNothing);
+      expect(find.text('CreateUserRecord'), findsNothing);
 
       // Search by method only (no name match).
       await tester.enterText(find.byType(TextField), 'post');
@@ -475,7 +485,7 @@ void main() {
 
       // Ancestor folders auto-expanded to show the method-matched request.
       expect(find.text('Users'), findsOneWidget);
-      expect(find.text('PostCreateUser'), findsOneWidget);
+      expect(find.text('CreateUserRecord'), findsOneWidget);
     },
   );
 }
