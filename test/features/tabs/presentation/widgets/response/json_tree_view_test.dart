@@ -285,6 +285,44 @@ void main() {
       },
     );
 
+    testWidgets(
+      'switching the filter query clears stale collapse overrides so the '
+      "new query's auto-expansion is not suppressed",
+      (tester) async {
+        await tester.pumpWidget(
+          _host({
+            'root': {
+              'container': {'itemA': 1, 'itemB': 2},
+            },
+          }),
+        );
+
+        await tester.enterText(
+          find.byKey(const ValueKey('tree_filter_field')),
+          'itemA',
+        );
+        await tester.pumpAndSettle();
+        expect(_row('itemA'), findsOneWidget);
+
+        // 'container' is open only as a filter ancestor of 'itemA'; collapse
+        // it — this must record a session-visual override, not a persisted
+        // one.
+        await tester.tap(find.text('container'));
+        await tester.pumpAndSettle();
+        expect(_row('itemA'), findsNothing);
+
+        // Switching to a different, non-empty query is a new filter — the
+        // stale 'container' override recorded under the 'itemA' query must
+        // not suppress auto-expansion for 'itemB'.
+        await tester.enterText(
+          find.byKey(const ValueKey('tree_filter_field')),
+          'itemB',
+        );
+        await tester.pumpAndSettle();
+        expect(_row('itemB'), findsOneWidget);
+      },
+    );
+
     testWidgets('collapse-all hides children; expand-all reveals deep rows', (
       tester,
     ) async {

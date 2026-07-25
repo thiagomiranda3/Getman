@@ -182,9 +182,11 @@ class _JsonTreeViewState extends State<JsonTreeView> {
   // `_expanded` and *add* it (toggle sees "not expanded" -> "expand"),
   // silently persisting an expansion the user never asked for — so clearing
   // the filter would leave that node (and its children) visible when they
-  // shouldn't be. Overrides are cleared whenever the filter clears or the
-  // data changes, so "clear filter restores exactly the pre-filter expansion"
-  // holds.
+  // shouldn't be. Overrides are cleared whenever the filter clears, the
+  // query text changes to a different value (a changed query IS a new
+  // filter — a collapse recorded under the old query must not suppress
+  // auto-expansion under the new one), or the data changes, so "clear filter
+  // restores exactly the pre-filter expansion" holds.
   final TextEditingController _filterQuery = TextEditingController();
   JsonTreeFilterResult? _filter;
   final Set<String> _filterCollapsedOverrides = {};
@@ -222,10 +224,13 @@ class _JsonTreeViewState extends State<JsonTreeView> {
       final next = _filterQuery.text.trim().isEmpty
           ? null
           : filterJsonTree(data: widget.data, query: _filterQuery.text);
-      // The override layer is scoped to "a filter is active"; once it clears
-      // there is nothing left to override and stale entries must not leak
-      // into the next filter session.
-      if (next == null) _filterCollapsedOverrides.clear();
+      // The override layer is scoped to "the currently active filter" — ANY
+      // query change (including to a different non-empty query, not just to
+      // empty) starts a new filter session, so overrides from the previous
+      // query must never carry over: otherwise a collapse recorded under
+      // query A could keep suppressing auto-expansion for a match that only
+      // exists under query B.
+      _filterCollapsedOverrides.clear();
       _filter = next;
       _flat = null;
     });
