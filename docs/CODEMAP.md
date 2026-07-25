@@ -126,6 +126,7 @@ widgets + screens). Shared cross-feature code lives under `lib/core/`. See
 | `lib/features/history/data/datasources` | `history_local_data_source.dart` (dedup by signature, trim, `Box.watch()`). |
 | `lib/features/history/data/models` | `request_config_model.dart` (typeId 1; `==` excludes id). |
 | `lib/features/history/data/repositories` | `history_repository_impl.dart` (debounced newest-first watch). |
+| `lib/features/history/domain/logic` | Pure history helpers: `history_day_grouper.dart` (TODAY / YESTERDAY / weekday day-group headers for the HISTORY tab). |
 | `lib/features/history/domain/repositories` | `history_repository.dart` (abstract). |
 | `lib/features/history/domain/usecases` | `history_usecases.dart`. |
 | `lib/features/history/presentation/bloc` | `history_bloc.dart` (no load event; subscribes on construct). |
