@@ -41,4 +41,46 @@ void main() {
     expect(e.exitCode, 3);
     expect(e.toString(), contains('boom'));
   });
+
+  // The three calls below need the gh binary but no login: outside a git
+  // repo gh fails fast (Process.run closes stdin, so it can never prompt).
+  // They pin the "throws, never hangs" contract and the best-effort null of
+  // defaultBranch. Skipped silently when gh is not installed.
+
+  test(
+    'createPr outside a repo throws a GhException with the exit code',
+    () async {
+      if (!await ghPresent()) return; // skip when gh missing
+      await expectLater(
+        gh.createPr(
+          tmp.path,
+          base: 'main',
+          title: 'title',
+          body: 'body',
+          draft: true,
+        ),
+        throwsA(
+          isA<GhException>()
+              .having((e) => e.exitCode, 'exitCode', isNot(0))
+              .having((e) => e.message, 'message', isNotEmpty),
+        ),
+      );
+    },
+  );
+
+  test('listPrs outside a repo throws a GhException', () async {
+    if (!await ghPresent()) return;
+    await expectLater(
+      gh.listPrs(tmp.path),
+      throwsA(isA<GhException>()),
+    );
+  });
+
+  test(
+    'defaultBranch outside a repo is null (best-effort, never throws)',
+    () async {
+      if (!await ghPresent()) return;
+      expect(await gh.defaultBranch(tmp.path), isNull);
+    },
+  );
 }

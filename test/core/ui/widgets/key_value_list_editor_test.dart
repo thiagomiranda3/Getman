@@ -1,4 +1,5 @@
 import 'package:collection/collection.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -654,6 +655,119 @@ void main() {
           findsOneWidget,
           reason: "the enabled neighbour ('a') keeps its drag handle",
         );
+      },
+    );
+  });
+
+  group('phone layout + row hover', () {
+    testWidgets('phone width stacks the value field under the key row', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(600, 900); // phone tier ≤ 700
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await pump(tester, const _EchoHarness(initial: {'Accept': '*/*'}));
+
+      final keyRect = tester.getRect(
+        find.widgetWithText(TextField, 'KEY').first,
+      );
+      final valRect = tester.getRect(
+        find.widgetWithText(TextField, 'VALUE').first,
+      );
+      expect(
+        valRect.top,
+        greaterThanOrEqualTo(keyRect.bottom),
+        reason: 'value stacks below the key row instead of beside it',
+      );
+      expect(
+        valRect.width,
+        greaterThan(keyRect.width),
+        reason: 'the value field spans the full row width on phones',
+      );
+    });
+
+    testWidgets(
+      'phone layout keeps checkbox/drag/duplicate affordances on the key row',
+      (tester) async {
+        tester.view.physicalSize = const Size(600, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+        await pump(
+          tester,
+          const _ReorderDuplicateHarness(
+            initial: {'a': '1', 'b': '2'},
+            disabledKeys: {'b'},
+          ),
+        );
+
+        expect(find.byType(Checkbox), findsNWidgets(2));
+        // Only the enabled row ('a') gets drag + duplicate; 'b' is disabled.
+        expect(find.byIcon(Icons.drag_indicator), findsOneWidget);
+        expect(find.byIcon(Icons.content_copy), findsOneWidget);
+        expect(find.byIcon(Icons.delete_outline), findsNWidgets(3));
+      },
+    );
+
+    testWidgets(
+      'phone layout keeps the secret lock toggle on the key row '
+      '(env editor)',
+      (tester) async {
+        tester.view.physicalSize = const Size(600, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+        await pump(
+          tester,
+          const _SecretHarness(
+            initialVars: {'TOKEN': 'abc123'},
+            initialSecrets: {'TOKEN'},
+          ),
+        );
+
+        expect(find.byIcon(Icons.lock_outline), findsOneWidget);
+        expect(find.byIcon(Icons.visibility), findsOneWidget);
+        expect(
+          tester
+              .widgetList<TextField>(find.byType(TextField))
+              .any((f) => f.obscureText),
+          isTrue,
+          reason: 'the secret value stays obscured on the phone layout too',
+        );
+      },
+    );
+
+    testWidgets(
+      'hovering a row applies the hover decoration and exit clears it',
+      (tester) async {
+        await pump(tester, const _EchoHarness(initial: {'Accept': '*/*'}));
+
+        AnimatedContainer rowContainer() => tester.widget<AnimatedContainer>(
+          find
+              .ancestor(
+                of: find.text('Accept'),
+                matching: find.byType(AnimatedContainer),
+              )
+              .first,
+        );
+        Color? rowColor() =>
+            (rowContainer().decoration as BoxDecoration?)?.color;
+        final theme = Theme.of(tester.element(find.text('Accept')));
+
+        expect(rowColor(), Colors.transparent);
+
+        final gesture = await tester.createGesture(
+          kind: PointerDeviceKind.mouse,
+        );
+        await gesture.addPointer(location: const Offset(750, 550));
+        addTearDown(gesture.removePointer);
+        await tester.pump();
+
+        await gesture.moveTo(tester.getCenter(find.text('Accept')));
+        await tester.pumpAndSettle();
+        expect(rowColor(), theme.hoverColor);
+
+        await gesture.moveTo(const Offset(750, 550));
+        await tester.pumpAndSettle();
+        expect(rowColor(), Colors.transparent);
       },
     );
   });
