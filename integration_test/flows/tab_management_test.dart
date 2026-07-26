@@ -29,10 +29,32 @@ void main() {
     await newTab($);
     expect(tabCount($), 3);
 
+    // The first-run seed tab (httpbin URL, unlinked) counts as unsaved work,
+    // so the bulk close is gated behind the UNSAVED CHANGES confirm (D6).
+    await openTabMenu($, 1);
+    await $('CLOSE OTHERS').tap();
+    await $.pumpAndSettle();
+    expect($('UNSAVED CHANGES'), findsOneWidget);
+    await $('CLOSE ANYWAY').tap();
+    await $.pumpAndSettle();
+
+    expect(tabCount($), 1);
+  });
+
+  patrolWidgetTest('close others with no unsaved work skips the confirm', (
+    $,
+  ) async {
+    await bootGetman($);
+    await enterUrl($, ''); // blank the seed URL so every tab is pristine
+    await newTab($);
+    await newTab($);
+    expect(tabCount($), 3);
+
     await openTabMenu($, 1);
     await $('CLOSE OTHERS').tap();
     await $.pumpAndSettle();
 
+    expect($('UNSAVED CHANGES'), findsNothing);
     expect(tabCount($), 1);
   });
 
