@@ -146,14 +146,65 @@ void main() {
 
   testWidgets('tapping the chip opens the tab switcher sheet', (tester) async {
     final panel = _panel('p1', 'Panel 1', ['t1']);
-    when(() => bloc.state).thenReturn(
-      TabsState(panels: [panel], activePanelId: 'p1', tabs: panel.tabs),
+    final state = TabsState(
+      panels: [panel],
+      activePanelId: 'p1',
+      tabs: panel.tabs,
     );
+    when(() => bloc.state).thenReturn(state);
 
     await tester.pumpWidget(_host(bloc));
-    await tester.tap(find.byType(TabChip));
+
+    await tester.tap(find.text('Panel 1 · 1/1 ▾'));
     await tester.pumpAndSettle();
 
     expect(find.byType(TabSwitcherSheet), findsOneWidget);
+    expect(find.text('OPEN TABS · 1'), findsOneWidget);
+
+    // Closing a row from the sheet routes through the chip's onRequestClose
+    // bridge and dispatches RemoveTab once confirmed.
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('switcher_t1')),
+        matching: find.byIcon(Icons.close),
+      ),
+    );
+    await tester.pumpAndSettle();
+    verify(() => bloc.add(const RemoveTab('t1'))).called(1);
+  });
+
+  testWidgets('chip title tracks tab-title emissions while the user types', (
+    tester,
+  ) async {
+    final panel = _panel('p1', 'Panel 1', ['t1']);
+    final before = TabsState(
+      panels: [panel],
+      activePanelId: 'p1',
+      tabs: panel.tabs,
+    );
+    // Same tab, now with a URL → displayTitle changes → buildWhen must fire.
+    const typedTab = HttpRequestTabEntity(
+      tabId: 't1',
+      config: HttpRequestConfigEntity(id: 't1', url: 'https://typed.dev/x'),
+    );
+    const typedPanel = PanelEntity(
+      id: 'p1',
+      name: 'Panel 1',
+      tabs: [typedTab],
+      activeTabId: 't1',
+    );
+    final after = TabsState(
+      panels: const [typedPanel],
+      activePanelId: 'p1',
+      tabs: typedPanel.tabs,
+    );
+    whenListen(bloc, Stream.fromIterable([after]), initialState: before);
+
+    await tester.pumpWidget(_host(bloc));
+    expect(find.text('NEW REQUEST'), findsOneWidget);
+
+    await tester.pump(); // deliver the emission
+    expect(find.text('https://typed.dev/x'), findsOneWidget);
+    expect(find.text('NEW REQUEST'), findsNothing);
   });
 }

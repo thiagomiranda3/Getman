@@ -1,8 +1,10 @@
 // Widget tests for UrlBar: URL field and SEND button presence, cURL paste
-// auto-parse, SEND button marks tab as isSending, and WS/SSE shows
-// RealtimeButton instead. Uses a real TabsBloc with mocked repository +
-// use case, plus mock blocs for EnvironmentsBloc/SettingsBloc/CollectionsBloc/
-// RealtimeBloc.
+// auto-parse, SEND button marks tab as isSending, WS/SSE shows RealtimeButton
+// instead, CANCEL mid-send, code-export live re-read, layout toggle, MCP
+// connect button, the narrow-width overflow menu, the {{var}} hover popover,
+// and env/settings/collections re-sync listeners. Uses a real TabsBloc with
+// mocked repository + use case, plus mock blocs for EnvironmentsBloc/
+// SettingsBloc/CollectionsBloc/RealtimeBloc/McpBloc.
 
 import 'dart:async';
 
@@ -13,6 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/navigation/url_focus_registry.dart';
+import 'package:getman/core/network/cancel_handle.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
@@ -21,11 +24,15 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
+import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/history/presentation/bloc/history_state.dart';
+import 'package:getman/features/mcp/presentation/bloc/mcp_bloc.dart';
+import 'package:getman/features/mcp/presentation/bloc/mcp_event.dart';
+import 'package:getman/features/mcp/presentation/bloc/mcp_state.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_event.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_state.dart';
@@ -58,6 +65,8 @@ class MockHistoryBloc extends Mock implements HistoryBloc {}
 
 class MockRealtimeBloc extends Mock implements RealtimeBloc {}
 
+class MockMcpBloc extends Mock implements McpBloc {}
+
 // Fake fallback values.
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 
@@ -70,6 +79,8 @@ class _FakeSettingsEvent extends Fake implements SettingsEvent {}
 class _FakeCollectionsEvent extends Fake implements CollectionsEvent {}
 
 class _FakeRealtimeEvent extends Fake implements RealtimeEvent {}
+
+class _FakeMcpEvent extends Fake implements McpEvent {}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -108,6 +119,7 @@ MockSettingsBloc _defaultSettingsBloc() {
     () => b.state,
   ).thenReturn(const SettingsState(settings: SettingsEntity()));
   when(() => b.stream).thenAnswer((_) => const Stream.empty());
+  when(() => b.add(any())).thenReturn(null);
   return b;
 }
 
@@ -135,6 +147,14 @@ MockRealtimeBloc _defaultRealtimeBloc() {
   return b;
 }
 
+MockMcpBloc _defaultMcpBloc() {
+  final b = MockMcpBloc();
+  when(() => b.state).thenReturn(const McpState());
+  when(() => b.stream).thenAnswer((_) => const Stream.empty());
+  when(() => b.add(any())).thenReturn(null);
+  return b;
+}
+
 Future<void> _pump(
   WidgetTester tester,
   TabsBloc bloc,
@@ -144,7 +164,11 @@ Future<void> _pump(
   MockCollectionsBloc? collectionsBloc,
   MockRealtimeBloc? realtimeBloc,
   MockHistoryBloc? historyBloc,
+  MockMcpBloc? mcpBloc,
+  double? width,
+  VoidCallback? onSave,
 }) async {
+  final urlBar = UrlBar(tabId: tabId, onSave: onSave ?? () {});
   await tester.pumpWidget(
     RepositoryProvider<UrlFocusRegistry>(
       create: (_) => UrlFocusRegistry(),
@@ -169,8 +193,16 @@ Future<void> _pump(
               BlocProvider<HistoryBloc>.value(
                 value: historyBloc ?? _defaultHistoryBloc(),
               ),
+              BlocProvider<McpBloc>.value(
+                value: mcpBloc ?? _defaultMcpBloc(),
+              ),
             ],
-            child: UrlBar(tabId: tabId, onSave: () {}),
+            // width < 560 exercises the isNarrow overflow-menu layout.
+            child: width == null
+                ? urlBar
+                : Center(
+                    child: SizedBox(width: width, child: urlBar),
+                  ),
           ),
         ),
       ),
@@ -192,6 +224,7 @@ void main() {
     registerFallbackValue(_FakeSettingsEvent());
     registerFallbackValue(_FakeCollectionsEvent());
     registerFallbackValue(_FakeRealtimeEvent());
+    registerFallbackValue(_FakeMcpEvent());
     registerFallbackValue(
       const HttpRequestTabEntity(
         tabId: 'fallback',
@@ -877,6 +910,417 @@ void main() {
         ),
       );
       expect(send.onPressed, isNotNull, reason: 'chip must never block SEND');
+
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
+
+  testWidgets('CANCEL face mid-send cancels the in-flight request handle', (
+    tester,
+  ) async {
+    const tab = HttpRequestTabEntity(
+      tabId: 'c1',
+      config: HttpRequestConfigEntity(id: 'c1', url: 'https://example.com'),
+    );
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+
+    final completer = Completer<HttpResponseEntity>();
+    NetworkCancelHandle? capturedHandle;
+    when(
+      () => sendRequestUseCase.call(
+        config: any(named: 'config'),
+        envVars: any(named: 'envVars'),
+        cancelHandle: any(named: 'cancelHandle'),
+      ),
+    ).thenAnswer((invocation) {
+      capturedHandle =
+          invocation.namedArguments[#cancelHandle] as NetworkCancelHandle?;
+      return completer.future;
+    });
+
+    await _pump(tester, bloc, 'c1');
+
+    await tester.tap(find.byKey(const ValueKey('send')));
+    await tester.pump();
+    expect(bloc.state.tabs.byId('c1')!.isSending, isTrue);
+    expect(capturedHandle, isNotNull);
+    expect(capturedHandle!.isCancelled, isFalse);
+
+    // Mid-send the button shows the CANCEL face — pressing it must cancel
+    // the handle that was passed into the use case.
+    await tester.tap(find.byKey(const ValueKey('cancel')));
+    await tester.pump();
+
+    expect(
+      capturedHandle!.isCancelled,
+      isTrue,
+      reason: 'CANCEL must dispatch CancelRequest for the in-flight handle',
+    );
+
+    completer.completeError(Exception('test-cancel'), StackTrace.current);
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pump(const Duration(seconds: 11));
+  });
+
+  testWidgets(
+    'code-export button opens GENERATE CODE with the live (re-read) URL',
+    (tester) async {
+      const tab = HttpRequestTabEntity(
+        tabId: 'ce1',
+        config: HttpRequestConfigEntity(id: 'ce1', url: 'https://old.dev'),
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      await _pump(tester, bloc, 'ce1');
+
+      // Edit the URL — UrlBar's buildWhen excludes url edits, so the builder
+      // snapshot goes stale. The export must re-read the live tab.
+      await tester.enterText(
+        find.byKey(const ValueKey('url_field')),
+        'https://edited.dev/v2',
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('code_export_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('GENERATE CODE'), findsOneWidget);
+      final snippet = tester.widget<SelectableText>(
+        find.byKey(const ValueKey('generated_code_text')),
+      );
+      expect(
+        snippet.data,
+        contains('https://edited.dev/v2'),
+        reason: 'export must use the live config, not the stale snapshot',
+      );
+
+      await tester.tap(find.text('CLOSE'));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
+
+  testWidgets(
+    'layout toggle button dispatches UpdateVerticalLayout with the flipped '
+    'value',
+    (tester) async {
+      const tab = HttpRequestTabEntity(
+        tabId: 'lt1',
+        config: HttpRequestConfigEntity(id: 'lt1', url: 'https://x.dev'),
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      final settingsBloc = _defaultSettingsBloc(); // isVerticalLayout: false
+      await _pump(tester, bloc, 'lt1', settingsBloc: settingsBloc);
+
+      await tester.tap(find.byTooltip('Vertical Layout'));
+      await tester.pump();
+
+      verify(
+        () => settingsBloc.add(
+          const UpdateVerticalLayout(isVerticalLayout: true),
+        ),
+      ).called(1);
+
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
+
+  testWidgets('MCP kind shows the MCP connect button instead of SEND', (
+    tester,
+  ) async {
+    const tab = HttpRequestTabEntity(
+      tabId: 'm1',
+      config: HttpRequestConfigEntity(
+        id: 'm1',
+        url: 'https://mcp.example.com',
+        kind: RequestKind.mcp,
+      ),
+    );
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+
+    await _pump(tester, bloc, 'm1');
+
+    expect(find.byKey(const ValueKey('mcp_connect_button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('send')), findsNothing);
+    expect(find.byKey(const ValueKey('realtime_connect_button')), findsNothing);
+
+    await tester.pump(const Duration(seconds: 11));
+  });
+
+  group('narrow-width overflow menu', () {
+    testWidgets(
+      'collapses code/save/layout buttons; SAVE TO COLLECTION invokes onSave',
+      (tester) async {
+        const tab = HttpRequestTabEntity(
+          tabId: 'n1',
+          config: HttpRequestConfigEntity(id: 'n1', url: 'https://x.dev'),
+        );
+        final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+        addTearDown(bloc.close);
+
+        var saved = false;
+        await _pump(tester, bloc, 'n1', width: 520, onSave: () => saved = true);
+
+        // The three wide-layout buttons collapse behind "More actions".
+        expect(find.byKey(const ValueKey('code_export_button')), findsNothing);
+        expect(find.byKey(const ValueKey('save_request_button')), findsNothing);
+        expect(find.byTooltip('More actions'), findsOneWidget);
+
+        await tester.tap(find.byTooltip('More actions'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('SAVE TO COLLECTION'));
+        await tester.pumpAndSettle();
+
+        expect(saved, isTrue, reason: 'overflow SAVE must call onSave');
+
+        await tester.pump(const Duration(seconds: 11));
+      },
+    );
+
+    testWidgets(
+      'GENERATE CODE opens the dialog and the layout entry dispatches '
+      'UpdateVerticalLayout',
+      (tester) async {
+        const tab = HttpRequestTabEntity(
+          tabId: 'n2',
+          config: HttpRequestConfigEntity(id: 'n2', url: 'https://nrw.dev'),
+        );
+        final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+        addTearDown(bloc.close);
+
+        final settingsBloc = _defaultSettingsBloc(); // isVerticalLayout: false
+        await _pump(
+          tester,
+          bloc,
+          'n2',
+          width: 520,
+          settingsBloc: settingsBloc,
+        );
+
+        await tester.tap(find.byTooltip('More actions'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('GENERATE CODE'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('GENERATE CODE'), findsOneWidget);
+        final snippet = tester.widget<SelectableText>(
+          find.byKey(const ValueKey('generated_code_text')),
+        );
+        expect(snippet.data, contains('https://nrw.dev'));
+
+        await tester.tap(find.text('CLOSE'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byTooltip('More actions'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('VERTICAL LAYOUT'));
+        await tester.pumpAndSettle();
+
+        verify(
+          () => settingsBloc.add(
+            const UpdateVerticalLayout(isVerticalLayout: true),
+          ),
+        ).called(1);
+
+        await tester.pump(const Duration(seconds: 11));
+      },
+    );
+  });
+
+  testWidgets(
+    'hovering a {{var}} token shows the layered resolution popover '
+    '(collection var wins over nothing, env label shown)',
+    (tester) async {
+      const tab = HttpRequestTabEntity(
+        tabId: 'hp1',
+        collectionNodeId: 'req1',
+        config: HttpRequestConfigEntity(
+          id: 'hp1',
+          url: 'https://{{base}}/path',
+        ),
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      const folder = CollectionNodeEntity(
+        id: 'folder1',
+        name: 'Folder',
+        variables: {'base': 'collection.example.com'},
+        children: [
+          CollectionNodeEntity(id: 'req1', name: 'Req', isFolder: false),
+        ],
+      );
+      final collectionsBloc = MockCollectionsBloc();
+      when(
+        () => collectionsBloc.state,
+      ).thenReturn(CollectionsState(collections: const [folder]));
+      when(
+        () => collectionsBloc.stream,
+      ).thenAnswer((_) => const Stream.empty());
+
+      await _pump(tester, bloc, 'hp1', collectionsBloc: collectionsBloc);
+
+      // Drive the highlight controller's hover callback directly (the same
+      // sink the field's token hit-testing feeds) — pointer-positioning over
+      // a specific painted token is not reproducible across font rasters.
+      final field = tester.widget<TextField>(
+        find.byKey(const ValueKey('url_field')),
+      );
+      final controller = field.controller! as VariableHighlightController;
+      controller.onVariableEnter!('base', const Offset(200, 40));
+      await tester.pump();
+
+      expect(find.text('{{base}}'), findsOneWidget);
+      expect(find.text('collection.example.com'), findsOneWidget);
+
+      // Leaving the token schedules the delayed hide.
+      controller.onVariableExit!();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.text('{{base}}'), findsNothing);
+
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
+
+  testWidgets('curl paste with a JSON body prettifies the body off-thread', (
+    tester,
+  ) async {
+    const tab = HttpRequestTabEntity(
+      tabId: 'cb1',
+      config: HttpRequestConfigEntity(id: 'cb1'),
+    );
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+
+    await _pump(tester, bloc, 'cb1');
+
+    await tester.enterText(
+      find.byKey(const ValueKey('url_field')),
+      'curl -X POST https://example.com -d \'{"a":1}\'',
+    );
+    await tester.pump();
+    // prettify() hops to a REAL isolate via compute(); fake-async pumps never
+    // advance it, so poll under real async until the prettified body lands.
+    await tester.runAsync(() async {
+      for (var i = 0; i < 100; i++) {
+        if (bloc.state.tabs.byId('cb1')!.config.body.contains('\n')) break;
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+    });
+    await tester.pump();
+
+    final updated = bloc.state.tabs.byId('cb1')!.config;
+    expect(updated.method, 'POST');
+    expect(
+      updated.body,
+      contains('\n'),
+      reason: 'the parsed body must arrive prettified, not single-line',
+    );
+    expect(updated.body, contains('"a": 1'));
+
+    await tester.pump(const Duration(seconds: 11));
+  });
+
+  testWidgets(
+    'environment/settings/collections emissions re-sync {{var}} highlighting',
+    (tester) async {
+      const tab = HttpRequestTabEntity(
+        tabId: 'ls1',
+        config: HttpRequestConfigEntity(
+          id: 'ls1',
+          url: 'https://{{base}}/path',
+        ),
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      final envController = StreamController<EnvironmentsState>.broadcast();
+      final settingsController = StreamController<SettingsState>.broadcast();
+      final collectionsController =
+          StreamController<CollectionsState>.broadcast();
+      addTearDown(envController.close);
+      addTearDown(settingsController.close);
+      addTearDown(collectionsController.close);
+
+      final envBloc = MockEnvironmentsBloc();
+      when(() => envBloc.state).thenReturn(const EnvironmentsState());
+      when(() => envBloc.stream).thenAnswer((_) => envController.stream);
+
+      final settingsBloc = MockSettingsBloc();
+      when(
+        () => settingsBloc.state,
+      ).thenReturn(const SettingsState(settings: SettingsEntity()));
+      when(
+        () => settingsBloc.stream,
+      ).thenAnswer((_) => settingsController.stream);
+
+      final collectionsBloc = MockCollectionsBloc();
+      when(() => collectionsBloc.state).thenReturn(CollectionsState());
+      when(
+        () => collectionsBloc.stream,
+      ).thenAnswer((_) => collectionsController.stream);
+
+      await _pump(
+        tester,
+        bloc,
+        'ls1',
+        envBloc: envBloc,
+        settingsBloc: settingsBloc,
+        collectionsBloc: collectionsBloc,
+      );
+
+      VariableHighlightController urlController() =>
+          tester
+                  .widget<TextField>(find.byKey(const ValueKey('url_field')))
+                  .controller!
+              as VariableHighlightController;
+
+      expect(urlController().variables.containsKey('base'), isFalse);
+
+      // 1. Environments change: the env now exists, but no active id yet.
+      final env = EnvironmentEntity(
+        id: 'e1',
+        name: 'Dev',
+        variables: const {'base': 'env.example.com'},
+      );
+      final envState = EnvironmentsState(environments: [env]);
+      when(() => envBloc.state).thenReturn(envState);
+      envController.add(envState);
+      await tester.pump();
+      expect(
+        urlController().variables.containsKey('base'),
+        isFalse,
+        reason: 'no active environment id yet',
+      );
+
+      // 2. Settings change: activating the environment must re-sync.
+      const activeSettings = SettingsState(
+        settings: SettingsEntity(activeEnvironmentId: 'e1'),
+      );
+      when(() => settingsBloc.state).thenReturn(activeSettings);
+      settingsController.add(activeSettings);
+      await tester.pump();
+      expect(
+        urlController().variables['base'],
+        'env.example.com',
+        reason: 'activating an environment must re-color the URL tokens',
+      );
+
+      // 3. Collections change: the listener re-syncs without breaking the
+      // already-resolved env layer.
+      final collState = CollectionsState(
+        collections: const [CollectionNodeEntity(id: 'f1', name: 'F')],
+      );
+      when(() => collectionsBloc.state).thenReturn(collState);
+      collectionsController.add(collState);
+      await tester.pump();
+      expect(urlController().variables['base'], 'env.example.com');
 
       await tester.pump(const Duration(seconds: 11));
     },

@@ -34,6 +34,7 @@ Future<void> _pumpSheet(
   WidgetTester tester,
   TabsBloc bloc, {
   TabsState? state,
+  Future<bool> Function(String tabId)? onRequestClose,
 }) async {
   final effectiveState = state ?? _twoPanelState();
   when(() => bloc.state).thenReturn(effectiveState);
@@ -45,12 +46,46 @@ Future<void> _pumpSheet(
         body: BlocProvider<TabsBloc>.value(
           value: bloc,
           child: TabSwitcherSheet(
-            onRequestClose: (_) async => true,
+            onRequestClose: onRequestClose ?? (_) async => true,
           ),
         ),
       ),
     ),
   );
+  await tester.pumpAndSettle();
+}
+
+/// Opens the sheet through the real [TabSwitcherSheet.show] modal path, so
+/// row taps / footer buttons that pop the route can be asserted against.
+Future<void> _pumpModal(
+  WidgetTester tester,
+  TabsBloc bloc, {
+  TabsState? state,
+}) async {
+  when(() => bloc.state).thenReturn(state ?? _twoPanelState());
+
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: resolveTheme('brutalist')(Brightness.light, isCompact: false),
+      home: Scaffold(
+        body: BlocProvider<TabsBloc>.value(
+          value: bloc,
+          child: Builder(
+            builder: (context) => Center(
+              child: ElevatedButton(
+                onPressed: () => TabSwitcherSheet.show(
+                  context,
+                  onRequestClose: (_) async => true,
+                ),
+                child: const Text('OPEN SHEET'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.tap(find.text('OPEN SHEET'));
   await tester.pumpAndSettle();
 }
 
@@ -262,5 +297,109 @@ void main() {
 
       expect(find.text('NO OPEN TABS'), findsOneWidget);
     });
+
+    testWidgets(
+      'row close button dispatches RemoveTab when the close is confirmed',
+      (tester) async {
+        await _pumpSheet(tester, bloc);
+
+        await tester.tap(
+          find.descendant(
+            of: find.byKey(const ValueKey('switcher_t1')),
+            matching: find.byIcon(Icons.close),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        verify(() => bloc.add(const RemoveTab('t1'))).called(1);
+      },
+    );
+
+    testWidgets(
+      'row close button is a no-op when onRequestClose declines',
+      (tester) async {
+        await _pumpSheet(tester, bloc, onRequestClose: (_) async => false);
+
+        await tester.tap(
+          find.descendant(
+            of: find.byKey(const ValueKey('switcher_t1')),
+            matching: find.byIcon(Icons.close),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        verifyNever(() => bloc.add(const RemoveTab('t1')));
+      },
+    );
+
+    testWidgets('dragging the row handle dispatches ReorderTabs', (
+      tester,
+    ) async {
+      await _pumpSheet(tester, bloc, state: _onePanelState());
+
+      final handle = find.descendant(
+        of: find.byKey(const ValueKey('switcher_t1')),
+        matching: find.byIcon(Icons.drag_handle),
+      );
+      // Drag row t1 well below row t2, with settled frames between moves so
+      // the ReorderableListView registers the displacement.
+      final gesture = await tester.startGesture(tester.getCenter(handle));
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.moveBy(const Offset(0, 60));
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.moveBy(const Offset(0, 60));
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      final captured = verify(() => bloc.add(captureAny())).captured;
+      expect(
+        captured.whereType<ReorderTabs>(),
+        isNotEmpty,
+        reason: 'the drag handle must dispatch a ReorderTabs event',
+      );
+    });
+  });
+
+  group('modal show() path', () {
+    testWidgets(
+      'tapping a tab row dispatches SetActiveIndex and dismisses the sheet',
+      (tester) async {
+        await _pumpModal(tester, bloc);
+        expect(find.byType(TabSwitcherSheet), findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('switcher_t1')));
+        await tester.pumpAndSettle();
+
+        verify(() => bloc.add(const SetActiveIndex(0))).called(1);
+        expect(find.byType(TabSwitcherSheet), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'NEW TAB footer dispatches AddTab and dismisses the sheet',
+      (tester) async {
+        await _pumpModal(tester, bloc);
+
+        await tester.tap(find.text('NEW TAB'));
+        await tester.pumpAndSettle();
+
+        verify(() => bloc.add(const AddTab())).called(1);
+        expect(find.byType(TabSwitcherSheet), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'CLOSE footer dismisses the sheet without dispatching anything',
+      (tester) async {
+        await _pumpModal(tester, bloc);
+
+        await tester.tap(find.text('CLOSE'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(TabSwitcherSheet), findsNothing);
+        verifyNever(() => bloc.add(any()));
+      },
+    );
   });
 }
