@@ -110,4 +110,143 @@ void main() {
     expect(props['weird: key'], 1);
     expect(props['#lead'], 2);
   });
+
+  group('nested list items', () {
+    test(
+      'first key of a list item holding a nested map indents beneath it',
+      () {
+        final tree = {
+          'paths': [
+            {
+              'op': {'a': 1},
+              'x': 2,
+            },
+          ],
+        };
+        final yaml = YamlEmitter.emit(tree);
+        expect(
+          yaml,
+          'paths:\n'
+          '  - op:\n'
+          '      a: 1\n'
+          '    x: 2\n',
+        );
+        expect(loadYaml(yaml), tree);
+      },
+    );
+
+    test('first key of a list item holding a nested list', () {
+      final tree = {
+        'items': [
+          {
+            'tags': ['a', 'b'],
+            'name': 'n',
+          },
+        ],
+      };
+      final yaml = YamlEmitter.emit(tree);
+      expect(
+        yaml,
+        'items:\n'
+        '  - tags:\n'
+        '      - a\n'
+        '      - b\n'
+        '    name: n\n',
+      );
+      expect(loadYaml(yaml), tree);
+    });
+
+    test('later keys of a list item holding nested maps and lists', () {
+      final tree = {
+        'servers': [
+          {
+            'url': 'https://a.dev',
+            'variables': {
+              'host': {'default': 'x'},
+            },
+            'tags': ['t1'],
+          },
+        ],
+      };
+      final yaml = YamlEmitter.emit(tree);
+      expect(
+        yaml,
+        'servers:\n'
+        '  - url: https://a.dev\n'
+        '    variables:\n'
+        '      host:\n'
+        '        default: x\n'
+        '    tags:\n'
+        '      - t1\n',
+      );
+      expect(loadYaml(yaml), tree);
+    });
+
+    test('empty containers stay inline in both first and later keys', () {
+      final tree = {
+        'l': [
+          {
+            'n': <dynamic>[],
+            'a': 1,
+            'm': <String, dynamic>{},
+            'o': <dynamic>[],
+          },
+        ],
+      };
+      final yaml = YamlEmitter.emit(tree);
+      expect(
+        yaml,
+        'l:\n'
+        '  - n: []\n'
+        '    a: 1\n'
+        '    m: {}\n'
+        '    o: []\n',
+      );
+      expect(loadYaml(yaml), tree);
+    });
+
+    test('an empty-map first key stays inline on the dash line', () {
+      final yaml = YamlEmitter.emit({
+        'l': [
+          {'m': <String, dynamic>{}, 'a': 1},
+        ],
+      });
+      expect(yaml, 'l:\n  - m: {}\n    a: 1\n');
+    });
+
+    test('a list of lists nests each inner list under a bare dash', () {
+      final tree = {
+        'grid': [
+          [1, 2],
+          [3],
+        ],
+      };
+      final yaml = YamlEmitter.emit(tree);
+      expect(
+        yaml,
+        'grid:\n'
+        '  -\n'
+        '    - 1\n'
+        '    - 2\n'
+        '  -\n'
+        '    - 3\n',
+      );
+      expect(loadYaml(yaml), tree);
+    });
+
+    test('an empty list as a direct list item stays inline', () {
+      final yaml = YamlEmitter.emit({
+        'l': ['x', <dynamic>[]],
+      });
+      expect(yaml, 'l:\n  - x\n  - []\n');
+    });
+  });
+
+  test('a top-level non-empty list emits dash entries', () {
+    expect(YamlEmitter.emit([1, 'a']), '- 1\n- a\n');
+  });
+
+  test('doubles emit as bare numbers', () {
+    expect(YamlEmitter.emit(1.5), '1.5\n');
+  });
 }
