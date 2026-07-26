@@ -175,4 +175,52 @@ void main() {
       expect(nodes.map((n) => n.path).toList(), [r'$.user', r'$.other']);
     });
   });
+
+  group('filterJsonTree edge shapes', () {
+    test('top-level list roots match by index path', () {
+      final r = filterJsonTree(data: ['apple', 'banana'], query: 'ban');
+      expect(r.matchedPaths, {r'$[1]'});
+      expect(r.ancestorPaths, isEmpty);
+      expect(r.matchCount, 1);
+    });
+
+    test('nested match under a top-level list reveals the list ancestors', () {
+      final r = filterJsonTree(
+        data: [
+          {'sku': 'A-1'},
+        ],
+        query: 'sku',
+      );
+      expect(r.matchedPaths, {r'$[0].sku'});
+      expect(r.ancestorPaths, {r'$[0]'});
+    });
+
+    test('scalar root without a match yields the empty sets', () {
+      final r = filterJsonTree(data: 'hello', query: 'nope');
+      expect(r.matchedPaths, isEmpty);
+      expect(r.ancestorPaths, isEmpty);
+      expect(r.matchCount, 0);
+      expect(r.truncated, isFalse);
+    });
+  });
+
+  group('planExpandAll edge shapes', () {
+    test('scalar data plans no containers', () {
+      final plan = planExpandAll(data: 'hello');
+      expect(plan.containerPaths, isEmpty);
+      expect(plan.limitedToDepth, isFalse);
+    });
+
+    test('top-level list containers are planned by index path', () {
+      final plan = planExpandAll(
+        data: [
+          [1, 2],
+          {'a': 3},
+          'scalar',
+        ],
+      );
+      expect(plan.containerPaths, {r'$[0]', r'$[1]'});
+      expect(plan.limitedToDepth, isFalse);
+    });
+  });
 }
