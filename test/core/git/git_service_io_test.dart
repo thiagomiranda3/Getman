@@ -195,4 +195,156 @@ void main() {
     expect(await git.stashList(tmp.path), isEmpty);
     expect(File('${tmp.path}/a.req.json').readAsStringSync(), '{"x":1}');
   });
+
+  test('init creates the directory and a fresh repository', () async {
+    if (!await gitPresent()) return;
+    final root = '${tmp.path}/nested/workspace';
+    expect(Directory(root).existsSync(), isFalse);
+
+    await git.init(root);
+
+    expect(await git.isRepo(root), isTrue);
+  });
+
+  test(
+    'commit with nothing to commit throws the fallback message '
+    '(git prints the reason on stdout, not stderr)',
+    () async {
+      if (!await gitPresent()) return;
+      await seedCommit();
+
+      await expectLater(
+        git.commit(tmp.path, 'empty'),
+        throwsA(
+          isA<GitException>().having(
+            (e) => e.message,
+            'message',
+            'git commit failed',
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'unstage falls back to rm --cached when reset cannot resolve HEAD',
+    () async {
+      if (!await gitPresent()) return;
+      // The fallback exists for repos where `git reset -q HEAD` fails.
+      // Modern git handles an unborn HEAD, so simulate the unresolvable-HEAD
+      // case directly: detach HEAD onto an object that does not exist.
+      await seedCommit();
+      File('${tmp.path}/b.req.json').writeAsStringSync('{"y":2}');
+      await git.stage(tmp.path, ['b.req.json']);
+      final headFile = File('${tmp.path}/.git/HEAD');
+      final originalHead = headFile.readAsStringSync();
+      headFile.writeAsStringSync('a' * 40);
+
+      await git.unstage(tmp.path, ['b.req.json']);
+
+      headFile.writeAsStringSync(originalHead);
+      final entry = (await git.status(
+        tmp.path,
+      )).firstWhere((e) => e.path == 'b.req.json');
+      expect(entry.isStaged, isFalse);
+      expect(entry.isUntracked, isTrue);
+    },
+  );
+
+  test('addRemote is idempotent: a second call re-points the URL', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+    await git.addRemote(tmp.path, 'origin', 'https://example.invalid/a.git');
+
+    // Retrying with a corrected URL must not dead-end on "already exists".
+    await git.addRemote(tmp.path, 'origin', 'https://example.invalid/b.git');
+
+    expect(await git.hasRemote(tmp.path), isTrue);
+    final r = await Process.run('git', [
+      'remote',
+      'get-url',
+      'origin',
+    ], workingDirectory: tmp.path);
+    expect((r.stdout as String).trim(), 'https://example.invalid/b.git');
+  });
+
+  test('push throws when there is no current branch (detached HEAD)', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+    await Process.run('git', [
+      'checkout',
+      '--detach',
+    ], workingDirectory: tmp.path);
+
+    await expectLater(
+      git.push(tmp.path, setUpstream: true),
+      throwsA(
+        isA<GitException>().having(
+          (e) => e.message,
+          'message',
+          contains('no current branch'),
+        ),
+      ),
+    );
+  });
+
+  test('removeFile deletes the file and stages the deletion', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+
+    await git.removeFile(tmp.path, 'a.req.json');
+
+    expect(File('${tmp.path}/a.req.json').existsSync(), isFalse);
+    final entry = (await git.status(
+      tmp.path,
+    )).firstWhere((e) => e.path == 'a.req.json');
+    expect(entry.indexStatus, 'D');
+  });
+
+  test('rebaseContinue throws when no rebase is in progress', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+
+    await expectLater(
+      git.rebaseContinue(tmp.path),
+      throwsA(isA<GitException>()),
+    );
+  });
+
+  test('fetch pulls remote-tracking refs from a local remote', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+    final branch = (await git.currentBranch(tmp.path))!;
+    final other = await Directory.systemTemp.createTemp('getman_git_remote');
+    addTearDown(() async {
+      if (other.existsSync()) await other.delete(recursive: true);
+    });
+    await Process.run('git', ['clone', '--bare', tmp.path, other.path]);
+    await git.addRemote(tmp.path, 'origin', other.path);
+
+    await git.fetch(tmp.path);
+
+    final r = await Process.run('git', [
+      'rev-parse',
+      '--verify',
+      'refs/remotes/origin/$branch',
+    ], workingDirectory: tmp.path);
+    expect(r.exitCode, 0, reason: 'fetch must create the remote-tracking ref');
+  });
+
+  test('status reports a staged rename with renamedFrom', () async {
+    if (!await gitPresent()) return;
+    await seedCommit();
+    await Process.run('git', [
+      'mv',
+      'a.req.json',
+      'b.req.json',
+    ], workingDirectory: tmp.path);
+
+    final entry = (await git.status(tmp.path)).single;
+
+    expect(entry.indexStatus, 'R');
+    expect(entry.path, 'b.req.json');
+    expect(entry.renamedFrom, 'a.req.json');
+  });
 }

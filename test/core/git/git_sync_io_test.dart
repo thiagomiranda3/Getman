@@ -148,6 +148,34 @@ void main() {
   );
 
   test(
+    'a conflicted autostash re-apply restores the pulled tree and keeps '
+    'the local edits stashed (PullOutcome.cleanEditsStashed)',
+    () async {
+      if (!await gitPresent()) return;
+      // Teammate rewrites the same file we have UNCOMMITTED local edits to:
+      // the rebase itself is clean (no local commits), but re-applying the
+      // autostash conflicts. `git pull` still exits 0 in that case — the
+      // service must not let the marker-riddled tree masquerade as a clean
+      // pull.
+      await commitFile(b.path, 'a.req.json', '{"v":"theirs"}');
+      await run(b.path, ['push', 'origin', 'main']);
+      File('${a.path}/a.req.json').writeAsStringSync('{"v":"local-wip"}');
+
+      final outcome = await git.pull(a.path);
+
+      expect(outcome, PullOutcome.cleanEditsStashed);
+      // The tree shows the pulled state — no conflict markers left behind.
+      expect(
+        File('${a.path}/a.req.json').readAsStringSync(),
+        '{"v":"theirs"}',
+      );
+      expect(await git.conflictedPaths(a.path), isEmpty);
+      // The local edits survive in the stash.
+      expect(await git.stashList(a.path), isNotEmpty);
+    },
+  );
+
+  test(
     'a non-resolvable pull failure aborts and leaves the tree untouched',
     () async {
       if (!await gitPresent()) return;
