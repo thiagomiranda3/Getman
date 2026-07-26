@@ -4,7 +4,14 @@
 // headers/body/auth plus the last response's columns (responseBody/
 // responseHeaders/statusCode/durationMs — null discriminates "nothing sent
 // yet"), and derives `params` from `url` (the query string is the single
-// source of truth; params are never stored separately).
+// source of truth; params are never stored separately). Also carries
+// row-disabling state: disabledParams (query params parked outside the URL
+// with their row position for re-insertion when re-enabled) and
+// disabledHeaderKeys (header keys flagged as disabled; rows stay in headers
+// to preserve insertion order, but are skipped at send/code-gen). `sentAt`
+// (nullable) is stamped by the history repository at send time and drives
+// the HISTORY tab's day-group headers (D3); it's null for tab/collection
+// configs and for history records persisted before the field existed.
 //
 // Gotchas: copyWith uses a private `_unset` sentinel to distinguish "leave
 // unchanged" from "explicitly set to null" for the nullable response/body
@@ -18,6 +25,7 @@ import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
+import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
@@ -46,6 +54,9 @@ class HttpRequestConfigEntity extends Equatable {
     this.responseHeaders,
     this.statusCode,
     this.durationMs,
+    this.sentAt,
+    this.disabledParams = const [],
+    this.disabledHeaderKeys = const {},
   });
   final String id;
   final String method;
@@ -75,6 +86,22 @@ class HttpRequestConfigEntity extends Equatable {
   final int? statusCode;
   final int? durationMs;
 
+  /// When this config was recorded into history (stamped by the history
+  /// repository at send time). Null for tab/collection configs and for
+  /// history records persisted before the field existed. Drives the HISTORY
+  /// tab's day-group headers (D3).
+  final DateTime? sentAt;
+
+  /// Query params currently disabled in the params editor: removed from
+  /// [url] (which only ever carries *enabled* params) and parked here with
+  /// the row position each re-inserts at when re-enabled.
+  final List<ParkedParamEntity> disabledParams;
+
+  /// Header keys currently disabled in the headers editor. The header row
+  /// STAYS in [headers] (preserving insertion order); senders and code-gen
+  /// skip keys listed here.
+  final Set<String> disabledHeaderKeys;
+
   /// Derived view of the query params embedded in [url]. URL is the single
   /// source of truth — params are never stored separately. Duplicates are
   /// preserved in order.
@@ -83,6 +110,16 @@ class HttpRequestConfigEntity extends Equatable {
   /// Type-safe view over the raw [auth] map. An empty map reads as
   /// [AuthType.none], so legacy records round-trip without migration.
   AuthConfig get authConfig => AuthConfig.fromMap(auth);
+
+  /// [headers] minus the user-disabled rows ([disabledHeaderKeys]) — what
+  /// SEND and code-gen actually put on the wire. Disabled headers stay in
+  /// [headers] (editor order preserved); they are only skipped here.
+  Map<String, String> get enabledHeaders => disabledHeaderKeys.isEmpty
+      ? headers
+      : {
+          for (final e in headers.entries)
+            if (!disabledHeaderKeys.contains(e.key)) e.key: e.value,
+        };
 
   /// Rebuilds the entity. If [url] is supplied it wins. Otherwise, if [params]
   /// is supplied, the current URL's query portion is rewritten to match.
@@ -102,6 +139,9 @@ class HttpRequestConfigEntity extends Equatable {
     Object? responseHeaders = _unset,
     Object? statusCode = _unset,
     Object? durationMs = _unset,
+    Object? sentAt = _unset,
+    List<ParkedParamEntity>? disabledParams,
+    Set<String>? disabledHeaderKeys,
   }) {
     final resolvedUrl =
         url ??
@@ -134,6 +174,9 @@ class HttpRequestConfigEntity extends Equatable {
       durationMs: identical(durationMs, _unset)
           ? this.durationMs
           : durationMs as int?,
+      sentAt: identical(sentAt, _unset) ? this.sentAt : sentAt as DateTime?,
+      disabledParams: disabledParams ?? this.disabledParams,
+      disabledHeaderKeys: disabledHeaderKeys ?? this.disabledHeaderKeys,
     );
   }
 
@@ -157,6 +200,9 @@ class HttpRequestConfigEntity extends Equatable {
     responseHeaders: responseHeaders,
     statusCode: statusCode,
     durationMs: durationMs,
+    sentAt: sentAt,
+    disabledParams: disabledParams,
+    disabledHeaderKeys: disabledHeaderKeys,
   );
 
   @override
@@ -165,6 +211,11 @@ class HttpRequestConfigEntity extends Equatable {
     method,
     url,
     headers,
+    // Header ORDER is user-visible and user-editable (B2 row reorder).
+    // Equatable's map equality is order-insensitive, so without this ordered
+    // key view a pure reorder compares equal — the bloc suppresses the
+    // emission and the new order is never rendered from state or persisted.
+    headers.keys.toList(),
     body,
     auth,
     bodyType,
@@ -176,5 +227,8 @@ class HttpRequestConfigEntity extends Equatable {
     responseHeaders,
     statusCode,
     durationMs,
+    sentAt,
+    disabledParams,
+    disabledHeaderKeys,
   ];
 }

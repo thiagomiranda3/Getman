@@ -30,6 +30,9 @@ class _FakeTabsBloc extends Bloc<TabsEvent, TabsState> implements TabsBloc {
   _FakeTabsBloc(super.initialState);
 
   void push(TabsState next) => emit(next);
+
+  @override
+  bool get canReopenClosedTab => false;
 }
 
 class _FakeCollectionsBloc extends Bloc<CollectionsEvent, CollectionsState>

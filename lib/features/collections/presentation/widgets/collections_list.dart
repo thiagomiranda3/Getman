@@ -1,7 +1,8 @@
-// Collections tree screen: search bar, branch chip + import menu, and the
-// scrollable TreeView (folders + saved-example rows) with drag-and-drop
-// moves. Sole consumer of two_dimensional_scrollables' TreeView in the app.
-// Tracks the tab-linked node to highlight + auto-scroll on focus change.
+// Collections tree screen: search bar (name/URL/method match) + collapse-all
+// button, branch chip + import menu, and the scrollable TreeView (folders +
+// saved-example rows) with drag-and-drop moves. Sole consumer of
+// two_dimensional_scrollables' TreeView in the app. Tracks the tab-linked
+// node to highlight + auto-scroll on focus change.
 //
 // Gotchas: expansion is owned manually via _expandedIds (a Set<String>
 // keyed by CollectionNodeEntity.id, reseeded into TreeViewNode(expanded:)
@@ -236,6 +237,19 @@ class _CollectionsListState extends State<CollectionsList> {
     }
   }
 
+  /// D2: collapses every folder by clearing the manual id-keyed expansion
+  /// state (the H2 set). If a search is active its force-expansion re-adds
+  /// matching folder ids on the next rebuild (searching owns expansion by
+  /// design); the pre-search snapshot is emptied so clearing the query lands
+  /// on a fully collapsed tree instead of restoring the old expansion.
+  void _collapseAll() {
+    _expandedIds.clear();
+    if (_preSearchExpandedIds != null) {
+      _preSearchExpandedIds = <String>{};
+    }
+    _rebuildTree();
+  }
+
   Future<void> _importCollections(BuildContext context) {
     final bloc = context.read<CollectionsBloc>();
     return importJsonFilesWithFeedback<CollectionNodeEntity>(
@@ -283,7 +297,9 @@ class _CollectionsListState extends State<CollectionsList> {
     for (final node in nodes) {
       final matchesSelf =
           node.name.toLowerCase().contains(lowerQuery) ||
-          (node.config?.url.toLowerCase().contains(lowerQuery) ?? false);
+          (node.config?.url.toLowerCase().contains(lowerQuery) ?? false) ||
+          // D2: "post" finds POST requests — consistent with the palette.
+          (node.config?.method.toLowerCase().contains(lowerQuery) ?? false);
       if (node.isFolder) {
         final filteredChildren = _filterNodes(node.children, query);
         if (matchesSelf || filteredChildren.isNotEmpty) {
@@ -321,41 +337,64 @@ class _CollectionsListState extends State<CollectionsList> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'SEARCH COLLECTIONS...',
-                    hintStyle: TextStyle(
-                      fontSize: layout.fontSizeSmall,
-                      fontWeight: context.appTypography.displayWeight,
-                      color: theme.colorScheme.onSurface.withValues(
-                        alpha: 0.5,
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: 'SEARCH COLLECTIONS...',
+                          hintStyle: TextStyle(
+                            fontSize: layout.fontSizeSmall,
+                            fontWeight: context.appTypography.displayWeight,
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.5,
+                            ),
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            size: layout.iconSize,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(
+                              context.appShape.panelRadius,
+                            ),
+                            borderSide: BorderSide(
+                              color: theme.dividerColor,
+                              width: layout.borderThin,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          isDense: true,
+                        ),
+                        style: TextStyle(
+                          fontSize: layout.fontSizeNormal,
+                          fontWeight: context.appTypography.titleWeight,
+                        ),
                       ),
                     ),
-                    prefixIcon: Icon(
-                      Icons.search,
-                      size: layout.iconSize,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(
-                        context.appShape.panelRadius,
+                    SizedBox(width: layout.tabSpacing),
+                    context.appDecoration.wrapInteractive(
+                      child: IconButton(
+                        key: const ValueKey('collections_collapse_all'),
+                        icon: Icon(
+                          Icons.unfold_less,
+                          size: layout.iconSize,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                        tooltip: _searchController.text.isNotEmpty
+                            ? 'Collapse all (clear search first)'
+                            : 'Collapse all',
+                        onPressed: _searchController.text.isNotEmpty
+                            ? null
+                            : _collapseAll,
                       ),
-                      borderSide: BorderSide(
-                        color: theme.dividerColor,
-                        width: layout.borderThin,
-                      ),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    isDense: true,
-                  ),
-                  style: TextStyle(
-                    fontSize: layout.fontSizeNormal,
-                    fontWeight: context.appTypography.titleWeight,
-                  ),
+                  ],
                 ),
                 SizedBox(height: layout.tabSpacing),
                 Row(

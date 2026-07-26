@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/git/git_service.dart';
 import 'package:getman/core/utils/workspace/workspace_collection_serializer.dart';
@@ -35,6 +36,8 @@ CollectionNodeEntity _leaf({
   Map<String, String> headers = const {},
   String body = '',
   Map<String, String> auth = const {},
+  List<ParkedParamEntity> disabledParams = const [],
+  Set<String> disabledHeaderKeys = const {},
 }) => CollectionNodeEntity(
   id: id,
   name: name,
@@ -47,6 +50,8 @@ CollectionNodeEntity _leaf({
     headers: headers,
     body: body,
     auth: auth,
+    disabledParams: disabledParams,
+    disabledHeaderKeys: disabledHeaderKeys,
   ),
 );
 
@@ -439,6 +444,147 @@ void main() {
           jsonDecode(written!) as Map<String, dynamic>,
         );
         expect(node.config!.auth['token'], 'yours-token');
+      },
+    );
+
+    // FIX C1: three-way merge previously had no branch for disabledParams /
+    // disabledHeaderKeys, so a parked param silently reverted to
+    // incoming/yours/base whenever any OTHER field on the same request also
+    // conflicted, applying a resolution. This is the reviewer's exact
+    // scenario end to end through `resolve()`.
+    test(
+      'C1 regression: resolving an unrelated url conflict does not drop a '
+      'param parked on only one side',
+      () async {
+        when(() => git.showStage(root, 'a.req.json', 1)).thenAnswer(
+          (_) async => _reqStage(_leaf(url: 'https://api.dev?X=1')),
+        );
+        // Incoming (upstream) changed the url — collides with yours below.
+        when(() => git.showStage(root, 'a.req.json', 2)).thenAnswer(
+          (_) async => _reqStage(_leaf(url: 'https://api.dev/v2?X=1')),
+        );
+        // Yours parked X (removed from url, recorded in disabledParams) and
+        // also changed the url differently — a true url conflict.
+        when(() => git.showStage(root, 'a.req.json', 3)).thenAnswer(
+          (_) async => _reqStage(
+            _leaf(
+              url: 'https://api.dev/v3',
+              disabledParams: const [
+                ParkedParamEntity(key: 'X', value: '1', rowIndex: 0),
+              ],
+            ),
+          ),
+        );
+        String? written;
+        when(
+          () => git.writeWorkingFile(root, 'a.req.json', any()),
+        ).thenAnswer((i) async {
+          written = i.positionalArguments[2] as String;
+        });
+        when(() => git.add(root, 'a.req.json')).thenAnswer((_) async {});
+
+        // Only the url conflict is explicitly resolved — disabledParams
+        // auto-merges (only yours touched it) and must survive untouched.
+        await service.resolve(root, const [
+          FileResolution(
+            path: 'a.req.json',
+            fieldChoices: {'url': 'https://api.dev/v2?X=1'},
+          ),
+        ]);
+
+        final node = WorkspaceCollectionSerializer.requestFromJson(
+          jsonDecode(written!) as Map<String, dynamic>,
+        );
+        expect(
+          node.config!.disabledParams,
+          const [ParkedParamEntity(key: 'X', value: '1', rowIndex: 0)],
+          reason:
+              'the park must not vanish when an unrelated field '
+              'conflict is resolved',
+        );
+      },
+    );
+
+    test(
+      'a "disabled params" whole-field pick takes the chosen side',
+      () async {
+        when(() => git.showStage(root, 'a.req.json', 1)).thenAnswer(
+          (_) async => _reqStage(_leaf()),
+        );
+        when(() => git.showStage(root, 'a.req.json', 2)).thenAnswer(
+          (_) async => _reqStage(
+            _leaf(
+              disabledParams: const [
+                ParkedParamEntity(key: 'a', value: '1', rowIndex: 0),
+              ],
+            ),
+          ),
+        );
+        when(() => git.showStage(root, 'a.req.json', 3)).thenAnswer(
+          (_) async => _reqStage(
+            _leaf(
+              disabledParams: const [
+                ParkedParamEntity(key: 'b', value: '2', rowIndex: 0),
+              ],
+            ),
+          ),
+        );
+        String? written;
+        when(
+          () => git.writeWorkingFile(root, 'a.req.json', any()),
+        ).thenAnswer((i) async {
+          written = i.positionalArguments[2] as String;
+        });
+        when(() => git.add(root, 'a.req.json')).thenAnswer((_) async {});
+
+        await service.resolve(root, const [
+          FileResolution(
+            path: 'a.req.json',
+            fieldChoices: {'disabled params': 'yours'},
+          ),
+        ]);
+
+        final node = WorkspaceCollectionSerializer.requestFromJson(
+          jsonDecode(written!) as Map<String, dynamic>,
+        );
+        expect(
+          node.config!.disabledParams,
+          const [ParkedParamEntity(key: 'b', value: '2', rowIndex: 0)],
+        );
+      },
+    );
+
+    test(
+      'a "disabled headers" whole-field pick takes the chosen side',
+      () async {
+        when(() => git.showStage(root, 'a.req.json', 1)).thenAnswer(
+          (_) async => _reqStage(_leaf()),
+        );
+        when(() => git.showStage(root, 'a.req.json', 2)).thenAnswer(
+          (_) async => _reqStage(_leaf(disabledHeaderKeys: const {'B'})),
+        );
+        when(() => git.showStage(root, 'a.req.json', 3)).thenAnswer(
+          (_) async => _reqStage(_leaf(disabledHeaderKeys: const {'A'})),
+        );
+        String? written;
+        when(
+          () => git.writeWorkingFile(root, 'a.req.json', any()),
+        ).thenAnswer((i) async {
+          written = i.positionalArguments[2] as String;
+        });
+        when(() => git.add(root, 'a.req.json')).thenAnswer((_) async {});
+
+        await service.resolve(root, const [
+          FileResolution(
+            path: 'a.req.json',
+            fieldChoices: {'disabled headers': 'yours'},
+          ),
+        ]);
+
+        final node = WorkspaceCollectionSerializer.requestFromJson(
+          jsonDecode(written!) as Map<String, dynamic>,
+        );
+        expect(node.config!.disabledHeaderKeys, const {'A'});
       },
     );
 

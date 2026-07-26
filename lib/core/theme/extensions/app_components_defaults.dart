@@ -10,6 +10,7 @@
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/extensions/app_components.dart';
+import 'package:getman/core/ui/widgets/hover_copy_row.dart';
 import 'package:shimmer/shimmer.dart';
 
 /// Returns an [AppComponents] whose every slot reproduces today's rendering.
@@ -411,7 +412,9 @@ class _LogLineRow extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// dataRow  — mirrors response header/cookie row (ListTile pattern)
+// dataRow  — mirrors response header/cookie row (ListTile pattern); name and
+// value are SelectableText and the row carries the HoverCopyRow copy
+// affordance (C3) — every theme override wraps in the same atom.
 // ---------------------------------------------------------------------------
 
 Widget _defaultDataRow(
@@ -442,28 +445,31 @@ class _DefaultDataRow extends StatelessWidget {
     // via panelBox); Flutter 3.44 asserts when a ListTile's nearest background
     // ancestor is that colored box rather than a Material. Transparency paints
     // nothing, so the panel behind it still shows through.
-    return Material(
-      type: MaterialType.transparency,
-      child: ListTile(
-        dense: true,
-        title: Text(
-          label,
-          style: TextStyle(
-            fontWeight: context.appTypography.titleWeight,
-            fontSize: layout.fontSizeNormal,
-            // Both highlight states use primaryColor — the views always show
-            // the key in primaryColor regardless of highlight state.
-            color: theme.primaryColor,
+    return HoverCopyRow(
+      value: value,
+      child: Material(
+        type: MaterialType.transparency,
+        child: ListTile(
+          dense: true,
+          title: SelectableText(
+            label,
+            style: TextStyle(
+              fontWeight: context.appTypography.titleWeight,
+              fontSize: layout.fontSizeNormal,
+              // Both highlight states use primaryColor — the views always show
+              // the key in primaryColor regardless of highlight state.
+              color: theme.primaryColor,
+            ),
           ),
-        ),
-        subtitle: Text(
-          value,
-          style: TextStyle(
-            fontSize: layout.fontSizeNormal,
-            fontWeight: highlight ? context.appTypography.titleWeight : null,
-            color: highlight
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurface,
+          subtitle: SelectableText(
+            value,
+            style: TextStyle(
+              fontSize: layout.fontSizeNormal,
+              fontWeight: highlight ? context.appTypography.titleWeight : null,
+              color: highlight
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurface,
+            ),
           ),
         ),
       ),

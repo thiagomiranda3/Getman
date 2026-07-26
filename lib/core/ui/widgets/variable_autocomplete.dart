@@ -2,7 +2,10 @@
 // Cmd/Ctrl+Space) opens a keyboard-navigable suggestion menu built from
 // suggestionsFor; accepting inserts the closing `}}` and reports the new
 // text via onAccepted, since a programmatic controller write never fires
-// TextField.onChanged the way a real keystroke does.
+// TextField.onChanged the way a real keystroke does. Optional
+// urlSuggestionsFor (B4) adds a URL mode: whenever the caret is NOT inside
+// a {{ token, whole-URL rows are offered and accepting one replaces the
+// ENTIRE field text (variable mode always wins inside a {{ token).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -23,6 +26,16 @@ class _PrevSuggestionIntent extends Intent {
 
 class _AcceptSuggestionIntent extends Intent {
   const _AcceptSuggestionIntent();
+}
+
+// FIX I4: Enter has its own intent, distinct from Tab's _AcceptSuggestionIntent
+// — in URL-suggestion mode, Enter only accepts once the user has actively
+// arrow-navigated the popup (see _EnterAcceptIntent's _GatedAction below);
+// otherwise it falls through to send. Tab always accepts when the menu is
+// open, in both modes. Variable mode is unaffected: Enter always accepts
+// there, same as before.
+class _EnterAcceptIntent extends Intent {
+  const _EnterAcceptIntent();
 }
 
 class _DismissSuggestionIntent extends Intent {
@@ -55,6 +68,12 @@ class _GatedAction extends Action<Intent> {
 /// Typing `{{` (or Cmd/Ctrl+Space) opens a keyboard-navigable overlay built
 /// from [suggestionsFor]; accepting inserts `name}}`.
 ///
+/// When [urlSuggestionsFor] is also wired, the same overlay gains a second,
+/// URL-suggestion mode (B4): whenever the caret is NOT inside an in-progress
+/// `{{` token, whole-URL rows are offered and accepting one replaces the
+/// entire field text. Variable mode always wins while the caret is inside a
+/// `{{` token.
+///
 /// [onAccepted] is called with the controller's full text after a suggestion
 /// is accepted (keyboard or tap). Use it to notify listeners that would
 /// otherwise only see programmatic controller mutations via
@@ -66,6 +85,7 @@ class VariableAutocomplete extends StatefulWidget {
     required this.suggestionsFor,
     required this.child,
     this.onAccepted,
+    this.urlSuggestionsFor,
     super.key,
   });
 
@@ -73,6 +93,14 @@ class VariableAutocomplete extends StatefulWidget {
   final FocusNode focusNode;
   final VariableSuggestionsProvider suggestionsFor;
   final ValueChanged<String>? onAccepted;
+
+  /// When non-null, enables the URL-suggestion mode (B4): whenever the caret
+  /// is NOT inside an in-progress `{{` token, the FULL field text is passed
+  /// here and each returned URL is offered as a whole-field replacement.
+  /// Variable mode always wins while the caret is inside a `{{` token. Null
+  /// (the default — VariableTextField and the KV-editor value fields) keeps
+  /// the variable-only behavior.
+  final List<String> Function(String text)? urlSuggestionsFor;
   final Widget child;
 
   @override
@@ -87,6 +115,18 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
   ActiveVariableQuery? _activeQuery;
   bool _dismissed = false; // Esc latch; cleared on the next text change.
   String _lastText = '';
+  List<String> _urlSuggestions = const [];
+  bool _urlMode = false;
+
+  // FIX I4: whether the user has pressed ↓/↑ at least once for the
+  // CURRENT url-suggestion set. Reset whenever that set changes (a keystroke
+  // re-queries the provider) or the menu closes; set on every _moveSelection
+  // call. Gates Enter-accept in URL mode only — Tab and variable-mode Enter
+  // are unaffected.
+  bool _urlModeNavigated = false;
+
+  int get _menuLength =>
+      _urlMode ? _urlSuggestions.length : _suggestions.length;
 
   bool get _isOpen => _entry != null;
 
@@ -128,12 +168,33 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
       widget.controller.text,
       sel.baseOffset,
     );
-    if (query == null) return _close();
+    // Variable mode always wins while the caret is inside a {{ token; URL
+    // mode (B4) covers everything else when a provider is wired.
+    if (query == null) return _refreshUrlMode();
     final suggestions = widget.suggestionsFor(query.query);
     if (suggestions.isEmpty) return _close();
+    _urlMode = false;
+    _urlSuggestions = const [];
     _activeQuery = query;
     _suggestions = suggestions;
     _selected = _selected.clamp(0, suggestions.length - 1);
+    _open();
+    _entry!.markNeedsBuild();
+  }
+
+  void _refreshUrlMode() {
+    final provider = widget.urlSuggestionsFor;
+    if (provider == null) return _close();
+    final urls = provider(widget.controller.text);
+    if (urls.isEmpty) return _close();
+    _urlMode = true;
+    _activeQuery = null;
+    _suggestions = const [];
+    _urlSuggestions = urls;
+    _selected = _selected.clamp(0, urls.length - 1);
+    // FIX I4: a new query (keystroke) means a new suggestion set — the user
+    // must arrow-navigate THIS set before Enter will accept from it.
+    _urlModeNavigated = false;
     _open();
     _entry!.markNeedsBuild();
   }
@@ -151,17 +212,32 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
     _entry = null;
     _activeQuery = null;
     _suggestions = const [];
+    _urlSuggestions = const [];
+    _urlMode = false;
     _selected = 0;
+    _urlModeNavigated = false;
   }
 
   void _moveSelection(int delta) {
-    if (!_isOpen || _suggestions.isEmpty) return;
-    _selected = (_selected + delta) % _suggestions.length;
-    if (_selected < 0) _selected += _suggestions.length;
+    final length = _menuLength;
+    if (!_isOpen || length == 0) return;
+    _selected = (_selected + delta) % length;
+    if (_selected < 0) _selected += length;
+    // FIX I4: explicit ↓/↑ engagement — from here on Enter may accept.
+    _urlModeNavigated = true;
     _entry!.markNeedsBuild();
   }
 
+  /// Variable-mode accept. The latch bookkeeping is pre-synced BEFORE the
+  /// programmatic write (mirrors [_acceptUrlAt]) because the controller
+  /// listener fires synchronously on assignment — without it, a dual-mode
+  /// field (both [VariableAutocomplete.suggestionsFor] and
+  /// [VariableAutocomplete.urlSuggestionsFor] wired) can instantly reopen the
+  /// URL overlay when the post-accept text happens to match a history/
+  /// collection URL (realistic: URLs can themselves contain `{{var}}`
+  /// templates).
   void _acceptAt(int index) {
+    if (_urlMode) return _acceptUrlAt(index);
     final query = _activeQuery;
     if (query == null || index < 0 || index >= _suggestions.length) return;
     final name = _suggestions[index].name;
@@ -171,10 +247,31 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
     final insert = query.hasClosingBraces ? name : '$name}}';
     final caret =
         before.length + insert.length + (query.hasClosingBraces ? 2 : 0);
+    final newText = '$before$insert$after';
     _close();
+    _lastText = newText;
+    _dismissed = true;
     widget.controller.value = TextEditingValue(
-      text: '$before$insert$after',
+      text: newText,
       selection: TextSelection.collapsed(offset: caret),
+    );
+    widget.onAccepted?.call(widget.controller.text);
+  }
+
+  /// URL-mode accept: the suggestion replaces the ENTIRE field text. The
+  /// latch bookkeeping is pre-synced BEFORE the programmatic write because
+  /// the controller listener fires synchronously on assignment — without it
+  /// the menu instantly reopens over the just-accepted URL (other candidates
+  /// can still contain it as a substring).
+  void _acceptUrlAt(int index) {
+    if (index < 0 || index >= _urlSuggestions.length) return;
+    final url = _urlSuggestions[index];
+    _close();
+    _lastText = url;
+    _dismissed = true;
+    widget.controller.value = TextEditingValue(
+      text: url,
+      selection: TextSelection.collapsed(offset: url.length),
     );
     widget.onAccepted?.call(widget.controller.text);
   }
@@ -221,7 +318,7 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
           SingleActivator(LogicalKeyboardKey.arrowDown):
               _NextSuggestionIntent(),
           SingleActivator(LogicalKeyboardKey.arrowUp): _PrevSuggestionIntent(),
-          SingleActivator(LogicalKeyboardKey.enter): _AcceptSuggestionIntent(),
+          SingleActivator(LogicalKeyboardKey.enter): _EnterAcceptIntent(),
           SingleActivator(LogicalKeyboardKey.tab): _AcceptSuggestionIntent(),
           SingleActivator(LogicalKeyboardKey.escape):
               _DismissSuggestionIntent(),
@@ -242,6 +339,16 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
             ),
             _AcceptSuggestionIntent: _GatedAction(
               isEnabledCallback: () => _isOpen,
+              onInvoke: () => _acceptAt(_selected),
+            ),
+            // FIX I4: in URL mode, Enter only accepts once the user has
+            // arrow-navigated the current suggestion set; otherwise it's
+            // left unconsumed so it falls through to the field's own
+            // onSubmitted (Enter-to-send). Variable mode (_urlMode false)
+            // behaves exactly like _AcceptSuggestionIntent above.
+            _EnterAcceptIntent: _GatedAction(
+              isEnabledCallback: () =>
+                  _isOpen && (!_urlMode || _urlModeNavigated),
               onInvoke: () => _acceptAt(_selected),
             ),
             _DismissSuggestionIntent: _GatedAction(
@@ -287,9 +394,10 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
                 child: ListView.builder(
                   padding: EdgeInsets.zero,
                   shrinkWrap: true,
-                  itemCount: _suggestions.length,
-                  itemBuilder: (context, i) =>
-                      _row(context, _suggestions[i], i, i == _selected),
+                  itemCount: _menuLength,
+                  itemBuilder: (context, i) => _urlMode
+                      ? _urlRow(context, _urlSuggestions[i], i, i == _selected)
+                      : _row(context, _suggestions[i], i, i == _selected),
                 ),
               ),
             ),
@@ -366,6 +474,35 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _urlRow(BuildContext context, String url, int index, bool selected) {
+    final theme = Theme.of(context);
+    final layout = context.appLayout;
+    return InkWell(
+      // Same as _row: never pull focus off the text field on tap.
+      canRequestFocus: false,
+      onTap: () => _acceptAt(index),
+      child: Container(
+        color: selected
+            ? theme.colorScheme.primary.withValues(alpha: 0.12)
+            : null,
+        padding: EdgeInsets.symmetric(
+          horizontal: layout.isCompact ? 8 : 12,
+          vertical: layout.isCompact ? 6 : 8,
+        ),
+        child: Text(
+          url,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: layout.fontSizeNormal,
+            fontWeight: context.appTypography.titleWeight,
+            color: theme.colorScheme.onSurface,
+          ),
         ),
       ),
     );

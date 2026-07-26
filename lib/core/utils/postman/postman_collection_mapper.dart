@@ -8,18 +8,30 @@
 // (empty value, `type:'secret'`) via _variablesToPostman — never emit the
 // real secret. Saved examples (CollectionNodeEntity.examples) are local-only
 // and this mapper never reads that field, so they're excluded from export.
-// Query-string handling is asymmetric by design: export always derives
-// `url.query` from the raw URL's still-percent-encoded segments (matching
-// Postman's own convention); import prefers a structured `url.query` when
-// present (percent-decoded before merging back in, else double-encoding
-// results), otherwise keeps the raw URL's query as-is.
+// Query-string handling: export composes `url.query` via
+// ParamRowComposer.compose over the decoded (params, disabledParams) pair —
+// the same interleaving logic the params tab editor uses — then
+// re-percent-encodes each row's key/value (matching Postman's own
+// still-percent-encoded convention; `{{var}}` tokens pass through intact).
+// Reusing the composer keeps parked-param display order correct by
+// construction, including when two parked params tie on the same rowIndex.
+// Import prefers a structured `url.query` when present (percent-decoded
+// before merging back in, else double-encoding results), otherwise keeps the
+// raw URL's query as-is.
+// Disabled rows (B1) map to Postman's native `disabled: true` both ways:
+// export marks parked (composer-interleaved) query rows and disabled header
+// entries (key in disabledHeaderKeys) with `disabled: true`; import keeps
+// disabled headers in the map + set and turns disabled query entries into
+// ParkedParamEntity at their array position (previously they were dropped).
 
 import 'dart:convert';
 import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
+import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/utils/param_row_composer.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:uuid/uuid.dart';
@@ -145,32 +157,6 @@ class PostmanCollectionMapper {
     };
   }
 
-  /// Splits the URL's query string into raw (still percent-encoded) key/value
-  /// segments — mirrors `url.raw`, matching Postman's own convention that
-  /// `url.query` entries are NOT decoded (see `_parseQueryList` below). Using
-  /// the decoded [QueryParamEntity] list here would double-encode on import
-  /// (`%2520` would round-trip through a decode step on each side).
-  static List<Map<String, String>> _rawQuery(String url) {
-    final hashIndex = url.indexOf('#');
-    var qIndex = url.indexOf('?');
-    if (hashIndex != -1 && qIndex > hashIndex) qIndex = -1;
-    if (qIndex == -1) return const [];
-    final afterQ = url.substring(qIndex + 1);
-    final hIndex = afterQ.indexOf('#');
-    final queryStr = hIndex == -1 ? afterQ : afterQ.substring(0, hIndex);
-    if (queryStr.isEmpty) return const [];
-    final result = <Map<String, String>>[];
-    for (final pair in queryStr.split('&')) {
-      if (pair.isEmpty) continue;
-      final eqIndex = pair.indexOf('=');
-      final key = eqIndex == -1 ? pair : pair.substring(0, eqIndex);
-      if (key.isEmpty) continue;
-      final value = eqIndex == -1 ? '' : pair.substring(eqIndex + 1);
-      result.add({'key': key, 'value': value});
-    }
-    return result;
-  }
-
   static Map<String, dynamic> _configToRequest(
     HttpRequestConfigEntity? config,
   ) {
@@ -182,12 +168,35 @@ class PostmanCollectionMapper {
       };
     }
     final headers = config.headers.entries
-        .map((e) => {'key': e.key, 'value': e.value, 'type': 'text'})
+        .map(
+          (e) => {
+            'key': e.key,
+            'value': e.value,
+            'type': 'text',
+            if (config.disabledHeaderKeys.contains(e.key)) 'disabled': true,
+          },
+        )
         .toList();
     final urlObj = <String, dynamic>{'raw': config.url};
-    // Emit the structured `query` array so Postman's UI renders rows.
-    // Derived from the URL's raw query segments — duplicates preserved.
-    final query = _rawQuery(config.url);
+    // Emit the structured `query` array so Postman's UI renders rows, in
+    // display order — built via the same ParamRowComposer the params tab
+    // editor uses to interleave enabled params with parked (disabled) ones,
+    // so tied rowIndexes come out in their stable sorted order instead of
+    // being re-clamped (and reversed) one insertion at a time. Composer input
+    // is decoded plaintext; re-encode each row for Postman's still-percent-
+    // encoded url.query convention (encodeComponent keeps {{var}} intact).
+    final composedRows = ParamRowComposer.compose(
+      params: config.params,
+      parked: config.disabledParams,
+    );
+    final query = [
+      for (final row in composedRows)
+        <String, dynamic>{
+          'key': UrlQueryUtils.encodeComponent(row.key),
+          'value': UrlQueryUtils.encodeComponent(row.value),
+          if (!row.enabled) 'disabled': true,
+        },
+    ];
     if (query.isNotEmpty) {
       urlObj['query'] = query;
     }
@@ -303,7 +312,9 @@ class PostmanCollectionMapper {
   // ---------- import helpers ----------
 
   static ({Map<String, String> variables, Set<String> secretKeys})
-  _variablesFromPostman(dynamic raw) {
+  _variablesFromPostman(
+    dynamic raw,
+  ) {
     final variables = <String, String>{};
     final secretKeys = <String>{};
     if (raw is List) {
@@ -372,14 +383,16 @@ class PostmanCollectionMapper {
     // raw URL's query portion. Otherwise keep raw as-is.
     final mergedUrl = structuredQuery == null
         ? rawUrl
-        : UrlQueryUtils.replaceQuery(rawUrl, structuredQuery);
+        : UrlQueryUtils.replaceQuery(rawUrl, structuredQuery.params);
     final headers = _parseHeaders(request['header']);
     final body = _parseBody(request['body']);
     return HttpRequestConfigEntity(
       id: _uuid.v4(),
       method: method,
       url: mergedUrl,
-      headers: headers,
+      headers: headers.headers,
+      disabledHeaderKeys: headers.disabledKeys,
+      disabledParams: structuredQuery?.parked ?? const [],
       auth: _parseAuth(request['auth']),
       body: body.body,
       bodyType: body.bodyType,
@@ -463,32 +476,45 @@ class PostmanCollectionMapper {
 
   /// Returns null when the Postman payload did not include a structured
   /// `url.query` array at all (caller should keep the raw URL's query intact).
-  /// Returns an empty list when `url.query` was present but empty or fully
-  /// disabled (caller should clear the raw URL's query).
-  static List<QueryParamEntity>? _parseQueryList(dynamic url) {
+  /// Enabled entries land in `params` (merged back into the URL); entries
+  /// marked `disabled: true` land in `parked` carrying their array position
+  /// as rowIndex, so the params tab re-interleaves them in place.
+  static ({List<QueryParamEntity> params, List<ParkedParamEntity> parked})?
+  _parseQueryList(
+    dynamic url,
+  ) {
     if (url is! Map) return null;
     final query = url['query'];
     if (query is! List) return null;
-    final result = <QueryParamEntity>[];
+    final params = <QueryParamEntity>[];
+    final parked = <ParkedParamEntity>[];
+    var display = 0;
     for (final entry in query.whereType<Map<dynamic, dynamic>>()) {
-      if (entry['disabled'] == true) continue;
       final key = entry['key'];
-      final value = entry['value'];
       if (key is! String || key.isEmpty) continue;
+      final value = entry['value'];
       // Postman's structured entries carry the query as it appears in
       // `url.raw`, i.e. still percent-encoded — decode before handing them to
       // replaceQuery (which encodes), or `hello%20world` arrives as
       // `hello%2520world` and the request sends a literal `%20`.
-      result.add(
-        QueryParamEntity(
-          key: _decodeQueryPart(key),
-          value: _decodeQueryPart(
-            value is String ? value : (value?.toString() ?? ''),
-          ),
-        ),
+      final decodedKey = _decodeQueryPart(key);
+      final decodedValue = _decodeQueryPart(
+        value is String ? value : (value?.toString() ?? ''),
       );
+      if (entry['disabled'] == true) {
+        parked.add(
+          ParkedParamEntity(
+            key: decodedKey,
+            value: decodedValue,
+            rowIndex: display,
+          ),
+        );
+      } else {
+        params.add(QueryParamEntity(key: decodedKey, value: decodedValue));
+      }
+      display++;
     }
-    return result;
+    return (params: params, parked: parked);
   }
 
   /// Percent-decodes a structured query key/value; malformed sequences (a
@@ -501,17 +527,23 @@ class PostmanCollectionMapper {
     }
   }
 
-  static Map<String, String> _parseHeaders(dynamic header) {
-    if (header is! List) return {};
+  /// Headers plus which of them Postman marked `disabled: true` — disabled
+  /// entries are KEPT in the map (order preserved) and their keys recorded,
+  /// matching Getman's own disabled-header model.
+  static ({Map<String, String> headers, Set<String> disabledKeys})
+  _parseHeaders(dynamic header) {
     final result = <String, String>{};
-    for (final entry in header.whereType<Map<dynamic, dynamic>>()) {
-      if (entry['disabled'] == true) continue;
-      final key = entry['key'];
-      final value = entry['value'];
-      if (key is! String || key.isEmpty) continue;
-      result[key] = value is String ? value : (value?.toString() ?? '');
+    final disabled = <String>{};
+    if (header is List) {
+      for (final entry in header.whereType<Map<dynamic, dynamic>>()) {
+        final key = entry['key'];
+        final value = entry['value'];
+        if (key is! String || key.isEmpty) continue;
+        result[key] = value is String ? value : (value?.toString() ?? '');
+        if (entry['disabled'] == true) disabled.add(key);
+      }
     }
-    return result;
+    return (headers: result, disabledKeys: disabled);
   }
 
   /// Reconstructs the body fields from a Postman `body` block. Mirrors the

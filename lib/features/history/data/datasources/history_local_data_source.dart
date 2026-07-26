@@ -1,11 +1,13 @@
-// History is read-only from the UI's perspective — writes happen only via
-// SendRequestUseCase. Dedup is by request signature (HttpRequestConfig's
-// method+url+body plus bodyType/graphqlVariables/bodyFilePath/formFields);
-// header differences do NOT dedupe. addToHistory maintains an in-memory
-// hashCode->keys index (rebuilt if the box length drifts) so dedup lookup is
-// O(1) instead of a full box scan. Trim uses a `while` loop so lowering the
-// history limit actually shrinks the box. watch() exposes Box.watch(); the
-// repository reverses insertion order so callers get newest-first.
+// History writes: appends happen via SendRequestUseCase; since D3 the UI can
+// also delete one entry, clear all, and restore deleted snapshots (undo,
+// signature-duplicates skipped). Dedup is by request signature
+// (HttpRequestConfig's method+url+body plus
+// bodyType/graphqlVariables/bodyFilePath/formFields); header differences do
+// NOT dedupe. addToHistory maintains an in-memory hashCode->keys index
+// (rebuilt if the box length drifts) so dedup lookup is O(1) instead of a
+// full box scan. Trim uses a `while` loop so lowering the history limit
+// actually shrinks the box. watch() exposes Box.watch(); the repository
+// reverses insertion order so callers get newest-first.
 
 import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
@@ -15,6 +17,25 @@ import 'package:hive_ce_flutter/hive_flutter.dart';
 abstract class HistoryLocalDataSource {
   Future<List<HttpRequestConfig>> getHistory();
   Future<void> addToHistory(HttpRequestConfig config, int limit);
+
+  /// Deletes the record whose model `id` equals [id]. No-op if absent.
+  ///
+  /// `id` is unique across the box: every stored row is minted a fresh id
+  /// at write time by `HistoryRepositoryImpl.addToHistory` (never the
+  /// source entity's id — a resent tab would otherwise share its id across
+  /// every row), so at most one record can ever match. restoreToHistory is
+  /// the one path that reinstates a caller-supplied id verbatim (an UNDO
+  /// must reinsert the exact deleted record).
+  Future<void> deleteFromHistory(String id);
+
+  /// Removes every record.
+  Future<void> clearHistory();
+
+  /// Re-inserts previously deleted records (an UNDO). Any config whose
+  /// request signature already exists in the box is skipped — the live
+  /// entry is newer than the undo snapshot.
+  Future<void> restoreToHistory(List<HttpRequestConfig> configs);
+
   Stream<void> watch();
 }
 
@@ -119,6 +140,65 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
       }
     } catch (e) {
       throw PersistenceException('Failed to add to history', cause: e);
+    }
+  }
+
+  @override
+  Future<void> deleteFromHistory(String id) async {
+    try {
+      final box = _box();
+      for (final entry in box.toMap().entries) {
+        if (entry.value.id == id) {
+          // Keep the lazily-built signature index consistent; if it hasn't
+          // been built yet there is nothing to maintain (it rebuilds from
+          // the box on first use).
+          if (_signatureIndex != null) {
+            _indexRemoveKey(entry.value.hashCode, entry.key);
+          }
+          await box.delete(entry.key);
+          return;
+        }
+      }
+    } catch (e) {
+      throw PersistenceException('Failed to delete history entry', cause: e);
+    }
+  }
+
+  @override
+  Future<void> clearHistory() async {
+    try {
+      await _box().clear();
+      // Drop the index wholesale; it rebuilds lazily on the next add.
+      _signatureIndex = null;
+      _indexedKeyCount = 0;
+    } catch (e) {
+      throw PersistenceException('Failed to clear history', cause: e);
+    }
+  }
+
+  @override
+  Future<void> restoreToHistory(List<HttpRequestConfig> configs) async {
+    try {
+      final box = _box();
+      _ensureIndex(box);
+      for (final config in configs) {
+        // Signature-duplicate guard (same hash-then-equality pattern as
+        // addToHistory's dedup): if the user re-sent the request after
+        // deleting it, UNDO must not create a second copy.
+        final candidates = _signatureIndex![config.hashCode] ?? const [];
+        final duplicate = candidates.any((key) {
+          final existing = box.get(key);
+          return existing != null && existing == config;
+        });
+        if (duplicate) continue;
+        final key = await box.add(config);
+        _indexAddKey(config.hashCode, key);
+      }
+    } catch (e) {
+      throw PersistenceException(
+        'Failed to restore history entries',
+        cause: e,
+      );
     }
   }
 

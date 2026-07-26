@@ -6,6 +6,7 @@ import 'package:collection/collection.dart';
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
+import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 
@@ -62,6 +63,7 @@ class NodeMergeResult {
 const _mapEq = MapEquality<String, String>();
 const _formFieldsEq = ListEquality<MultipartFieldEntity>();
 const _secretKeysEq = SetEquality<String>();
+const _parkedParamsEq = ListEquality<ParkedParamEntity>();
 
 /// Pure field-level 3-way merge for collection nodes, driven by a rebase
 /// conflict's base (stage 1) / incoming (stage 2, upstream) / yours (stage 3,
@@ -263,6 +265,18 @@ class ThreeWayMerge {
       incoming?.formFields ?? const [],
       yours?.formFields ?? const [],
     );
+    final disabledParams = _mergeDisabledParams(
+      conflicts,
+      base?.disabledParams ?? const [],
+      incoming?.disabledParams ?? const [],
+      yours?.disabledParams ?? const [],
+    );
+    final disabledHeaderKeys = _mergeDisabledHeaderKeys(
+      conflicts,
+      base?.disabledHeaderKeys ?? const {},
+      incoming?.disabledHeaderKeys ?? const {},
+      yours?.disabledHeaderKeys ?? const {},
+    );
 
     return skeleton.copyWith(
       method: method,
@@ -274,6 +288,8 @@ class ThreeWayMerge {
       formFields: formFields,
       bodyFilePath: bodyFilePath,
       graphqlVariables: graphqlVariables,
+      disabledParams: disabledParams,
+      disabledHeaderKeys: disabledHeaderKeys,
     );
   }
 
@@ -384,6 +400,51 @@ class ThreeWayMerge {
     if (_formFieldsEq.equals(yours, base)) return incoming;
     conflicts.add(
       const FieldConflict(field: 'form fields', kind: FieldConflictKind.list),
+    );
+    return incoming;
+  }
+
+  /// Whole-field 3-way merge for the B1 parked-params list, same shape as
+  /// [_mergeFormFields] (list of structured rows, no raw values surfaced on
+  /// conflict). FIX C1: previously unhandled, so a locally-parked param
+  /// silently reverted to `incoming ?? yours ?? base` whenever ANY other
+  /// config field also conflicted — deleting the park with no conflict
+  /// raised.
+  static List<ParkedParamEntity> _mergeDisabledParams(
+    List<FieldConflict> conflicts,
+    List<ParkedParamEntity> base,
+    List<ParkedParamEntity> incoming,
+    List<ParkedParamEntity> yours,
+  ) {
+    if (_parkedParamsEq.equals(incoming, yours)) return incoming;
+    if (_parkedParamsEq.equals(incoming, base)) return yours;
+    if (_parkedParamsEq.equals(yours, base)) return incoming;
+    conflicts.add(
+      const FieldConflict(
+        field: 'disabled params',
+        kind: FieldConflictKind.list,
+      ),
+    );
+    return incoming;
+  }
+
+  /// Whole-field 3-way merge for the B1 disabled-header-keys set, same shape
+  /// as [_mergeSecretKeys] (its closest existing sibling by type). FIX C1:
+  /// previously unhandled — see [_mergeDisabledParams].
+  static Set<String> _mergeDisabledHeaderKeys(
+    List<FieldConflict> conflicts,
+    Set<String> base,
+    Set<String> incoming,
+    Set<String> yours,
+  ) {
+    if (_secretKeysEq.equals(incoming, yours)) return incoming;
+    if (_secretKeysEq.equals(incoming, base)) return yours;
+    if (_secretKeysEq.equals(yours, base)) return incoming;
+    conflicts.add(
+      const FieldConflict(
+        field: 'disabled headers',
+        kind: FieldConflictKind.list,
+      ),
     );
     return incoming;
   }

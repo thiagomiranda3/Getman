@@ -563,4 +563,140 @@ void main() {
       expect(merged, onDisk);
     });
   });
+
+  group('insertIntoTree / insertExampleInNode / siblingIndexOf (A1 undo)', () {
+    CollectionNodeEntity leaf(String id, String name) => CollectionNodeEntity(
+      id: id,
+      name: name,
+      isFolder: false,
+      config: HttpRequestConfigEntity(id: id),
+    );
+
+    test('insertIntoTree inserts at index under the parent', () {
+      final tree = [
+        CollectionNodeEntity(
+          id: 'f1',
+          name: 'Auth',
+          children: [leaf('a', 'A'), leaf('c', 'C')],
+        ),
+      ];
+      final next = CollectionsTreeHelper.insertIntoTree(
+        tree,
+        'f1',
+        leaf('b', 'B'),
+        1,
+      );
+      expect(
+        next.single.children.map((n) => n.id).toList(),
+        ['a', 'b', 'c'],
+      );
+      // Pure: input untouched.
+      expect(tree.single.children, hasLength(2));
+    });
+
+    test('insertIntoTree with null parentId inserts at the root level', () {
+      final tree = [leaf('a', 'A'), leaf('c', 'C')];
+      final next = CollectionsTreeHelper.insertIntoTree(
+        tree,
+        null,
+        leaf('b', 'B'),
+        1,
+      );
+      expect(next.map((n) => n.id).toList(), ['a', 'b', 'c']);
+    });
+
+    test('insertIntoTree clamps an out-of-range index', () {
+      final tree = [
+        CollectionNodeEntity(
+          id: 'f1',
+          name: 'Auth',
+          children: [leaf('a', 'A')],
+        ),
+      ];
+      final next = CollectionsTreeHelper.insertIntoTree(
+        tree,
+        'f1',
+        leaf('z', 'Z'),
+        99,
+      );
+      expect(next.single.children.map((n) => n.id).toList(), ['a', 'z']);
+    });
+
+    test('insertIntoTree is a no-op walk on a missing parentId', () {
+      final tree = [leaf('a', 'A')];
+      final next = CollectionsTreeHelper.insertIntoTree(
+        tree,
+        'ghost',
+        leaf('b', 'B'),
+        0,
+      );
+      expect(next.map((n) => n.id).toList(), ['a']);
+    });
+
+    test('insertExampleInNode inserts at index and clamps', () {
+      final ex1 = SavedExampleEntity(
+        id: 'e1',
+        name: 'One',
+        capturedAt: DateTime(2026),
+        config: const HttpRequestConfigEntity(id: 'e1'),
+      );
+      final ex2 = SavedExampleEntity(
+        id: 'e2',
+        name: 'Two',
+        capturedAt: DateTime(2026),
+        config: const HttpRequestConfigEntity(id: 'e2'),
+      );
+      final tree = [
+        CollectionNodeEntity(
+          id: 'r1',
+          name: 'Req',
+          isFolder: false,
+          config: const HttpRequestConfigEntity(id: 'r1'),
+          examples: [ex2],
+        ),
+      ];
+      final next = CollectionsTreeHelper.insertExampleInNode(
+        tree,
+        'r1',
+        ex1,
+        0,
+      );
+      expect(next.single.examples.map((e) => e.id).toList(), ['e1', 'e2']);
+
+      final clamped = CollectionsTreeHelper.insertExampleInNode(
+        tree,
+        'r1',
+        ex1,
+        42,
+      );
+      expect(clamped.single.examples.map((e) => e.id).toList(), ['e2', 'e1']);
+
+      // Missing node id → no-op.
+      final noop = CollectionsTreeHelper.insertExampleInNode(
+        tree,
+        'ghost',
+        ex1,
+        0,
+      );
+      expect(noop.single.examples.map((e) => e.id).toList(), ['e2']);
+    });
+
+    test(
+      'siblingIndexOf returns position among siblings (root and nested)',
+      () {
+        final tree = [
+          CollectionNodeEntity(
+            id: 'f1',
+            name: 'Auth',
+            children: [leaf('a', 'A'), leaf('b', 'B')],
+          ),
+          leaf('r', 'Root leaf'),
+        ];
+        expect(CollectionsTreeHelper.siblingIndexOf(tree, 'b'), 1);
+        expect(CollectionsTreeHelper.siblingIndexOf(tree, 'r'), 1);
+        expect(CollectionsTreeHelper.siblingIndexOf(tree, 'f1'), 0);
+        expect(CollectionsTreeHelper.siblingIndexOf(tree, 'ghost'), -1);
+      },
+    );
+  });
 }

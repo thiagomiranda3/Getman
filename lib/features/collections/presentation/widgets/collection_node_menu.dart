@@ -1,7 +1,8 @@
 // More-actions menu for a collection node row: rename, edit description,
 // variables (folders), add subfolder (folders), export to Postman, export as
-// API docs, favorite/unfavorite, delete (with confirm). Two entry points
-// share the same items + actions: the row's trailing "⋮" PopupMenuButton
+// API docs, favorite/unfavorite, delete (instant + UNDO for requests; confirm
+// + UNDO for folders — delete_node_with_undo.dart). Two entry points share
+// the same items + actions: the row's trailing "⋮" PopupMenuButton
 // (CollectionNodeMenu) and right-click anywhere on the row
 // (showCollectionNodeMenuAt). Dispatches CollectionsBloc events;
 // delete/favorite show a snackbar.
@@ -11,7 +12,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
-import 'package:getman/core/ui/widgets/confirm_dialog.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/utils/json_file_io.dart';
 import 'package:getman/core/utils/postman/postman_collection_mapper.dart';
@@ -19,6 +19,7 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/collection_variables_dialog.dart';
+import 'package:getman/features/collections/presentation/widgets/delete_node_with_undo.dart';
 import 'package:getman/features/collections/presentation/widgets/export_api_docs_dialog.dart';
 
 /// Shows the node's actions menu at [globalPosition] — the right-click path.
@@ -189,20 +190,7 @@ void _handleSelection(
     case 'variables':
       unawaited(CollectionVariablesDialog.show(context, node));
     case 'delete':
-      unawaited(
-        ConfirmDialog.show(
-          context,
-          title: node.isFolder ? 'Delete folder?' : 'Delete request?',
-          message: node.isFolder
-              ? 'Deletes "${node.name}" and everything inside it. '
-                    'This cannot be undone.'
-              : 'Deletes "${node.name}". This cannot be undone.',
-          onConfirm: () {
-            context.read<CollectionsBloc>().add(DeleteNode(node.id));
-            showAppSnackBar(context, 'Deleted "${node.name}"');
-          },
-        ),
-      );
+      deleteNodeWithUndo(context, node);
     case 'favorite':
       context.read<CollectionsBloc>().add(ToggleFavorite(node.id));
       showAppSnackBar(

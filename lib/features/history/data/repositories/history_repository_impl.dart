@@ -2,19 +2,34 @@
 // the data source's raw Box.watch() events (a single addToHistory can fire up
 // to ~3 mutations) within an 80ms coalescing window so subscribers see one
 // re-read + emission per burst, not one per mutation; the emitted list is
-// always newest-first (models.reversed).
+// ordered by a stable mergeSort on sentAt descending (nulls/legacy rows
+// last), with the pre-sort `.reversed` (box insertion order) acting as the
+// tie-break for entries with equal or missing timestamps. addToHistory mints
+// a FRESH id per stored row — never the source entity's id — because a tab
+// edited-and-resent N times shares one tabId across all N sends, and every
+// history row must be independently addressable so deleteHistoryEntry/
+// deleteFromHistory (id-keyed) targets exactly one row. clearHistory wipes
+// everything; restoreHistoryEntries is the exception to the fresh-id rule —
+// it deliberately keeps the captured entity's id verbatim (no re-mint) so an
+// UNDO reinserts the exact record that was deleted, not a new identity.
 
 import 'dart:async';
 
+import 'package:collection/collection.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/error/guard.dart';
 import 'package:getman/features/history/data/datasources/history_local_data_source.dart';
 import 'package:getman/features/history/data/models/request_config_model.dart';
 import 'package:getman/features/history/domain/repositories/history_repository.dart';
+import 'package:uuid/uuid.dart';
 
 class HistoryRepositoryImpl implements HistoryRepository {
-  HistoryRepositoryImpl(this.localDataSource);
+  HistoryRepositoryImpl(this.localDataSource, {DateTime Function()? now})
+    : _now = now ?? DateTime.now;
   final HistoryLocalDataSource localDataSource;
+
+  /// Injectable clock so tests can pin the sentAt stamp.
+  final DateTime Function() _now;
 
   /// One `addToHistory` performs up to ~3 box mutations (dedup delete + add +
   /// batched trim), each firing a watch event. Coalescing within this window
@@ -23,16 +38,65 @@ class HistoryRepositoryImpl implements HistoryRepository {
 
   Future<List<HttpRequestConfigEntity>> _read() => guardPersistence(() async {
     final models = await localDataSource.getHistory();
-    // Newest first: the UI always wants this ordering.
-    return models.reversed.map((m) => m.toEntity()).toList();
+    // Newest first. Reversed box insertion order is the tie-break baseline; a
+    // STABLE mergeSort by sentAt then overlays chronological order so
+    // restored entries (appended at the box tail by an UNDO) land back at
+    // their original slot. Legacy records without sentAt sink below all
+    // dated ones (they group under the EARLIER day header).
+    final entities = models.reversed.map((m) => m.toEntity()).toList();
+    mergeSort<HttpRequestConfigEntity>(entities, compare: _bySentAtDesc);
+    return entities;
   });
+
+  static int _bySentAtDesc(
+    HttpRequestConfigEntity a,
+    HttpRequestConfigEntity b,
+  ) {
+    final at = a.sentAt;
+    final bt = b.sentAt;
+    if (at == null && bt == null) return 0;
+    if (at == null) return 1;
+    if (bt == null) return -1;
+    return bt.compareTo(at);
+  }
 
   @override
   Future<void> addToHistory(HttpRequestConfigEntity config, int limit) =>
       guardPersistence(() async {
         await localDataSource.addToHistory(
-          HttpRequestConfig.fromEntity(config),
+          // Mint a fresh id — do NOT keep config.id. History rows must have
+          // ids unique across the box: config.id is the TAB's id, and the
+          // same tab can be edited-and-resent many times, which would give
+          // every resulting row the same id and break id-keyed delete (it
+          // would hit whichever row iteration reaches first, not necessarily
+          // the intended one). Dedup stays signature-based and is untouched
+          // by this — id was already excluded from ==/hashCode.
+          // Also stamp the send time here (the data layer owns wall-clock
+          // concerns). Dedup ignores sentAt by design, so a re-send of the
+          // same request refreshes the stamp.
+          HttpRequestConfig.fromEntity(config)
+            ..id = const Uuid().v4()
+            ..sentAt = _now(),
           limit,
+        );
+      });
+
+  @override
+  Future<void> deleteHistoryEntry(String id) =>
+      guardPersistence(() => localDataSource.deleteFromHistory(id));
+
+  @override
+  Future<void> clearHistory() => guardPersistence(localDataSource.clearHistory);
+
+  @override
+  Future<void> restoreHistoryEntries(List<HttpRequestConfigEntity> entries) =>
+      guardPersistence(() async {
+        // fromEntity preserves the snapshot's sentAt AND id verbatim —
+        // restore must NOT re-stamp (the undone entry would jump to the top
+        // as "just sent") and must NOT re-mint the id (unlike addToHistory,
+        // an UNDO has to reinsert the exact deleted record, not a new one).
+        await localDataSource.restoreToHistory(
+          entries.map(HttpRequestConfig.fromEntity).toList(),
         );
       });
 

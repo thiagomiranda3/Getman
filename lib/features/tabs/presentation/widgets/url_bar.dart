@@ -1,9 +1,13 @@
 // The URL input row of a request tab: request-kind/method selector +
-// {{variable}}-highlighted URL field with autocomplete + code-export/save
+// {{variable}}-highlighted URL field with autocomplete ({{var}} names plus
+// B4 URL suggestions merged from history + saved collection requests;
+// selecting a URL replaces the whole field) + code-export/revert/save
 // buttons + SEND/CANCEL (or CONNECT for WS/SSE/MCP). Plain Enter in the
 // focused URL field sends too (HTTP only). Resolves env vars via
 // RequestVariableResolver/ActiveEnvironmentHelper at press time, not build
-// time.
+// time. Wide layout only: RevertTabButton (A4) sits beside the save button
+// for dirty linked tabs; compact/narrow layouts cover revert via the
+// tab-chip context menu instead (see url_overflow_menu.dart).
 //
 // Gotchas: push text into _urlController ONLY via
 // _setControllerPreservingEnd — anything else jumps the cursor mid-echo.
@@ -16,6 +20,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -25,6 +30,7 @@ import 'package:getman/core/ui/widgets/variable_hover_popover.dart';
 import 'package:getman/core/utils/curl_utils.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/core/utils/request_variable_resolver.dart';
+import 'package:getman/core/utils/url_suggestion_source.dart';
 import 'package:getman/core/utils/variable_resolution_helper.dart';
 import 'package:getman/core/utils/variable_suggestions.dart';
 import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
@@ -33,6 +39,7 @@ import 'package:getman/features/collections/presentation/bloc/collections_state.
 import 'package:getman/features/environments/domain/logic/active_environment_helper.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
+import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/mcp/presentation/widgets/mcp_connect_button.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
@@ -44,6 +51,8 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/code_export_dialog.dart';
 import 'package:getman/features/tabs/presentation/widgets/realtime_button.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_kind_method_selector.dart';
+import 'package:getman/features/tabs/presentation/widgets/revert_tab_button.dart';
+import 'package:getman/features/tabs/presentation/widgets/unresolved_vars_chip.dart';
 import 'package:getman/features/tabs/presentation/widgets/url_overflow_menu.dart';
 
 void _setControllerPreservingEnd(
@@ -183,6 +192,37 @@ class _UrlBarState extends State<UrlBar> {
     );
   }
 
+  // B4: collection request URLs for the URL-suggestion mode, recomputed only
+  // when the CollectionsState instance changes (identity check —
+  // state.configById is memoized per instance, so a recompute is one flat
+  // map walk per tree change, not per keystroke).
+  CollectionsState? _collectionUrlsSource;
+  List<String> _cachedCollectionUrls = const [];
+
+  List<String> _collectionRequestUrls() {
+    final s = context.read<CollectionsBloc>().state;
+    if (!identical(s, _collectionUrlsSource)) {
+      _collectionUrlsSource = s;
+      _cachedCollectionUrls = [
+        for (final config in s.configById.values)
+          if (config.url.trim().isNotEmpty) config.url,
+      ];
+    }
+    return _cachedCollectionUrls;
+  }
+
+  /// URL-mode suggestions (B4): history (already newest-first in
+  /// HistoryState) merged with saved collection request URLs. Reads live
+  /// bloc state at call time, mirroring _layeredContext.
+  List<String> _urlSuggestionsFromHistoryAndCollections(String text) {
+    final history = context.read<HistoryBloc>().state.history;
+    return buildUrlSuggestions(
+      query: text,
+      historyUrls: [for (final config in history) config.url],
+      collectionUrls: _collectionRequestUrls(),
+    );
+  }
+
   // Resolves the full active environment (not just its variables, as
   // _activeVariables does) because the popover needs the name + secretKeys to
   // mask secrets and label the source. Both read live bloc state at call time.
@@ -292,6 +332,34 @@ class _UrlBarState extends State<UrlBar> {
                           ? 2.0
                           : (layout.isCompact ? 4.0 : 8.0);
 
+                      // E2: tooltip hints from the one platform-aware source
+                      // (same predicate as buildAppShortcuts — never
+                      // Theme.of(context).platform).
+                      final sendHint = shortcutHint(
+                        AppShortcutAction.send,
+                        useMeta: useMetaShortcuts,
+                      );
+                      final saveHint = shortcutHint(
+                        AppShortcutAction.save,
+                        useMeta: useMetaShortcuts,
+                      );
+                      // Extracted (rather than inlined in the CANCEL Row
+                      // below) so the extra Tooltip nesting doesn't push its
+                      // lines past 80 columns.
+                      final sendingSpinner = SizedBox(
+                        width: layout.smallIconSize,
+                        height: layout.smallIconSize,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: theme.colorScheme.onError,
+                          // Drop the track ring: some themes (AURIS) set a
+                          // circularTrackColor nearly identical to onError,
+                          // so the moving arc blends in and reads as a
+                          // static ring.
+                          backgroundColor: Colors.transparent,
+                        ),
+                      );
+
                       return Row(
                         children: [
                           RequestKindMethodSelector(
@@ -304,6 +372,8 @@ class _UrlBarState extends State<UrlBar> {
                               controller: _urlController,
                               focusNode: _urlFocusNode,
                               suggestionsFor: _urlSuggestions,
+                              urlSuggestionsFor:
+                                  _urlSuggestionsFromHistoryAndCollections,
                               onAccepted: (value) =>
                                   _handleUrlChanged(context, tab, value),
                               child: TextField(
@@ -331,9 +401,18 @@ class _UrlBarState extends State<UrlBar> {
                                 // Enter sends right from the URL field (no
                                 // Cmd/Ctrl needed — unlike multi-line editors
                                 // where plain Enter inserts a newline). When
-                                // the {{var}} autocomplete menu is open its
-                                // Enter-to-accept consumes the key first, so
-                                // accepting a suggestion never fires a send.
+                                // the {{var}} autocomplete menu is open in
+                                // VARIABLE mode, its Enter-to-accept always
+                                // consumes the key first, so accepting a
+                                // suggestion never fires a send. In URL
+                                // mode (whole-URL history/collection
+                                // suggestions), Enter only accepts once the
+                                // user has arrow-navigated the popup (FIX
+                                // I4) — otherwise it's left unconsumed and
+                                // sends, so typing a full URL that happens to
+                                // prefix another suggestion still sends on
+                                // Enter instead of silently rewriting the
+                                // field.
                                 onSubmitted: (_) =>
                                     _handleUrlSubmitted(context),
                               ),
@@ -370,89 +449,84 @@ class _UrlBarState extends State<UrlBar> {
                             ),
                             SizedBox(width: smallGap),
                           ],
+                          // E3: pre-send unresolved-{{var}} warning. Advisory
+                          // only — SEND stays enabled regardless. The chip
+                          // (not this builder) watches config edits; it
+                          // renders nothing when every var resolves.
+                          UnresolvedVarsChip(tabId: widget.tabId),
                           if (tab.config.kind == RequestKind.http)
-                            context.appDecoration.wrapInteractive(
-                              child: ElevatedButton(
-                                onPressed: tab.isSending
-                                    ? () => context.read<TabsBloc>().add(
-                                        CancelRequest(tab.tabId),
-                                      )
-                                    : () => context.read<TabsBloc>().add(
-                                        _sendEvent(context, tab.tabId),
-                                      ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: tab.isSending
-                                      ? theme.colorScheme.error
-                                      : null,
-                                  foregroundColor: tab.isSending
-                                      ? theme.colorScheme.onError
-                                      : null,
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: isNarrow
-                                        ? 12
-                                        : layout.buttonPaddingHorizontal,
-                                    vertical: isNarrow
-                                        ? 10
-                                        : layout.buttonPaddingVertical,
-                                  ),
-                                  minimumSize: Size.zero,
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 300),
-                                  transitionBuilder: (child, animation) =>
-                                      ScaleTransition(
-                                        scale: animation,
-                                        child: FadeTransition(
-                                          opacity: animation,
-                                          child: child,
-                                        ),
-                                      ),
-                                  child: tab.isSending
-                                      ? Row(
-                                          key: const ValueKey('cancel'),
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            SizedBox(
-                                              width: layout.smallIconSize,
-                                              height: layout.smallIconSize,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color:
-                                                    theme.colorScheme.onError,
-                                                // Drop the track ring: some
-                                                // themes (AURIS) set a
-                                                // circularTrackColor nearly
-                                                // identical to onError, so the
-                                                // moving arc blends in and
-                                                // reads as a static ring.
-                                                backgroundColor:
-                                                    Colors.transparent,
-                                              ),
-                                            ),
-                                            SizedBox(width: isNarrow ? 4 : 8),
-                                            Text(
-                                              isNarrow ? 'STOP' : 'CANCEL',
-                                              style: TextStyle(
-                                                fontSize: layout.fontSizeTitle,
-                                                fontWeight: context
-                                                    .appTypography
-                                                    .displayWeight,
-                                              ),
-                                            ),
-                                          ],
+                            Tooltip(
+                              message: tab.isSending
+                                  ? 'Cancel request'
+                                  : 'Send — $sendHint',
+                              child: context.appDecoration.wrapInteractive(
+                                child: ElevatedButton(
+                                  onPressed: tab.isSending
+                                      ? () => context.read<TabsBloc>().add(
+                                          CancelRequest(tab.tabId),
                                         )
-                                      : Text(
-                                          'SEND',
-                                          key: const ValueKey('send'),
-                                          style: TextStyle(
-                                            fontSize: layout.fontSizeTitle,
-                                            fontWeight: context
-                                                .appTypography
-                                                .displayWeight,
+                                      : () => context.read<TabsBloc>().add(
+                                          _sendEvent(context, tab.tabId),
+                                        ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: tab.isSending
+                                        ? theme.colorScheme.error
+                                        : null,
+                                    foregroundColor: tab.isSending
+                                        ? theme.colorScheme.onError
+                                        : null,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: isNarrow
+                                          ? 12
+                                          : layout.buttonPaddingHorizontal,
+                                      vertical: isNarrow
+                                          ? 10
+                                          : layout.buttonPaddingVertical,
+                                    ),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 300),
+                                    transitionBuilder: (child, animation) =>
+                                        ScaleTransition(
+                                          scale: animation,
+                                          child: FadeTransition(
+                                            opacity: animation,
+                                            child: child,
                                           ),
                                         ),
+                                    child: tab.isSending
+                                        ? Row(
+                                            key: const ValueKey('cancel'),
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              sendingSpinner,
+                                              SizedBox(width: isNarrow ? 4 : 8),
+                                              Text(
+                                                isNarrow ? 'STOP' : 'CANCEL',
+                                                style: TextStyle(
+                                                  fontSize:
+                                                      layout.fontSizeTitle,
+                                                  fontWeight: context
+                                                      .appTypography
+                                                      .displayWeight,
+                                                ),
+                                              ),
+                                            ],
+                                          )
+                                        : Text(
+                                            'SEND',
+                                            key: const ValueKey('send'),
+                                            style: TextStyle(
+                                              fontSize: layout.fontSizeTitle,
+                                              fontWeight: context
+                                                  .appTypography
+                                                  .displayWeight,
+                                            ),
+                                          ),
+                                  ),
                                 ),
                               ),
                             )
@@ -501,6 +575,11 @@ class _UrlBarState extends State<UrlBar> {
                             ),
                           ] else ...[
                             SizedBox(width: gap),
+                            RevertTabButton(
+                              tabId: widget.tabId,
+                              iconSize: iconSize,
+                              gap: smallGap,
+                            ),
                             context.appDecoration.wrapInteractive(
                               child: IconButton(
                                 key: const ValueKey('save_request_button'),
@@ -512,8 +591,8 @@ class _UrlBarState extends State<UrlBar> {
                                   size: iconSize,
                                 ),
                                 tooltip: tab.collectionNodeId != null
-                                    ? 'Update Request'
-                                    : 'Save to Collection',
+                                    ? 'Update Request — $saveHint'
+                                    : 'Save to Collection — $saveHint',
                                 onPressed: widget.onSave,
                               ),
                             ),

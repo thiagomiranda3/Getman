@@ -89,6 +89,8 @@ ThemeData glassTheme(
     variableResolved: GlassPalette.variableResolved,
     variableUnresolved: GlassPalette.variableUnresolved,
     selectorActive: accent,
+    findMatchHighlight: accent.withValues(alpha: 0.3),
+    findMatchActiveHighlight: accent.withValues(alpha: 0.65),
     diffAddedForeground: GlassPalette.statusSuccess,
     diffAddedBackground: GlassPalette.statusSuccess.withValues(alpha: 0.16),
     diffRemovedForeground: GlassPalette.statusError,

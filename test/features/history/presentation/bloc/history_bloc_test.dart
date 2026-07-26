@@ -1,10 +1,13 @@
 import 'dart:async';
 
+import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/history/domain/repositories/history_repository.dart';
 import 'package:getman/features/history/domain/usecases/history_usecases.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
+import 'package:getman/features/history/presentation/bloc/history_event.dart';
+import 'package:getman/features/history/presentation/bloc/history_state.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockHistoryRepository extends Mock implements HistoryRepository {}
@@ -16,16 +19,27 @@ void main() {
   HttpRequestConfigEntity req(String url) =>
       HttpRequestConfigEntity(id: url, url: url);
 
+  setUpAll(() {
+    registerFallbackValue(<HttpRequestConfigEntity>[]);
+  });
+
   setUp(() {
     repo = MockHistoryRepository();
     controller = StreamController<List<HttpRequestConfigEntity>>();
     when(() => repo.watchHistory()).thenAnswer((_) => controller.stream);
+    when(() => repo.deleteHistoryEntry(any())).thenAnswer((_) async {});
+    when(() => repo.clearHistory()).thenAnswer((_) async {});
+    when(() => repo.restoreHistoryEntries(any())).thenAnswer((_) async {});
   });
 
   tearDown(() => controller.close());
 
-  HistoryBloc build() =>
-      HistoryBloc(watchHistoryUseCase: WatchHistoryUseCase(repo));
+  HistoryBloc build() => HistoryBloc(
+    watchHistoryUseCase: WatchHistoryUseCase(repo),
+    deleteHistoryEntryUseCase: DeleteHistoryEntryUseCase(repo),
+    clearHistoryUseCase: ClearHistoryUseCase(repo),
+    restoreHistoryEntriesUseCase: RestoreHistoryEntriesUseCase(repo),
+  );
 
   test('starts loading, then mirrors the watched history', () async {
     final bloc = build();
@@ -68,5 +82,54 @@ void main() {
       expect(() => controller.add([req('https://c.com')]), returnsNormally);
       expect(bloc.state.history.map((e) => e.url), ['https://a.com']);
     },
+  );
+
+  blocTest<HistoryBloc, HistoryState>(
+    'DeleteHistoryEntry optimistically drops the entry and calls the use case',
+    build: build,
+    seed: () => HistoryState(
+      history: [req('https://a.com'), req('https://b.com')],
+    ),
+    act: (bloc) => bloc.add(const DeleteHistoryEntry('https://a.com')),
+    expect: () => [
+      HistoryState(history: [req('https://b.com')]),
+    ],
+    verify: (_) =>
+        verify(() => repo.deleteHistoryEntry('https://a.com')).called(1),
+  );
+
+  blocTest<HistoryBloc, HistoryState>(
+    'ClearHistory optimistically empties the list and calls the use case',
+    build: build,
+    seed: () => HistoryState(history: [req('https://a.com')]),
+    act: (bloc) => bloc.add(const ClearHistory()),
+    expect: () => [const HistoryState()],
+    verify: (_) => verify(() => repo.clearHistory()).called(1),
+  );
+
+  blocTest<HistoryBloc, HistoryState>(
+    'RestoreHistoryEntries calls the use case and emits nothing itself '
+    '(the watch stream pushes the merged list)',
+    build: build,
+    act: (bloc) => bloc.add(RestoreHistoryEntries([req('https://a.com')])),
+    expect: () => <HistoryState>[],
+    verify: (_) => verify(
+      () => repo.restoreHistoryEntries(
+        any(that: equals([req('https://a.com')])),
+      ),
+    ).called(1),
+  );
+
+  blocTest<HistoryBloc, HistoryState>(
+    'a failed delete is logged, not thrown (optimistic state stands until '
+    'the next watch emission)',
+    build: () {
+      when(() => repo.deleteHistoryEntry(any())).thenThrow(Exception('boom'));
+      return build();
+    },
+    seed: () => HistoryState(history: [req('https://a.com')]),
+    act: (bloc) => bloc.add(const DeleteHistoryEntry('https://a.com')),
+    expect: () => [const HistoryState()],
+    errors: List<Matcher>.empty,
   );
 }

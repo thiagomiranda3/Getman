@@ -510,4 +510,24 @@ void main() {
       expect(out, contains('"x":1'));
     });
   });
+
+  group('disabled headers are skipped in every code-gen target (B1)', () {
+    const config = HttpRequestConfigEntity(
+      id: 'c',
+      method: 'POST',
+      url: 'https://api.dev/x',
+      headers: {'X-Keep': 'kept-value', 'X-Skip': 'skipped-value'},
+      disabledHeaderKeys: {'X-Skip'},
+      body: '{"a":1}',
+    );
+
+    for (final target in CodeGenTarget.values) {
+      test('${target.name} omits X-Skip and keeps X-Keep', () {
+        final out = CodeGenService.generate(config, target);
+        expect(out, contains('X-Keep'));
+        expect(out, isNot(contains('X-Skip')));
+        expect(out, isNot(contains('skipped-value')));
+      });
+    }
+  });
 }

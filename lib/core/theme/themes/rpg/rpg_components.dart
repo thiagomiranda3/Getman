@@ -14,6 +14,7 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/extensions/app_components.dart';
 import 'package:getman/core/theme/extensions/app_components_defaults.dart';
 import 'package:getman/core/theme/themes/rpg/rpg_palette.dart';
+import 'package:getman/core/ui/widgets/hover_copy_row.dart';
 
 AppComponents rpgComponents({bool reduceEffects = false}) {
   return defaultAppComponents().copyWith(
@@ -540,7 +541,7 @@ class _GrimoireRow extends StatelessWidget {
   }
 }
 
-// --- dataRow: quest ledger row ---------------------------------------------
+// --- dataRow: quest ledger row (wrapped in HoverCopyRow for C3 copy) -------
 
 class QuestLedgerRow extends StatelessWidget {
   const QuestLedgerRow({
@@ -559,50 +560,53 @@ class QuestLedgerRow extends StatelessWidget {
     final layout = context.appLayout;
     final isDark = theme.brightness == Brightness.dark;
     final borderColor = isDark ? RpgPalette.borderDark : RpgPalette.borderLight;
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: borderColor, width: layout.borderThin),
+    return HoverCopyRow(
+      value: value,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: borderColor, width: layout.borderThin),
+          ),
         ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '᛫',
-            style: TextStyle(
-              color: RpgPalette.gold,
-              fontSize: layout.fontSizeNormal,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              color: RpgPalette.gold,
-              fontWeight: context.appTypography.titleWeight,
-              fontSize: layout.fontSizeSmall,
-              letterSpacing: 0.8,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: SelectableText(
-              value,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '᛫',
               style: TextStyle(
-                fontFamily: context.appTypography.codeFontFamily,
+                color: RpgPalette.gold,
                 fontSize: layout.fontSizeNormal,
-                fontWeight: highlight
-                    ? context.appTypography.titleWeight
-                    : null,
-                color: highlight
-                    ? RpgPalette.gold
-                    : theme.colorScheme.onSurface,
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 6),
+            SelectableText(
+              label.toUpperCase(),
+              style: TextStyle(
+                color: RpgPalette.gold,
+                fontWeight: context.appTypography.titleWeight,
+                fontSize: layout.fontSizeSmall,
+                letterSpacing: 0.8,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: SelectableText(
+                value,
+                style: TextStyle(
+                  fontFamily: context.appTypography.codeFontFamily,
+                  fontSize: layout.fontSizeNormal,
+                  fontWeight: highlight
+                      ? context.appTypography.titleWeight
+                      : null,
+                  color: highlight
+                      ? RpgPalette.gold
+                      : theme.colorScheme.onSurface,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

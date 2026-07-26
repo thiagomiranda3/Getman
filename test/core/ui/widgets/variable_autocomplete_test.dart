@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/core/ui/widgets/variable_autocomplete.dart';
+import 'package:getman/core/utils/url_suggestion_source.dart';
 import 'package:getman/core/utils/variable_resolution_helper.dart';
 import 'package:getman/core/utils/variable_suggestions.dart';
 
@@ -34,7 +35,10 @@ void main() {
     focusNode.dispose();
   });
 
-  Future<void> pump(WidgetTester tester) {
+  Future<void> pump(
+    WidgetTester tester, {
+    List<String> Function(String text)? urlSuggestionsFor,
+  }) {
     return tester.pumpWidget(
       MaterialApp(
         theme: brutalistTheme(Brightness.light),
@@ -43,6 +47,7 @@ void main() {
             controller: controller,
             focusNode: focusNode,
             suggestionsFor: _suggest,
+            urlSuggestionsFor: urlSuggestionsFor,
             child: TextField(controller: controller, focusNode: focusNode),
           ),
         ),
@@ -302,6 +307,192 @@ void main() {
         matching: find.byType(TextFieldTapRegion),
       ),
       findsOneWidget,
+    );
+  });
+
+  group('URL suggestion mode (B4)', () {
+    List<String> urlSuggest(String text) => buildUrlSuggestions(
+      query: text,
+      historyUrls: const [
+        'https://api.dev/users',
+        'https://api.dev/orders',
+        'https://api.dev/users/all',
+      ],
+      collectionUrls: const ['https://saved.dev/items'],
+    );
+
+    testWidgets('3+ typed chars with no {{ token open URL suggestions', (
+      tester,
+    ) async {
+      await pump(tester, urlSuggestionsFor: urlSuggest);
+      await tester.enterText(find.byType(TextField), 'api');
+      await tester.pumpAndSettle();
+      expect(find.text('https://api.dev/users'), findsOneWidget);
+      expect(find.text('https://api.dev/orders'), findsOneWidget);
+    });
+
+    testWidgets('fewer than 3 chars keep the menu closed', (tester) async {
+      await pump(tester, urlSuggestionsFor: urlSuggest);
+      await tester.enterText(find.byType(TextField), 'ap');
+      await tester.pumpAndSettle();
+      expect(find.text('https://api.dev/users'), findsNothing);
+    });
+
+    testWidgets('variable mode wins while the caret is inside a {{ token', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        urlSuggestionsFor: (_) => const ['https://api.dev/users'],
+      );
+      await tester.enterText(find.byType(TextField), '{{ba');
+      await tester.pumpAndSettle();
+      expect(find.text('baseUrl'), findsOneWidget);
+      expect(find.text('https://api.dev/users'), findsNothing);
+    });
+
+    testWidgets(
+      // FIX I4: plain Enter (no arrow-navigation) in URL mode must NOT
+      // accept a suggestion — the _EnterAcceptIntent action must report
+      // itself disabled so Flutter's Actions/Shortcuts leaves the key
+      // event unconsumed (per _GatedAction's contract, exercised
+      // identically by every other gated intent in this widget; the
+      // engine-level "does it then reach onSubmitted" hop is untestable
+      // via sendKeyEvent — see EditableText.onSubmitted's own testing
+      // note — so this asserts the proxy the widget actually controls:
+      // no accept happened, the menu is still open). Regression guard for
+      // the reviewer's exact trap: typing a URL that happens to prefix
+      // another history entry must not have it silently rewritten.
+      'Enter with no arrow-navigation does not accept — text and menu '
+      'unchanged',
+      (tester) async {
+        await pump(tester, urlSuggestionsFor: urlSuggest);
+        await tester.enterText(find.byType(TextField), 'api');
+        await tester.pumpAndSettle();
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+
+        expect(
+          controller.text,
+          'api',
+          reason: 'an unnavigated Enter must not rewrite the field',
+        );
+        expect(
+          find.text('https://api.dev/users'),
+          findsOneWidget,
+          reason: 'the menu must still be open — Enter was not consumed',
+        );
+      },
+    );
+
+    testWidgets(
+      'ArrowDown then Enter picks the second URL and onAccepted fires — '
+      'FIX I4 (navigated Enter still accepts)',
+      (tester) async {
+        String? accepted;
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: brutalistTheme(Brightness.light),
+            home: Scaffold(
+              body: VariableAutocomplete(
+                controller: controller,
+                focusNode: focusNode,
+                suggestionsFor: _suggest,
+                urlSuggestionsFor: urlSuggest,
+                onAccepted: (value) => accepted = value,
+                child: TextField(controller: controller, focusNode: focusNode),
+              ),
+            ),
+          ),
+        );
+        await tester.enterText(find.byType(TextField), 'api');
+        await tester.pumpAndSettle();
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        expect(controller.text, 'https://api.dev/orders');
+        expect(accepted, 'https://api.dev/orders');
+      },
+    );
+
+    testWidgets(
+      'Tab still accepts a URL suggestion with no navigation required — '
+      'only Enter is gated (FIX I4)',
+      (tester) async {
+        await pump(tester, urlSuggestionsFor: urlSuggest);
+        await tester.enterText(find.byType(TextField), 'api');
+        await tester.pumpAndSettle();
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pumpAndSettle();
+
+        expect(controller.text, 'https://api.dev/users');
+      },
+    );
+
+    testWidgets('tapping a URL row accepts it', (tester) async {
+      await pump(tester, urlSuggestionsFor: urlSuggest);
+      await tester.enterText(find.byType(TextField), 'saved');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('https://saved.dev/items'));
+      await tester.pumpAndSettle();
+      expect(controller.text, 'https://saved.dev/items');
+    });
+
+    testWidgets(
+      'Escape closes URL mode and stays closed until the text changes',
+      (tester) async {
+        await pump(tester, urlSuggestionsFor: urlSuggest);
+        await tester.enterText(find.byType(TextField), 'api');
+        await tester.pumpAndSettle();
+        expect(find.text('https://api.dev/users'), findsOneWidget);
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+        expect(find.text('https://api.dev/users'), findsNothing);
+
+        await tester.enterText(find.byType(TextField), 'api.');
+        await tester.pumpAndSettle();
+        expect(find.text('https://api.dev/users'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'dual mode: accepting a {{variable}} whose result matches a URL '
+      'candidate does not reopen URL mode; a real text change re-enables '
+      'it (regression)',
+      (tester) async {
+        // Realistic dual-mode config (the URL bar wires both callbacks):
+        // one history URL is itself a {{var}} template, so the text left
+        // behind by accepting the variable suggestion is a substring of it.
+        List<String> dualModeUrlSuggest(String text) => buildUrlSuggestions(
+          query: text,
+          historyUrls: const ['{{baseUrl}}/users'],
+          collectionUrls: const [],
+        );
+
+        await pump(tester, urlSuggestionsFor: dualModeUrlSuggest);
+        await tester.enterText(find.byType(TextField), '{{');
+        await tester.pumpAndSettle();
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+
+        expect(controller.text, '{{baseUrl}}');
+        expect(
+          find.text('{{baseUrl}}/users'),
+          findsNothing,
+          reason:
+              'accepting a variable suggestion must not instantly reopen '
+              'URL mode even though the resulting text matches a history '
+              'URL — the latch must be pre-synced the same way as '
+              '_acceptUrlAt',
+        );
+
+        // A genuine subsequent text change clears the latch — URL mode can
+        // reopen normally.
+        await tester.enterText(find.byType(TextField), '{{baseUrl}}/');
+        await tester.pumpAndSettle();
+        expect(find.text('{{baseUrl}}/users'), findsOneWidget);
+      },
     );
   });
 }

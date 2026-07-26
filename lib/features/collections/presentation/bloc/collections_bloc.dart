@@ -39,6 +39,8 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
     on<SaveExampleToNode>(_onSaveExampleToNode);
     on<DeleteExample>(_onDeleteExample);
     on<RenameExample>(_onRenameExample);
+    on<RestoreNodeSubtree>(_onRestoreNodeSubtree);
+    on<RestoreExample>(_onRestoreExample);
     on<MoveNode>(_onMoveNode);
     on<ImportCollections>(_onImportCollections);
     on<ReplaceCollections>(_onReplaceCollections);
@@ -286,6 +288,56 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
         event.nodeId,
         event.exampleId,
         event.newName,
+      ),
+    );
+  }
+
+  /// UNDO of DeleteNode. Restores under the nearest surviving captured
+  /// ancestor (root when none survive); no-op if the id is already back
+  /// (double-restore / concurrent import must never duplicate ids). _commit
+  /// re-sorts, so the node lands in its original visual position.
+  Future<void> _onRestoreNodeSubtree(
+    RestoreNodeSubtree event,
+    Emitter<CollectionsState> emit,
+  ) {
+    if (CollectionsTreeHelper.findNode(state.collections, event.node.id) !=
+        null) {
+      return Future.value();
+    }
+    String? parentId;
+    for (final id in event.ancestorIds.reversed) {
+      if (CollectionsTreeHelper.findNode(state.collections, id) != null) {
+        parentId = id;
+        break;
+      }
+    }
+    return _commit(
+      emit,
+      CollectionsTreeHelper.insertIntoTree(
+        state.collections,
+        parentId,
+        event.node,
+        event.siblingIndex,
+      ),
+    );
+  }
+
+  /// UNDO of DeleteExample. No-op when the owning node vanished.
+  Future<void> _onRestoreExample(
+    RestoreExample event,
+    Emitter<CollectionsState> emit,
+  ) {
+    if (CollectionsTreeHelper.findNode(state.collections, event.nodeId) ==
+        null) {
+      return Future.value();
+    }
+    return _commit(
+      emit,
+      CollectionsTreeHelper.insertExampleInNode(
+        state.collections,
+        event.nodeId,
+        event.example,
+        event.exampleIndex,
       ),
     );
   }

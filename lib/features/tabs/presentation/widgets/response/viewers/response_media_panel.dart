@@ -6,15 +6,21 @@
 // entry, since bodyBytes is never persisted to Hive). Gates its BlocBuilder
 // on bodyBytes identity + body + content-type, not length, because a
 // re-sent response can have different bytes of the same length.
+// The toolbar carries the shared ResponseBodyControls cluster (C4):
+// panel-level SAVE TO FILE (bytes), SAVE AS EXAMPLE, COMPARE, and COPY gated
+// to csv/html.
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/utils/json_file_io.dart';
 import 'package:getman/core/utils/response_media.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
+import 'package:getman/features/tabs/presentation/widgets/response/response_body_controls.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/viewers/binary_response_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/viewers/csv_response_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/viewers/html_response_view.dart';
@@ -68,7 +74,30 @@ class _ResponseMediaPanelState extends State<ResponseMediaPanel> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _toggle(context),
+            // PREVIEW/RAW toggle (left) + the shared action cluster (right).
+            // Wrap mirrors the textual body view: the cluster drops onto a
+            // second line instead of overflowing in a narrow pane.
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _toggle(context),
+                ResponseBodyControls(
+                  tabId: widget.tabId,
+                  getCopyableText: () => _textishText(kind, bytes),
+                  copyEnabled: _isTextish(kind) && bytes != null,
+                  copyDisabledTooltip:
+                      'Copy is available for CSV/HTML media only',
+                  saveEnabled: bytes != null,
+                  onSaveToFile: () => _saveBytesToFile(
+                    context,
+                    bytes,
+                    contentType,
+                    tab?.config.url,
+                  ),
+                ),
+              ],
+            ),
             Expanded(
               child: _tab == _MediaTab.raw || bytes == null
                   ? (bytes == null && _tab == _MediaTab.preview
@@ -156,6 +185,36 @@ class _ResponseMediaPanelState extends State<ResponseMediaPanel> {
           style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
         ),
       ),
+    );
+  }
+
+  /// CSV and HTML are the only media kinds with meaningful text to copy.
+  static bool _isTextish(ResponseMediaKind kind) =>
+      kind == ResponseMediaKind.csv || kind == ResponseMediaKind.html;
+
+  /// Decoded text for text-ish media (same lenient decode the CSV/HTML
+  /// viewers use); empty otherwise — Copy is disabled in that case anyway.
+  static String _textishText(ResponseMediaKind kind, Uint8List? bytes) {
+    if (!_isTextish(kind) || bytes == null) return '';
+    return utf8.decode(bytes, allowMalformed: true);
+  }
+
+  /// Panel-level SAVE TO FILE: raw bytes with the media extension (the same
+  /// pair BinaryResponseView's RAW-card button uses).
+  Future<void> _saveBytesToFile(
+    BuildContext context,
+    Uint8List? bytes,
+    String? contentType,
+    String? url,
+  ) async {
+    if (bytes == null) return;
+    final ext = mediaExtension(contentType: contentType, url: url);
+    await saveBytesFileWithFeedback(
+      context,
+      bytes: bytes,
+      fileName: 'response.$ext',
+      dialogTitle: 'Save response',
+      allowedExtensions: [ext],
     );
   }
 

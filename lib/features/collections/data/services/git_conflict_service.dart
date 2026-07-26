@@ -273,6 +273,19 @@ class GitConflictService implements ConflictService {
           formFields:
               _sideConfig(value, incoming, yours)?.formFields ?? const [],
         );
+      } else if (field == 'disabled params') {
+        // FIX C1: whole-field side pick, same convention as 'form fields'.
+        config = config?.copyWith(
+          disabledParams:
+              _sideConfig(value, incoming, yours)?.disabledParams ?? const [],
+        );
+      } else if (field == 'disabled headers') {
+        // FIX C1: whole-field side pick, same convention as 'secret keys'.
+        config = config?.copyWith(
+          disabledHeaderKeys:
+              _sideConfig(value, incoming, yours)?.disabledHeaderKeys ??
+              const {},
+        );
       } else if (headerKey != null) {
         final headers = Map<String, String>.from(config?.headers ?? const {});
         if (value == kFieldDeletedMarker) {

@@ -14,6 +14,7 @@ import 'package:getman/features/history/data/models/request_config_model.dart';
 import 'package:getman/features/settings/data/models/settings_model.dart';
 import 'package:getman/features/tabs/data/models/multipart_field_model.dart';
 import 'package:getman/features/tabs/data/models/panel_model.dart';
+import 'package:getman/features/tabs/data/models/parked_param_model.dart';
 import 'package:getman/features/tabs/data/models/request_tab_model.dart';
 import 'package:getman/features/tabs/data/models/stored_response_model.dart';
 
@@ -27,6 +28,7 @@ extension HiveRegistrar on HiveInterface {
     registerAdapter(HttpRequestTabModelAdapter());
     registerAdapter(MultipartFieldModelAdapter());
     registerAdapter(PanelModelAdapter());
+    registerAdapter(ParkedParamModelAdapter());
     registerAdapter(RequestRulesModelAdapter());
     registerAdapter(SavedExampleModelAdapter());
     registerAdapter(SettingsModelAdapter());
@@ -45,6 +47,7 @@ extension IsolatedHiveRegistrar on IsolatedHiveInterface {
     registerAdapter(HttpRequestTabModelAdapter());
     registerAdapter(MultipartFieldModelAdapter());
     registerAdapter(PanelModelAdapter());
+    registerAdapter(ParkedParamModelAdapter());
     registerAdapter(RequestRulesModelAdapter());
     registerAdapter(SavedExampleModelAdapter());
     registerAdapter(SettingsModelAdapter());

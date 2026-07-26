@@ -48,6 +48,8 @@ class AppLayout extends ThemeExtension<AppLayout> {
     required this.foldGutterWidth,
     required this.quickListMaxHeight,
     required this.mcpEditorPaneHeight,
+    required this.kvDisabledRowOpacity,
+    required this.kvToggleSlotWidth,
   });
   final double pagePadding;
   final double sectionSpacing;
@@ -106,6 +108,14 @@ class AppLayout extends ThemeExtension<AppLayout> {
   /// MCP tool detail panel.
   final double mcpEditorPaneHeight;
 
+  /// Opacity applied to a disabled (unchecked) key/value editor row —
+  /// parked params and disabled headers render dimmed at this alpha.
+  final double kvDisabledRowOpacity;
+
+  /// Width of the leading enable/disable checkbox slot in the key/value
+  /// editor. Fixed so rows with and without a checkbox stay column-aligned.
+  final double kvToggleSlotWidth;
+
   @override
   AppLayout copyWith({
     bool? isCompact,
@@ -150,6 +160,8 @@ class AppLayout extends ThemeExtension<AppLayout> {
     double? foldGutterWidth,
     double? quickListMaxHeight,
     double? mcpEditorPaneHeight,
+    double? kvDisabledRowOpacity,
+    double? kvToggleSlotWidth,
   }) {
     return AppLayout(
       isCompact: isCompact ?? this.isCompact,
@@ -199,6 +211,8 @@ class AppLayout extends ThemeExtension<AppLayout> {
       foldGutterWidth: foldGutterWidth ?? this.foldGutterWidth,
       quickListMaxHeight: quickListMaxHeight ?? this.quickListMaxHeight,
       mcpEditorPaneHeight: mcpEditorPaneHeight ?? this.mcpEditorPaneHeight,
+      kvDisabledRowOpacity: kvDisabledRowOpacity ?? this.kvDisabledRowOpacity,
+      kvToggleSlotWidth: kvToggleSlotWidth ?? this.kvToggleSlotWidth,
     );
   }
 
@@ -264,6 +278,8 @@ class AppLayout extends ThemeExtension<AppLayout> {
       foldGutterWidth: l(foldGutterWidth, other.foldGutterWidth),
       quickListMaxHeight: l(quickListMaxHeight, other.quickListMaxHeight),
       mcpEditorPaneHeight: l(mcpEditorPaneHeight, other.mcpEditorPaneHeight),
+      kvDisabledRowOpacity: l(kvDisabledRowOpacity, other.kvDisabledRowOpacity),
+      kvToggleSlotWidth: l(kvToggleSlotWidth, other.kvToggleSlotWidth),
     );
   }
 
@@ -310,6 +326,8 @@ class AppLayout extends ThemeExtension<AppLayout> {
     foldGutterWidth: 20,
     quickListMaxHeight: 360,
     mcpEditorPaneHeight: 160,
+    kvDisabledRowOpacity: 0.45,
+    kvToggleSlotWidth: 36,
   );
 
   static const compact = AppLayout(
@@ -355,5 +373,7 @@ class AppLayout extends ThemeExtension<AppLayout> {
     foldGutterWidth: 16,
     quickListMaxHeight: 280,
     mcpEditorPaneHeight: 160,
+    kvDisabledRowOpacity: 0.45,
+    kvToggleSlotWidth: 30,
   );
 }

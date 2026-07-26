@@ -612,4 +612,189 @@ void main() {
       },
     );
   });
+
+  Future<void> openContextMenu(WidgetTester tester) async {
+    await tester.tapAt(
+      tester.getCenter(find.text('GetUsers')),
+      buttons: kSecondaryMouseButton,
+    );
+    await tester.pumpAndSettle();
+  }
+
+  group('Wave-3 context-menu entries', () {
+    testWidgets('REOPEN CLOSED TAB is present and disabled when the stack is '
+        'empty', (tester) async {
+      await pumpTab(tester, _linkedTab());
+      await openContextMenu(tester);
+
+      expect(find.text('REOPEN CLOSED TAB'), findsOneWidget);
+      final item = tester.widget<PopupMenuItem<void>>(
+        find.ancestor(
+          of: find.text('REOPEN CLOSED TAB'),
+          matching: find.byWidgetPredicate((w) => w is PopupMenuItem<void>),
+        ),
+      );
+      expect(item.enabled, isFalse);
+    });
+
+    testWidgets(
+      'CLOSE SAVED TABS dispatches CloseSavedTabs for the active panel — '
+      'closes the clean tab onto the reopen stack and keeps the dirty one',
+      (tester) async {
+        // Two tabs in the SAME panel: `dirty` (_linkedTab, linked to node1
+        // with no matching saved node → DIRTY) and `clean` (_emptyTab,
+        // unlinked → matches the pristine default config → CLEAN). This is
+        // discriminating: a single-dirty-tab panel passes
+        // `hasLength(1)` whether CLOSE SAVED TABS actually ran, used the
+        // wrong panelId, or was never dispatched at all — a second, closable
+        // tab is required to prove the dispatch actually reached the bloc.
+        final dirty = _linkedTab();
+        final clean = _emptyTab();
+        when(() => tabsRepo.getPanels()).thenAnswer(
+          (_) async => [
+            PanelEntity(
+              id: 'p1',
+              name: 'Panel 1',
+              tabs: [dirty, clean],
+              activeTabId: dirty.tabId,
+            ),
+          ],
+        );
+        when(() => tabsRepo.getActivePanelId()).thenAnswer((_) async => 'p1');
+
+        final tabsBloc = TabsBloc(
+          repository: tabsRepo,
+          sendRequestUseCase: sendUseCase,
+        )..add(const LoadTabs());
+        await tabsBloc.stream.firstWhere(
+          (s) => !s.isLoading && s.tabs.length == 2,
+        );
+
+        final collectionsBloc = CollectionsBloc(
+          getCollectionsUseCase: GetCollectionsUseCase(collectionsRepo),
+          saveCollectionsUseCase: SaveCollectionsUseCase(collectionsRepo),
+          saveDebounce: const Duration(milliseconds: 5),
+        )..add(const ReplaceCollections([]));
+        await collectionsBloc.stream.first;
+
+        addTearDown(tabsBloc.close);
+        addTearDown(collectionsBloc.close);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: brutalistTheme(Brightness.light),
+            home: Scaffold(
+              body: MultiBlocProvider(
+                providers: [
+                  BlocProvider.value(value: tabsBloc),
+                  BlocProvider.value(value: collectionsBloc),
+                ],
+                child: RepositoryProvider<TabDirtyChecker>.value(
+                  value: const TabDirtyChecker(),
+                  child: Center(
+                    child: RequestTabChip(
+                      tabId: dirty.tabId,
+                      index: 0,
+                      isActive: true,
+                      onTap: () {},
+                      onClose: () async => true,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await openContextMenu(tester);
+
+        await tester.tap(find.text('CLOSE SAVED TABS'));
+        await tester.pumpAndSettle();
+
+        expect(
+          tabsBloc.state.tabs.map((t) => t.tabId),
+          [dirty.tabId],
+          reason: 'the clean tab closed; the dirty tab was kept',
+        );
+        expect(
+          tabsBloc.canReopenClosedTab,
+          isTrue,
+          reason: 'the closed clean tab landed on the reopen stack',
+        );
+      },
+    );
+
+    testWidgets('REVERT CHANGES appears only for a DIRTY linked tab, confirms, '
+        'and reverts', (tester) async {
+      // Seed collections so the linked node exists with a DIFFERENT config →
+      // dirty. The harness's collectionsBloc is reachable via the tree.
+      const saved = HttpRequestConfigEntity(
+        id: 'node1',
+        url: 'https://api/users?orig=1',
+      );
+      await pumpTab(tester, _linkedTab()); // config url https://api/users
+      final chipState = tester.state<State<RequestTabChip>>(
+        find.byType(RequestTabChip),
+      );
+      chipState.context.read<CollectionsBloc>().add(
+        const ReplaceCollections([
+          CollectionNodeEntity(
+            id: 'node1',
+            name: 'GetUsers',
+            isFolder: false,
+            config: saved,
+          ),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      await openContextMenu(tester);
+      expect(find.text('REVERT CHANGES'), findsOneWidget);
+
+      await tester.tap(find.text('REVERT CHANGES'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Discard unsaved changes to this request?'),
+        findsOneWidget,
+      );
+      await tester.tap(find.widgetWithText(TextButton, 'REVERT'));
+      await tester.pumpAndSettle();
+
+      final tabsBloc = chipState.context.read<TabsBloc>();
+      expect(tabsBloc.state.tabs.first.config, saved);
+
+      // RevertTab schedules TabsBloc's 10s save debounce; flush it so no
+      // Timer is left pending when the test ends (mirrors url_bar_test.dart).
+      await tester.pump(const Duration(seconds: 11));
+    });
+
+    testWidgets('REVERT CHANGES is absent for a clean linked tab', (
+      tester,
+    ) async {
+      await pumpTab(tester, _linkedTab());
+      final chipState = tester.state<State<RequestTabChip>>(
+        find.byType(RequestTabChip),
+      );
+      // Saved node config IDENTICAL to the tab's → clean.
+      chipState.context.read<CollectionsBloc>().add(
+        const ReplaceCollections([
+          CollectionNodeEntity(
+            id: 'node1',
+            name: 'GetUsers',
+            isFolder: false,
+            config: HttpRequestConfigEntity(
+              id: 'node1',
+              url: 'https://api/users',
+            ),
+          ),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      await openContextMenu(tester);
+      expect(find.text('REVERT CHANGES'), findsNothing);
+    });
+  });
 }

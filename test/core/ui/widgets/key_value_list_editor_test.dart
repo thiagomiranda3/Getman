@@ -334,6 +334,329 @@ void main() {
       );
     },
   );
+
+  group('per-row enable checkbox (B1)', () {
+    testWidgets('no checkbox column when rowEnabled/onToggleEnabled are null', (
+      tester,
+    ) async {
+      await pump(tester, const _EchoHarness(initial: {'Accept': '*/*'}));
+      expect(find.byType(Checkbox), findsNothing);
+    });
+
+    testWidgets('one checkbox per row, none on the trailing blank row', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        const _ToggleHarness(
+          initial: {'A': '1', 'B': '2'},
+          initiallyDisabled: {},
+        ),
+      );
+      // 3 rows rendered (A, B, trailing blank) but only 2 checkboxes.
+      expect(find.widgetWithText(TextField, 'KEY'), findsNWidgets(3));
+      expect(find.byType(Checkbox), findsNWidgets(2));
+    });
+
+    testWidgets('toggling reports index, key, value and the new state', (
+      tester,
+    ) async {
+      (int, String, String, bool)? reported;
+      await pump(
+        tester,
+        _ToggleHarness(
+          initial: const {'A': '1', 'B': '2'},
+          initiallyDisabled: const {},
+          onToggle: (index, key, value, enabled) =>
+              reported = (index, key, value, enabled),
+        ),
+      );
+
+      await tester.tap(find.byType(Checkbox).first);
+      await tester.pump();
+
+      expect(reported, (0, 'A', '1', false));
+      final checkbox = tester.widget<Checkbox>(find.byType(Checkbox).first);
+      expect(checkbox.value, isFalse);
+    });
+
+    testWidgets('a disabled row renders dimmed (key and value cells)', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        const _ToggleHarness(
+          initial: {'A': '1', 'B': '2'},
+          initiallyDisabled: {0},
+        ),
+      );
+      expect(
+        find.byWidgetPredicate((w) => w is Opacity && w.opacity < 1.0),
+        findsNWidgets(2),
+        reason: 'the disabled row dims its key cell and its value cell',
+      );
+    });
+
+    testWidgets(
+      'disabledRowsReadOnly makes disabled row fields non-interactive',
+      (tester) async {
+        await pump(
+          tester,
+          const _ToggleHarness(
+            initial: {'A': '1', 'B': '2'},
+            initiallyDisabled: {0},
+            readOnlyWhenDisabled: true,
+          ),
+        );
+        expect(
+          find.byWidgetPredicate((w) => w is IgnorePointer && w.ignoring),
+          findsNWidgets(2),
+          reason: 'key + value cells of the disabled row are pointer-blocked',
+        );
+      },
+    );
+
+    testWidgets(
+      'a headers-style toggle (items unchanged) keeps controllers alive',
+      (tester) async {
+        await pump(
+          tester,
+          const _ToggleHarness(
+            initial: {'A': '1', 'B': '2'},
+            initiallyDisabled: {},
+          ),
+        );
+        final controllerBefore = tester
+            .widget<TextField>(keyFieldAt(0))
+            .controller;
+
+        await tester.tap(find.byType(Checkbox).first);
+        await tester.pump();
+
+        final controllerAfter = tester
+            .widget<TextField>(keyFieldAt(0))
+            .controller;
+        expect(
+          identical(controllerBefore, controllerAfter),
+          isTrue,
+          reason: 'toggling must not rebuild rows when items are unchanged',
+        );
+      },
+    );
+
+    testWidgets('deleting a row keeps flags aligned with remaining rows', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        const _ToggleHarness(
+          initial: {'A': '1', 'B': '2', 'C': '3'},
+          initiallyDisabled: {1},
+        ),
+      );
+      // Delete row 0 (A). B's disabled flag must follow B to index 0.
+      await tester.tap(find.byIcon(Icons.delete_outline).first);
+      await tester.pump();
+
+      final firstCheckbox = tester.widget<Checkbox>(
+        find.byType(Checkbox).at(0),
+      );
+      final secondCheckbox = tester.widget<Checkbox>(
+        find.byType(Checkbox).at(1),
+      );
+      expect(firstCheckbox.value, isFalse, reason: 'B stays disabled');
+      expect(secondCheckbox.value, isTrue, reason: 'C stays enabled');
+    });
+  });
+
+  group('reorder + duplicate (B2)', () {
+    Future<void> dragHandleBy(
+      WidgetTester tester,
+      Finder handle,
+      double dy,
+    ) async {
+      final gesture = await tester.startGesture(tester.getCenter(handle));
+      await tester.pump(const Duration(milliseconds: 20));
+      await gesture.moveBy(Offset(0, dy / 2));
+      await tester.pump(const Duration(milliseconds: 20));
+      await gesture.moveBy(Offset(0, dy / 2));
+      await tester.pump(const Duration(milliseconds: 20));
+      await gesture.up();
+      await tester.pumpAndSettle();
+    }
+
+    String keyTextAt(WidgetTester tester, int index) => tester
+        .widget<TextField>(find.byKey(ValueKey('kv_key_$index')))
+        .controller!
+        .text;
+
+    testWidgets(
+      'no drag handles or duplicate buttons when the callbacks are null '
+      '(existing hosts unchanged)',
+      (tester) async {
+        await pump(tester, const _EchoHarness(initial: {'a': '1', 'b': '2'}));
+        expect(find.byIcon(Icons.drag_indicator), findsNothing);
+        expect(find.byIcon(Icons.content_copy), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'data rows show handle + duplicate; the trailing blank row shows '
+      'neither',
+      (tester) async {
+        await pump(
+          tester,
+          const _ReorderDuplicateHarness(initial: {'a': '1', 'b': '2'}),
+        );
+        // 2 data rows + 1 trailing blank = 3 delete buttons, but only the
+        // 2 data rows get a handle and a duplicate button.
+        expect(find.byIcon(Icons.delete_outline), findsNWidgets(3));
+        expect(find.byIcon(Icons.drag_indicator), findsNWidgets(2));
+        expect(find.byIcon(Icons.content_copy), findsNWidgets(2));
+      },
+    );
+
+    testWidgets(
+      'dragging row 0 below row 1 reports onReorder(0, 1) and moves the '
+      'row visually',
+      (tester) async {
+        final calls = <(int, int)>[];
+        await pump(
+          tester,
+          _ReorderDuplicateHarness(
+            initial: const {'a': '1', 'b': '2'},
+            onReorderCalls: calls,
+          ),
+        );
+
+        final row0 = tester.getCenter(find.byKey(const ValueKey('kv_key_0')));
+        final row1 = tester.getCenter(find.byKey(const ValueKey('kv_key_1')));
+        await dragHandleBy(
+          tester,
+          find.byIcon(Icons.drag_indicator).first,
+          row1.dy - row0.dy + 8,
+        );
+
+        expect(calls, [(0, 1)]);
+        expect(keyTextAt(tester, 0), 'b');
+        expect(keyTextAt(tester, 1), 'a');
+      },
+    );
+
+    testWidgets(
+      'a drop past the trailing blank row clamps to the last data slot',
+      (tester) async {
+        final calls = <(int, int)>[];
+        await pump(
+          tester,
+          _ReorderDuplicateHarness(
+            initial: const {'a': '1', 'b': '2'},
+            onReorderCalls: calls,
+          ),
+        );
+
+        await dragHandleBy(
+          tester,
+          find.byIcon(Icons.drag_indicator).first,
+          500,
+        );
+
+        expect(
+          calls,
+          [(0, 1)],
+          reason: 'newIndex must clamp to the last data row, never the blank',
+        );
+        expect(keyTextAt(tester, 0), 'b');
+        expect(keyTextAt(tester, 1), 'a');
+      },
+    );
+
+    testWidgets(
+      'tapping duplicate reports the row index and the host copy appears '
+      'below',
+      (tester) async {
+        final calls = <int>[];
+        await pump(
+          tester,
+          _ReorderDuplicateHarness(
+            initial: const {'a': '1', 'b': '2'},
+            onDuplicateCalls: calls,
+          ),
+        );
+
+        await tester.tap(find.byIcon(Icons.content_copy).first);
+        await tester.pumpAndSettle();
+
+        expect(calls, [0]);
+        // Host inserted a-copy below a: rows are now a, a-copy, b (+ blank).
+        expect(find.widgetWithText(TextField, 'KEY'), findsNWidgets(4));
+        expect(keyTextAt(tester, 1), 'a-copy');
+      },
+    );
+
+    testWidgets(
+      'a disabled (parked) row shows neither a drag handle nor a duplicate '
+      'button — only the checkbox and delete stay live',
+      (tester) async {
+        await pump(
+          tester,
+          const _ReorderDuplicateHarness(
+            initial: {'a': '1', 'z': '9', 'b': '2'},
+            disabledKeys: {'z'},
+          ),
+        );
+
+        // 3 data rows: a (enabled), z (disabled/parked), b (enabled).
+        expect(find.byType(Checkbox), findsNWidgets(3));
+        expect(
+          find.byIcon(Icons.drag_indicator),
+          findsNWidgets(2),
+          reason: 'the parked row (z) must not get a drag handle',
+        );
+        expect(
+          find.byIcon(Icons.content_copy),
+          findsNWidgets(2),
+          reason: 'the parked row (z) must not get a duplicate button',
+        );
+
+        // Position-specific: the parked row's own layout Row (nearest Row
+        // ancestor of its key field) has neither affordance; the enabled
+        // neighbour's Row has both.
+        Finder rowOf(String fieldKey) => find
+            .ancestor(
+              of: find.byKey(ValueKey(fieldKey)),
+              matching: find.byType(Row),
+            )
+            .first;
+
+        expect(
+          find.descendant(
+            of: rowOf('kv_key_1'),
+            matching: find.byIcon(Icons.drag_indicator),
+          ),
+          findsNothing,
+          reason: "no drag handle in the parked row's ('z') own layout row",
+        );
+        expect(
+          find.descendant(
+            of: rowOf('kv_key_1'),
+            matching: find.byIcon(Icons.content_copy),
+          ),
+          findsNothing,
+          reason:
+              "no duplicate button in the parked row's ('z') own layout row",
+        );
+        expect(
+          find.descendant(
+            of: rowOf('kv_key_0'),
+            matching: find.byIcon(Icons.drag_indicator),
+          ),
+          findsOneWidget,
+          reason: "the enabled neighbour ('a') keeps its drag handle",
+        );
+      },
+    );
+  });
 }
 
 class _SecretHarness extends StatefulWidget {
@@ -369,6 +692,124 @@ class _SecretHarnessState extends State<_SecretHarness> {
       onSecretKeysChanged: (s) {
         widget.onSecrets?.call(s);
         setState(() => secrets = s);
+      },
+    );
+  }
+}
+
+class _ToggleHarness extends StatefulWidget {
+  const _ToggleHarness({
+    required this.initial,
+    required this.initiallyDisabled,
+    this.readOnlyWhenDisabled = false,
+    this.onToggle,
+  });
+  final Map<String, String> initial;
+  final Set<int> initiallyDisabled;
+  final bool readOnlyWhenDisabled;
+  // Positional `enabled` mirrors the widget's onToggleEnabled contract.
+  // ignore: avoid_positional_boolean_parameters
+  final void Function(int index, String key, String value, bool enabled)?
+  onToggle;
+
+  @override
+  State<_ToggleHarness> createState() => _ToggleHarnessState();
+}
+
+class _ToggleHarnessState extends State<_ToggleHarness> {
+  late Map<String, String> items = widget.initial;
+  late Set<int> disabled = Set.of(widget.initiallyDisabled);
+
+  @override
+  Widget build(BuildContext context) {
+    return KeyValueListEditor<Map<String, String>>(
+      items: items,
+      decode: (map) => [for (final e in map.entries) (e.key, e.value)],
+      encode: (rows) => {
+        for (final (key, value) in rows)
+          if (key.isNotEmpty) key: value,
+      },
+      equals: _mapEquality.equals,
+      rowEnabled: (index) => !disabled.contains(index),
+      onToggleEnabled: (index, key, value, enabled) {
+        widget.onToggle?.call(index, key, value, enabled);
+        setState(() {
+          enabled ? disabled.remove(index) : disabled.add(index);
+        });
+      },
+      disabledRowsReadOnly: widget.readOnlyWhenDisabled,
+      onChanged: (map) => setState(() => items = map),
+    );
+  }
+}
+
+/// Harness for the B2 affordances: applies reorder/duplicate to its canonical
+/// map exactly the way a map-backed host (headers/env) does, and records the
+/// callback arguments for assertions. Optional [disabledKeys] wires
+/// `rowEnabled`/`onToggleEnabled` too, so a single harness covers the B1+B2
+/// interaction (a disabled row's affordance gating).
+class _ReorderDuplicateHarness extends StatefulWidget {
+  const _ReorderDuplicateHarness({
+    required this.initial,
+    this.onReorderCalls,
+    this.onDuplicateCalls,
+    this.disabledKeys,
+  });
+  final Map<String, String> initial;
+  final List<(int, int)>? onReorderCalls;
+  final List<int>? onDuplicateCalls;
+  final Set<String>? disabledKeys;
+
+  @override
+  State<_ReorderDuplicateHarness> createState() =>
+      _ReorderDuplicateHarnessState();
+}
+
+class _ReorderDuplicateHarnessState extends State<_ReorderDuplicateHarness> {
+  late Map<String, String> items = widget.initial;
+  late Set<String> disabled = Set.of(widget.disabledKeys ?? const {});
+
+  @override
+  Widget build(BuildContext context) {
+    final keys = items.keys.toList();
+    return KeyValueListEditor<Map<String, String>>(
+      items: items,
+      fieldPrefix: 'kv',
+      decode: (map) => [for (final e in map.entries) (e.key, e.value)],
+      encode: (rows) => {
+        for (final (key, value) in rows)
+          if (key.isNotEmpty) key: value,
+      },
+      equals: _mapEquality.equals,
+      onChanged: (map) => setState(() => items = map),
+      rowEnabled: widget.disabledKeys == null
+          ? null
+          : (index) => index >= keys.length || !disabled.contains(keys[index]),
+      onToggleEnabled: widget.disabledKeys == null
+          ? null
+          : (index, key, value, enabled) {
+              setState(() {
+                enabled ? disabled.remove(key) : disabled.add(key);
+              });
+            },
+      onReorder: (oldIndex, newIndex) {
+        widget.onReorderCalls?.add((oldIndex, newIndex));
+        final entries = items.entries.toList();
+        if (oldIndex < 0 || oldIndex >= entries.length) return;
+        final entry = entries.removeAt(oldIndex);
+        entries.insert(newIndex.clamp(0, entries.length), entry);
+        setState(() => items = Map.fromEntries(entries));
+      },
+      onDuplicate: (index) {
+        widget.onDuplicateCalls?.add(index);
+        final entries = items.entries.toList();
+        if (index < 0 || index >= entries.length) return;
+        final source = entries[index];
+        entries.insert(
+          index + 1,
+          MapEntry('${source.key}-copy', source.value),
+        );
+        setState(() => items = Map.fromEntries(entries));
       },
     );
   }

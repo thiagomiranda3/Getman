@@ -1,9 +1,11 @@
 // Widget tests for AddTabButton: tapping dispatches AddTab to TabsBloc.
 
 import 'package:bloc_test/bloc_test.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/features/home/presentation/widgets/add_tab_button.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
@@ -52,5 +54,21 @@ void main() {
     verify(
       () => bloc.add(any(that: isA<AddTab>())),
     ).called(1);
+  });
+
+  testWidgets('tooltip carries the new-tab shortcut hint', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+
+    await tester.pumpWidget(_host(bloc));
+    // Reset within the body: the testWidgets invariant check runs before
+    // addTearDown, and it forbids a leaked foundation debug override.
+    debugDefaultTargetPlatformOverride = null;
+
+    expect(
+      find.byTooltip(
+        'New Tab — ${shortcutHint(AppShortcutAction.newTab, useMeta: true)}',
+      ),
+      findsOneWidget,
+    );
   });
 }

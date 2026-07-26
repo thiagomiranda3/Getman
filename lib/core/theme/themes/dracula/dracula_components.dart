@@ -13,6 +13,7 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/extensions/app_components.dart';
 import 'package:getman/core/theme/extensions/app_components_defaults.dart';
 import 'package:getman/core/theme/themes/dracula/dracula_palette.dart';
+import 'package:getman/core/ui/widgets/hover_copy_row.dart';
 
 AppComponents draculaComponents({bool reduceEffects = false}) {
   return defaultAppComponents().copyWith(
@@ -432,7 +433,7 @@ class _ConsoleRow extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// ConsoleKvRow — dataRow
+// ConsoleKvRow — dataRow (wrapped in HoverCopyRow for C3 copy)
 // ---------------------------------------------------------------------------
 
 /// `key:` in accent color + mono value, separated by a thin divider.
@@ -456,42 +457,45 @@ class ConsoleKvRow extends StatelessWidget {
         ? DraculaPalette.primaryDark
         : DraculaPalette.primaryLight;
 
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: theme.dividerColor,
-            width: layout.borderThin,
-          ),
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$label: ',
-            style: TextStyle(
-              fontFamily: context.appTypography.codeFontFamily,
-              fontSize: layout.fontSizeNormal,
-              color: keyColor,
-              fontWeight: context.appTypography.titleWeight,
+    return HoverCopyRow(
+      value: value,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: theme.dividerColor,
+              width: layout.borderThin,
             ),
           ),
-          Expanded(
-            child: SelectableText(
-              value,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SelectableText(
+              '$label: ',
               style: TextStyle(
                 fontFamily: context.appTypography.codeFontFamily,
                 fontSize: layout.fontSizeNormal,
-                fontWeight: highlight
-                    ? context.appTypography.titleWeight
-                    : context.appTypography.bodyWeight,
-                color: theme.colorScheme.onSurface,
+                color: keyColor,
+                fontWeight: context.appTypography.titleWeight,
               ),
             ),
-          ),
-        ],
+            Expanded(
+              child: SelectableText(
+                value,
+                style: TextStyle(
+                  fontFamily: context.appTypography.codeFontFamily,
+                  fontSize: layout.fontSizeNormal,
+                  fontWeight: highlight
+                      ? context.appTypography.titleWeight
+                      : context.appTypography.bodyWeight,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

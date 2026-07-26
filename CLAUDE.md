@@ -133,7 +133,7 @@ workspace mirror (`workspace_sync_service.dart`). Find any of these in CODEMAP.
 ## Hive quick-rules
 
 - **Never renumber an existing `typeId`.** Add new models with a fresh ID —
-  **next free: 13** (highest in use is 12, `PanelModel`).
+  **next free: 14** (highest in use is 13, `ParkedParamModel`).
 - **Retired `SettingsModel` fields — never reuse these indices:** `HiveField(22)`
   (`reduceVisualEffects`) and `HiveField(27)` (`enableThemeSounds`).
 - After any `@HiveType`/`@HiveField` change, regenerate:
@@ -198,5 +198,7 @@ file-specific ones in each file's `//` header.
   `CodeLineEditingController`.
 - **Hive regen is not optional** after any `@HiveType`/`@HiveField` change.
 - **Shared chrome atoms, always**: snackbars → `showAppSnackBar(context, …)`
-  (never inline `SnackBar`s); irreversible actions confirm via
-  `ConfirmDialog.show(…)`; single-line text prompts → `NamePromptDialog.show(…)`.
+  (never inline `SnackBar`s); irreversible **or bulk** actions confirm via
+  `ConfirmDialog.show(…)` — single-item deletes are instant with an UNDO
+  snackbar (`actionLabel: 'UNDO'`, 5 s); single-line text prompts →
+  `NamePromptDialog.show(…)`.

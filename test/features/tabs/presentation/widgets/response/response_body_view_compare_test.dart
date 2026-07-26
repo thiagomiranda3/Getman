@@ -26,6 +26,9 @@ import 'package:re_editor/re_editor.dart';
 // context.read<...>() / BlocBuilder and never dispatches events here.
 class _FakeTabsBloc extends Bloc<TabsEvent, TabsState> implements TabsBloc {
   _FakeTabsBloc(super.initialState);
+
+  @override
+  bool get canReopenClosedTab => false;
 }
 
 class _FakeCollectionsBloc extends Bloc<CollectionsEvent, CollectionsState>

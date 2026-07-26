@@ -1,16 +1,15 @@
 // Touch-first replacement for the desktop three-dot context menu. Opened
 // via long-press on a collection node when `BuildContext.isPhone`. Mirrors
 // CollectionNodeMenu's actions (favorite, rename, describe, add subfolder,
-// variables, export, delete) plus a MOVE TO... folder picker that makes up
-// for the lack of drag-and-drop on narrow screens.
+// variables, export, delete — instant + UNDO for requests, confirm + UNDO
+// for folders via delete_node_with_undo.dart) plus a MOVE TO... folder
+// picker that makes up for the lack of drag-and-drop on narrow screens.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
-import 'package:getman/core/ui/widgets/app_snack_bar.dart';
-import 'package:getman/core/ui/widgets/confirm_dialog.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/utils/json_file_io.dart';
 import 'package:getman/core/utils/postman/postman_collection_mapper.dart';
@@ -18,6 +17,7 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/collection_variables_dialog.dart';
+import 'package:getman/features/collections/presentation/widgets/delete_node_with_undo.dart';
 import 'package:getman/features/collections/presentation/widgets/export_api_docs_dialog.dart';
 
 /// Touch-first replacement for the three-dot context menu. Opened via long-
@@ -203,23 +203,11 @@ class _SheetBody extends StatelessWidget {
             icon: Icons.delete_outline,
             label: 'DELETE',
             isDestructive: true,
-            onTap: () {
-              unawaited(
-                ConfirmDialog.show(
-                  context,
-                  title: node.isFolder ? 'Delete folder?' : 'Delete request?',
-                  message: node.isFolder
-                      ? 'Deletes "${node.name}" and everything inside it. '
-                            'This cannot be undone.'
-                      : 'Deletes "${node.name}". This cannot be undone.',
-                  onConfirm: () {
-                    context.read<CollectionsBloc>().add(DeleteNode(node.id));
-                    showAppSnackBar(context, 'Deleted "${node.name}"');
-                    Navigator.of(context).pop(); // close the action sheet
-                  },
-                ),
-              );
-            },
+            onTap: () => deleteNodeWithUndo(
+              context,
+              node,
+              onDeleted: () => Navigator.of(context).pop(), // close the sheet
+            ),
           ),
           SizedBox(height: layout.tabSpacing),
         ],

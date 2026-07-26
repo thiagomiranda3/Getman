@@ -1,10 +1,13 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/theme/theme_ids.dart';
 import 'package:getman/core/theme/theme_registry.dart';
+import 'package:getman/core/ui/widgets/hover_copy_row.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
@@ -15,6 +18,9 @@ import 'package:getman/features/tabs/presentation/widgets/response/response_head
 // Lightweight fake — only exposes `state`.
 class _FakeTabsBloc extends Bloc<TabsEvent, TabsState> implements TabsBloc {
   _FakeTabsBloc(super.initialState);
+
+  @override
+  bool get canReopenClosedTab => false;
 }
 
 const _kTabId = 'tab-test';
@@ -30,6 +36,7 @@ HttpRequestTabEntity _tabWith({required HttpResponseEntity response}) {
 Future<void> _pumpHeaders(
   WidgetTester tester, {
   required Map<String, String> headers,
+  String themeId = kBrutalistThemeId,
 }) async {
   final tab = _tabWith(
     response: HttpResponseEntity(
@@ -43,7 +50,7 @@ Future<void> _pumpHeaders(
     BlocProvider<TabsBloc>(
       create: (_) => _FakeTabsBloc(TabsState(tabs: [tab])),
       child: MaterialApp(
-        theme: resolveTheme(kBrutalistThemeId)(
+        theme: resolveTheme(themeId)(
           Brightness.light,
           isCompact: false,
         ),
@@ -59,6 +66,7 @@ Future<void> _pumpHeaders(
 Future<void> _pumpCookies(
   WidgetTester tester, {
   required String setCookieHeader,
+  String themeId = kBrutalistThemeId,
 }) async {
   final tab = _tabWith(
     response: HttpResponseEntity(
@@ -72,7 +80,7 @@ Future<void> _pumpCookies(
     BlocProvider<TabsBloc>(
       create: (_) => _FakeTabsBloc(TabsState(tabs: [tab])),
       child: MaterialApp(
-        theme: resolveTheme(kBrutalistThemeId)(
+        theme: resolveTheme(themeId)(
           Brightness.light,
           isCompact: false,
         ),
@@ -83,6 +91,40 @@ Future<void> _pumpCookies(
     ),
   );
   await tester.pumpAndSettle();
+}
+
+/// Captures Clipboard.setData payloads for the current test.
+List<String> _mockClipboard(WidgetTester tester) {
+  final clips = <String>[];
+  tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+    SystemChannels.platform,
+    (call) async {
+      if (call.method == 'Clipboard.setData') {
+        clips.add((call.arguments as Map)['text'] as String);
+      }
+      return null;
+    },
+  );
+  addTearDown(
+    () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      null,
+    ),
+  );
+  return clips;
+}
+
+/// Hovers the first HoverCopyRow and taps its revealed copy button.
+Future<void> _hoverAndCopyFirstRow(WidgetTester tester) async {
+  final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+  await gesture.addPointer(location: Offset.zero);
+  addTearDown(gesture.removePointer);
+  await gesture.moveTo(tester.getCenter(find.byType(HoverCopyRow).first));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const ValueKey('row_copy_value_button')).first);
+  await tester.pump();
+  // Flush the 'Value copied' snackbar timer.
+  await tester.pump(const Duration(seconds: 3));
 }
 
 void main() {
@@ -135,5 +177,92 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.textContaining('token'), findsOneWidget);
     });
+  });
+
+  group(
+    'C3: default slot rows are selectable and hover-copyable (classic)',
+    () {
+      testWidgets('name and value render as SelectableText', (tester) async {
+        await _pumpHeaders(
+          tester,
+          headers: {'content-type': 'application/json'},
+          themeId: kClassicThemeId,
+        );
+        // One row → label + value both selectable.
+        expect(find.byType(SelectableText), findsNWidgets(2));
+      });
+
+      testWidgets('hover copy icon copies the VALUE only', (tester) async {
+        final clips = _mockClipboard(tester);
+        await _pumpHeaders(
+          tester,
+          headers: {'content-type': 'application/json'},
+          themeId: kClassicThemeId,
+        );
+        await _hoverAndCopyFirstRow(tester);
+        expect(clips, ['application/json']);
+      });
+
+      testWidgets('cookie row copies the rendered value payload', (
+        tester,
+      ) async {
+        final clips = _mockClipboard(tester);
+        await _pumpCookies(
+          tester,
+          setCookieHeader: 'sessionId=abc123; Path=/',
+          themeId: kClassicThemeId,
+        );
+        await _hoverAndCopyFirstRow(tester);
+        // The cookies view passes value+attributes as the row value.
+        expect(clips, ['abc123\nPath=/']);
+      });
+    },
+  );
+
+  group('C3: copy affordance under every theme dataRow override', () {
+    const overridingThemes = [
+      kBrutalistThemeId,
+      kEditorialThemeId,
+      kRpgThemeId,
+      kDraculaThemeId,
+      kGlassThemeId,
+      kAurisThemeId,
+    ];
+
+    for (final themeId in overridingThemes) {
+      testWidgets('hover copy copies the header value under $themeId', (
+        tester,
+      ) async {
+        final clips = _mockClipboard(tester);
+        await _pumpHeaders(
+          tester,
+          headers: {'content-type': 'application/json'},
+          themeId: themeId,
+        );
+        await _hoverAndCopyFirstRow(tester);
+        expect(clips, ['application/json'], reason: 'theme: $themeId');
+      });
+    }
+
+    // AURIS delegates to the external AurisDataRow kit widget, so the
+    // selectability contract is only asserted for the in-repo bespoke rows.
+    for (final themeId in overridingThemes.where(
+      (id) => id != kAurisThemeId,
+    )) {
+      testWidgets('label and value are selectable under $themeId', (
+        tester,
+      ) async {
+        await _pumpHeaders(
+          tester,
+          headers: {'content-type': 'application/json'},
+          themeId: themeId,
+        );
+        expect(
+          find.byType(SelectableText),
+          findsNWidgets(2),
+          reason: 'theme: $themeId',
+        );
+      });
+    }
   });
 }

@@ -9,6 +9,17 @@
 // the kResponseBodyTooLargePlaceholder sentinel always stays plain text.
 // Extract-to-{{var}} from a tree node dispatches AddExtractionRule to the
 // global RulesBloc, closing the loop with the chaining feature.
+//
+// C1 find-everywhere: ResponseBodyControls' magnifier calls
+// `_onFindPressed()`, which dispatches per body mode — large plain-text
+// toggles the windowed LargeBodyFindView, TREE focuses the C2 filter field
+// (_treeFilterFocusNode), and PRETTY/RAW/opted-in-large open the editor's
+// CodeFindPanel via the caller-owned `_editorFindController`
+// (CodeFindController — this widget creates/disposes it, matching
+// JsonCodeEditor's caller-owned findController contract). `_findActive`
+// resets on every new body so a stale find session never survives a re-send.
+// Word-wrap is a per-tab session override (_wordWrapOverride) layered over
+// the mode default.
 import 'dart:async';
 
 import 'package:flutter/foundation.dart' show compute;
@@ -30,6 +41,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/json_tree_view.dart';
+import 'package:getman/features/tabs/presentation/widgets/response/large_body_find_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_body_controls.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_large_body_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/viewers/response_media_panel.dart';
@@ -124,6 +136,27 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
   bool _showFullPreview = false;
   bool _highlightingOptedIn = false;
 
+  // C4: per-tab session word-wrap override. null = mode default (wrap ON for
+  // normal responses, OFF for the opted-in large editor — today's forced
+  // behavior). Session-only: never persisted, survives re-sends while this
+  // tab's view state is alive.
+  bool? _wordWrapOverride;
+
+  bool get _effectiveWordWrap => _wordWrapOverride ?? !_highlightingOptedIn;
+
+  void _toggleWordWrap() {
+    setState(() => _wordWrapOverride = !_effectiveWordWrap);
+  }
+
+  // C1 find-everywhere state. _editorFindController drives the editor's
+  // CodeFindPanel (PRETTY/RAW/opted-in large; caller-owned per
+  // JsonCodeEditor's contract — dispose it here). _treeFilterFocusNode is
+  // handed to JsonTreeView so the find button can focus the C2 filter.
+  // _findActive toggles the windowed large-body find.
+  late CodeFindController _editorFindController;
+  final FocusNode _treeFilterFocusNode = FocusNode();
+  bool _findActive = false;
+
   // Hoisted out of [_suggestVariableName] so the patterns compile once, not on
   // every "Extract to {{var}}" click.
   static final RegExp _dotTailRe = RegExp(r'\.([A-Za-z_$][\w$]*)$');
@@ -135,8 +168,25 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
   @override
   void initState() {
     super.initState();
+    _editorFindController = CodeFindController(widget.responseController);
     final tab = context.read<TabsBloc>().state.tabs.byId(widget.tabId);
     unawaited(_syncBody(tab?.response?.body));
+  }
+
+  @override
+  void didUpdateWidget(covariant _TextualResponseBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.responseController != widget.responseController) {
+      _editorFindController.dispose();
+      _editorFindController = CodeFindController(widget.responseController);
+    }
+  }
+
+  @override
+  void dispose() {
+    _editorFindController.dispose();
+    _treeFilterFocusNode.dispose();
+    super.dispose();
   }
 
   Future<void> _syncBody(String? rawBody) async {
@@ -162,6 +212,7 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
           _largeBody = rawBody;
           _showFullPreview = false;
           _highlightingOptedIn = true;
+          _findActive = false;
           _clearTreeState();
         });
         return;
@@ -172,6 +223,7 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
         _largeBody = rawBody;
         _showFullPreview = false;
         _highlightingOptedIn = false;
+        _findActive = false;
         _clearTreeState();
       });
       return;
@@ -196,6 +248,7 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
       _largeBody = null;
       _showFullPreview = false;
       _highlightingOptedIn = false;
+      _findActive = false;
       _decoded = null;
       _treeDecoding = false;
       _treeAvailable = treeMaybe;
@@ -346,6 +399,21 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
     setState(() => _highlightingOptedIn = true);
   }
 
+  /// C1 dispatch: routes the toolbar find button to the affordance matching
+  /// the current view — the windowed large-body find, the TREE filter box,
+  /// or the editor's CodeFindPanel (PRETTY/RAW/opted-in large).
+  void _onFindPressed() {
+    if (_largeBody != null && !_highlightingOptedIn) {
+      setState(() => _findActive = true);
+      return;
+    }
+    if (_mode == _BodyMode.tree) {
+      _treeFilterFocusNode.requestFocus();
+      return;
+    }
+    _editorFindController.findMode();
+  }
+
   @override
   Widget build(BuildContext context) {
     return MultiBlocListener(
@@ -415,6 +483,12 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
             ResponseBodyControls(
               tabId: widget.tabId,
               getCopyableText: _copyableText,
+              onFind: _onFindPressed,
+              // Text modes only — TREE has no wrapping concept.
+              wordWrap: _mode == _BodyMode.tree ? null : _effectiveWordWrap,
+              onToggleWordWrap: _mode == _BodyMode.tree
+                  ? null
+                  : _toggleWordWrap,
             ),
           ],
         ),
@@ -424,6 +498,7 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
                     ? JsonTreeView(
                         data: _decoded,
                         onExtract: _extractToVariable,
+                        filterFocusNode: _treeFilterFocusNode,
                       )
                     : const Center(child: CircularProgressIndicator()))
               : _buildEditorMode(),
@@ -438,16 +513,13 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
       child: JsonCodeEditor(
         controller: widget.responseController,
         readOnly: true,
-        wordWrap: !_highlightingOptedIn,
+        wordWrap: _effectiveWordWrap,
+        findController: _editorFindController,
       ),
     );
   }
 
   Widget _buildLargeMode() {
-    final palette = context.appPalette;
-    final typography = context.appTypography;
-    final layout = context.appLayout;
-    final theme = Theme.of(context);
     final body = _largeBody!;
     final displayText = _showFullPreview
         ? body
@@ -466,6 +538,11 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
           controls: ResponseBodyControls(
             tabId: widget.tabId,
             getCopyableText: _copyableText,
+            onFind: _onFindPressed,
+            // Only the opted-in editor wraps; the plain SelectableText view
+            // always soft-wraps, so the toggle is hidden there.
+            wordWrap: _highlightingOptedIn ? _effectiveWordWrap : null,
+            onToggleWordWrap: _highlightingOptedIn ? _toggleWordWrap : null,
           ),
         ),
         // Body — editor when opted-in, plain text otherwise. Kept here so the
@@ -474,22 +551,38 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
         Expanded(
           child: _highlightingOptedIn
               ? _buildEditorMode()
-              : ColoredBox(
-                  color: palette.codeBackground,
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.all(layout.pagePadding),
-                    child: SelectableText(
-                      displayText,
-                      style: TextStyle(
-                        fontFamily: typography.codeFontFamily,
-                        fontSize: layout.fontSizeCode,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                  ),
-                ),
+              : (_findActive
+                    ? LargeBodyFindView(
+                        body: body,
+                        fallback: _buildPlainTextView(displayText),
+                        onClose: () => setState(() => _findActive = false),
+                      )
+                    : _buildPlainTextView(displayText)),
         ),
       ],
+    );
+  }
+
+  /// The normal large-mode plain-text view (preview or SHOW FULL). Also the
+  /// windowed find's fallback while the query is empty/matchless.
+  Widget _buildPlainTextView(String displayText) {
+    final palette = context.appPalette;
+    final typography = context.appTypography;
+    final layout = context.appLayout;
+    final theme = Theme.of(context);
+    return ColoredBox(
+      color: palette.codeBackground,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.all(layout.pagePadding),
+        child: SelectableText(
+          displayText,
+          style: TextStyle(
+            fontFamily: typography.codeFontFamily,
+            fontSize: layout.fontSizeCode,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+      ),
     );
   }
 }

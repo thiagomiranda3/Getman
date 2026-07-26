@@ -3,6 +3,8 @@
 //  - Import menu opens.
 //  - Active-tab linkage: focusing a tab linked to a saved request auto-expands
 //    its ancestor folders and highlights the matching row.
+//  - D2: tree search matches name/URL/method; collapse-all button disabled
+//    during active search and doesn't resurrect pre-search expansion state.
 
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
@@ -220,6 +222,270 @@ void main() {
       );
       expect(row.node.id, 'req-1');
       expect(row.isSelected, isTrue);
+    },
+  );
+
+  testWidgets('tree search matches the request method (case-insensitive)', (
+    tester,
+  ) async {
+    final bloc = build();
+    addTearDown(bloc.close);
+    final tabs = MockTabsBloc();
+    addTearDown(tabs.close);
+
+    const getReq = CollectionNodeEntity(
+      id: 'g',
+      name: 'FetchUsers',
+      isFolder: false,
+      config: HttpRequestConfigEntity(id: 'g', url: 'https://api.dev/users'),
+    );
+    const postReq = CollectionNodeEntity(
+      id: 'p',
+      name: 'CreateUser',
+      isFolder: false,
+      config: HttpRequestConfigEntity(
+        id: 'p',
+        method: 'POST',
+        url: 'https://api.dev/users',
+      ),
+    );
+
+    bloc.add(const ReplaceCollections([getReq, postReq]));
+    await bloc.stream.first;
+
+    await tester.pumpWidget(host(bloc, tabs));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'post');
+    // Past the search Debouncer.
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.text('CreateUser'), findsOneWidget);
+    expect(find.text('FetchUsers'), findsNothing);
+  });
+
+  testWidgets('collapse-all button collapses every expanded folder', (
+    tester,
+  ) async {
+    final bloc = build();
+    addTearDown(bloc.close);
+    final tabs = MockTabsBloc();
+    addTearDown(tabs.close);
+
+    const child = CollectionNodeEntity(
+      id: 'C2',
+      name: 'NestedReq',
+      isFolder: false,
+      config: HttpRequestConfigEntity(id: 'C2'),
+    );
+    const folder = CollectionNodeEntity(
+      id: 'F2',
+      name: 'ApiFolder2',
+      children: [child],
+    );
+
+    bloc.add(const ReplaceCollections([folder]));
+    await bloc.stream.first;
+
+    await tester.pumpWidget(host(bloc, tabs));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('ApiFolder2'));
+    await tester.pumpAndSettle();
+    expect(find.text('NestedReq'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('collections_collapse_all')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('NestedReq'), findsNothing);
+  });
+
+  testWidgets('collapse-all button is disabled while search query is active', (
+    tester,
+  ) async {
+    final bloc = build();
+    addTearDown(bloc.close);
+    final tabs = MockTabsBloc();
+    addTearDown(tabs.close);
+
+    const child = CollectionNodeEntity(
+      id: 'C3',
+      name: 'NestedReq',
+      isFolder: false,
+      config: HttpRequestConfigEntity(id: 'C3'),
+    );
+    const folder = CollectionNodeEntity(
+      id: 'F3',
+      name: 'ApiFolder',
+      children: [child],
+    );
+
+    bloc.add(const ReplaceCollections([folder]));
+    await bloc.stream.first;
+
+    await tester.pumpWidget(host(bloc, tabs));
+    await tester.pumpAndSettle();
+
+    // Button is enabled initially.
+    var button = tester.widget<IconButton>(
+      find.byKey(const ValueKey('collections_collapse_all')),
+    );
+    expect(button.onPressed, isNotNull);
+
+    // Type a search query.
+    await tester.enterText(find.byType(TextField), 'Nested');
+    // Past the search Debouncer (400ms).
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    // Button is disabled during active search.
+    button = tester.widget<IconButton>(
+      find.byKey(const ValueKey('collections_collapse_all')),
+    );
+    expect(button.onPressed, isNull);
+
+    // Clear the search.
+    await tester.enterText(find.byType(TextField), '');
+    // Past the search Debouncer.
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    // Button is enabled again.
+    button = tester.widget<IconButton>(
+      find.byKey(const ValueKey('collections_collapse_all')),
+    );
+    expect(button.onPressed, isNotNull);
+  });
+
+  testWidgets(
+    'collapse-all after search + clear fully collapses and does not resurrect '
+    'pre-search expansion',
+    (tester) async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      final tabs = MockTabsBloc();
+      addTearDown(tabs.close);
+
+      const child = CollectionNodeEntity(
+        id: 'C4',
+        name: 'NestedReq',
+        isFolder: false,
+        config: HttpRequestConfigEntity(id: 'C4'),
+      );
+      const folder = CollectionNodeEntity(
+        id: 'F4',
+        name: 'ApiFolder',
+        children: [child],
+      );
+
+      bloc.add(const ReplaceCollections([folder]));
+      await bloc.stream.first;
+
+      await tester.pumpWidget(host(bloc, tabs));
+      await tester.pumpAndSettle();
+
+      // Manually expand the folder.
+      await tester.tap(find.text('ApiFolder'));
+      await tester.pumpAndSettle();
+      expect(find.text('NestedReq'), findsOneWidget);
+
+      // Type a search query.
+      await tester.enterText(find.byType(TextField), 'Nested');
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+
+      // Collapse-all is disabled during search (button unresponsive).
+      expect(
+        find.text('NestedReq'),
+        findsOneWidget,
+      ); // still visible due to search
+      final button = tester.widget<IconButton>(
+        find.byKey(const ValueKey('collections_collapse_all')),
+      );
+      expect(button.onPressed, isNull);
+
+      // Clear the search.
+      await tester.enterText(find.byType(TextField), '');
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+
+      // Folder reverts to pre-search state (expanded).
+      expect(find.text('NestedReq'), findsOneWidget);
+
+      // Now collapse-all works and fully collapses the tree.
+      await tester.tap(find.byKey(const ValueKey('collections_collapse_all')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('NestedReq'), findsNothing);
+
+      // Verify it stays collapsed by triggering a rebuild via an unrelated
+      // tree mutation — not a no-op ReplaceCollections. Bloc.emit() skips
+      // emitting a state that equals the current one (bloc_base.dart), so
+      // re-adding the identical `folder` value would never complete
+      // `bloc.stream.first`. _preSearchExpandedIds must not resurrect the old
+      // expansion on this rebuild.
+      bloc.add(const RenameNode('F4', 'ApiFolderRenamed'));
+      await bloc.stream.first;
+      await tester.pumpAndSettle();
+
+      expect(find.text('NestedReq'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'tree search by method-only match auto-expands ancestor folders',
+    (tester) async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      final tabs = MockTabsBloc();
+      addTearDown(tabs.close);
+
+      const nested = CollectionNodeEntity(
+        id: 'DEEP',
+        // Deliberately no "post" substring in the name — this must match by
+        // config.method alone, not piggyback on a name match.
+        name: 'CreateUserRecord',
+        isFolder: false,
+        config: HttpRequestConfigEntity(
+          id: 'DEEP',
+          method: 'POST',
+          url: 'https://api.dev/users',
+        ),
+      );
+      const middleFolder = CollectionNodeEntity(
+        id: 'MID',
+        name: 'Users',
+        children: [nested],
+      );
+      const rootFolder = CollectionNodeEntity(
+        id: 'ROOT',
+        name: 'Api',
+        children: [middleFolder],
+      );
+
+      bloc.add(const ReplaceCollections([rootFolder]));
+      await bloc.stream.first;
+
+      await tester.pumpWidget(host(bloc, tabs));
+      await tester.pumpAndSettle();
+
+      // Both ancestor folders are collapsed: the root folder always renders
+      // (TreeView roots are active regardless of expansion), but its child
+      // folder — and the doubly-nested request — are inactive until an
+      // ancestor expands.
+      expect(find.text('Api'), findsOneWidget);
+      expect(find.text('Users'), findsNothing);
+      expect(find.text('CreateUserRecord'), findsNothing);
+
+      // Search by method only (no name match).
+      await tester.enterText(find.byType(TextField), 'post');
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+
+      // Ancestor folders auto-expanded to show the method-matched request.
+      expect(find.text('Users'), findsOneWidget);
+      expect(find.text('CreateUserRecord'), findsOneWidget);
     },
   );
 }

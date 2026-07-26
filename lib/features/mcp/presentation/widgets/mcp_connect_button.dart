@@ -74,8 +74,12 @@ class McpConnectButton extends StatelessWidget {
                           current.url,
                           vars,
                         ).trim(),
+                        // FIX I2: enabledHeaders (not headers) skips B1's
+                        // user-disabled rows — HTTP send + code-gen already
+                        // use it; the MCP handshake was the one consumer
+                        // that still sent disabled headers unfiltered.
                         headers: EnvironmentResolver.resolveMap(
-                          current.headers,
+                          current.enabledHeaders,
                           vars,
                         ),
                       ),

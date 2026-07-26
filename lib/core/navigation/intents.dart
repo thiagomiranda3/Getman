@@ -1,6 +1,7 @@
 // Intent classes for every global keyboard shortcut wired in main.dart's
 // appShortcuts map (new/close/send/save/beautify tab, command palette,
-// environment switcher, tab/panel navigation + jump-to-index, focus URL).
+// environment switcher, tab/panel navigation + jump-to-index, focus URL,
+// reopen closed tab, save all, shortcuts help).
 // Pure markers with no logic; the matching Actions live in MainScreen or
 // deeper, wherever their dependencies are reachable (see
 // docs/architecture/app-shell.md).
@@ -76,4 +77,24 @@ class PrevPanelIntent extends Intent {
 class JumpToPanelIntent extends Intent {
   const JumpToPanelIntent(this.panelIndex);
   final int panelIndex;
+}
+
+/// Reopen the most recently closed tab from TabsBloc's in-memory stack
+/// (Cmd/Ctrl+Shift+T). Empty stack → the MainScreen action shows the
+/// 'Nothing to reopen' snackbar instead of dispatching.
+class ReopenClosedTabIntent extends Intent {
+  const ReopenClosedTabIntent();
+}
+
+/// Save every dirty collection-linked tab across all panels
+/// (Cmd/Ctrl+Alt+S) via the save-all coordinator.
+class SaveAllTabsIntent extends Intent {
+  const SaveAllTabsIntent();
+}
+
+/// Open the keyboard-shortcuts cheat sheet (Cmd/Ctrl+/) — or, when invoked
+/// from INSIDE the open dialog (whose local Actions maps it to pop), close
+/// it again: the same chord toggles.
+class ShowShortcutsIntent extends Intent {
+  const ShowShortcutsIntent();
 }

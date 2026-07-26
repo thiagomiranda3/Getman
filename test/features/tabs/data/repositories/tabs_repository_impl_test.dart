@@ -239,6 +239,82 @@ void main() {
     });
   });
 
+  group('sendRequest disabled headers (B1)', () {
+    const response = HttpResponseEntity(
+      statusCode: 200,
+      body: '',
+      headers: {},
+      durationMs: 1,
+    );
+
+    void stubRequest() {
+      when(
+        () => networkService.request(
+          url: any(named: 'url'),
+          method: any(named: 'method'),
+          queryParameters: any(named: 'queryParameters'),
+          data: any<dynamic>(named: 'data'),
+          headers: any(named: 'headers'),
+          cancelHandle: any(named: 'cancelHandle'),
+        ),
+      ).thenAnswer((_) async => response);
+    }
+
+    Map<String, dynamic> capturedHeaders() {
+      return verify(
+            () => networkService.request(
+              url: any(named: 'url'),
+              method: any(named: 'method'),
+              queryParameters: any(named: 'queryParameters'),
+              data: any<dynamic>(named: 'data'),
+              headers: captureAny(named: 'headers'),
+              cancelHandle: any(named: 'cancelHandle'),
+            ),
+          ).captured.single
+          as Map<String, dynamic>;
+    }
+
+    test('headers in disabledHeaderKeys never reach the wire', () async {
+      stubRequest();
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        url: 'https://api.dev/x',
+        headers: {'X-Keep': 'yes', 'X-Skip': 'no'},
+        disabledHeaderKeys: {'X-Skip'},
+      );
+
+      await repository.sendRequest(config);
+
+      final headers = capturedHeaders();
+      expect(headers['X-Keep'], 'yes');
+      expect(headers.containsKey('X-Skip'), isFalse);
+    });
+
+    test(
+      'a disabled Authorization header does not block auth injection',
+      () async {
+        stubRequest();
+        const config = HttpRequestConfigEntity(
+          id: 'c',
+          url: 'https://api.dev/x',
+          headers: {'Authorization': 'manual-old'},
+          disabledHeaderKeys: {'Authorization'},
+          auth: {'type': 'bearer', 'token': 'abc'},
+        );
+
+        await repository.sendRequest(config);
+
+        expect(
+          capturedHeaders()['Authorization'],
+          'Bearer abc',
+          reason:
+              'the disabled manual header is gone, so skip-if-set '
+              'must not suppress the AUTH tab value',
+        );
+      },
+    );
+  });
+
   group('sendRequest body assembly failures', () {
     test(
       'a multipart body with a missing file fails as NetworkFailure, '

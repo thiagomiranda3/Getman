@@ -10,6 +10,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/core/ui/widgets/bulk_kv_editor.dart';
@@ -253,5 +254,86 @@ void main() {
   testWidgets('params tab also offers the bulk toggle', (tester) async {
     await pumpParamsTab(tester);
     expect(find.byTooltip('Bulk edit'), findsOneWidget);
+  });
+
+  testWidgets('headers bulk mode shows disabled rows with a // prefix', (
+    tester,
+  ) async {
+    const tab = HttpRequestTabEntity(
+      tabId: 't',
+      config: HttpRequestConfigEntity(
+        id: 't',
+        headers: {'Accept': '*/*', 'X-Auth': 'token'},
+        disabledHeaderKeys: {'X-Auth'},
+      ),
+    );
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+    await pumpTab(tester, bloc, const HeadersTabView(tabId: 't'));
+
+    await tester.tap(find.byTooltip('Bulk edit'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.widgetWithText(TextField, 'Accept: */*\n//X-Auth: token'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('typing a // line in headers bulk mode disables that header', (
+    tester,
+  ) async {
+    const tab = HttpRequestTabEntity(
+      tabId: 't',
+      config: HttpRequestConfigEntity(id: 't', headers: {'Accept': '*/*'}),
+    );
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+    await pumpTab(tester, bloc, const HeadersTabView(tabId: 't'));
+
+    await tester.tap(find.byTooltip('Bulk edit'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextField),
+      'Accept: */*\n//X-Auth: token',
+    );
+    await tester.pump();
+
+    final config = bloc.state.tabs.first.config;
+    expect(config.headers, {'Accept': '*/*', 'X-Auth': 'token'});
+    expect(config.disabledHeaderKeys, {'X-Auth'});
+    await tester.pump(const Duration(seconds: 11)); // flush debounced save
+  });
+
+  testWidgets('params bulk mode round-trips a parked row as a // line', (
+    tester,
+  ) async {
+    const tab = HttpRequestTabEntity(
+      tabId: 't',
+      config: HttpRequestConfigEntity(
+        id: 't',
+        url: 'https://x.test/?a=1',
+        disabledParams: [ParkedParamEntity(key: 'b', value: '2', rowIndex: 1)],
+      ),
+    );
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+    await pumpTab(tester, bloc, const ParamsTabView(tabId: 't'));
+
+    await tester.tap(find.byTooltip('Bulk edit'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.widgetWithText(TextField, 'a: 1\n//b: 2'),
+      findsOneWidget,
+    );
+
+    // Removing the // re-enables the param (URL gains b=2 at its position).
+    await tester.enterText(find.byType(TextField), 'a: 1\nb: 2');
+    await tester.pump();
+    final config = bloc.state.tabs.first.config;
+    expect(config.url, 'https://x.test/?a=1&b=2');
+    expect(config.disabledParams, isEmpty);
+    await tester.pump(const Duration(seconds: 11));
   });
 }

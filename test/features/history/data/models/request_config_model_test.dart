@@ -1,11 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
+import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/features/history/data/models/request_config_model.dart';
 import 'package:getman/features/tabs/data/models/multipart_field_model.dart';
+import 'package:getman/features/tabs/data/models/parked_param_model.dart';
 
 void main() {
   group('HttpRequestConfig.toEntity() legacy-params migration', () {
@@ -274,6 +276,75 @@ void main() {
       );
       expect(a == b, isTrue);
       expect(a.hashCode, b.hashCode);
+    });
+  });
+
+  group('disabled params/headers (B1)', () {
+    test('a model built without the new fields reads back empty '
+        '(pre-migration record)', () {
+      final entity = HttpRequestConfig(id: 'id').toEntity();
+      expect(entity.disabledParams, isEmpty);
+      expect(entity.disabledHeaderKeys, isEmpty);
+    });
+
+    test('round-trips parked params + disabled header keys', () {
+      const entity = HttpRequestConfigEntity(
+        id: 'id',
+        url: 'https://x.y/path?a=1',
+        disabledParams: [
+          ParkedParamEntity(key: 'debug', value: 'true', rowIndex: 1),
+        ],
+        disabledHeaderKeys: {'X-Trace'},
+      );
+      final back = HttpRequestConfig.fromEntity(entity).toEntity();
+      expect(back.disabledParams, entity.disabledParams);
+      expect(back.disabledHeaderKeys, entity.disabledHeaderKeys);
+    });
+
+    test('history dedup signature deliberately ignores the new fields', () {
+      // ==/hashCode are the guarded dedup signature (see the model header);
+      // widening it for B1 was considered and rejected for this wave.
+      final a = HttpRequestConfig(id: 'a', url: 'https://x.y');
+      final b = HttpRequestConfig(
+        id: 'b',
+        url: 'https://x.y',
+        disabledParams: [ParkedParamModel(key: 'k', value: 'v')],
+        disabledHeaderKeys: ['X-Trace'],
+      );
+      expect(a == b, isTrue);
+    });
+  });
+
+  group('sentAt (D3 day grouping)', () {
+    test('fromEntity/toEntity round-trips sentAt', () {
+      final sentAt = DateTime(2026, 7, 24, 10, 30);
+      final entity = HttpRequestConfigEntity(
+        id: 'x',
+        url: 'https://a.dev',
+        sentAt: sentAt,
+      );
+      final model = HttpRequestConfig.fromEntity(entity);
+      expect(model.sentAt, sentAt);
+      expect(model.toEntity().sentAt, sentAt);
+    });
+
+    test('== and hashCode ignore sentAt (dedup is signature-only)', () {
+      final a = HttpRequestConfig(url: 'https://a.dev')
+        ..sentAt = DateTime(2026, 7, 23);
+      final b = HttpRequestConfig(url: 'https://a.dev')
+        ..sentAt = DateTime(2026, 7, 24);
+      expect(a == b, isTrue);
+      expect(a.hashCode, b.hashCode);
+    });
+
+    test('entity copyWith preserves sentAt and clears it via the sentinel', () {
+      final entity = HttpRequestConfigEntity(
+        id: 'x',
+        sentAt: DateTime(2026, 7, 24),
+      );
+      expect(entity.copyWith(method: 'POST').sentAt, DateTime(2026, 7, 24));
+      expect(entity.copyWith(sentAt: null).sentAt, isNull);
+      expect(entity.withId('y').sentAt, DateTime(2026, 7, 24));
     });
   });
 }

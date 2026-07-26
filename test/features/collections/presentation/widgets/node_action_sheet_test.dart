@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
@@ -224,6 +225,39 @@ void main() {
       },
     );
 
+    testWidgets('folder DELETE keeps the confirm and then offers UNDO', (
+      tester,
+    ) async {
+      final bloc = await openSheet(tester, _folderNode, repo: repo);
+      addTearDown(bloc.close);
+      bloc.add(const ReplaceCollections([_folderNode]));
+      await tester.pump();
+
+      await tester.tap(find.text('DELETE'));
+      await tester.pump(const Duration(milliseconds: 200));
+
+      // The bulk-destruction confirm stays (A1).
+      expect(find.text('Delete folder?'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(TextButton, 'DELETE'));
+      // Let the sheet's dismiss transition finish so the UNDO snackbar
+      // action isn't obscured by an in-flight barrier when tapped below.
+      await tester.pumpAndSettle();
+
+      expect(
+        CollectionsTreeHelper.findNode(bloc.state.collections, 'f1'),
+        isNull,
+      );
+      expect(find.text('UNDO'), findsOneWidget);
+
+      await tester.tap(find.text('UNDO'));
+      await tester.pumpAndSettle();
+      expect(
+        CollectionsTreeHelper.findNode(bloc.state.collections, 'f1'),
+        isNotNull,
+      );
+    });
+
     testWidgets('tapping VARIABLES closes sheet and opens variables dialog', (
       tester,
     ) async {
@@ -297,16 +331,47 @@ void main() {
       expect(find.text('DELETE'), findsOneWidget);
     });
 
-    testWidgets('tapping DELETE for leaf shows request confirm title', (
-      tester,
-    ) async {
+    testWidgets('tapping DELETE for leaf deletes INSTANTLY (no dialog) and '
+        'offers UNDO', (tester) async {
       final bloc = await openSheet(tester, _leafNode, repo: repo);
       addTearDown(bloc.close);
+      // Seed the tree so there is something to delete/restore.
+      bloc.add(const ReplaceCollections([_leafNode]));
+      await tester.pump();
 
       await tester.tap(find.text('DELETE'));
       await tester.pump(const Duration(milliseconds: 200));
 
-      expect(find.text('Delete request?'), findsOneWidget);
+      // No ConfirmDialog for a single request node (A1).
+      expect(find.text('Delete request?'), findsNothing);
+      expect(
+        CollectionsTreeHelper.findNode(bloc.state.collections, 'r1'),
+        isNull,
+      );
+      // Undoable snackbar.
+      expect(find.text('Deleted "My Request"'), findsOneWidget);
+      expect(find.text('UNDO'), findsOneWidget);
+    });
+
+    testWidgets('UNDO after leaf delete restores the node', (tester) async {
+      final bloc = await openSheet(tester, _leafNode, repo: repo);
+      addTearDown(bloc.close);
+      bloc.add(const ReplaceCollections([_leafNode]));
+      await tester.pump();
+
+      await tester.tap(find.text('DELETE'));
+      // Let the sheet's dismiss transition finish so the UNDO snackbar
+      // action isn't obscured by an in-flight barrier when tapped below.
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('UNDO'));
+      await tester.pumpAndSettle();
+
+      final restored = CollectionsTreeHelper.findNode(
+        bloc.state.collections,
+        'r1',
+      );
+      expect(restored, _leafNode);
     });
 
     testWidgets(

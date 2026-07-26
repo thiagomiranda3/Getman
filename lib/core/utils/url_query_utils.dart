@@ -82,7 +82,7 @@ class UrlQueryUtils {
     final rendered = <String>[];
     for (final p in params) {
       if (p.key.isEmpty) continue;
-      rendered.add('${_encode(p.key)}=${_encode(p.value)}');
+      rendered.add('${encodeComponent(p.key)}=${encodeComponent(p.value)}');
     }
     if (rendered.isNotEmpty) {
       buf
@@ -97,7 +97,11 @@ class UrlQueryUtils {
     return buf.toString();
   }
 
-  static String _encode(String input) {
+  /// Percent-encodes [input] while passing `{{var}}` tokens through verbatim
+  /// (the same grammar the rest of this class uses). Public because the
+  /// Postman mapper needs it to emit parked params in `url.query`'s
+  /// still-percent-encoded convention.
+  static String encodeComponent(String input) {
     if (input.isEmpty) return '';
     final buf = StringBuffer();
     var i = 0;

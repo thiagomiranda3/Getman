@@ -20,6 +20,10 @@ Implemented with **typed** `Draggable<NodeDragData>` and `DragTarget<NodeDragDat
 
 Nodes carry an optional free-text `description` (folders and requests). Edited via "EDIT DESCRIPTION" in both the phone `NodeActionSheet` and the desktop popup menu → `UpdateNodeDescription` → `CollectionsTreeHelper.describeInTree`. An empty string clears it. The prompt uses `NamePromptDialog.show(..., allowEmpty: true, multiline: true)`.
 
+## Delete with UNDO (A1)
+
+Both node deletion (`delete_node_with_undo.dart`, shared by the desktop node menu and the phone action sheet) and saved-example deletion (`example_menu.dart`) follow the same pattern: single request nodes and saved examples delete **instantly** with a 5s UNDO snackbar; folders keep the `ConfirmDialog` (bulk destruction) and gain the same UNDO snackbar after. Before dispatching `DeleteNode`/`DeleteExample`, the caller captures a restore snapshot from **live** bloc state (not the row's build-time copy): the node/example itself, its ancestor folder-id chain (`CollectionsTreeHelper.ancestorFolderIds`), and its sibling index (`siblingIndexOf`). Pressing UNDO dispatches `RestoreNodeSubtree`/`RestoreExample`, which re-inserts under the nearest **surviving** ancestor (root if none survived) at the captured sibling index — `_commit` re-sorts, so the node lands back in its original visual position. Only the latest snackbar is undoable — a newer delete replaces the previous one instantly (`showAppSnackBar`/`showAppSnackBarVia` call `removeCurrentSnackBar()` before showing an action-carrying snackbar; `ScaffoldMessenger` itself just queues, it does not replace — accepted loss per spec).
+
 ## Saved examples (M10)
 
 A leaf node carries a `List<SavedExampleEntity> examples` (separate from `children`). Captured from the response panel's "Save as example" button (`SaveExampleToNode`); each is a `{id, name, capturedAt, config}` where `config` carries the response snapshot. In the tree they render as inline expandable sub-rows (the `TreeView` content is a `_TreeItem` union — node vs example); tapping one opens it via `AddTab(response: …)` as an **unlinked** tab (so re-sending never overwrites the saved request). Rename/delete via the per-example menu (`RenameExample`/`DeleteExample`). Examples are local-only — excluded from Postman export and the git workspace mirror.
@@ -30,6 +34,8 @@ The tree uses `two_dimensional_scrollables`'s `TreeView` (sole consumer: `collec
 
 - Expansion is tracked by `CollectionNodeEntity.id` in a `Set<String>` (`_expandedIds`) seeded into each `TreeViewNode(expanded:)` on rebuild. Tapping a node updates the set in `onNodeToggle`. **Don't switch to value-keyed expansion** — it collapses on every mutation (the H2 regression).
 - Rows use `TreeViewIndentationType.none` + manual `depthPaddingMultiplier` padding, a **fixed** `AppLayout.treeRowExtent` (no content-sizing in the 2D viewport — size via the layout field, never a literal), and a viewport-width `SizedBox` (rows have unbounded cross-axis width in the 2D viewport, so this restores the `Expanded` layout + neutralizes horizontal scroll).
+- **Search** (`collections_list.dart`'s `_filterNodes`): matches node name, request URL, **or HTTP method** case-insensitively — typing "post" surfaces every POST request, consistent with the method-color palette. A folder survives the filter if its own name matches OR any descendant survives (recursive), so the parent chain to a match is never hidden.
+- **Collapse-all** (D2): clears the manual `_expandedIds` set (and the pre-search snapshot, so clearing the query afterward lands on a fully collapsed tree instead of restoring old expansion) — **disabled while a search is active** (tooltip explains why), since searching force-expands matching folders by design and a collapse would fight it.
 
 ## Git-friendly workspace mirror
 

@@ -3,7 +3,10 @@
 // NewTabIntent, moved here from the root Actions in main.dart (see the D8
 // comment below) — plus the dialog-openers CommandPaletteIntent /
 // SwitchEnvironmentIntent, EXCEPT SaveRequestIntent/BeautifyJsonIntent (those
-// live inside RequestView). This class sits below MaterialApp + the router's
+// live inside RequestView). Also hosts ReopenClosedTabIntent (checks
+// TabsBloc.canReopenClosedTab, showing a 'Nothing to reopen' snackbar on an
+// empty stack) and SaveAllTabsIntent (delegates to the saveAllTabs
+// coordinator). This class sits below MaterialApp + the router's
 // Navigator, which dialog-opening actions need for showDialog to find
 // MaterialLocalizations, and which keeps every shortcut here correctly dead
 // while a modal dialog is up. `_buildTabBar` IS the desktop/tablet tab strip
@@ -19,6 +22,7 @@ import 'package:getman/core/navigation/intents.dart';
 import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
+import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
 import 'package:getman/core/utils/request_variable_resolver.dart';
@@ -32,6 +36,7 @@ import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/home/presentation/widgets/add_tab_button.dart';
 import 'package:getman/features/home/presentation/widgets/empty_tabs_placeholder.dart';
 import 'package:getman/features/home/presentation/widgets/request_tab_chip.dart';
+import 'package:getman/features/home/presentation/widgets/shortcuts_help_dialog.dart';
 import 'package:getman/features/home/presentation/widgets/side_menu.dart';
 import 'package:getman/features/home/presentation/widgets/tab_chip.dart';
 import 'package:getman/features/home/presentation/widgets/tab_content_stack.dart';
@@ -43,7 +48,9 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
+import 'package:getman/features/tabs/presentation/widgets/open_tabs_dropdown.dart';
 import 'package:getman/features/tabs/presentation/widgets/panel_selector.dart';
+import 'package:getman/features/tabs/presentation/widgets/save_all_coordinator.dart';
 import 'package:getman/features/updates/presentation/update_gate.dart';
 
 class MainScreen extends StatefulWidget {
@@ -256,6 +263,17 @@ class _MainScreenState extends State<MainScreen> {
                         return null;
                       },
                     ),
+                // Cmd/Ctrl+/ cheat sheet — OPEN half only. The CLOSE half
+                // lives inside ShortcutsHelpDialog: while it is up this
+                // Actions is an unreachable sibling route (D8), but the root
+                // Shortcuts map still fires the intent and the dialog's own
+                // Actions pops it, so the same chord toggles.
+                ShowShortcutsIntent: CallbackAction<ShowShortcutsIntent>(
+                  onInvoke: (_) {
+                    unawaited(ShortcutsHelpDialog.show(context));
+                    return null;
+                  },
+                ),
                 CloseTabIntent: CallbackAction<CloseTabIntent>(
                   onInvoke: (_) {
                     if (activeIndex < 0 || activeIndex >= tabs.length) {
@@ -264,6 +282,25 @@ class _MainScreenState extends State<MainScreen> {
                     unawaited(
                       _confirmAndClose(context, tabs[activeIndex].tabId),
                     );
+                    return null;
+                  },
+                ),
+                ReopenClosedTabIntent: CallbackAction<ReopenClosedTabIntent>(
+                  onInvoke: (_) {
+                    final tabsBloc = context.read<TabsBloc>();
+                    // The dispatcher checks the stack so TabsBloc never needs
+                    // a Flutter/snackbar dependency for the empty case.
+                    if (!tabsBloc.canReopenClosedTab) {
+                      showAppSnackBar(context, 'Nothing to reopen');
+                      return null;
+                    }
+                    tabsBloc.add(const ReopenClosedTab());
+                    return null;
+                  },
+                ),
+                SaveAllTabsIntent: CallbackAction<SaveAllTabsIntent>(
+                  onInvoke: (_) {
+                    saveAllTabs(context);
                     return null;
                   },
                 ),
@@ -624,6 +661,9 @@ class _MainScreenState extends State<MainScreen> {
                   ),
           ),
           const AddTabButton(),
+          // D1: open-tabs list — desktop/tablet only; compact-phone keeps the
+          // TabSwitcherSheet.
+          if (!context.useTabSwitcher) const OpenTabsDropdown(),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: layout.tabSpacing),
             child: const PanelSelector(),

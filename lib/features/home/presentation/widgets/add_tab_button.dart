@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/hover_highlight.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
@@ -14,6 +15,13 @@ class AddTabButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
+    // E2: tooltip hint from the one platform-aware source (same predicate as
+    // buildAppShortcuts — never Theme.of(context).platform). Extracted so the
+    // tooltip string doesn't push its line past 80 columns.
+    final newTabHint = shortcutHint(
+      AppShortcutAction.newTab,
+      useMeta: useMetaShortcuts,
+    );
     return HoverHighlight(
       decoration: (hovered) => BoxDecoration(
         color: hovered ? theme.primaryColor : theme.scaffoldBackgroundColor,
@@ -27,6 +35,7 @@ class AddTabButton extends StatelessWidget {
       child: context.appDecoration.wrapInteractive(
         child: IconButton(
           key: const ValueKey('add_tab_button'),
+          tooltip: 'New Tab — $newTabHint',
           icon: Icon(
             Icons.add,
             size: layout.addIconSize,

@@ -81,6 +81,7 @@ import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/tabs/data/datasources/tabs_local_data_source.dart';
 import 'package:getman/features/tabs/data/models/multipart_field_model.dart';
 import 'package:getman/features/tabs/data/models/panel_model.dart';
+import 'package:getman/features/tabs/data/models/parked_param_model.dart';
 import 'package:getman/features/tabs/data/models/request_tab_model.dart';
 import 'package:getman/features/tabs/data/models/stored_response_model.dart';
 import 'package:getman/features/tabs/data/repositories/tabs_repository_impl.dart';
@@ -127,6 +128,7 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
       ..registerAdapter(SavedExampleModelAdapter())
       ..registerAdapter(EnvironmentModelAdapter())
       ..registerAdapter(MultipartFieldModelAdapter())
+      ..registerAdapter(ParkedParamModelAdapter())
       ..registerAdapter(StoredCookieModelAdapter())
       ..registerAdapter(ExtractionRuleModelAdapter())
       ..registerAdapter(AssertionModelAdapter())
@@ -186,9 +188,19 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
       SettingsLocalDataSourceImpl.new,
     )
     // Features - History
-    ..registerLazySingleton(() => HistoryBloc(watchHistoryUseCase: sl()))
+    ..registerLazySingleton(
+      () => HistoryBloc(
+        watchHistoryUseCase: sl(),
+        deleteHistoryEntryUseCase: sl(),
+        clearHistoryUseCase: sl(),
+        restoreHistoryEntriesUseCase: sl(),
+      ),
+    )
     ..registerLazySingleton(() => AddToHistoryUseCase(sl()))
     ..registerLazySingleton(() => WatchHistoryUseCase(sl()))
+    ..registerLazySingleton(() => DeleteHistoryEntryUseCase(sl()))
+    ..registerLazySingleton(() => ClearHistoryUseCase(sl()))
+    ..registerLazySingleton(() => RestoreHistoryEntriesUseCase(sl()))
     ..registerLazySingleton<HistoryRepository>(
       () => HistoryRepositoryImpl(sl()),
     )

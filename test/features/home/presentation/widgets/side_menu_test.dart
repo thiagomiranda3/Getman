@@ -82,6 +82,9 @@ void main() {
     );
     final historyBloc = HistoryBloc(
       watchHistoryUseCase: WatchHistoryUseCase(historyRepo),
+      deleteHistoryEntryUseCase: DeleteHistoryEntryUseCase(historyRepo),
+      clearHistoryUseCase: ClearHistoryUseCase(historyRepo),
+      restoreHistoryEntriesUseCase: RestoreHistoryEntriesUseCase(historyRepo),
     );
     final settingsBloc = SettingsBloc(
       saveSettingsUseCase: saveSettingsUseCase,

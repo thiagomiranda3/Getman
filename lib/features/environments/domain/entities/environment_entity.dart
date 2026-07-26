@@ -33,5 +33,15 @@ class EnvironmentEntity extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, name, variables, secretKeys];
+  List<Object?> get props => [
+    id,
+    name,
+    variables,
+    // Variable ORDER is user-editable (B2 row reorder in the env editor);
+    // Equatable's map equality is order-insensitive, so expose the key order
+    // or a pure reorder is suppressed as an equal state and the dialog shows
+    // the stale order until restart.
+    variables.keys.toList(),
+    secretKeys,
+  ];
 }

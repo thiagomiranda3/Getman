@@ -99,6 +99,8 @@ ThemeData classicTheme(
     variableResolved: ClassicPalette.statusAccentSuccess,
     variableUnresolved: ClassicPalette.statusAccentError,
     selectorActive: accent,
+    findMatchHighlight: accent.withValues(alpha: 0.3),
+    findMatchActiveHighlight: accent.withValues(alpha: 0.65),
     diffAddedForeground: ClassicPalette.statusSuccess,
     diffAddedBackground: ClassicPalette.statusSuccess.withValues(alpha: 0.12),
     diffRemovedForeground: ClassicPalette.statusError,

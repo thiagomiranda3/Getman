@@ -1,8 +1,10 @@
 // Pure functional helpers over the collections tree: sort/addToParent/
 // removeFromTree/renameInTree/toggleFavoriteInTree/updateConfigInTree/
 // describeInTree/setVariablesInTree, saved-example CRUD, ancestor/parent
-// lookups, and overlayLocalOnly (restores app-only data after a disk
-// reload).
+// lookups, overlayLocalOnly (restores app-only data after a disk reload),
+// and insertIntoTree/insertExampleInNode/siblingIndexOf — the UNDO side of
+// removeFromTree/removeExampleFromNode, restoring a captured node or example
+// back to a remembered position.
 //
 // Gotchas: every function returns a new tree and never mutates its input.
 // addToParent does NOT treat a missing parentId as an error — it's a no-op
@@ -49,6 +51,33 @@ class CollectionsTreeHelper {
       if (node.children.isEmpty) return node;
       return node.copyWith(
         children: addToParent(node.children, parentId, newNode),
+      );
+    }).toList();
+  }
+
+  /// Insert [newNode] into [parentId]'s children at [index] (clamped to the
+  /// valid range). A null [parentId] inserts at the root level. Like
+  /// [addToParent], a missing [parentId] is a no-op walk — callers verify the
+  /// parent exists first (RestoreNodeSubtree picks a surviving ancestor).
+  /// The UNDO side of a delete: puts a captured subtree back in place.
+  static List<CollectionNodeEntity> insertIntoTree(
+    List<CollectionNodeEntity> nodes,
+    String? parentId,
+    CollectionNodeEntity newNode,
+    int index,
+  ) {
+    if (parentId == null) {
+      return [...nodes]..insert(index.clamp(0, nodes.length), newNode);
+    }
+    return nodes.map((node) {
+      if (node.id == parentId) {
+        final children = [...node.children]
+          ..insert(index.clamp(0, node.children.length), newNode);
+        return node.copyWith(children: children);
+      }
+      if (node.children.isEmpty) return node;
+      return node.copyWith(
+        children: insertIntoTree(node.children, parentId, newNode, index),
       );
     }).toList();
   }
@@ -172,6 +201,17 @@ class CollectionsTreeHelper {
     return path[path.length - 2].id;
   }
 
+  /// The position of [id] among its siblings (the root list for root-level
+  /// nodes), or -1 when not found. Captured at delete time so UNDO can
+  /// restore the node at its original position.
+  static int siblingIndexOf(List<CollectionNodeEntity> nodes, String id) {
+    final parentId = parentIdOf(nodes, id);
+    final siblings = parentId == null
+        ? nodes
+        : findNode(nodes, parentId)?.children ?? const <CollectionNodeEntity>[];
+    return siblings.indexWhere((n) => n.id == id);
+  }
+
   /// Append [example] to the node's saved examples (newest last). No-op if the
   /// id is missing.
   static List<CollectionNodeEntity> addExampleToNode(
@@ -197,6 +237,19 @@ class CollectionsTreeHelper {
       examples: node.examples.where((e) => e.id != exampleId).toList(),
     ),
   );
+
+  /// Insert [example] into the node's saved examples at [index] (clamped).
+  /// No-op if [id] is missing — the UNDO side of removeExampleFromNode.
+  static List<CollectionNodeEntity> insertExampleInNode(
+    List<CollectionNodeEntity> nodes,
+    String id,
+    SavedExampleEntity example,
+    int index,
+  ) => _updateNodeById(nodes, id, (node) {
+    final examples = [...node.examples]
+      ..insert(index.clamp(0, node.examples.length), example);
+    return node.copyWith(examples: examples);
+  });
 
   /// Rename the example with [exampleId] inside the node. No-op if either id is
   /// missing.

@@ -1,5 +1,8 @@
 // AUTH tab of the request editor: bearer/basic/api-key/inherit form over
 // AuthConfig, composed by RequestConfigSection and UnifiedRequestPanel.
+// Secret fields (bearer TOKEN, basic PASSWORD, api-key VALUE) are obscured
+// by default with a per-field, session-only eye reveal toggle (B3),
+// mirroring the env editor's reveal affordance.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/auth_config.dart';
@@ -52,6 +55,10 @@ class _AuthTabViewState extends State<AuthTabView> {
   late final FocusNode _apiKeyValueFocus;
 
   Map<String, String>? _lastEmitted;
+
+  /// Labels of obscurable fields currently revealed. Per-field and
+  /// session-only by design (B3) — never persisted.
+  final Set<String> _revealedFields = {};
 
   @override
   void initState() {
@@ -194,7 +201,16 @@ class _AuthTabViewState extends State<AuthTabView> {
       case AuthType.inherit:
         return [_hint(context, 'Inherits auth from the parent collection.')];
       case AuthType.bearer:
-        return [_field(context, 'TOKEN', _token, _tokenFocus, varContext)];
+        return [
+          _field(
+            context,
+            'TOKEN',
+            _token,
+            _tokenFocus,
+            varContext,
+            obscurable: true,
+          ),
+        ];
       case AuthType.basic:
         return [
           _field(context, 'USERNAME', _username, _usernameFocus, varContext),
@@ -204,13 +220,20 @@ class _AuthTabViewState extends State<AuthTabView> {
             _password,
             _passwordFocus,
             varContext,
-            obscure: true,
+            obscurable: true,
           ),
         ];
       case AuthType.apiKey:
         return [
           _field(context, 'KEY', _apiKeyName, _apiKeyNameFocus, varContext),
-          _field(context, 'VALUE', _apiKeyValue, _apiKeyValueFocus, varContext),
+          _field(
+            context,
+            'VALUE',
+            _apiKeyValue,
+            _apiKeyValueFocus,
+            varContext,
+            obscurable: true,
+          ),
           _label(context, 'ADD TO'),
           SizedBox(height: context.appLayout.tabSpacing),
           DropdownButton<ApiKeyLocation>(
@@ -260,9 +283,10 @@ class _AuthTabViewState extends State<AuthTabView> {
     VariableHighlightController controller,
     FocusNode focusNode,
     LayeredVariableContext variables, {
-    bool obscure = false,
+    bool obscurable = false,
   }) {
     final layout = context.appLayout;
+    final revealed = _revealedFields.contains(label);
     return Padding(
       padding: EdgeInsets.only(bottom: layout.sectionSpacing),
       child: Column(
@@ -275,7 +299,7 @@ class _AuthTabViewState extends State<AuthTabView> {
             variables: variables,
             controller: controller,
             focusNode: focusNode,
-            obscureText: obscure,
+            obscureText: obscurable && !revealed,
             onChanged: (_) => _emit(),
             style: TextStyle(
               fontSize: layout.fontSizeNormal,
@@ -285,6 +309,24 @@ class _AuthTabViewState extends State<AuthTabView> {
               hintText: label,
               isDense: true,
               contentPadding: EdgeInsets.all(layout.isCompact ? 8 : 12),
+              // Mirrors the env editor's reveal affordance in
+              // key_value_list_editor.dart — same icon, tooltip, sizing.
+              suffixIcon: obscurable
+                  ? IconButton(
+                      key: ValueKey('auth_reveal_$label'),
+                      visualDensity: VisualDensity.compact,
+                      icon: Icon(
+                        revealed ? Icons.visibility_off : Icons.visibility,
+                        size: layout.isCompact ? 18 : 20,
+                      ),
+                      tooltip: revealed ? 'Hide value' : 'Reveal value',
+                      onPressed: () => setState(() {
+                        revealed
+                            ? _revealedFields.remove(label)
+                            : _revealedFields.add(label);
+                      }),
+                    )
+                  : null,
             ),
           ),
         ],
