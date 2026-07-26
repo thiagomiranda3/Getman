@@ -341,6 +341,7 @@ class _CollectionsListState extends State<CollectionsList> {
                   children: [
                     Expanded(
                       child: TextField(
+                        key: const ValueKey('collections_search_field'),
                         controller: _searchController,
                         decoration: InputDecoration(
                           hintText: 'SEARCH COLLECTIONS...',
