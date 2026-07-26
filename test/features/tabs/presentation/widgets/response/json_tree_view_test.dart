@@ -412,4 +412,102 @@ void main() {
       );
     });
   });
+
+  group('JsonTreeView node actions', () {
+    List<String> mockClipboard(WidgetTester tester) {
+      final clips = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            clips.add((call.arguments as Map)['text'] as String);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      return clips;
+    }
+
+    testWidgets('copy value of a scalar puts its string on the clipboard', (
+      tester,
+    ) async {
+      final clips = mockClipboard(tester);
+      await tester.pumpWidget(
+        _host({
+          'user': {'id': 7},
+        }),
+      );
+
+      await tester.tap(find.byKey(const ValueKey(r'tree_menu_$.user.id')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Copy value'));
+      await tester.pumpAndSettle();
+
+      expect(clips, ['7']);
+      expect(find.text('Value copied'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('copy value of a container copies indented JSON', (
+      tester,
+    ) async {
+      final clips = mockClipboard(tester);
+      await tester.pumpWidget(
+        _host({
+          'user': {'id': 7},
+        }),
+      );
+
+      await tester.tap(find.byKey(const ValueKey(r'tree_menu_$.user')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Copy value'));
+      await tester.pumpAndSettle();
+
+      expect(clips.single, '{\n  "id": 7\n}');
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets(
+      'copy path on a key the grammar cannot express refuses with a '
+      'snackbar and copies nothing',
+      (tester) async {
+        final clips = mockClipboard(tester);
+        await tester.pumpWidget(_host(const {'a]b': 1}));
+
+        await tester.tap(find.byKey(const ValueKey(r'tree_menu_$["a]b"]')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Copy path'));
+        await tester.pumpAndSettle();
+
+        expect(clips, isEmpty);
+        expect(
+          find.text('This key cannot be expressed as a JSON path'),
+          findsOneWidget,
+        );
+        await tester.pump(const Duration(seconds: 3));
+      },
+    );
+  });
+
+  group('JsonTreeView scalar root', () {
+    testWidgets(r'renders a single $ row with the quoted preview', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_host('hello'));
+      expect(_row(r'$'), findsOneWidget);
+      expect(_row('"hello"'), findsOneWidget);
+    });
+
+    testWidgets('null scalar previews as null', (tester) async {
+      await tester.pumpWidget(_host(null));
+      expect(_row(r'$'), findsOneWidget);
+      expect(_row('null'), findsOneWidget);
+    });
+  });
 }
