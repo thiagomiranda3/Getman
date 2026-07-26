@@ -6,7 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/theme/theme_registry.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
 import 'package:getman/features/collections/presentation/widgets/node_drag_data.dart';
+import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
@@ -17,6 +20,8 @@ import 'package:getman/features/tabs/presentation/widgets/tab_drag_data.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockTabsBloc extends MockBloc<TabsEvent, TabsState> implements TabsBloc {}
+
+class MockCollectionsBloc extends Mock implements CollectionsBloc {}
 
 class _FakeTabsEvent extends Fake implements TabsEvent {}
 
@@ -376,4 +381,131 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'row rename pencil opens the prompt and dispatches RenamePanel for THAT '
+    'row (not the active panel)',
+    (tester) async {
+      await tester.pumpWidget(_host(bloc));
+      await tester.tap(find.byKey(const ValueKey('panel_selector_button')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey('panel_rename_$_workPanelId')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('RENAME PANEL'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('name_prompt_field')),
+        'Ops',
+      );
+      await tester.tap(find.text('SAVE'));
+      await tester.pumpAndSettle();
+
+      verify(() => bloc.add(const RenamePanel(_workPanelId, 'Ops'))).called(1);
+    },
+  );
+
+  testWidgets(
+    'tapping the barrier outside the button dismisses the menu without '
+    'opening rename',
+    (tester) async {
+      await tester.pumpWidget(_host(bloc));
+      await tester.tap(find.byKey(const ValueKey('panel_selector_button')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('panel_row_$_workPanelId')),
+        findsOneWidget,
+      );
+
+      // Let the double-tap window lapse so this cannot read as a double-tap.
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('panel_row_$_workPanelId')),
+        findsNothing,
+      );
+      expect(find.text('RENAME PANEL'), findsNothing);
+    },
+  );
+
+  testWidgets('dragging a panel row handle dispatches ReorderPanels', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_host(bloc));
+    await tester.tap(find.byKey(const ValueKey('panel_selector_button')));
+    await tester.pumpAndSettle();
+
+    final handle = find.descendant(
+      of: find.byKey(const ValueKey('panel_row_p1')),
+      matching: find.byIcon(Icons.drag_handle),
+    );
+    // Stepped manual gesture with settled frames between moves so the
+    // ReorderableListView registers the displacement.
+    final gesture = await tester.startGesture(tester.getCenter(handle));
+    await tester.pump(const Duration(milliseconds: 100));
+    await gesture.moveBy(const Offset(0, 40));
+    await tester.pump(const Duration(milliseconds: 100));
+    await gesture.moveBy(const Offset(0, 40));
+    await tester.pump(const Duration(milliseconds: 100));
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    final captured = verify(() => bloc.add(captureAny())).captured;
+    expect(
+      captured.whereType<ReorderPanels>(),
+      isNotEmpty,
+      reason: 'the row drag handle must dispatch a ReorderPanels event',
+    );
+  });
+
+  testWidgets(
+    'row close (X) confirms CLOSE PANEL and dispatches RemovePanel',
+    (tester) async {
+      // closePanelWithSavePrompt runs against the ROOT navigator's context, so
+      // the blocs + TabDirtyChecker must be provided ABOVE MaterialApp (as the
+      // real app shell does).
+      final collectionsBloc = MockCollectionsBloc();
+      when(() => collectionsBloc.state).thenReturn(CollectionsState());
+      when(
+        () => collectionsBloc.stream,
+      ).thenAnswer((_) => const Stream.empty());
+
+      await tester.pumpWidget(
+        MultiBlocProvider(
+          providers: [
+            BlocProvider<TabsBloc>.value(value: bloc),
+            BlocProvider<CollectionsBloc>.value(value: collectionsBloc),
+          ],
+          child: RepositoryProvider<TabDirtyChecker>.value(
+            value: const TabDirtyChecker(),
+            child: MaterialApp(
+              theme: resolveTheme('brutalist')(
+                Brightness.light,
+                isCompact: false,
+              ),
+              home: const Scaffold(body: Align(child: PanelSelector())),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('panel_selector_button')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('panel_close_$_workPanelId')));
+      await tester.pumpAndSettle();
+
+      // Both tabs in 'Work' are pristine/unlinked → clean → simple confirm.
+      expect(find.text('CLOSE PANEL?'), findsOneWidget);
+      expect(find.text('Close "Work" and its 2 tabs?'), findsOneWidget);
+
+      await tester.tap(find.text('CLOSE'));
+      await tester.pumpAndSettle();
+
+      verify(() => bloc.add(const RemovePanel(_workPanelId))).called(1);
+    },
+  );
 }
