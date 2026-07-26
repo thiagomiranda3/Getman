@@ -10,6 +10,7 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
+import 'package:getman/features/tabs/presentation/widgets/tab_switcher_sheet.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockTabsBloc extends MockBloc<TabsEvent, TabsState> implements TabsBloc {}
@@ -127,5 +128,32 @@ void main() {
     await tester.pumpWidget(_host(bloc));
 
     expect(find.text('Work · 1/1 ▾'), findsOneWidget);
+  });
+
+  testWidgets('shows NO TABS as the title when there are no tabs', (
+    tester,
+  ) async {
+    when(() => bloc.state).thenReturn(const TabsState());
+
+    await tester.pumpWidget(_host(bloc));
+
+    expect(find.text('NO TABS'), findsOneWidget);
+    // With no tabs the chip is inert — tapping must not open the sheet.
+    await tester.tap(find.byType(TabChip));
+    await tester.pumpAndSettle();
+    expect(find.byType(TabSwitcherSheet), findsNothing);
+  });
+
+  testWidgets('tapping the chip opens the tab switcher sheet', (tester) async {
+    final panel = _panel('p1', 'Panel 1', ['t1']);
+    when(() => bloc.state).thenReturn(
+      TabsState(panels: [panel], activePanelId: 'p1', tabs: panel.tabs),
+    );
+
+    await tester.pumpWidget(_host(bloc));
+    await tester.tap(find.byType(TabChip));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TabSwitcherSheet), findsOneWidget);
   });
 }
