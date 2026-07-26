@@ -6,9 +6,18 @@ import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/features/collections/data/datasources/workspace_collections_data_source.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/entities/branch_status.dart';
+import 'package:getman/features/collections/presentation/bloc/conflict_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/conflict_event.dart';
+import 'package:getman/features/collections/presentation/bloc/conflict_state.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_event.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_state.dart';
+import 'package:getman/features/collections/presentation/bloc/pull_requests_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/pull_requests_event.dart';
+import 'package:getman/features/collections/presentation/bloc/pull_requests_state.dart';
+import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/review_event.dart';
+import 'package:getman/features/collections/presentation/bloc/review_state.dart';
 import 'package:getman/features/collections/presentation/widgets/branch_chip.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
@@ -23,10 +32,23 @@ class _MockSettingsBloc extends Mock implements SettingsBloc {}
 class _MockWorkspaceDataSource extends Mock
     implements WorkspaceCollectionsDataSource {}
 
+class _MockPullRequestsBloc
+    extends MockBloc<PullRequestsEvent, PullRequestsState>
+    implements PullRequestsBloc {}
+
+class _MockConflictBloc extends MockBloc<ConflictEvent, ConflictState>
+    implements ConflictBloc {}
+
+class _MockReviewBloc extends MockBloc<ReviewEvent, ReviewState>
+    implements ReviewBloc {}
+
 void main() {
   const root = '/ws';
   late _MockGitSyncBloc bloc;
   late _MockSettingsBloc settings;
+  late _MockPullRequestsBloc prBloc;
+  late _MockConflictBloc conflictBloc;
+  late _MockReviewBloc reviewBloc;
 
   setUpAll(() {
     // Needed for `captureAny()` on `bloc.add(...)` in the PULL-no-remote
@@ -42,6 +64,18 @@ void main() {
       const SettingsState(settings: SettingsEntity(workspacePath: root)),
     );
     when(() => settings.stream).thenAnswer((_) => const Stream.empty());
+    prBloc = _MockPullRequestsBloc();
+    when(() => prBloc.state).thenReturn(
+      const PullRequestsState(status: PrStatus.ready),
+    );
+    conflictBloc = _MockConflictBloc();
+    when(() => conflictBloc.state).thenReturn(
+      const ConflictState(status: ConflictStatus.ready),
+    );
+    reviewBloc = _MockReviewBloc();
+    when(() => reviewBloc.state).thenReturn(
+      const ReviewState(status: ReviewStatus.ready),
+    );
   });
 
   Widget host(GitSyncState state) {
@@ -55,6 +89,9 @@ void main() {
             providers: [
               BlocProvider<GitSyncBloc>.value(value: bloc),
               BlocProvider<SettingsBloc>.value(value: settings),
+              BlocProvider<PullRequestsBloc>.value(value: prBloc),
+              BlocProvider<ConflictBloc>.value(value: conflictBloc),
+              BlocProvider<ReviewBloc>.value(value: reviewBloc),
             ],
             child: const BranchChip(),
           ),
@@ -374,5 +411,191 @@ void main() {
 
     expect(find.text('REVIEW CHANGES…'), findsOneWidget);
     expect(find.text('STASH CHANGES'), findsOneWidget);
+  });
+
+  const repoState = GitSyncState(
+    status: GitSyncStatus.ready,
+    branch: BranchStatus(
+      isRepo: true,
+      current: 'main',
+      branches: ['main'],
+      hasRemote: true,
+    ),
+  );
+
+  testWidgets('NEW BRANCH prompts for a name and dispatches CreateBranch', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(repoState));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('branch_chip')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('NEW BRANCH…'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('name_prompt_field')), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('name_prompt_field')),
+      'feat/shiny',
+    );
+    await tester.pump();
+    await tester.tap(find.widgetWithText(TextButton, 'CREATE'));
+    await tester.pumpAndSettle();
+
+    verify(() => bloc.add(const CreateBranch(root, 'feat/shiny'))).called(1);
+  });
+
+  testWidgets('the STASHES item carries the count and opens the stash list', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(
+        const GitSyncState(
+          status: GitSyncStatus.ready,
+          branch: BranchStatus(
+            isRepo: true,
+            current: 'main',
+            branches: ['main'],
+            hasRemote: true,
+            stashes: [
+              StashInfo(index: 0, message: 'WIP on main'),
+              StashInfo(index: 1, message: 'Getman WIP'),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('branch_chip')));
+    await tester.pumpAndSettle();
+    expect(find.text('STASHES (2)'), findsOneWidget);
+
+    await tester.tap(find.text('STASHES (2)'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('STASHES'), findsOneWidget);
+    expect(find.text('WIP on main'), findsOneWidget);
+    expect(find.text('Getman WIP'), findsOneWidget);
+  });
+
+  testWidgets('PULL REQUESTS… opens the PR dialog and loads the list', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(repoState));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('branch_chip')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('PULL REQUESTS…'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('PULL REQUESTS'), findsOneWidget);
+    verify(() => prBloc.add(const LoadPullRequests(root))).called(1);
+  });
+
+  testWidgets('a generic git error opens the GIT ERROR dialog', (
+    tester,
+  ) async {
+    whenListen(
+      bloc,
+      Stream<GitSyncState>.fromIterable([
+        repoState.copyWith(
+          status: GitSyncStatus.error,
+          errorMessage: 'fatal: remote imploded',
+        ),
+      ]),
+      initialState: repoState,
+    );
+
+    await tester.pumpWidget(host(repoState));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('branch_error_dialog')), findsOneWidget);
+    expect(find.text('fatal: remote imploded'), findsOneWidget);
+
+    await tester.tap(find.text('CLOSE'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('branch_error_dialog')), findsNothing);
+  });
+
+  testWidgets('the dirty prompt STASH CHANGES dispatches StashChanges', (
+    tester,
+  ) async {
+    whenListen(
+      bloc,
+      Stream<GitSyncState>.fromIterable([
+        repoState.copyWith(
+          status: GitSyncStatus.error,
+          errorMessage: 'You have uncommitted changes',
+        ),
+      ]),
+      initialState: repoState,
+    );
+
+    await tester.pumpWidget(host(repoState));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('STASH CHANGES'));
+    await tester.pumpAndSettle();
+
+    verify(() => bloc.add(const StashChanges(root, 'Getman WIP'))).called(1);
+    expect(find.text('UNCOMMITTED CHANGES'), findsNothing); // prompt closed
+  });
+
+  testWidgets('the dirty prompt REVIEW CHANGES… opens the review dialog', (
+    tester,
+  ) async {
+    whenListen(
+      bloc,
+      Stream<GitSyncState>.fromIterable([
+        repoState.copyWith(
+          status: GitSyncStatus.error,
+          errorMessage: 'You have uncommitted changes',
+        ),
+      ]),
+      initialState: repoState,
+    );
+
+    await tester.pumpWidget(host(repoState));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('REVIEW CHANGES…'));
+    await tester.pumpAndSettle();
+
+    verify(() => reviewBloc.add(const LoadReview(root))).called(1);
+    expect(find.text('No changes to review.'), findsOneWidget);
+  });
+
+  testWidgets('a conflictToken bump opens the conflict resolver exactly once', (
+    tester,
+  ) async {
+    whenListen(
+      bloc,
+      Stream<GitSyncState>.fromIterable([repoState.copyWith(conflictToken: 1)]),
+      initialState: repoState,
+    );
+
+    await tester.pumpWidget(host(repoState));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Resolving conflicts — commit 1'), findsOneWidget);
+  });
+
+  testWidgets('auto-fetches silently every kAutoFetchInterval', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(repoState));
+    await tester.pumpAndSettle();
+
+    // The post-frame boot already fired one silent fetch.
+    verify(() => bloc.add(const FetchRemote(root, silent: true))).called(1);
+
+    await tester.pump(kAutoFetchInterval);
+    verify(() => bloc.add(const FetchRemote(root, silent: true))).called(1);
+
+    await tester.pump(kAutoFetchInterval);
+    verify(() => bloc.add(const FetchRemote(root, silent: true))).called(1);
   });
 }

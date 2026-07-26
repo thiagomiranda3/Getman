@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
@@ -363,5 +364,125 @@ void main() {
     );
     expect(refresh.onPressed, isNull);
     expect(create.onPressed, isNull);
+  });
+
+  testWidgets('a draft PR shows the DRAFT tag and per-status check glyphs', (
+    tester,
+  ) async {
+    final bloc = _MockPrBloc();
+    when(() => bloc.state).thenReturn(
+      const PullRequestsState(
+        status: PrStatus.ready,
+        prs: [
+          PullRequestEntity(
+            number: 1,
+            title: 'draft one',
+            state: PrState.open,
+            url: 'u/1',
+            isDraft: true,
+            checks: PrChecks.failing,
+          ),
+          PullRequestEntity(
+            number: 2,
+            title: 'pending one',
+            state: PrState.open,
+            url: 'u/2',
+            isDraft: false,
+            checks: PrChecks.pending,
+          ),
+          PullRequestEntity(
+            number: 3,
+            title: 'no checks',
+            state: PrState.open,
+            url: 'u/3',
+            isDraft: false,
+            checks: PrChecks.none,
+          ),
+        ],
+      ),
+    );
+    await tester.pumpWidget(host(bloc));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('DRAFT'), findsOneWidget);
+    expect(find.byIcon(Icons.cancel), findsOneWidget); // failing
+    expect(find.byIcon(Icons.schedule), findsOneWidget); // pending
+    expect(find.byIcon(Icons.remove), findsOneWidget); // none
+  });
+
+  testWidgets('REFRESH re-dispatches LoadPullRequests', (tester) async {
+    final bloc = _MockPrBloc();
+    when(() => bloc.state).thenReturn(
+      const PullRequestsState(status: PrStatus.ready),
+    );
+    await tester.pumpWidget(host(bloc));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('pr_refresh')));
+    // Once from initState, once from the button.
+    verify(() => bloc.add(const LoadPullRequests(root))).called(2);
+  });
+
+  testWidgets('the auth prompt REFRESH re-checks gh availability', (
+    tester,
+  ) async {
+    final bloc = _MockPrBloc();
+    when(() => bloc.state).thenReturn(
+      const PullRequestsState(
+        status: PrStatus.ready,
+        availability: GhAvailability.notAuthenticated,
+      ),
+    );
+    await tester.pumpWidget(host(bloc));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('REFRESH'));
+    verify(() => bloc.add(const LoadPullRequests(root))).called(2);
+  });
+
+  testWidgets(
+    'tapping a PR row that cannot open the browser shows a snackbar',
+    (tester) async {
+      // The mocked url_launcher channel reports "not launched", so openUrl
+      // resolves to false and the row surfaces its snackbar — the failure
+      // branch.
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('plugins.flutter.io/url_launcher'),
+        (_) async => false,
+      );
+      final bloc = _MockPrBloc();
+      when(() => bloc.state).thenReturn(
+        const PullRequestsState(status: PrStatus.ready, prs: [_pr]),
+      );
+      await tester.pumpWidget(host(bloc));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('pr_row_77')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Could not open the PR url.'), findsOneWidget);
+    },
+  );
+
+  testWidgets('INSTALL GH survives a missing browser handler', (tester) async {
+    final bloc = _MockPrBloc();
+    when(() => bloc.state).thenReturn(
+      const PullRequestsState(
+        status: PrStatus.ready,
+        availability: GhAvailability.notInstalled,
+      ),
+    );
+    await tester.pumpWidget(host(bloc));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('pr_install_gh')));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
   });
 }

@@ -212,6 +212,224 @@ void main() {
     expect(find.textContaining('Initialize git'), findsOneWidget);
   });
 
+  testWidgets('tapping Initialize git dispatches InitRepo', (tester) async {
+    await tester.pumpWidget(
+      host(const ReviewState(status: ReviewStatus.ready, repoExists: false)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Initialize git here'));
+    verify(() => bloc.add(const InitRepo('/ws'))).called(1);
+  });
+
+  testWidgets('git missing from PATH shows the git-not-found message', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(const ReviewState(status: ReviewStatus.ready, gitAvailable: false)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('git was not found on your PATH.'), findsOneWidget);
+    // No PUSH-worthy body — but the repoExists default keeps PUSH visible;
+    // the load itself decides. The commit row must not render.
+    expect(find.byKey(const ValueKey('review_commit_button')), findsNothing);
+  });
+
+  testWidgets('no entries shows the empty message', (tester) async {
+    await tester.pumpWidget(
+      host(const ReviewState(status: ReviewStatus.ready)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('No changes to review.'), findsOneWidget);
+  });
+
+  testWidgets('a load error with no entries shows the banner over the empty '
+      'message', (tester) async {
+    await tester.pumpWidget(
+      host(
+        const ReviewState(status: ReviewStatus.error, errorMessage: 'kaput'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('review_error_banner')), findsOneWidget);
+    expect(find.text('kaput'), findsOneWidget);
+    expect(find.text('No changes to review.'), findsOneWidget);
+  });
+
+  testWidgets('the title carries the current branch when known', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(
+        const ReviewState(
+          status: ReviewStatus.ready,
+          branch: 'feat/x',
+          entries: [entry],
+          selectedPath: 'a.req.json',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('REVIEW CHANGES · feat/x'), findsOneWidget);
+  });
+
+  testWidgets('an entry checkbox stages and a staged one unstages', (
+    tester,
+  ) async {
+    const staged = ReviewEntry(
+      path: 'b.req.json',
+      nodeKind: NodeKind.request,
+      changeType: ChangeType.added,
+      displayName: 'Other',
+      staged: true,
+      diff: SemanticDiff([]),
+    );
+    await tester.pumpWidget(
+      host(
+        const ReviewState(
+          status: ReviewStatus.ready,
+          entries: [entry, staged],
+          selectedPath: 'a.req.json',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The unstaged entry's row checkbox stages it.
+    final unstagedBox = find.descendant(
+      of: find.widgetWithText(ListTile, 'Get User'),
+      matching: find.byType(Checkbox),
+    );
+    await tester.tap(unstagedBox);
+    verify(() => bloc.add(const StageNode('/ws', 'a.req.json'))).called(1);
+
+    // The staged entry's row checkbox unstages it.
+    final stagedBox = find.descendant(
+      of: find.widgetWithText(ListTile, 'Other'),
+      matching: find.byType(Checkbox),
+    );
+    await tester.tap(stagedBox);
+    verify(() => bloc.add(const UnstageNode('/ws', 'b.req.json'))).called(1);
+  });
+
+  testWidgets('tapping an entry row selects it', (tester) async {
+    const other = ReviewEntry(
+      path: 'b.req.json',
+      nodeKind: NodeKind.request,
+      changeType: ChangeType.deleted,
+      displayName: 'Other',
+      staged: false,
+      diff: SemanticDiff([]),
+    );
+    await tester.pumpWidget(
+      host(
+        const ReviewState(
+          status: ReviewStatus.ready,
+          entries: [entry, other],
+          selectedPath: 'a.req.json',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Other'));
+    verify(() => bloc.add(const SelectEntry('b.req.json'))).called(1);
+  });
+
+  testWidgets(
+    'COMMIT enables once staged + message present and dispatches Commit '
+    'with the settings identity',
+    (tester) async {
+      when(() => settingsBloc.state).thenReturn(
+        const SettingsState(
+          settings: SettingsEntity(
+            gitUserName: 'Ada',
+            gitUserEmail: 'ada@example.com',
+          ),
+        ),
+      );
+      const staged = ReviewEntry(
+        path: 'a.req.json',
+        nodeKind: NodeKind.request,
+        changeType: ChangeType.modified,
+        displayName: 'Get User',
+        staged: true,
+        diff: SemanticDiff([]),
+      );
+      await tester.pumpWidget(
+        host(
+          const ReviewState(
+            status: ReviewStatus.ready,
+            entries: [staged],
+            selectedPath: 'a.req.json',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Staged but no message yet → still disabled.
+      ElevatedButton commitButton() => tester.widget<ElevatedButton>(
+        find.byKey(const ValueKey('review_commit_button')),
+      );
+      expect(commitButton().onPressed, isNull);
+      expect(find.text('COMMIT (1)'), findsOneWidget);
+
+      await tester.enterText(
+        find.byType(TextField),
+        '  add user request  ',
+      );
+      await tester.pump();
+      expect(commitButton().onPressed, isNotNull);
+
+      await tester.tap(find.byKey(const ValueKey('review_commit_button')));
+      verify(
+        () => bloc.add(
+          const Commit(
+            '/ws',
+            'add user request',
+            authorName: 'Ada',
+            authorEmail: 'ada@example.com',
+          ),
+        ),
+      ).called(1);
+    },
+  );
+
+  testWidgets('while committing the button reads COMMITTING… and disables', (
+    tester,
+  ) async {
+    const staged = ReviewEntry(
+      path: 'a.req.json',
+      nodeKind: NodeKind.request,
+      changeType: ChangeType.modified,
+      displayName: 'Get User',
+      staged: true,
+      diff: SemanticDiff([]),
+    );
+    await tester.pumpWidget(
+      host(
+        const ReviewState(
+          status: ReviewStatus.committing,
+          entries: [staged],
+          selectedPath: 'a.req.json',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'msg');
+    await tester.pump();
+
+    final commit = tester.widget<ElevatedButton>(
+      find.byKey(const ValueKey('review_commit_button')),
+    );
+    expect(commit.onPressed, isNull);
+    expect(find.text('COMMITTING…'), findsOneWidget);
+  });
+
   testWidgets('the PUSH button is present when the workspace is a repo', (
     tester,
   ) async {
