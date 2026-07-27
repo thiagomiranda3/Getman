@@ -65,6 +65,19 @@ dirty/edge-path coverage (~95 cases). What remains is genuinely blocked
   per-panel active tab + dirty tab, via a manual same-dir double `di.init`);
   compact-phone `TabSwitcherSheet` (create / switch via chip) + resize back.
 
+- **QoL waves 1–2 (2026-07-26 pass)** — `open_tabs_dropdown_test` (D1 strip
+  dropdown: list/filter/activate/Esc), `tab_strip_double_click_test` (PR62
+  empty-strip double-click = new tab; chip double-click excluded),
+  `tree_search_collapse_test` (D2 method search + collapse-all disabled during
+  search), `history_management_test` (D3 day headers, hover-delete + UNDO,
+  clear-all confirm + UNDO, empty state + disabled CLEAR ALL),
+  `shortcuts_help_test` (E1 Cmd+/ toggle + CLOSE), `unresolved_vars_chip_test`
+  (E3 chip appear/list/env-editor link/clear), `collections_context_menu_test`
+  (PR62 right-click rename + instant delete/UNDO), `url_enter_to_send_test`
+  (PR62 Enter submits + re-sends). Also aligned `collections_test` (A1 instant
+  delete + UNDO) and `tab_management_test` (D6 bulk-close UNSAVED CHANGES
+  confirm — covered both gated and ungated paths).
+
 ---
 
 ## Still not automated

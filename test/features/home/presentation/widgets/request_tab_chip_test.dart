@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
@@ -93,7 +94,13 @@ void main() {
     when(() => collectionsRepo.saveCollections(any())).thenAnswer((_) async {});
   });
 
-  Future<void> pumpTab(WidgetTester tester, HttpRequestTabEntity tab) async {
+  Future<TabsBloc> pumpTab(
+    WidgetTester tester,
+    HttpRequestTabEntity tab, {
+    bool isActive = true,
+    VoidCallback? onTap,
+    Future<bool> Function()? onClose,
+  }) async {
     _stubLoad(tabsRepo, tab);
     final tabsBloc = TabsBloc(
       repository: tabsRepo,
@@ -129,9 +136,9 @@ void main() {
                 child: RequestTabChip(
                   tabId: tab.tabId,
                   index: 0,
-                  isActive: true,
-                  onTap: () {},
-                  onClose: () async => true,
+                  isActive: isActive,
+                  onTap: onTap ?? () {},
+                  onClose: onClose ?? () async => true,
                 ),
               ),
             ),
@@ -140,6 +147,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    return tabsBloc;
   }
 
   // The screen's top-left corner, outside the centered tab — moving on/off it
@@ -613,9 +621,12 @@ void main() {
     );
   });
 
-  Future<void> openContextMenu(WidgetTester tester) async {
+  Future<void> openContextMenu(
+    WidgetTester tester, {
+    String title = 'GetUsers',
+  }) async {
     await tester.tapAt(
-      tester.getCenter(find.text('GetUsers')),
+      tester.getCenter(find.text(title)),
       buttons: kSecondaryMouseButton,
     );
     await tester.pumpAndSettle();
@@ -796,5 +807,402 @@ void main() {
       await openContextMenu(tester);
       expect(find.text('REVERT CHANGES'), findsNothing);
     });
+  });
+
+  group('chip interactions', () {
+    testWidgets('tapping the chip fires onTap', (tester) async {
+      var tapped = false;
+      await pumpTab(tester, _linkedTab(), onTap: () => tapped = true);
+
+      await tester.tap(find.text('GetUsers'));
+      await tester.pump();
+
+      expect(tapped, isTrue);
+    });
+
+    testWidgets(
+      'close button animates the chip out and dispatches RemoveTab',
+      (tester) async {
+        final tabsBloc = await pumpTab(tester, _linkedTab());
+
+        await tester.tap(find.byKey(const ValueKey('tab_close_tab1')));
+        // Confirm callback + the 300ms reverse size animation.
+        await tester.pumpAndSettle();
+
+        expect(tabsBloc.state.tabs, isEmpty);
+      },
+    );
+
+    testWidgets('close is a no-op when onClose declines', (tester) async {
+      final tabsBloc = await pumpTab(
+        tester,
+        _linkedTab(),
+        onClose: () async => false,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('tab_close_tab1')));
+      await tester.pumpAndSettle();
+
+      expect(tabsBloc.state.tabs, hasLength(1));
+    });
+
+    testWidgets('inactive dirty chip renders the dirty star', (tester) async {
+      // _linkedTab() links to node1 with no saved collections → dirty.
+      await pumpTab(tester, _linkedTab(), isActive: false);
+
+      expect(find.text('*'), findsOneWidget);
+    });
+
+    testWidgets(
+      'long-press drag shows the drag-feedback chip and the dimmed ghost',
+      (tester) async {
+        await pumpTab(tester, _linkedTab());
+
+        final center = tester.getCenter(find.text('GetUsers'));
+        final gesture = await tester.startGesture(center);
+        await tester.pump(kLongPressTimeout + kPressTimeout);
+        await gesture.moveBy(const Offset(60, 60));
+        await tester.pump();
+
+        // The title now paints twice: once in the childWhenDragging ghost,
+        // once in the floating _TabDragFeedback chip.
+        expect(find.text('GetUsers'), findsNWidgets(2));
+        expect(
+          tester
+              .widgetList<Opacity>(find.byType(Opacity))
+              .any((w) => w.opacity == 0.4),
+          isTrue,
+          reason: 'the ghost dims the in-strip chip while dragging',
+        );
+
+        await gesture.up();
+        await tester.pumpAndSettle();
+        expect(find.text('GetUsers'), findsOneWidget);
+      },
+    );
+  });
+
+  group('context-menu actions', () {
+    testWidgets('DUPLICATE dispatches DuplicateTab and shows a snackbar', (
+      tester,
+    ) async {
+      final tabsBloc = await pumpTab(tester, _linkedTab());
+      await openContextMenu(tester);
+
+      await tester.tap(find.text('DUPLICATE'));
+      await tester.pumpAndSettle();
+
+      expect(tabsBloc.state.tabs, hasLength(2));
+      expect(find.text('Tab duplicated'), findsOneWidget);
+
+      // DuplicateTab schedules TabsBloc's save debounce; flush it.
+      await tester.pump(const Duration(seconds: 11));
+    });
+
+    testWidgets('COPY URL puts the tab URL on the clipboard', (tester) async {
+      final clipboardLog = <MethodCall>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') clipboardLog.add(call);
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+
+      await pumpTab(tester, _linkedTab());
+      await openContextMenu(tester);
+
+      await tester.tap(find.text('COPY URL'));
+      await tester.pumpAndSettle();
+
+      expect(clipboardLog, hasLength(1));
+      expect(
+        (clipboardLog.single.arguments as Map<Object?, Object?>)['text'],
+        'https://api/users',
+      );
+      expect(find.text('URL copied'), findsOneWidget);
+    });
+
+    testWidgets(
+      'REOPEN CLOSED TAB is enabled after a close and restores the tab',
+      (tester) async {
+        final tabsBloc = await pumpTab(tester, _linkedTab());
+
+        // Duplicate first so a close leaves the chip's own tab in place.
+        await openContextMenu(tester);
+        await tester.tap(find.text('DUPLICATE'));
+        await tester.pumpAndSettle();
+        expect(tabsBloc.state.tabs, hasLength(2));
+
+        // Close the duplicate (clean? both are linked copies — close via
+        // CLOSE OTHERS which prompts for the dirty duplicate).
+        await openContextMenu(tester);
+        await tester.tap(find.text('CLOSE OTHERS'));
+        await tester.pumpAndSettle();
+        // The duplicate is dirty (linked node1 has no saved config) → confirm.
+        await tester.tap(find.text('CLOSE ANYWAY'));
+        await tester.pumpAndSettle();
+        expect(tabsBloc.state.tabs, hasLength(1));
+        expect(tabsBloc.canReopenClosedTab, isTrue);
+
+        await openContextMenu(tester);
+        final item = tester.widget<PopupMenuItem<void>>(
+          find.ancestor(
+            of: find.text('REOPEN CLOSED TAB'),
+            matching: find.byWidgetPredicate((w) => w is PopupMenuItem<void>),
+          ),
+        );
+        expect(item.enabled, isTrue);
+
+        await tester.tap(find.text('REOPEN CLOSED TAB'));
+        await tester.pumpAndSettle();
+
+        expect(tabsBloc.state.tabs, hasLength(2));
+
+        await tester.pump(const Duration(seconds: 11));
+      },
+    );
+
+    testWidgets(
+      'MOVE TO PANEL → NEW PANEL… moves the tab into a fresh panel',
+      (tester) async {
+        final tab1 = _linkedTab();
+        final tab2 = _emptyTab();
+        when(() => tabsRepo.getPanels()).thenAnswer(
+          (_) async => [
+            PanelEntity(
+              id: 'p1',
+              name: 'Panel 1',
+              tabs: [tab1],
+              activeTabId: tab1.tabId,
+            ),
+            PanelEntity(
+              id: 'p2',
+              name: 'Panel 2',
+              tabs: [tab2],
+              activeTabId: tab2.tabId,
+            ),
+          ],
+        );
+        when(() => tabsRepo.getActivePanelId()).thenAnswer((_) async => 'p1');
+
+        final tabsBloc = TabsBloc(
+          repository: tabsRepo,
+          sendRequestUseCase: sendUseCase,
+        )..add(const LoadTabs());
+        await tabsBloc.stream.firstWhere(
+          (s) => !s.isLoading && s.tabs.isNotEmpty,
+        );
+
+        final collectionsBloc = CollectionsBloc(
+          getCollectionsUseCase: GetCollectionsUseCase(collectionsRepo),
+          saveCollectionsUseCase: SaveCollectionsUseCase(collectionsRepo),
+          saveDebounce: const Duration(milliseconds: 5),
+        )..add(const ReplaceCollections([]));
+        await collectionsBloc.stream.first;
+
+        addTearDown(tabsBloc.close);
+        addTearDown(collectionsBloc.close);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: brutalistTheme(Brightness.light),
+            home: Scaffold(
+              body: MultiBlocProvider(
+                providers: [
+                  BlocProvider.value(value: tabsBloc),
+                  BlocProvider.value(value: collectionsBloc),
+                ],
+                child: RepositoryProvider<TabDirtyChecker>.value(
+                  value: const TabDirtyChecker(),
+                  child: Center(
+                    child: RequestTabChip(
+                      tabId: tab1.tabId,
+                      index: 0,
+                      isActive: true,
+                      onTap: () {},
+                      onClose: () async => true,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await openContextMenu(tester);
+        await tester.tap(
+          find.byKey(const ValueKey('tab_context_move_to_panel')),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const ValueKey('tab_move_to_new_panel')));
+        await tester.pumpAndSettle();
+
+        expect(tabsBloc.state.panels, hasLength(3));
+        final newPanel = tabsBloc.state.panels.last;
+        expect(newPanel.tabs.single.tabId, tab1.tabId);
+
+        await tester.pump(const Duration(seconds: 11));
+      },
+    );
+  });
+
+  group('D6: directional bulk closes', () {
+    // Pumps [tabs] into one panel with the chip rendered for [chipTab] at
+    // [chipIndex]; returns the live bloc for state assertions.
+    Future<TabsBloc> pumpStrip(
+      WidgetTester tester,
+      List<HttpRequestTabEntity> tabs,
+      HttpRequestTabEntity chipTab,
+      int chipIndex,
+    ) async {
+      when(() => tabsRepo.getPanels()).thenAnswer(
+        (_) async => [
+          PanelEntity(
+            id: 'p1',
+            name: 'Panel 1',
+            tabs: tabs,
+            activeTabId: chipTab.tabId,
+          ),
+        ],
+      );
+      when(() => tabsRepo.getActivePanelId()).thenAnswer((_) async => 'p1');
+
+      final tabsBloc = TabsBloc(
+        repository: tabsRepo,
+        sendRequestUseCase: sendUseCase,
+      )..add(const LoadTabs());
+      await tabsBloc.stream.firstWhere(
+        (s) => !s.isLoading && s.tabs.length == tabs.length,
+      );
+
+      final collectionsBloc = CollectionsBloc(
+        getCollectionsUseCase: GetCollectionsUseCase(collectionsRepo),
+        saveCollectionsUseCase: SaveCollectionsUseCase(collectionsRepo),
+        saveDebounce: const Duration(milliseconds: 5),
+      )..add(const ReplaceCollections([]));
+      await collectionsBloc.stream.first;
+
+      addTearDown(tabsBloc.close);
+      addTearDown(collectionsBloc.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: brutalistTheme(Brightness.light),
+          home: Scaffold(
+            body: MultiBlocProvider(
+              providers: [
+                BlocProvider.value(value: tabsBloc),
+                BlocProvider.value(value: collectionsBloc),
+              ],
+              child: RepositoryProvider<TabDirtyChecker>.value(
+                value: const TabDirtyChecker(),
+                child: Center(
+                  child: RequestTabChip(
+                    tabId: chipTab.tabId,
+                    index: chipIndex,
+                    isActive: true,
+                    onTap: () {},
+                    onClose: () async => true,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return tabsBloc;
+    }
+
+    HttpRequestTabEntity cleanTab(String id) => HttpRequestTabEntity(
+      tabId: id,
+      config: HttpRequestConfigEntity(id: id),
+    );
+
+    // A linked tab whose collection node has no saved config → dirty.
+    HttpRequestTabEntity dirtyTab(String id) => HttpRequestTabEntity(
+      tabId: id,
+      config: HttpRequestConfigEntity(id: id, url: 'https://$id.dev'),
+      collectionName: id,
+      collectionNodeId: 'missing_$id',
+    );
+
+    testWidgets(
+      'CLOSE TO THE LEFT with clean targets dispatches immediately',
+      (tester) async {
+        final left = cleanTab('left');
+        final mid = cleanTab('mid');
+        final right = cleanTab('right');
+        final tabsBloc = await pumpStrip(tester, [left, mid, right], mid, 1);
+
+        await openContextMenu(tester, title: 'NEW REQUEST');
+        await tester.tap(find.text('CLOSE TO THE LEFT'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('UNSAVED CHANGES'), findsNothing);
+        expect(
+          tabsBloc.state.tabs.map((t) => t.tabId),
+          ['mid', 'right'],
+        );
+      },
+    );
+
+    testWidgets(
+      'CLOSE TO THE RIGHT with a dirty target confirms before dispatching',
+      (tester) async {
+        final left = cleanTab('left');
+        final mid = cleanTab('mid');
+        final right = dirtyTab('right');
+        final tabsBloc = await pumpStrip(tester, [left, mid, right], mid, 1);
+
+        await openContextMenu(tester, title: 'NEW REQUEST');
+        await tester.tap(find.text('CLOSE TO THE RIGHT'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('UNSAVED CHANGES'), findsOneWidget);
+        await tester.tap(find.text('CLOSE ANYWAY'));
+        await tester.pumpAndSettle();
+
+        expect(
+          tabsBloc.state.tabs.map((t) => t.tabId),
+          ['left', 'mid'],
+        );
+      },
+    );
+
+    testWidgets(
+      'CLOSE OTHERS with two dirty targets shows the plural confirm message',
+      (tester) async {
+        final left = dirtyTab('left');
+        final mid = cleanTab('mid');
+        final right = dirtyTab('right');
+        final tabsBloc = await pumpStrip(tester, [left, mid, right], mid, 1);
+
+        await openContextMenu(tester, title: 'NEW REQUEST');
+        await tester.tap(find.text('CLOSE OTHERS'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text(
+            '2 TABS HAVE UNSAVED CHANGES. ARE YOU SURE YOU WANT TO '
+            'CLOSE THEM?',
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('CLOSE ANYWAY'));
+        await tester.pumpAndSettle();
+
+        expect(tabsBloc.state.tabs.map((t) => t.tabId), ['mid']);
+      },
+    );
   });
 }

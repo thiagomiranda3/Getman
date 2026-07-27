@@ -1,20 +1,20 @@
 // Tests for the Action callback LOGIC registered by MainScreen.
 //
-// Pumping the real MainScreen is not feasible in widget tests: its transitive
-// tree requires GetIt-registered singletons (WorkspacePulseController,
-// TabDirtyChecker) plus
-// SideMenu / TabContentStack / ChainingWriteBackListener
-// that cannot be provided without running the full DI container, and the
-// theme's ambient ticker never settles so pumpAndSettle would hang.
+// Pumping the real MainScreen IS feasible after all — see
+// main_screen_boot_test.dart, which boots the full DI container into a temp
+// dir and pumps the real MyApp with bounded pumps (never pumpAndSettle, since
+// theme ambient tickers never settle). This file remains valuable as the
+// fast, DI-free unit coverage of each callback's edge cases.
 //
-// Instead, this harness rebuilds each relevant Action callback in a thin
+// This harness rebuilds each relevant Action callback in a thin
 // Actions wrapper with mock blocs in scope — a faithful copy of the exact
 // callbacks in MainScreen._buildMainScreenActions — then invokes the Intent
 // and asserts the expected BLoC event was dispatched.
 //
 // NOTE: this tests the ACTION CALLBACK LOGIC (a verbatim copy), NOT the
 // MainScreen widget itself. The real MainScreen shortcut wiring (keyboard
-// chords → Intents → correct Actions tree) is covered end-to-end by
+// chords → Intents → correct Actions tree) is covered by
+// main_screen_boot_test.dart in-process and end-to-end by
 // integration_test/flows/tab_shortcuts_test.dart.
 
 import 'dart:async';

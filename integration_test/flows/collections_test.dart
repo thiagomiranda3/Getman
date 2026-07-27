@@ -38,14 +38,16 @@ void main() {
     await $('SAVE').tap();
     expect($('Temp'), findsWidgets);
 
-    // Open the (only) node's context menu and delete it (confirm). The node row
-    // is the sole `more_vert` source in the tree, so it being gone afterwards
-    // proves the node was removed.
+    // Open the (only) node's context menu and delete it. Single-request
+    // deletes are instant (no confirm dialog) with an UNDO snackbar (A1). The
+    // node row is the sole `more_vert` source in the tree, so it being gone
+    // afterwards proves the node was removed.
     await $(find.byIcon(Icons.more_vert)).tap();
-    await $('DELETE').tap(); // menu item
-    await $('DELETE').tap(); // confirm dialog
+    await $('DELETE').tap(); // menu item — delete happens immediately
     await $.pumpAndSettle();
 
     expect($(find.byIcon(Icons.more_vert)), findsNothing);
+    expect($(find.textContaining('Deleted')), findsWidgets); // UNDO snackbar
+    expect($('UNDO'), findsWidgets);
   });
 }

@@ -152,6 +152,15 @@ integration_test/
     auth_deep_test.dart             # Basic + API-key (header & query)
     settings_network_test.dart      # history-limit trim + receive-timeout abort
     extras_test.dart                # drag-reorder tabs + clear cookie jar
+    # --- QoL wave 1/2 flows (2026-07-26 pass) ---
+    open_tabs_dropdown_test.dart    # D1: strip dropdown lists/filters/activates tabs
+    tab_strip_double_click_test.dart# PR62: double-click empty strip = new tab
+    tree_search_collapse_test.dart  # D2: method search + collapse-all (disabled in search)
+    history_management_test.dart    # D3: day headers, hover delete/UNDO, clear-all
+    shortcuts_help_test.dart        # E1: Cmd+/ cheat-sheet toggle + CLOSE
+    unresolved_vars_chip_test.dart  # E3: warning chip appears/lists/clears
+    collections_context_menu_test.dart # PR62: right-click node menu rename/delete
+    url_enter_to_send_test.dart     # PR62: Enter in URL field sends (and re-sends)
 ```
 
 Stable test anchors live as intentional `ValueKey`s in `lib/` (e.g.

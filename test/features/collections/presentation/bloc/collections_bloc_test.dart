@@ -1,6 +1,7 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/error/failures.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
 import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
@@ -666,5 +667,236 @@ void main() {
         isNull,
       );
     });
+  });
+
+  group('loading', () {
+    blocTest<CollectionsBloc, CollectionsState>(
+      'LoadCollections emits loading, then the sorted repository tree',
+      build: build,
+      setUp: () {
+        when(() => repo.getCollections()).thenAnswer(
+          (_) async => [
+            leaf('r1', 'Zeta'),
+            folder('f1', 'Alpha'),
+          ],
+        );
+      },
+      act: (bloc) => bloc.add(const LoadCollections()),
+      expect: () => [
+        isA<CollectionsState>().having((s) => s.isLoading, 'isLoading', true),
+        isA<CollectionsState>()
+            .having((s) => s.isLoading, 'isLoading', false)
+            .having(
+              (s) => s.collections.map((n) => n.id),
+              'ids (folders sorted first)',
+              ['f1', 'r1'],
+            ),
+      ],
+    );
+
+    blocTest<CollectionsBloc, CollectionsState>(
+      'LoadCollections failure clears isLoading and keeps the tree — '
+      'never throws',
+      build: build,
+      setUp: () {
+        when(
+          () => repo.getCollections(),
+        ).thenThrow(const PersistenceFailure('box corrupted'));
+      },
+      act: (bloc) => bloc.add(const LoadCollections()),
+      expect: () => [
+        isA<CollectionsState>().having((s) => s.isLoading, 'isLoading', true),
+        isA<CollectionsState>()
+            .having((s) => s.isLoading, 'isLoading', false)
+            .having((s) => s.collections, 'collections', isEmpty),
+      ],
+    );
+  });
+
+  group('handler edges', () {
+    test('UpdateNodeRequest swaps the config on the target node', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      await seed(bloc, [leaf('R', 'R')]);
+
+      bloc.add(
+        const UpdateNodeRequest(
+          'R',
+          HttpRequestConfigEntity(
+            id: 'R',
+            method: 'POST',
+            url: 'https://api.dev/users',
+          ),
+        ),
+      );
+      await bloc.stream.first;
+
+      final node = CollectionsTreeHelper.findNode(bloc.state.collections, 'R')!;
+      expect(node.config?.method, 'POST');
+      expect(node.config?.url, 'https://api.dev/users');
+    });
+
+    test('UpdateNodeRequest is a no-op for an unknown id', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      await seed(bloc, [leaf('R', 'R')]);
+
+      bloc
+        ..add(
+          const UpdateNodeRequest(
+            'ghost',
+            HttpRequestConfigEntity(id: 'ghost'),
+          ),
+        )
+        // No emission expected; poke another event to prove liveness.
+        ..add(const AddFolder('After'));
+      await bloc.stream.first;
+
+      expect(
+        CollectionsTreeHelper.findNode(bloc.state.collections, 'ghost'),
+        isNull,
+      );
+    });
+
+    test('UpdateNodeDescription is a no-op for an unknown id', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      await seed(bloc, [leaf('R', 'R')]);
+
+      bloc
+        ..add(const UpdateNodeDescription('ghost', 'text'))
+        ..add(const AddFolder('After'));
+      await bloc.stream.first;
+
+      expect(
+        CollectionsTreeHelper.findNode(
+          bloc.state.collections,
+          'R',
+        )?.description,
+        isNull,
+      );
+    });
+
+    test('DeleteExample is a no-op when the owning node is missing', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      await seed(bloc, [leaf('R', 'R')]);
+
+      bloc
+        ..add(const DeleteExample('ghost', 'e1'))
+        ..add(const AddFolder('After'));
+      await bloc.stream.first;
+
+      expect(
+        bloc.state.collections.any((n) => n.name == 'After'),
+        isTrue,
+        reason: 'the bloc must stay live after the no-op',
+      );
+    });
+
+    test('RenameExample is a no-op when the owning node is missing', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      await seed(bloc, [leaf('R', 'R')]);
+
+      bloc
+        ..add(const RenameExample('ghost', 'e1', 'New'))
+        ..add(const AddFolder('After'));
+      await bloc.stream.first;
+
+      expect(
+        bloc.state.collections.any((n) => n.name == 'After'),
+        isTrue,
+        reason: 'the bloc must stay live after the no-op',
+      );
+    });
+
+    test(
+      'MoveNode falls back to the root when the destination folder vanished',
+      () async {
+        final bloc = build();
+        addTearDown(bloc.close);
+        await seed(bloc, [
+          folder('A', 'A', children: [leaf('R', 'R')]),
+        ]);
+
+        // Destination deleted since the event was built (e.g. a concurrent
+        // git reload) — the node must land at the root, never be dropped.
+        bloc.add(const MoveNode('R', 'ghost'));
+        await bloc.stream.first;
+
+        expect(
+          bloc.state.collections.map((n) => n.id),
+          contains('R'),
+          reason: 'R should sit at the root, not vanish',
+        );
+        final a = CollectionsTreeHelper.findNode(bloc.state.collections, 'A')!;
+        expect(a.children, isEmpty);
+      },
+    );
+
+    test('AddFolder with a stale parentId falls back to the root', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      await seed(bloc, [folder('A', 'A')]);
+
+      bloc.add(const AddFolder('Orphan', parentId: 'ghost'));
+      await bloc.stream.first;
+
+      expect(
+        bloc.state.collections.any((n) => n.name == 'Orphan' && n.isFolder),
+        isTrue,
+      );
+      expect(
+        CollectionsTreeHelper.findNode(bloc.state.collections, 'A')!.children,
+        isEmpty,
+      );
+    });
+
+    test('ImportCollections with an empty list neither emits nor '
+        'saves', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+      await seed(bloc, [folder('A', 'A')]);
+      clearInteractions(repo);
+
+      bloc.add(const ImportCollections([]));
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      // An empty import must not trigger the immediate (_commitNow) save.
+      verifyNever(() => repo.saveCollections(any()));
+      expect(bloc.state.collections.map((n) => n.id), ['A']);
+
+      // And the bloc stays live.
+      bloc.add(const AddFolder('After'));
+      await bloc.stream.first;
+      expect(bloc.state.collections.any((n) => n.name == 'After'), isTrue);
+    });
+
+    test(
+      'a failing debounced save is logged, never thrown — the bloc keeps '
+      'accepting edits',
+      () async {
+        when(
+          () => repo.saveCollections(any()),
+        ).thenThrow(const PersistenceFailure('disk full'));
+        final bloc = build();
+        addTearDown(bloc.close);
+
+        bloc.add(const AddFolder('One'));
+        await bloc.stream.first;
+        await untilCalled(() => repo.saveCollections(any()));
+        // Give the failed flush a turn to (not) blow up.
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        bloc.add(const AddFolder('Two'));
+        await bloc.stream.first;
+
+        expect(
+          bloc.state.collections.map((n) => n.name),
+          containsAll(<String>['One', 'Two']),
+        );
+      },
+    );
   });
 }
