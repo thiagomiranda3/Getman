@@ -3,7 +3,11 @@
 // verifies the right CollectionsBloc event is dispatched (or that the right
 // dialog appears).
 
+import 'dart:io';
+
+import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
@@ -15,9 +19,23 @@ import 'package:getman/features/collections/domain/usecases/collections_usecases
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/node_action_sheet.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
+import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
+import 'package:getman/features/settings/domain/entities/settings_entity.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockCollectionsRepository extends Mock implements CollectionsRepository {}
+
+class MockEnvironmentsBloc
+    extends MockBloc<EnvironmentsEvent, EnvironmentsState>
+    implements EnvironmentsBloc {}
+
+class MockSettingsBloc extends MockBloc<SettingsEvent, SettingsState>
+    implements SettingsBloc {}
 
 const _folderNode = CollectionNodeEntity(id: 'f1', name: 'My Folder');
 
@@ -51,16 +69,38 @@ Future<CollectionsBloc> openSheet(
     saveDebounce: const Duration(milliseconds: 5),
   );
 
+  // Environments/Settings sit ABOVE the MaterialApp (as in main.dart) so
+  // dialogs opened from the sheet's route (EXPORT AS API DOCS…) can reach
+  // them through the Navigator.
+  final environments = MockEnvironmentsBloc();
+  whenListen(
+    environments,
+    const Stream<EnvironmentsState>.empty(),
+    initialState: const EnvironmentsState(),
+  );
+  final settings = MockSettingsBloc();
+  whenListen(
+    settings,
+    const Stream<SettingsState>.empty(),
+    initialState: const SettingsState(settings: SettingsEntity()),
+  );
+
   await tester.pumpWidget(
-    MaterialApp(
-      theme: brutalistTheme(Brightness.light),
-      home: Scaffold(
-        body: BlocProvider.value(
-          value: bloc,
-          child: Builder(
-            builder: (context) => TextButton(
-              onPressed: () => NodeActionSheet.show(context, node),
-              child: const Text('OPEN'),
+    MultiBlocProvider(
+      providers: [
+        BlocProvider<EnvironmentsBloc>.value(value: environments),
+        BlocProvider<SettingsBloc>.value(value: settings),
+      ],
+      child: MaterialApp(
+        theme: brutalistTheme(Brightness.light),
+        home: Scaffold(
+          body: BlocProvider.value(
+            value: bloc,
+            child: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => NodeActionSheet.show(context, node),
+                child: const Text('OPEN'),
+              ),
             ),
           ),
         ),
@@ -406,6 +446,159 @@ void main() {
 
         // ROOT (TOP LEVEL) is always the first option in the move sheet.
         expect(find.text('ROOT (TOP LEVEL)'), findsOneWidget);
+      },
+    );
+  });
+
+  group('move + export actions', () {
+    testWidgets(
+      'picking a folder in the move sheet moves the node into that folder',
+      (tester) async {
+        final bloc = await openSheet(tester, _leafNode, repo: repo);
+        addTearDown(bloc.close);
+        bloc.add(
+          const ReplaceCollections([
+            CollectionNodeEntity(id: 'dest', name: 'Destination'),
+            _leafNode,
+          ]),
+        );
+        await tester.pump(const Duration(milliseconds: 50));
+
+        await tester.tap(find.text('MOVE TO...'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Destination'));
+        await tester.pumpAndSettle();
+
+        final dest = CollectionsTreeHelper.findNode(
+          bloc.state.collections,
+          'dest',
+        )!;
+        expect(dest.children.map((n) => n.id), contains('r1'));
+        expect(
+          bloc.state.collections.map((n) => n.id),
+          isNot(contains('r1')),
+          reason: 'the request should no longer sit at the root',
+        );
+      },
+    );
+
+    testWidgets(
+      'picking ROOT (TOP LEVEL) in the move sheet moves the node to the root',
+      (tester) async {
+        final bloc = await openSheet(tester, _leafNode, repo: repo);
+        addTearDown(bloc.close);
+        bloc.add(
+          const ReplaceCollections([
+            CollectionNodeEntity(
+              id: 'holder',
+              name: 'Holder',
+              children: [_leafNode],
+            ),
+          ]),
+        );
+        await tester.pump(const Duration(milliseconds: 50));
+
+        await tester.tap(find.text('MOVE TO...'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('ROOT (TOP LEVEL)'));
+        await tester.pumpAndSettle();
+
+        expect(bloc.state.collections.map((n) => n.id), contains('r1'));
+        final holder = CollectionsTreeHelper.findNode(
+          bloc.state.collections,
+          'holder',
+        )!;
+        expect(holder.children, isEmpty);
+      },
+    );
+
+    testWidgets(
+      'the move sheet excludes the moved folder itself from the targets',
+      (tester) async {
+        final bloc = await openSheet(tester, _folderNode, repo: repo);
+        addTearDown(bloc.close);
+        bloc.add(
+          const ReplaceCollections([
+            _folderNode,
+            CollectionNodeEntity(id: 'dest', name: 'Destination'),
+          ]),
+        );
+        await tester.pump(const Duration(milliseconds: 50));
+
+        await tester.tap(find.text('MOVE TO...'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Destination'), findsOneWidget);
+        expect(
+          find.text('My Folder'),
+          findsNothing,
+          reason: 'a folder must not offer itself as a move destination',
+        );
+      },
+    );
+
+    testWidgets('EXPORT AS API DOCS… closes the sheet and opens the dialog', (
+      tester,
+    ) async {
+      final bloc = await openSheet(tester, _folderNode, repo: repo);
+      addTearDown(bloc.close);
+
+      await tester.tap(find.text('EXPORT AS API DOCS…'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('EXPORT AS API DOCS'), findsOneWidget);
+      expect(find.text('OpenAPI 3.0.3 (JSON)'), findsOneWidget);
+    });
+
+    testWidgets(
+      'EXPORT TO POSTMAN writes the collection JSON to the picked path and '
+      'confirms with a snackbar',
+      (tester) async {
+        // Mock the file_picker channel: the "save" dialog picks a temp path.
+        final dir = Directory.systemTemp.createTempSync('getman_sheet_export');
+        addTearDown(() => dir.deleteSync(recursive: true));
+        final savePath = '${dir.path}/my_folder.postman_collection.json';
+        const channel = MethodChannel('miguelruivo.flutter.plugins.filepicker');
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          (call) async => call.method == 'save' ? savePath : null,
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            channel,
+            null,
+          ),
+        );
+
+        final bloc = await openSheet(tester, _folderNode, repo: repo);
+        addTearDown(bloc.close);
+
+        await tester.tap(find.text('EXPORT TO POSTMAN'));
+        await tester.pumpAndSettle();
+        // The export's real file write completes over several event-loop
+        // turns interleaved with fake-async microtask flushes — alternate
+        // (bounded) until the feedback snackbar lands.
+        for (
+          var i = 0;
+          i < 20 && find.byType(SnackBar).evaluate().isEmpty;
+          i++
+        ) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+          await tester.pump();
+        }
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        expect(find.textContaining('Exported to'), findsOneWidget);
+        expect(
+          File(savePath).readAsStringSync(),
+          contains('My Folder'),
+          reason: 'the exported Postman JSON should carry the node name',
+        );
       },
     );
   });
