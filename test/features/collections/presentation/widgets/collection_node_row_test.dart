@@ -1,23 +1,37 @@
+import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/theme/theme_registry.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/collection_node_row.dart';
 import 'package:getman/features/collections/presentation/widgets/node_drag_data.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/tab_drag_data.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockCollectionsRepository extends Mock implements CollectionsRepository {}
 
+class MockTabsBloc extends MockBloc<TabsEvent, TabsState> implements TabsBloc {}
+
+class _FakeTabsEvent extends Fake implements TabsEvent {}
+
 void main() {
   late MockCollectionsRepository repo;
+
+  setUpAll(() {
+    registerFallbackValue(_FakeTabsEvent());
+  });
 
   setUp(() {
     repo = MockCollectionsRepository();
@@ -437,6 +451,325 @@ void main() {
       );
     },
   );
+
+  // Hosts a row under both a CollectionsBloc and a (mock) TabsBloc so leaf
+  // taps can dispatch AddTab.
+  Widget rowHostWithTabs(
+    CollectionsBloc collections,
+    TabsBloc tabs,
+    CollectionNodeEntity node, {
+    VoidCallback onToggle = _noop,
+  }) {
+    return MaterialApp(
+      theme: resolveTheme('brutalist')(Brightness.light, isCompact: false),
+      home: Scaffold(
+        body: MultiBlocProvider(
+          providers: [
+            BlocProvider<CollectionsBloc>.value(value: collections),
+            BlocProvider<TabsBloc>.value(value: tabs),
+          ],
+          child: CollectionNodeRow(
+            node: node,
+            isExpanded: false,
+            depth: 0,
+            onToggle: onToggle,
+            rowWidth: 300,
+            rowHeight: 44,
+          ),
+        ),
+      ),
+    );
+  }
+
+  testWidgets(
+    'tapping a request row opens it in a new tab linked to the node',
+    (tester) async {
+      final bloc = buildBloc();
+      addTearDown(bloc.close);
+      final tabs = MockTabsBloc();
+      addTearDown(tabs.close);
+
+      await tester.pumpWidget(rowHostWithTabs(bloc, tabs, requestNode));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('GetUser'));
+      await tester.pump();
+
+      final added =
+          verify(() => tabs.add(captureAny())).captured.single as AddTab;
+      expect(added.collectionNodeId, 'req-1');
+      expect(added.collectionName, 'GetUser');
+      expect(added.config?.id, 'req-1');
+    },
+  );
+
+  testWidgets(
+    'request with saved examples shows a toggle chevron + example count, and '
+    'the chevron toggles without opening a tab',
+    (tester) async {
+      final bloc = buildBloc();
+      addTearDown(bloc.close);
+      final tabs = MockTabsBloc();
+      addTearDown(tabs.close);
+      var toggled = 0;
+
+      final nodeWithExamples = requestNode.copyWith(
+        examples: [
+          SavedExampleEntity(
+            id: 'e1',
+            name: 'First',
+            capturedAt: DateTime.utc(2026, 7, 26),
+            config: const HttpRequestConfigEntity(id: 'req-1'),
+          ),
+          SavedExampleEntity(
+            id: 'e2',
+            name: 'Second',
+            capturedAt: DateTime.utc(2026, 7, 26),
+            config: const HttpRequestConfigEntity(id: 'req-1'),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        rowHostWithTabs(
+          bloc,
+          tabs,
+          nodeWithExamples,
+          onToggle: () => toggled++,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.keyboard_arrow_right), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.keyboard_arrow_right));
+      await tester.pump();
+
+      expect(toggled, 1);
+      verifyNever(() => tabs.add(any()));
+    },
+  );
+
+  testWidgets(
+    'a request without examples reserves the chevron space but shows none',
+    (tester) async {
+      final bloc = buildBloc();
+      addTearDown(bloc.close);
+      final tabs = MockTabsBloc();
+      addTearDown(tabs.close);
+
+      await tester.pumpWidget(rowHostWithTabs(bloc, tabs, requestNode));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.keyboard_arrow_right), findsNothing);
+      expect(find.byIcon(Icons.keyboard_arrow_down), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'a non-HTTP request shows its protocol label instead of an HTTP method',
+    (tester) async {
+      final bloc = buildBloc();
+      addTearDown(bloc.close);
+      final tabs = MockTabsBloc();
+      addTearDown(tabs.close);
+
+      const wsNode = CollectionNodeEntity(
+        id: 'ws-1',
+        name: 'LiveFeed',
+        isFolder: false,
+        config: HttpRequestConfigEntity(
+          id: 'ws-1',
+          kind: RequestKind.webSocket,
+        ),
+      );
+
+      await tester.pumpWidget(rowHostWithTabs(bloc, tabs, wsNode));
+      await tester.pumpAndSettle();
+
+      expect(find.text('WS'), findsOneWidget);
+      expect(find.text('GET'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'dropping a node onto a folder row moves it into that folder',
+    (tester) async {
+      const folderNode = CollectionNodeEntity(id: 'f1', name: 'Folder1');
+      const draggedId = 'dragged';
+      final tree = <CollectionNodeEntity>[
+        folderNode,
+        const CollectionNodeEntity(
+          id: draggedId,
+          name: 'Dragged',
+          isFolder: false,
+          config: HttpRequestConfigEntity(id: draggedId),
+        ),
+      ];
+      when(() => repo.getCollections()).thenAnswer((_) async => tree);
+      final bloc = buildBloc()..add(const LoadCollections());
+      addTearDown(bloc.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: resolveTheme('brutalist')(Brightness.light, isCompact: false),
+          home: Scaffold(
+            body: BlocProvider<CollectionsBloc>.value(
+              value: bloc,
+              child: const CollectionNodeRow(
+                node: folderNode,
+                isExpanded: false,
+                depth: 0,
+                onToggle: _noop,
+                rowWidth: 300,
+                rowHeight: 44,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final dragTarget = tester.widget<DragTarget<NodeDragData>>(
+        find.byType(DragTarget<NodeDragData>),
+      );
+      dragTarget.onAcceptWithDetails!(
+        DragTargetDetails<NodeDragData>(
+          data: const NodeDragData(draggedId),
+          offset: Offset.zero,
+        ),
+      );
+      // Let MoveNode emit, then fire the debounced-save timer so no timer is
+      // left pending at teardown.
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 3));
+
+      final folder = bloc.state.collections.firstWhere((n) => n.id == 'f1');
+      expect(folder.children.map((c) => c.id), contains(draggedId));
+      expect(
+        bloc.state.collections.map((n) => n.id),
+        isNot(contains(draggedId)),
+      );
+    },
+  );
+
+  testWidgets(
+    'a legal drag over a folder row highlights it and leaving clears it',
+    (tester) async {
+      const folderNode = CollectionNodeEntity(id: 'f1', name: 'Folder1');
+      when(
+        () => repo.getCollections(),
+      ).thenAnswer(
+        (_) async => const [
+          folderNode,
+          CollectionNodeEntity(
+            id: 'other',
+            name: 'Other',
+            isFolder: false,
+            config: HttpRequestConfigEntity(id: 'other'),
+          ),
+        ],
+      );
+      final bloc = buildBloc()..add(const LoadCollections());
+      addTearDown(bloc.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: resolveTheme('brutalist')(Brightness.light, isCompact: false),
+          home: Scaffold(
+            body: BlocProvider<CollectionsBloc>.value(
+              value: bloc,
+              child: const CollectionNodeRow(
+                node: folderNode,
+                isExpanded: false,
+                depth: 0,
+                onToggle: _noop,
+                rowWidth: 300,
+                rowHeight: 44,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final dragTarget = tester.widget<DragTarget<NodeDragData>>(
+        find.byType(DragTarget<NodeDragData>),
+      );
+      dragTarget.onWillAcceptWithDetails!(
+        DragTargetDetails<NodeDragData>(
+          data: const NodeDragData('other'),
+          offset: Offset.zero,
+        ),
+      );
+      await tester.pump();
+      expect(_isBrutalistDropHighlightActive(tester), isTrue);
+
+      dragTarget.onLeave!(const NodeDragData('other'));
+      await tester.pump();
+      expect(_isBrutalistDropHighlightActive(tester), isFalse);
+    },
+  );
+
+  testWidgets(
+    'phone width: long-pressing a row opens the node action sheet',
+    (tester) async {
+      tester.view.physicalSize = const Size(600, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final bloc = buildBloc();
+      addTearDown(bloc.close);
+      final tabs = MockTabsBloc();
+      addTearDown(tabs.close);
+
+      await tester.pumpWidget(rowHostWithTabs(bloc, tabs, requestNode));
+      await tester.pumpAndSettle();
+
+      // Phone rows are not draggable — long-press opens the action sheet.
+      expect(find.byType(Draggable<NodeDragData>), findsNothing);
+
+      await tester.longPress(find.text('GetUser'));
+      // Bounded pumps: let the bottom-sheet entrance animation run.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+      await tester.pump(const Duration(milliseconds: 150));
+      await tester.pump(const Duration(milliseconds: 150));
+
+      expect(find.text('MOVE TO...'), findsOneWidget);
+      expect(find.text('RENAME'), findsOneWidget);
+    },
+  );
+
+  testWidgets('dragging a row shows the drag feedback with the node name', (
+    tester,
+  ) async {
+    final bloc = buildBloc();
+    addTearDown(bloc.close);
+    final tabs = MockTabsBloc();
+    addTearDown(tabs.close);
+
+    await tester.pumpWidget(rowHostWithTabs(bloc, tabs, requestNode));
+    await tester.pumpAndSettle();
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('GetUser')),
+    );
+    await gesture.moveBy(const Offset(40, 40));
+    await tester.pump();
+
+    expect(
+      find.text('GetUser'),
+      findsNWidgets(2),
+      reason: 'row + drag feedback should both show the name mid-drag',
+    );
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text('GetUser'), findsOneWidget);
+  });
 }
 
 /// Whether the brutalist theme's tree-drop highlight is currently active.
