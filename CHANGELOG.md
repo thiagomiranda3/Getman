@@ -5,6 +5,87 @@ All notable changes to **Getman** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-07-27
+
+### Added
+
+- **In-app update install on Windows & Linux** — **UPDATE NOW** now installs
+  the update end-to-end: after a **CLOSE AND UPDATE?** confirmation, the
+  installer downloads to your Downloads folder behind a **DOWNLOADING
+  UPDATE…** dialog, then launches automatically and Getman closes itself
+  (unsaved tabs are flushed first). If the download or the launch fails, the
+  app stays open and tells you where the downloaded file is. macOS keeps the
+  open-in-browser hand-off, since an in-app download would re-trigger the
+  Gatekeeper "damaged" quarantine issue on this unsigned build.
+
+- **Request editor**
+  - **Per-row enable/disable checkboxes for params and headers** — untick a
+    row to keep it in the request but skip it when sending (also skipped in
+    code generation and WebSocket/SSE/MCP connects). Disabled rows round-trip
+    through Postman import/export and the git workspace mirror, and the bulk
+    editor represents them with a `//` prefix.
+  - **Drag-to-reorder and duplicate rows** in the params, headers, and
+    environment-variable editors.
+  - **Auth secrets are masked** — Bearer tokens, Basic passwords, and API
+    keys render obscured with a reveal toggle.
+  - **URL autocomplete** — the URL bar suggests matching URLs from your
+    history and saved collection requests as you type.
+  - **Plain Enter in the URL field sends the request** (HTTP requests only;
+    no-op while a send is already in flight). Everywhere else stays
+    Cmd/Ctrl+Enter.
+
+- **Never lose work**
+  - **Instant delete with UNDO** — deleting a single request, saved example,
+    or history row no longer asks for confirmation; it happens immediately
+    with a 5-second **UNDO** snackbar. Folders, collections, and environments
+    keep the confirmation dialog and gain UNDO too.
+  - **Reopen closed tab (Cmd/Ctrl+Shift+T)** — restores the last 10 closed
+    tabs with their content, response, and panel; discarded dirty edits are
+    recoverable.
+  - **Save all (Cmd/Ctrl+Alt+S)** and a **CLOSE SAVED TABS** action; dirty
+    tabs linked to a saved request offer **REVERT CHANGES**.
+
+- **Response reading**
+  - **Find works everywhere** — a visible find button, searching in PRETTY
+    and RAW body views, filter bars on HEADERS and COOKIES, a filter plus
+    expand/collapse-all in the JSON TREE, and fast windowed search in very
+    large plain-text bodies.
+  - **Copyable header and cookie rows** with a **COPY ALL** action, and a
+    **word-wrap toggle** for the body.
+  - **Media responses** (image/video/audio/PDF/CSV/HTML) gain **SAVE**,
+    **COMPARE**, and **SAVE AS EXAMPLE** (plus **COPY** for CSV/HTML).
+  - **COPY AS BUG REPORT** — copies a ready-to-paste bundle of the request as
+    cURL plus the response, with secrets masked and large bodies truncated.
+
+- **Navigation & discoverability**
+  - **OPEN TABS dropdown** on desktop — a searchable list of every open tab,
+    grouped by panel.
+  - **Collections tree**: search now also matches the HTTP method, a
+    **collapse-all** button, **right-click opens the node context menu at the
+    cursor** (same actions as the "⋮" button), and **double-clicking the tab
+    strip's empty area opens a new tab**.
+  - **History management** — entries show when they were sent, grouped under
+    day headers (TODAY / YESTERDAY / …), with per-row delete and **CLEAR
+    ALL** (both undoable) and a proper first-run empty state.
+  - **Keyboard-shortcuts cheat sheet (Cmd/Ctrl+/)** listing every shortcut;
+    tooltips on buttons now show their shortcut hints.
+  - **Unresolved-variable warning** — a pre-send warning chip appears when
+    the request still contains `{{variables}}` the active environment can't
+    resolve (it never blocks the send).
+
+### Fixed
+
+- **Find bar (Cmd/Ctrl+F) pre-selects the query** — reopening find over a
+  previous query now select-alls it, so typing or pasting replaces it instead
+  of appending.
+
+### Internal
+
+- Major maintainability pass with no user-facing behavior change: a
+  navigation refactor of the docs and code headers, unit/widget test coverage
+  raised from 86.6% to 94.8% (3,244 tests), and the macOS integration suite
+  expanded to 143 flows.
+
 ## [1.9.0] - 2026-07-16
 
 ### Added
