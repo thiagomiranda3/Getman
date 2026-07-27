@@ -9,8 +9,10 @@ import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/features/history/data/models/request_config_model.dart';
 import 'package:getman/features/tabs/data/datasources/tabs_local_data_source.dart';
+import 'package:getman/features/tabs/data/models/panel_model.dart';
 import 'package:getman/features/tabs/data/models/request_tab_model.dart';
 import 'package:getman/features/tabs/data/repositories/tabs_repository_impl.dart';
+import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/entities/response_history_entry.dart';
 import 'package:mocktail/mocktail.dart';
@@ -29,6 +31,14 @@ void main() {
       HttpRequestTabModel(
         config: HttpRequestConfig(id: 'fallback'),
         tabId: 'fallback',
+      ),
+    );
+    registerFallbackValue(
+      PanelModel(
+        id: 'fallback',
+        name: 'fallback',
+        orderedTabIds: const [],
+        activeTabId: '',
       ),
     );
   });
@@ -390,5 +400,183 @@ void main() {
         throwsA(isA<PersistenceFailure>()),
       );
     });
+  });
+
+  group('tab and panel read/write forwarding', () {
+    test('getTabs maps stored models to entities in order', () async {
+      when(() => dataSource.getTabs()).thenAnswer(
+        (_) async => [
+          HttpRequestTabModel(
+            config: HttpRequestConfig.fromEntity(
+              const HttpRequestConfigEntity(id: 'c1', url: 'https://one.dev'),
+            ),
+            tabId: 't1',
+          ),
+          HttpRequestTabModel(
+            config: HttpRequestConfig.fromEntity(
+              const HttpRequestConfigEntity(id: 'c2', url: 'https://two.dev'),
+            ),
+            tabId: 't2',
+          ),
+        ],
+      );
+
+      final tabs = await repository.getTabs();
+
+      expect(tabs.map((t) => t.tabId), ['t1', 't2']);
+      expect(tabs.first.config.url, 'https://one.dev');
+      expect(tabs.last.config.url, 'https://two.dev');
+    });
+
+    test('getActivePanelId forwards the stored id', () async {
+      when(() => dataSource.getActivePanelId()).thenAnswer((_) async => 'p9');
+
+      expect(await repository.getActivePanelId(), 'p9');
+    });
+
+    test('putPanel maps the entity (tabs → ordered tab ids)', () async {
+      when(() => dataSource.putPanel(any())).thenAnswer((_) async {});
+      const panel = PanelEntity(
+        id: 'p1',
+        name: 'Work',
+        tabs: [
+          HttpRequestTabEntity(
+            tabId: 't1',
+            config: HttpRequestConfigEntity(id: 'c1'),
+          ),
+          HttpRequestTabEntity(
+            tabId: 't2',
+            config: HttpRequestConfigEntity(id: 'c2'),
+          ),
+        ],
+        activeTabId: 't2',
+      );
+
+      await repository.putPanel(panel);
+
+      final model =
+          verify(() => dataSource.putPanel(captureAny())).captured.single
+              as PanelModel;
+      expect(model.id, 'p1');
+      expect(model.name, 'Work');
+      expect(model.orderedTabIds, ['t1', 't2']);
+      expect(model.activeTabId, 't2');
+    });
+
+    test('deletePanels and savePanelMeta forward verbatim', () async {
+      when(() => dataSource.deletePanels(any())).thenAnswer((_) async {});
+      when(
+        () => dataSource.savePanelMeta(any(), any()),
+      ).thenAnswer((_) async {});
+
+      await repository.deletePanels(['p1', 'p2']);
+      await repository.savePanelMeta(['p2', 'p1'], 'p2');
+
+      verify(() => dataSource.deletePanels(['p1', 'p2'])).called(1);
+      verify(() => dataSource.savePanelMeta(['p2', 'p1'], 'p2')).called(1);
+    });
+
+    test('panel operations translate PersistenceException into '
+        'PersistenceFailure', () async {
+      when(
+        () => dataSource.getActivePanelId(),
+      ).thenThrow(PersistenceException('boom'));
+      when(
+        () => dataSource.deletePanels(any()),
+      ).thenThrow(PersistenceException('boom'));
+
+      expect(
+        () => repository.getActivePanelId(),
+        throwsA(isA<PersistenceFailure>()),
+      );
+      expect(
+        () => repository.deletePanels(['p1']),
+        throwsA(isA<PersistenceFailure>()),
+      );
+    });
+  });
+
+  group('sendRequest GraphQL variables', () {
+    test(
+      'invalid variables JSON fails as a status-0 NetworkFailure '
+      'and never reaches the network',
+      () async {
+        const config = HttpRequestConfigEntity(
+          id: 'c',
+          method: 'POST',
+          url: 'https://api.dev/graphql',
+          bodyType: BodyType.graphql,
+          body: 'query { me { id } }',
+          graphqlVariables: '{not valid json',
+        );
+
+        await expectLater(
+          () => repository.sendRequest(config),
+          throwsA(
+            isA<NetworkFailure>().having((f) => f.statusCode, 'statusCode', 0),
+          ),
+        );
+        verifyNever(
+          () => networkService.request(
+            url: any(named: 'url'),
+            method: any(named: 'method'),
+            queryParameters: any(named: 'queryParameters'),
+            data: any<dynamic>(named: 'data'),
+            headers: any(named: 'headers'),
+            cancelHandle: any(named: 'cancelHandle'),
+          ),
+        );
+      },
+    );
+  });
+
+  group('sendRequest query assembly', () {
+    test(
+      'duplicate query keys ride through as list values, env-resolved',
+      () async {
+        when(
+          () => networkService.request(
+            url: any(named: 'url'),
+            method: any(named: 'method'),
+            queryParameters: any(named: 'queryParameters'),
+            data: any<dynamic>(named: 'data'),
+            headers: any(named: 'headers'),
+            cancelHandle: any(named: 'cancelHandle'),
+          ),
+        ).thenAnswer(
+          (_) async => const HttpResponseEntity(
+            statusCode: 200,
+            body: '',
+            headers: {},
+            durationMs: 1,
+          ),
+        );
+        const config = HttpRequestConfigEntity(
+          id: 'c',
+          url: 'https://{{host}}/x?k=1&k=2&env={{v}}',
+        );
+
+        await repository.sendRequest(
+          config,
+          envVars: {'host': 'api.dev', 'v': 'resolved'},
+        );
+
+        final captured = verify(
+          () => networkService.request(
+            url: captureAny(named: 'url'),
+            method: any(named: 'method'),
+            queryParameters: captureAny(named: 'queryParameters'),
+            data: any<dynamic>(named: 'data'),
+            headers: any(named: 'headers'),
+            cancelHandle: any(named: 'cancelHandle'),
+          ),
+        ).captured;
+        expect(captured.first, 'https://api.dev/x');
+        expect(captured.last, {
+          'k': ['1', '2'],
+          'env': ['resolved'],
+        });
+      },
+    );
   });
 }
