@@ -1,8 +1,11 @@
 // Widget tests for BodyTabView: the body-type selector switches the active
-// editor and form rows round-trip into config.formFields.
+// editor and form rows round-trip into config.formFields; the NONE hint,
+// the BINARY file picker (mocked platform channel), and the RAW beautify
+// button (both format and no-op outcomes).
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
@@ -10,6 +13,7 @@ import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
@@ -189,14 +193,36 @@ void main() {
   HttpRequestTabEntity tab(
     BodyType type, {
     List<MultipartFieldEntity> fields = const [],
+    String? bodyFilePath,
   }) => HttpRequestTabEntity(
     tabId: 't',
     config: HttpRequestConfigEntity(
       id: 't',
       bodyType: type,
       formFields: fields,
+      bodyFilePath: bodyFilePath,
     ),
   );
+
+  /// Stubs file_picker's platform channel so tapping CHOOSE FILE resolves to
+  /// [files] (each map needs at least name/path/size) — null means the user
+  /// cancelled the native dialog.
+  void mockFilePickerChannel(
+    WidgetTester tester,
+    List<Map<String, Object?>>? files,
+  ) {
+    const channel = MethodChannel('miguelruivo.flutter.plugins.filepicker');
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      channel,
+      (call) async => files,
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        null,
+      ),
+    );
+  }
 
   testWidgets('defaults to RAW with the JSON code editor', (tester) async {
     final bloc = await _loadedBloc(
@@ -373,6 +399,271 @@ void main() {
         '${shortcutHint(AppShortcutAction.beautifyJson, useMeta: true)}',
       ),
       findsOneWidget,
+    );
+  });
+
+  testWidgets('NONE shows the empty-body hint and no editor', (tester) async {
+    final bloc = await _loadedBloc(
+      repository,
+      sendRequestUseCase,
+      tab(BodyType.none),
+    );
+    addTearDown(bloc.close);
+
+    final controller = await _pump(tester, bloc, 't');
+    addTearDown(controller.dispose);
+
+    expect(find.text('THIS REQUEST HAS NO BODY'), findsOneWidget);
+    expect(find.byType(CodeEditor), findsNothing);
+    expect(find.byType(FormDataEditor), findsNothing);
+  });
+
+  group('BINARY body picker', () {
+    testWidgets('with no file selected shows the CHOOSE FILE prompt', (
+      tester,
+    ) async {
+      final bloc = await _loadedBloc(
+        repository,
+        sendRequestUseCase,
+        tab(BodyType.binary),
+      );
+      addTearDown(bloc.close);
+
+      final controller = await _pump(tester, bloc, 't');
+      addTearDown(controller.dispose);
+
+      expect(find.text('NO FILE SELECTED'), findsOneWidget);
+      expect(find.text('CHOOSE FILE'), findsOneWidget);
+    });
+
+    testWidgets('with a saved file path shows its basename and CHANGE FILE', (
+      tester,
+    ) async {
+      final bloc = await _loadedBloc(
+        repository,
+        sendRequestUseCase,
+        tab(BodyType.binary, bodyFilePath: '/tmp/uploads/payload.bin'),
+      );
+      addTearDown(bloc.close);
+
+      final controller = await _pump(tester, bloc, 't');
+      addTearDown(controller.dispose);
+
+      expect(find.text('payload.bin'), findsOneWidget);
+      expect(find.text('CHANGE FILE'), findsOneWidget);
+      expect(find.text('NO FILE SELECTED'), findsNothing);
+    });
+
+    testWidgets('picking a file stores its path on config.bodyFilePath', (
+      tester,
+    ) async {
+      mockFilePickerChannel(tester, [
+        {
+          'name': 'upload.bin',
+          'path': '/tmp/picked/upload.bin',
+          'size': 3,
+          'bytes': null,
+          'identifier': null,
+        },
+      ]);
+      final bloc = await _loadedBloc(
+        repository,
+        sendRequestUseCase,
+        tab(BodyType.binary),
+      );
+      addTearDown(bloc.close);
+
+      final controller = await _pump(tester, bloc, 't');
+      addTearDown(controller.dispose);
+
+      await tester.tap(find.text('CHOOSE FILE'));
+      await tester.pumpAndSettle();
+
+      expect(
+        bloc.state.tabs.byId('t')!.config.bodyFilePath,
+        '/tmp/picked/upload.bin',
+      );
+      expect(find.text('upload.bin'), findsOneWidget);
+      expect(find.text('CHANGE FILE'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 11));
+    });
+
+    testWidgets('a pathless pick (web) explains and stores nothing', (
+      tester,
+    ) async {
+      mockFilePickerChannel(tester, [
+        {
+          'name': 'upload.bin',
+          'path': null,
+          'size': 0,
+          'bytes': null,
+          'identifier': null,
+        },
+      ]);
+      final bloc = await _loadedBloc(
+        repository,
+        sendRequestUseCase,
+        tab(BodyType.binary),
+      );
+      addTearDown(bloc.close);
+
+      final controller = await _pump(tester, bloc, 't');
+      addTearDown(controller.dispose);
+
+      await tester.tap(find.text('CHOOSE FILE'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Binary bodies need the desktop or mobile app.'),
+        findsOneWidget,
+      );
+      expect(bloc.state.tabs.byId('t')!.config.bodyFilePath, isNull);
+
+      await tester.pump(const Duration(seconds: 11));
+    });
+
+    testWidgets('cancelling the native dialog leaves the config untouched', (
+      tester,
+    ) async {
+      mockFilePickerChannel(tester, null);
+      final bloc = await _loadedBloc(
+        repository,
+        sendRequestUseCase,
+        tab(BodyType.binary),
+      );
+      addTearDown(bloc.close);
+
+      final controller = await _pump(tester, bloc, 't');
+      addTearDown(controller.dispose);
+
+      await tester.tap(find.text('CHOOSE FILE'));
+      await tester.pumpAndSettle();
+
+      expect(bloc.state.tabs.byId('t')!.config.bodyFilePath, isNull);
+      expect(find.text('NO FILE SELECTED'), findsOneWidget);
+    });
+  });
+
+  group('RAW beautify button', () {
+    testWidgets('formats valid JSON and confirms via snackbar', (tester) async {
+      const ugly = '{"a":1,"b":[2,3]}';
+      final bloc = await _loadedBloc(
+        repository,
+        sendRequestUseCase,
+        tab(BodyType.raw),
+      );
+      addTearDown(bloc.close);
+
+      final controller = await _pump(tester, bloc, 't');
+      addTearDown(controller.dispose);
+      controller.text = ugly;
+      await tester.pump();
+
+      // prettify hops to a background isolate (compute), which needs the real
+      // event loop — drive the tap and wait for the result under runAsync.
+      String? expected;
+      await tester.runAsync(() async {
+        expected = await JsonUtils.prettify(ugly);
+        await tester.tap(find.widgetWithIcon(IconButton, Icons.auto_fix_high));
+        for (var i = 0; i < 100 && controller.text == ugly; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+      });
+      await tester.pumpAndSettle();
+
+      expect(expected, isNot(ugly));
+      expect(controller.text, expected);
+      expect(find.text('JSON formatted'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 11));
+    });
+
+    testWidgets('leaves non-JSON untouched and says so', (tester) async {
+      const notJson = 'plain text body';
+      final bloc = await _loadedBloc(
+        repository,
+        sendRequestUseCase,
+        tab(BodyType.raw),
+      );
+      addTearDown(bloc.close);
+
+      final controller = await _pump(tester, bloc, 't');
+      addTearDown(controller.dispose);
+      controller.text = notJson;
+      await tester.pump();
+
+      // Non-JSON short-circuits before the isolate hop, so a plain tap works.
+      await tester.tap(find.widgetWithIcon(IconButton, Icons.auto_fix_high));
+      await tester.pumpAndSettle();
+
+      expect(controller.text, notJson);
+      expect(find.text('Already formatted or not valid JSON'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 11));
+    });
+  });
+
+  testWidgets('swapping the body controller rebinds editor + find controller', (
+    tester,
+  ) async {
+    final bloc = await _loadedBloc(
+      repository,
+      sendRequestUseCase,
+      tab(BodyType.raw),
+    );
+    addTearDown(bloc.close);
+
+    final controllerA = CodeLineEditingController();
+    addTearDown(controllerA.dispose);
+    final controllerB = CodeLineEditingController();
+    addTearDown(controllerB.dispose);
+    final variablesController = CodeLineEditingController();
+    addTearDown(variablesController.dispose);
+
+    final settingsBloc = _settingsBloc();
+    addTearDown(settingsBloc.close);
+    final environmentsBloc = _environmentsBloc();
+    addTearDown(environmentsBloc.close);
+    final collectionsBloc = _collectionsBloc();
+    addTearDown(collectionsBloc.close);
+
+    Widget build(CodeLineEditingController controller) => MaterialApp(
+      theme: brutalistTheme(Brightness.light),
+      home: Scaffold(
+        body: MultiBlocProvider(
+          providers: [
+            BlocProvider.value(value: bloc),
+            BlocProvider<SettingsBloc>.value(value: settingsBloc),
+            BlocProvider<EnvironmentsBloc>.value(value: environmentsBloc),
+            BlocProvider<CollectionsBloc>.value(value: collectionsBloc),
+          ],
+          child: BodyTabView(
+            tabId: 't',
+            controller: controller,
+            variablesController: variablesController,
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(build(controllerA));
+    await tester.pumpAndSettle();
+    final before = tester
+        .widget<CodeEditor>(find.byType(CodeEditor))
+        .findController;
+
+    await tester.pumpWidget(build(controllerB));
+    await tester.pumpAndSettle();
+
+    final editor = tester.widget<CodeEditor>(find.byType(CodeEditor));
+    expect(editor.controller, controllerB);
+    expect(
+      editor.findController,
+      isNot(same(before)),
+      reason:
+          'didUpdateWidget must recreate the find controller for the new '
+          'editing controller',
     );
   });
 }

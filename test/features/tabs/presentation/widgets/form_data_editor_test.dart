@@ -1,4 +1,6 @@
-// Widget tests for form-data value-field variable autocomplete.
+// Widget tests for FormDataEditor: value-field variable autocomplete, the
+// file-row toggle + file picking (mocked platform channel), external-update
+// row rebuilds vs echo suppression, row deletion, and contentType survival.
 //
 // Verifies that non-file VALUE fields in FormDataEditor offer {{var}}
 // autocomplete (via VariableTextField) while the KEY/name field remains a
@@ -9,6 +11,7 @@
 // CollectionsBloc + TabsBloc.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
@@ -188,6 +191,36 @@ void main() {
     description: '$hint text field',
   );
 
+  /// Stubs file_picker's platform channel so the row file picker resolves to
+  /// [files] (null = the user cancelled the native dialog).
+  void mockFilePickerChannel(
+    WidgetTester tester,
+    List<Map<String, Object?>>? files,
+  ) {
+    const channel = MethodChannel('miguelruivo.flutter.plugins.filepicker');
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      channel,
+      (call) async => files,
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        null,
+      ),
+    );
+  }
+
+  Future<TabsBloc> loadedWithFields(
+    List<MultipartFieldEntity> fields,
+  ) => _loadedBloc(
+    repository,
+    sendRequestUseCase,
+    HttpRequestTabEntity(
+      tabId: 't',
+      config: HttpRequestConfigEntity(id: 't', formFields: fields),
+    ),
+  );
+
   testWidgets(
     'value field shows variable suggestion when typing {{ho and accepts it',
     (tester) async {
@@ -287,6 +320,256 @@ void main() {
       expect(find.text('host'), findsNothing);
 
       // Flush the debounced-save timer triggered by the name-field onChanged.
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
+
+  testWidgets(
+    'an external formFields update (import/revert) rebuilds the rows',
+    (tester) async {
+      final bloc = await loadedWithFields(
+        const [MultipartFieldEntity(name: 'old', value: '1')],
+      );
+      addTearDown(bloc.close);
+
+      await pumpEditor(tester, bloc);
+      expect(
+        tester.widget<TextField>(fieldByHint('KEY').first).controller?.text,
+        'old',
+      );
+
+      // Simulate a change that did NOT originate from this editor.
+      final tab = bloc.state.tabs.byId('t')!;
+      bloc.add(
+        UpdateTab(
+          tab.copyWith(
+            config: tab.config.copyWith(
+              formFields: const [
+                MultipartFieldEntity(name: 'fresh', value: '9'),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final keyTexts = tester
+          .widgetList<TextField>(fieldByHint('KEY'))
+          .map((w) => w.controller?.text)
+          .toList();
+      expect(keyTexts, ['fresh', '']);
+
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
+
+  testWidgets(
+    'typing does not bounce the rows back through the bloc (echo suppression)',
+    (tester) async {
+      final bloc = await loadedWithFields(const []);
+      addTearDown(bloc.close);
+
+      await pumpEditor(tester, bloc);
+
+      await tester.enterText(fieldByHint('KEY').first, 'token');
+      await tester.pumpAndSettle();
+
+      // The emission round-trips through the bloc; the editor must keep the
+      // live row controllers (text intact, a fresh trailing blank row added)
+      // instead of rebuilding from state mid-keystroke.
+      final keyTexts = tester
+          .widgetList<TextField>(fieldByHint('KEY'))
+          .map((w) => w.controller?.text)
+          .toList();
+      expect(keyTexts, ['token', '']);
+      expect(
+        bloc.state.tabs.byId('t')!.config.formFields,
+        const [MultipartFieldEntity(name: 'token')],
+      );
+
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
+
+  testWidgets(
+    'the file toggle swaps VALUE for a picker and back, keeping the text',
+    (tester) async {
+      final bloc = await loadedWithFields(
+        const [MultipartFieldEntity(name: 'doc', value: 'v1')],
+      );
+      addTearDown(bloc.close);
+
+      await pumpEditor(tester, bloc);
+
+      // → file mode: the row emits as a (pathless) file field.
+      await tester.tap(find.byIcon(Icons.attach_file).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('CHOOSE FILE'), findsOneWidget);
+      expect(
+        bloc.state.tabs.byId('t')!.config.formFields.single,
+        const MultipartFieldEntity(name: 'doc', isFile: true),
+      );
+
+      // → back to text mode: the typed value survives the round trip.
+      await tester.tap(find.byIcon(Icons.text_fields).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('CHOOSE FILE'), findsNothing);
+      expect(
+        bloc.state.tabs.byId('t')!.config.formFields.single,
+        const MultipartFieldEntity(name: 'doc', value: 'v1'),
+      );
+
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
+
+  testWidgets('a stored file row shows the file basename as its label', (
+    tester,
+  ) async {
+    final bloc = await loadedWithFields(
+      const [
+        MultipartFieldEntity(
+          name: 'photo',
+          isFile: true,
+          filePath: '/tmp/shots/holiday.png',
+        ),
+      ],
+    );
+    addTearDown(bloc.close);
+
+    await pumpEditor(tester, bloc);
+
+    expect(find.text('holiday.png'), findsOneWidget);
+    expect(find.text('CHOOSE FILE'), findsNothing);
+  });
+
+  testWidgets('picking a file stores its path and shows its name', (
+    tester,
+  ) async {
+    mockFilePickerChannel(tester, [
+      {
+        'name': 'contract.pdf',
+        'path': '/tmp/picked/contract.pdf',
+        'size': 7,
+        'bytes': null,
+        'identifier': null,
+      },
+    ]);
+    final bloc = await loadedWithFields(
+      const [MultipartFieldEntity(name: 'doc', isFile: true)],
+    );
+    addTearDown(bloc.close);
+
+    await pumpEditor(tester, bloc);
+
+    await tester.tap(find.text('CHOOSE FILE'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('contract.pdf'), findsOneWidget);
+    expect(
+      bloc.state.tabs.byId('t')!.config.formFields.single,
+      const MultipartFieldEntity(
+        name: 'doc',
+        isFile: true,
+        filePath: '/tmp/picked/contract.pdf',
+      ),
+    );
+
+    await tester.pump(const Duration(seconds: 11));
+  });
+
+  testWidgets('a pathless pick (web) explains and stores nothing', (
+    tester,
+  ) async {
+    mockFilePickerChannel(tester, [
+      {
+        'name': 'contract.pdf',
+        'path': null,
+        'size': 0,
+        'bytes': null,
+        'identifier': null,
+      },
+    ]);
+    final bloc = await loadedWithFields(
+      const [MultipartFieldEntity(name: 'doc', isFile: true)],
+    );
+    addTearDown(bloc.close);
+
+    await pumpEditor(tester, bloc);
+
+    await tester.tap(find.text('CHOOSE FILE'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('File uploads need the desktop or mobile app.'),
+      findsOneWidget,
+    );
+    expect(
+      bloc.state.tabs.byId('t')!.config.formFields.single.filePath,
+      isNull,
+    );
+
+    await tester.pump(const Duration(seconds: 11));
+  });
+
+  testWidgets('deleting a named row removes it from config.formFields', (
+    tester,
+  ) async {
+    final bloc = await loadedWithFields(
+      const [
+        MultipartFieldEntity(name: 'a', value: '1'),
+        MultipartFieldEntity(name: 'b', value: '2'),
+      ],
+    );
+    addTearDown(bloc.close);
+
+    await pumpEditor(tester, bloc);
+
+    await tester.tap(find.byIcon(Icons.delete_outline).first);
+    await tester.pumpAndSettle();
+
+    expect(
+      bloc.state.tabs.byId('t')!.config.formFields,
+      const [MultipartFieldEntity(name: 'b', value: '2')],
+    );
+
+    await tester.pump(const Duration(seconds: 11));
+  });
+
+  testWidgets(
+    'an imported content type survives editing the row (re-emit keeps it)',
+    (tester) async {
+      final bloc = await loadedWithFields(
+        const [
+          MultipartFieldEntity(
+            name: 'img',
+            isFile: true,
+            filePath: '/tmp/a/pic.png',
+            contentType: 'image/png',
+          ),
+        ],
+      );
+      addTearDown(bloc.close);
+
+      await pumpEditor(tester, bloc);
+
+      // Rename the field — the re-emitted entity must keep the content type
+      // that came from an import / the workspace mirror.
+      await tester.enterText(fieldByHint('KEY').first, 'image');
+      await tester.pumpAndSettle();
+
+      expect(
+        bloc.state.tabs.byId('t')!.config.formFields.single,
+        const MultipartFieldEntity(
+          name: 'image',
+          isFile: true,
+          filePath: '/tmp/a/pic.png',
+          contentType: 'image/png',
+        ),
+      );
+
       await tester.pump(const Duration(seconds: 11));
     },
   );
