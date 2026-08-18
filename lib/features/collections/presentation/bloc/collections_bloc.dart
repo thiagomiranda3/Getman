@@ -8,7 +8,16 @@
 // orphan it via removeFromTree) and falls back to appending at root if the
 // destination parent vanished since the event was built (e.g. a concurrent
 // git reload) — addToParent itself no-ops on a missing parent rather than
-// erroring.
+// erroring. ReplaceCollections harvests app-only data (saved examples,
+// secret variable values) from the outgoing forest into _localOnlyStore and
+// re-applies it onto the incoming one — the braces behind the callers' own
+// overlayLocalOnly belt (M6 branch round-trip data loss); see
+// _localOnlyStore. Saves are serialized on _saveInFlight (chained-future
+// pattern, same as WorkspaceSyncService._startMirror): _flush has four
+// concurrent triggers (debounce timer, _commitNow, close, flushPendingSaves)
+// and the repository's diff-save must never overlap itself — two saves
+// diffing the same stale _persisted snapshot let a delete land after a
+// re-add, silently dropping the root from disk.
 import 'dart:async';
 import 'dart:developer';
 
@@ -49,6 +58,26 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
   final SaveCollectionsUseCase _saveCollectionsUseCase;
   static const Uuid _uuid = Uuid();
 
+  /// Session-level side-store of app-only data (saved examples, secret
+  /// variable VALUES) harvested from every forest a ReplaceCollections
+  /// throws away — the *braces* behind the callers' overlayLocalOnly *belt*
+  /// (M6): callers overlay from the LIVE forest, so a node absent from it
+  /// (switch to a branch without request R, then switch back) would lose its
+  /// examples/secrets permanently without this store. Keyed by node id.
+  ///
+  /// Memory bound: after every replace, entries for nodes present in the new
+  /// forest are pruned (their data was just restored, or the incoming tree
+  /// legitimately superseded it — either way the live tree is now the
+  /// authority and gets re-harvested on the next replace), so the store only
+  /// ever holds nodes NOT in the live forest. It is in-memory only (dies
+  /// with the session) and LRU-capped at [_localOnlyStoreCap] entries by
+  /// harvest recency, because saved examples can carry large response
+  /// bodies.
+  final Map<String, LocalOnlyNodeData> _localOnlyStore = {};
+
+  /// Max node entries kept in [_localOnlyStore] (LRU by harvest recency).
+  static const int _localOnlyStoreCap = 200;
+
   /// Granular edits (add/rename/move/delete/favorite) emit instantly and persist
   /// the whole tree on a debounce — coalescing a burst of edits into one write
   /// instead of one rewrite per action. Import/Replace flush immediately.
@@ -56,17 +85,48 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
   Timer? _saveTimer;
   bool _pendingSave = false;
 
+  /// Tail of the serialized save chain. [_flush] queues every save behind the
+  /// previous one, because the repository's per-root diff-save snapshots its
+  /// last-persisted map at start and updates it only at the end: two saves
+  /// running concurrently diff against the same stale snapshot, so a save
+  /// that re-adds root X (import/undo) can skip writing it while the earlier
+  /// save's `deleteRoots([X])` lands afterwards — X vanishes from disk with
+  /// no pending save left to restore it.
+  Future<void>? _saveInFlight;
+
   void _scheduleSave() {
     _pendingSave = true;
     _saveTimer?.cancel();
     _saveTimer = Timer(_saveDebounce, _flush);
   }
 
-  /// Persist the current tree if a save is pending. Logged-not-thrown so a
-  /// write failure never blocks the UI (which already reflects the change).
-  Future<void> _flush() async {
+  /// Persist the current tree if a save is pending, serialized behind any
+  /// save already in flight (see [_saveInFlight]). Returns the chain tail, so
+  /// awaiting it awaits every outstanding save, not just the one queued here.
+  Future<void> _flush() {
     _saveTimer?.cancel();
     _saveTimer = null;
+    final previous = _saveInFlight;
+    // _save never throws (PersistenceFailure is caught), so the chain cannot
+    // break mid-sequence.
+    final future = previous == null ? _save() : previous.then((_) => _save());
+    _saveInFlight = future;
+    // Only the *current* tail may clear the field — an older save completing
+    // must not wipe the handle on a save queued after it.
+    unawaited(
+      future.whenComplete(() {
+        if (identical(_saveInFlight, future)) _saveInFlight = null;
+      }),
+    );
+    return future;
+  }
+
+  /// One save pass: re-checks [_pendingSave] and re-reads `state.collections`
+  /// at run time — after the previous save in the chain landed — so a queued
+  /// flush always persists the latest tree (or no-ops if a chained-ahead pass
+  /// already covered it). Logged-not-thrown so a write failure never blocks
+  /// the UI (which already reflects the change).
+  Future<void> _save() async {
     if (!_pendingSave) return;
     _pendingSave = false;
     try {
@@ -404,6 +464,48 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
     ReplaceCollections event,
     Emitter<CollectionsState> emit,
   ) {
-    return _commitNow(emit, event.rootNodes);
+    // Harvest the OUTGOING forest before it is replaced, then overlay the
+    // store onto the incoming one for nodes the caller's own
+    // overlayLocalOnly (run against the live forest) couldn't cover — the
+    // M6 branch round-trip fix. See [_localOnlyStore].
+    _harvestLocalOnly();
+    final next = CollectionsTreeHelper.reapplyLocalOnly(
+      event.rootNodes,
+      _localOnlyStore,
+    );
+    _pruneLocalOnlyStore(next);
+    return _commitNow(emit, next);
+  }
+
+  /// Merges the live forest's app-only data into [_localOnlyStore]. A fresh
+  /// harvest wins over an older entry for the same node; entries for nodes
+  /// absent from the live forest are KEPT (they may be several branch
+  /// switches old and still owed a restore). Re-inserting refreshes LRU
+  /// recency (Dart maps are insertion-ordered), and the oldest entries are
+  /// evicted past [_localOnlyStoreCap].
+  void _harvestLocalOnly() {
+    final harvested = CollectionsTreeHelper.harvestLocalOnly(
+      state.collections,
+    );
+    for (final entry in harvested.entries) {
+      _localOnlyStore
+        ..remove(entry.key)
+        ..[entry.key] = entry.value;
+    }
+    while (_localOnlyStore.length > _localOnlyStoreCap) {
+      _localOnlyStore.remove(_localOnlyStore.keys.first);
+    }
+  }
+
+  /// Drops store entries for every node present in [forest]: its data was
+  /// just restored by reapplyLocalOnly (or the incoming tree legitimately
+  /// superseded it), and a kept entry would let a stale harvest resurrect
+  /// deliberately-deleted data on a later replace. Entries for still-absent
+  /// nodes survive — they are the whole point of the store.
+  void _pruneLocalOnlyStore(List<CollectionNodeEntity> forest) {
+    for (final node in forest) {
+      _localOnlyStore.remove(node.id);
+      _pruneLocalOnlyStore(node.children);
+    }
   }
 }

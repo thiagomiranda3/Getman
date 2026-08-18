@@ -4,7 +4,9 @@
 // working tree the first is mid-way through changing. _onPull bypasses the
 // uniform _run helper because PullOutcome decides which token to bump:
 // reloadToken on a clean pull, conflictToken (never reloadToken) when the
-// rebase halted on a conflict.
+// rebase halted on a conflict. _onResolved is the one never-dropped event:
+// while another op is in flight it bumps reloadToken WITHOUT emitting
+// busy/ready, so the in-flight op's busy guard survives (see its comment).
 import 'dart:developer';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -44,6 +46,14 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
 
   final BranchService _service;
 
+  /// True while another handler holds the bloc — the single definition of
+  /// "in flight" shared by [_dropWhileBusy] and [_onResolved]'s bump-only
+  /// path. `loading` counts too: a status load runs git subprocesses of its
+  /// own.
+  bool get _opInFlight =>
+      state.status == GitSyncStatus.busy ||
+      state.status == GitSyncStatus.loading;
+
   /// Drops an event while another op is in flight — the bloc is effectively
   /// droppable. A second op would run git against a working tree the first one
   /// is mid-way through changing, and whichever finished last would overwrite
@@ -54,10 +64,7 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
   /// terminal (ready/error) state in a try/catch, so neither status can
   /// deadlock.
   bool _dropWhileBusy(String op) {
-    if (state.status != GitSyncStatus.busy &&
-        state.status != GitSyncStatus.loading) {
-      return false;
-    }
+    if (!_opInFlight) return false;
     log('$op ignored: another operation is in flight', name: 'GitSyncBloc');
     return true;
   }
@@ -258,8 +265,9 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
   /// The conflict resolver finished a rebase (RESOLVE & CONTINUE reached
   /// `RebaseStep.done`). Nothing here touches git directly — the resolved
   /// files are already on disk — this only needs to bump `reloadToken` so
-  /// `BranchSyncListener` reloads the merged tree, using the same
-  /// `changedDisk: true` pattern as every other disk-changing op.
+  /// `BranchSyncListener` reloads the merged tree: via the same
+  /// `changedDisk: true` [_run] pattern as every other disk-changing op when
+  /// the bloc is idle, or as a bare token bump when another op is in flight.
   Future<void> _onResolved(
     ConflictsResolved event,
     Emitter<GitSyncState> emit,
@@ -268,8 +276,25 @@ class GitSyncBloc extends Bloc<GitSyncEvent, GitSyncState> {
     // signal that the just-merged tree must be reloaded into Hive. Dropping
     // it because e.g. the 5-minute auto-fetch happened to hold `busy` would
     // leave Hive on the pre-pull forest — and the next mirror would silently
-    // revert the merge on disk. It runs no git subprocess of its own, so
-    // overlapping an in-flight op only interleaves state emissions.
+    // revert the merge on disk. But "never drop" must not mean "run the full
+    // pipeline": _run ends in a terminal `ready`, and emitting that while
+    // another op's git subprocess is still in flight would clear its `busy`
+    // mid-run — re-enabling the UI and defeating _dropWhileBusy, letting a
+    // third op (e.g. a branch switch) race the first over `.git`. So while
+    // an op is in flight, bump `reloadToken` only — the load-bearing signal:
+    // BranchSyncListener listens on the token, never on the status — and
+    // leave the in-flight op's status untouched. That op's own pipeline
+    // still ends in a terminal state, and its follow-up status() read runs
+    // after the merge landed on disk, so nothing else is lost.
+    if (_opInFlight) {
+      log(
+        'resolved during an in-flight op: reloadToken bumped, status left '
+        'to the in-flight op',
+        name: 'GitSyncBloc',
+      );
+      emit(state.copyWith(reloadToken: state.reloadToken + 1));
+      return;
+    }
     await _run(event.root, emit, 'resolved', () async {}, changedDisk: true);
   }
 

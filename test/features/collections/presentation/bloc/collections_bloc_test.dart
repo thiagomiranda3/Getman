@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/error/failures.dart';
+import 'package:getman/features/collections/data/datasources/collections_local_data_source.dart';
+import 'package:getman/features/collections/data/models/collection_node_model.dart';
+import 'package:getman/features/collections/data/repositories/collections_repository_impl.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
 import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
@@ -13,6 +18,43 @@ import 'package:getman/features/collections/presentation/bloc/collections_state.
 import 'package:mocktail/mocktail.dart';
 
 class MockCollectionsRepository extends Mock implements CollectionsRepository {}
+
+/// In-memory data source whose FIRST putRoots call blocks on [putGate] —
+/// lets a test hold save#1 mid-diff while save#2 is triggered (see the
+/// 'save serialization' regression group).
+class _GatedCollectionsDataSource implements CollectionsLocalDataSource {
+  final Map<String, CollectionNode> store = {};
+  final Completer<void> putStarted = Completer<void>();
+  final Completer<void> putGate = Completer<void>();
+  bool _firstPut = true;
+
+  @override
+  Future<List<CollectionNode>> getCollections() async => store.values.toList();
+
+  @override
+  Future<void> saveCollections(List<CollectionNode> collections) async {
+    store
+      ..clear()
+      ..addEntries(collections.map((c) => MapEntry(c.id, c)));
+  }
+
+  @override
+  Future<void> putRoots(List<CollectionNode> roots) async {
+    final hold = _firstPut;
+    _firstPut = false;
+    if (hold) {
+      putStarted.complete();
+      await putGate.future;
+    }
+    for (final r in roots) {
+      store[r.id] = r;
+    }
+  }
+
+  @override
+  Future<void> deleteRoots(Iterable<String> ids) async =>
+      ids.forEach(store.remove);
+}
 
 void main() {
   late MockCollectionsRepository repo;
@@ -385,6 +427,107 @@ void main() {
         isNotNull,
       );
     });
+  });
+
+  group('save serialization (race regression)', () {
+    test(
+      'a flush triggered while a save is in flight never runs the '
+      'repository save concurrently',
+      () async {
+        var active = 0;
+        var maxActive = 0;
+        final gate = Completer<void>();
+        var held = false;
+        when(() => repo.saveCollections(any())).thenAnswer((_) async {
+          active++;
+          if (active > maxActive) maxActive = active;
+          if (!held) {
+            held = true;
+            await gate.future; // hold save#1 mid-write
+          }
+          active--;
+        });
+
+        final bloc = build();
+        addTearDown(bloc.close);
+
+        bloc.add(const AddFolder('One'));
+        await untilCalled(() => repo.saveCollections(any())); // save#1 held
+
+        // Import flushes immediately (_commitNow) — it must chain behind the
+        // held debounce save, not run alongside it.
+        bloc.add(ImportCollections([folder('I', 'Imported')]));
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        gate.complete();
+        await bloc.flushPendingSaves(); // awaits the whole chain tail
+
+        expect(
+          maxActive,
+          1,
+          reason:
+              'overlapping saves diff the repository against the same stale '
+              'persisted snapshot — they must be serialized',
+        );
+      },
+    );
+
+    test(
+      'a root re-added while the save deleting it is in flight survives on '
+      'disk (delete must not land after the skipped re-add)',
+      () async {
+        // Real repository impl over a gate-able data source: flush#1 diffs
+        // {rename Y, delete X} and is held inside putRoots; an import then
+        // re-adds X. Unserialized, flush#2 diffs against the same stale
+        // snapshot (X "unchanged" → not written) and flush#1's
+        // deleteRoots([X]) lands last — X is gone from disk with no pending
+        // save, while the bloc still shows it.
+        final ds = _GatedCollectionsDataSource();
+        final x = folder('X', 'X');
+        final y = folder('Y', 'Y');
+        await ds.saveCollections(
+          [x, y].map(CollectionNode.fromEntity).toList(),
+        );
+        final realRepo = CollectionsRepositoryImpl(ds);
+        final bloc = CollectionsBloc(
+          getCollectionsUseCase: GetCollectionsUseCase(realRepo),
+          saveCollectionsUseCase: SaveCollectionsUseCase(realRepo),
+          saveDebounce: const Duration(milliseconds: 5),
+        );
+        addTearDown(bloc.close);
+
+        bloc.add(const LoadCollections()); // seeds the repo's diff snapshot
+        await bloc.stream.firstWhere((s) => s.collections.length == 2);
+
+        // One debounce burst: a changed root (so flush#1 blocks in putRoots)
+        // plus the delete of X (so flush#1 ends with deleteRoots([X])).
+        bloc
+          ..add(const RenameNode('Y', 'Y2'))
+          ..add(const DeleteNode('X'));
+        await ds.putStarted.future; // flush#1 now held mid-save
+
+        bloc.add(ImportCollections([x])); // re-adds X, flushes immediately
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        ds.putGate.complete(); // release flush#1
+        await bloc.flushPendingSaves();
+        // Give an unserialized flush#1 time to finish its deleteRoots.
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        expect(
+          bloc.state.collections.map((n) => n.id),
+          contains('X'),
+          reason: 'the bloc still shows the re-added root',
+        );
+        expect(
+          ds.store.keys,
+          containsAll(<String>['X', 'Y']),
+          reason:
+              'X was re-added while the save deleting it was in flight — '
+              'it must survive on disk (restart would otherwise lose it)',
+        );
+      },
+    );
   });
 
   group('undo restore (A1)', () {
@@ -898,5 +1041,175 @@ void main() {
         );
       },
     );
+  });
+
+  group('ReplaceCollections local-only store (M6)', () {
+    SavedExampleEntity example(String id) => SavedExampleEntity(
+      id: id,
+      name: 'Example $id',
+      capturedAt: DateTime.fromMillisecondsSinceEpoch(1),
+      config: HttpRequestConfigEntity(id: 'cfg-$id'),
+    );
+
+    /// Replaces the tree and waits for the (immediate) emit — the same shape
+    /// as [seed], named for readability in the round-trip scenarios.
+    Future<void> replace(
+      CollectionsBloc bloc,
+      List<CollectionNodeEntity> nodes,
+    ) async {
+      bloc.add(ReplaceCollections(nodes));
+      await bloc.stream.first;
+    }
+
+    test(
+      'branch round trip restores examples and secret values for a node '
+      'absent from the intermediate forest',
+      () async {
+        final bloc = build();
+        addTearDown(bloc.close);
+
+        // Branch A, live: leaf R has a saved example, folder F a secret value.
+        await seed(bloc, [
+          folder('F', 'API').copyWith(
+            variables: {'base': 'https://api.dev', 'token': 'sk-123'},
+            secretKeys: {'token'},
+          ),
+          leaf('R', 'R').copyWith(examples: [example('ex1')]),
+        ]);
+
+        // Switch to branch B, which has neither R nor F. The caller's
+        // overlayLocalOnly(onDiskB, liveA) is an identity pass here (no
+        // shared ids) — exactly the M6 hole.
+        await replace(bloc, [leaf('other', 'Other')]);
+
+        // Switch back to branch A: R and F return from disk WITHOUT their
+        // app-only data (examples stripped, secret masked to ''), and the
+        // caller's overlay can't help — the live forest is branch B's.
+        await replace(bloc, [
+          folder('F', 'API').copyWith(
+            variables: {'base': 'https://api.dev', 'token': ''},
+            secretKeys: {'token'},
+          ),
+          leaf('R', 'R'),
+        ]);
+
+        final r = CollectionsTreeHelper.findNode(bloc.state.collections, 'R')!;
+        expect(
+          r.examples.map((e) => e.id),
+          ['ex1'],
+          reason: 'the bloc store must restore what the belt overlay missed',
+        );
+        final f = CollectionsTreeHelper.findNode(bloc.state.collections, 'F')!;
+        expect(f.variables, {'base': 'https://api.dev', 'token': 'sk-123'});
+      },
+    );
+
+    test('a node that stays present is untouched by the store', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+
+      await seed(bloc, [
+        folder('F', 'API').copyWith(
+          variables: {'token': 'local-secret'},
+          secretKeys: {'token'},
+        ),
+        leaf('S', 'S').copyWith(examples: [example('ex-old')]),
+      ]);
+
+      // Both nodes survive the replace. The caller's belt overlay already
+      // produced the incoming forest: S carries a FRESHER example and F a
+      // deliberate non-empty upstream secret — the store must not stomp
+      // either with its older harvest.
+      await replace(bloc, [
+        folder('F', 'API').copyWith(
+          variables: {'token': 'upstream'},
+          secretKeys: {'token'},
+        ),
+        leaf('S', 'S').copyWith(examples: [example('ex-new')]),
+      ]);
+
+      final s = CollectionsTreeHelper.findNode(bloc.state.collections, 'S')!;
+      expect(s.examples.map((e) => e.id), ['ex-new']);
+      final f = CollectionsTreeHelper.findNode(bloc.state.collections, 'F')!;
+      expect(f.variables['token'], 'upstream');
+    });
+
+    test(
+      'restored entries are pruned — a deliberate delete is not resurrected '
+      'by a later round trip',
+      () async {
+        final bloc = build();
+        addTearDown(bloc.close);
+
+        await seed(bloc, [
+          leaf('R', 'R').copyWith(examples: [example('ex1')]),
+        ]);
+
+        // Round trip 1: away (harvests R) and back (restores + prunes R).
+        await replace(bloc, [leaf('other', 'Other')]);
+        await replace(bloc, [leaf('R', 'R')]);
+        expect(
+          CollectionsTreeHelper.findNode(
+            bloc.state.collections,
+            'R',
+          )!.examples,
+          isNotEmpty,
+        );
+
+        // The user now deletes the example for good.
+        bloc.add(const DeleteExample('R', 'ex1'));
+        await bloc.stream.first;
+
+        // Round trip 2: R leaves (nothing app-only to harvest) and returns.
+        // A stale, unpruned entry from round trip 1 would resurrect ex1.
+        await replace(bloc, [leaf('other', 'Other')]);
+        await replace(bloc, [leaf('R', 'R')]);
+
+        expect(
+          CollectionsTreeHelper.findNode(
+            bloc.state.collections,
+            'R',
+          )!.examples,
+          isEmpty,
+          reason: 'the prune-on-restore must forget deliberately-deleted data',
+        );
+      },
+    );
+
+    test('the store is LRU-capped at 200 node entries', () async {
+      final bloc = build();
+      addTearDown(bloc.close);
+
+      // 201 leaves, each with one example. Names sort N001..N201, so the
+      // harvest walk (over the sorted forest) inserts them in that order and
+      // the cap evicts the oldest entry: N001.
+      final many = [
+        for (var i = 1; i <= 201; i++)
+          leaf(
+            'N${i.toString().padLeft(3, '0')}',
+            'N${i.toString().padLeft(3, '0')}',
+          ).copyWith(examples: [example('ex-$i')]),
+      ];
+      await seed(bloc, many);
+
+      // Away (harvest all 201, evict the first) and back (bare from disk).
+      await replace(bloc, [leaf('other', 'Other')]);
+      await replace(bloc, [
+        for (final node in many) node.copyWith(examples: []),
+      ]);
+
+      final tree = bloc.state.collections;
+      expect(
+        CollectionsTreeHelper.findNode(tree, 'N001')!.examples,
+        isEmpty,
+        reason: 'the oldest harvest past the 200-entry cap is dropped',
+      );
+      expect(CollectionsTreeHelper.findNode(tree, 'N002')!.examples, [
+        example('ex-2'),
+      ]);
+      expect(CollectionsTreeHelper.findNode(tree, 'N201')!.examples, [
+        example('ex-201'),
+      ]);
+    });
   });
 }

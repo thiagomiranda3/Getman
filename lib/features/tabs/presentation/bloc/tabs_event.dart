@@ -56,12 +56,28 @@ class SetActiveIndex extends TabsEvent {
   List<Object?> get props => [index];
 }
 
+/// Position-based by design (position *is* the operation — see
+/// docs/architecture/tabs-and-panels.md), but anchored to the panel the drag
+/// happened in via [panelId].
 class ReorderTabs extends TabsEvent {
-  const ReorderTabs(this.oldIndex, this.newIndex);
+  const ReorderTabs(this.oldIndex, this.newIndex, {this.panelId});
   final int oldIndex;
   final int newIndex;
+
+  /// The panel whose strip the indices were captured against. Null targets
+  /// the active panel at processing time (the pre-panelId behavior, so
+  /// existing dispatch sites keep working) — but null is only safe when the
+  /// dispatcher cannot race a panel switch; a drag-and-drop strip should
+  /// always name its panel. When [panelId] is set, the reorder applies to
+  /// THAT panel even if the active panel changed mid-drag (Cmd+Shift+],
+  /// Cmd+Shift+T reopen): the indices are only meaningful for the strip they
+  /// were captured on, and reordering it is exactly what the user's drop
+  /// visually promised — applying the same indices to whichever panel is now
+  /// active would silently scramble the wrong panel's tabs. The event is a
+  /// no-op only if the named panel has vanished (its indices point nowhere).
+  final String? panelId;
   @override
-  List<Object?> get props => [oldIndex, newIndex];
+  List<Object?> get props => [oldIndex, newIndex, panelId];
 }
 
 class UpdateTab extends TabsEvent {

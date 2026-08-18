@@ -1,5 +1,7 @@
 // Result entity for an MCP `tools/call`; see class doc below.
 
+import 'dart:convert';
+
 import 'package:equatable/equatable.dart';
 
 /// The result of a `tools/call`. [textBlocks] are the `type: "text"` content
@@ -14,10 +16,24 @@ class McpToolResult extends Equatable {
 
   factory McpToolResult.fromJson(Map<String, dynamic> result) {
     final content = (result['content'] as List?) ?? const [];
-    final raw = content
+    var raw = content
         .whereType<Map<dynamic, dynamic>>()
         .map((m) => m.cast<String, dynamic>())
         .toList();
+    // 2025-06-18 spec (the version Getman negotiates): `content` is optional
+    // when the tool declares an output schema — a result may carry only
+    // `structuredContent`. Synthesize a pretty-printed `type: "text"` block
+    // (feeding both textBlocks and rawBlocks below) so such a result renders
+    // its data instead of "(no content)".
+    final structured = result['structuredContent'];
+    if (raw.isEmpty && structured is Map<dynamic, dynamic>) {
+      raw = [
+        {
+          'type': 'text',
+          'text': const JsonEncoder.withIndent('  ').convert(structured),
+        },
+      ];
+    }
     final text = raw
         .where((m) => m['type'] == 'text')
         .map((m) => (m['text'] as String?) ?? '')

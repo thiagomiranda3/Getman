@@ -31,10 +31,21 @@ void main() {
     expect(a, isNot(equals(c))); // different length → not equal
   });
 
-  test('copyWithBody preserves bodyBytes', () {
+  test('copyWithBody preserves bodyBytes by default', () {
     final bytes = Uint8List.fromList([1, 2, 3]);
     final r = make(bytes: bytes).copyWithBody('placeholder');
     expect(r.body, 'placeholder');
     expect(r.bodyBytes, bytes);
+  });
+
+  test('copyWithBody(keepBytes: false) drops bodyBytes', () {
+    final bytes = Uint8List.fromList([1, 2, 3]);
+    final r = make(bytes: bytes).copyWithBody('placeholder', keepBytes: false);
+    expect(r.body, 'placeholder');
+    // The history downgrade path relies on this to release superseded media
+    // buffers (S5) — status/headers/duration still ride along.
+    expect(r.bodyBytes, isNull);
+    expect(r.statusCode, 200);
+    expect(r.durationMs, 1);
   });
 }

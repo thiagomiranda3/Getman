@@ -663,6 +663,11 @@ void main() {
     });
   });
 
+  // ReorderTabs panel identity (D3) — a panelId-carrying reorder applies to
+  // the panel the indices were captured against, never the now-active one —
+  // lives in tabs_bloc_reorder_panel_test.dart (main() here is at the
+  // function_lines_of_code metric gate).
+
   group('SendRequest', () {
     const response = HttpResponseEntity(
       statusCode: 200,
@@ -1025,6 +1030,11 @@ void main() {
         );
       },
     );
+
+    // The saveLargeResponsesInHistory bodyBytes downgrade (S5) and the
+    // viewedHistoryEntryId identity tracking (G2) are covered in
+    // tabs_bloc_time_travel_test.dart (main() here is at the
+    // function_lines_of_code metric gate).
   });
 
   group('post-response rules', () {

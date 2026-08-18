@@ -5,6 +5,10 @@
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/collections/domain/entities/review_entry.dart';
 
+/// copyWith sentinel: distinguishes "leave [ReviewState.selectedPath] alone"
+/// (omitted) from "explicitly clear it" (passed null — empty review).
+const Object _unset = Object();
+
 enum ReviewStatus {
   initial,
   loading,
@@ -45,17 +49,28 @@ class ReviewState extends Equatable {
     bool? repoExists,
     String? branch,
     List<ReviewEntry>? entries,
-    String? selectedPath,
+    Object? selectedPath = _unset,
     String? errorMessage,
-  }) => ReviewState(
-    status: status ?? this.status,
-    gitAvailable: gitAvailable ?? this.gitAvailable,
-    repoExists: repoExists ?? this.repoExists,
-    branch: branch ?? this.branch,
-    entries: entries ?? this.entries,
-    selectedPath: selectedPath ?? this.selectedPath,
-    errorMessage: errorMessage,
-  );
+  }) {
+    final next = status ?? this.status;
+    return ReviewState(
+      status: next,
+      gitAvailable: gitAvailable ?? this.gitAvailable,
+      repoExists: repoExists ?? this.repoExists,
+      branch: branch ?? this.branch,
+      entries: entries ?? this.entries,
+      selectedPath: identical(selectedPath, _unset)
+          ? this.selectedPath
+          : selectedPath as String?,
+      // Gated on the *resolved* status, not the parameter (sibling-state
+      // rule: git_sync_state, pull_requests_state): an error state copied
+      // without a status (e.g. SelectEntry's copyWith(selectedPath: …))
+      // must keep its message; every non-error emission clears it.
+      errorMessage: next == ReviewStatus.error
+          ? (errorMessage ?? this.errorMessage)
+          : null,
+    );
+  }
 
   @override
   List<Object?> get props => [
