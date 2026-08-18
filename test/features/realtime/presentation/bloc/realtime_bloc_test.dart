@@ -6,6 +6,7 @@ import 'package:getman/core/network/realtime_service.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_event.dart';
+import 'package:getman/features/realtime/presentation/bloc/realtime_state.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockRealtimeService extends Mock implements RealtimeService {}
@@ -84,6 +85,40 @@ void main() {
     bloc.add(const Disconnect('t1'));
     await bloc.stream.firstWhere((s) => !s.sessionFor('t1').connected);
     expect(fake.closed, isTrue);
+  });
+
+  test(
+    'RealtimeTabsClosed closes the connection and drops the session entry',
+    () async {
+      await connect();
+      expect(bloc.state.sessions.containsKey('t1'), isTrue);
+
+      bloc.add(const RealtimeTabsClosed({'t1'}));
+      await bloc.stream.firstWhere((s) => !s.sessions.containsKey('t1'));
+
+      expect(fake.closed, isTrue);
+      expect(
+        bloc.state.sessions.containsKey('t1'),
+        isFalse,
+        reason:
+            'a closed tab has nothing left to show a session for — the '
+            'entry is dropped entirely, not merely marked disconnected',
+      );
+    },
+  );
+
+  test('RealtimeTabsClosed for an id with no session emits nothing', () async {
+    await connect();
+    final emissions = <RealtimeState>[];
+    final sub = bloc.stream.listen(emissions.add);
+
+    bloc.add(const RealtimeTabsClosed({'ghost'}));
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    await sub.cancel();
+
+    expect(emissions, isEmpty, reason: 'no session to drop, no emission');
+    expect(bloc.state.sessions.keys.toList(), ['t1']);
+    expect(fake.closed, isFalse);
   });
 
   test('a close frame marks the session disconnected', () async {

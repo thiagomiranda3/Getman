@@ -1,19 +1,21 @@
 // Coordinator that pushes network-settings changes into the live
-// NetworkService + RealtimeService; see the class doc below for the
-// listenWhen gating and the bloc-decoupling rationale.
+// NetworkService + RealtimeService + McpService; see the class doc below for
+// the listenWhen gating and the bloc-decoupling rationale.
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/network/mcp_service.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/network/realtime_service.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 
-/// Pushes network-related settings into the live [NetworkService] and
-/// [RealtimeService] (SSE) whenever they change. Keeps [SettingsBloc] free of
-/// any dependency on either network service (the coordinating widget holds
-/// both, per the project's bloc-coupling rule). `listenWhen` is gated to the
-/// network fields so unrelated settings keystrokes never touch Dio.
+/// Pushes network-related settings into the live [NetworkService],
+/// [RealtimeService] (SSE), and [McpService] whenever they change. Keeps
+/// [SettingsBloc] free of any dependency on the network services (the
+/// coordinating widget holds them, per the project's bloc-coupling rule).
+/// `listenWhen` is gated to the network fields so unrelated settings
+/// keystrokes never touch Dio.
 class NetworkSettingsListener extends StatelessWidget {
   const NetworkSettingsListener({required this.child, super.key});
   final Widget child;
@@ -39,6 +41,7 @@ class NetworkSettingsListener extends StatelessWidget {
         final config = state.settings.toNetworkConfig();
         context.read<NetworkService>().applyConfig(config);
         context.read<RealtimeService>().applyConfig(config);
+        context.read<McpService>().applyConfig(config);
       },
       child: child,
     );

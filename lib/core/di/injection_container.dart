@@ -302,8 +302,9 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     // registered below, alongside NetworkService, once the cookie store and
     // initial NetworkConfig it needs (H2) are available.
     ..registerLazySingleton(() => RealtimeBloc(service: sl()))
-    // Features - MCP (Model Context Protocol client over Streamable HTTP)
-    ..registerLazySingleton(McpService.new)
+    // Features - MCP (Model Context Protocol client over Streamable HTTP).
+    // McpService itself is registered below, alongside NetworkService, once
+    // the cookie store and initial NetworkConfig it needs are available.
     ..registerLazySingleton(() => McpBloc(service: sl()))
     // Features - Home
     ..registerLazySingleton(() => const TabDirtyChecker())
@@ -343,6 +344,16 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     ..registerLazySingleton(
       () => RealtimeService(
         dio: RealtimeService.buildSseDio(
+          initialSettings.toNetworkConfig(),
+          CookieInterceptor(cookieStore),
+        ),
+      ),
+    )
+    // Same wiring for MCP: SSL verify/proxy/mTLS + cookie jar — a bare Dio
+    // here silently ignored every network setting and stored cookie.
+    ..registerLazySingleton(
+      () => McpService(
+        dio: McpService.buildMcpDio(
           initialSettings.toNetworkConfig(),
           CookieInterceptor(cookieStore),
         ),

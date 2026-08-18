@@ -162,6 +162,53 @@ void main() {
   );
 
   blocTest<McpBloc, McpState>(
+    'McpTabsClosed closes the connection and drops the session entry',
+    build: () {
+      when(
+        () => service.connect(any(), headers: any(named: 'headers')),
+      ).thenAnswer((_) async => conn);
+      return McpBloc(service: service);
+    },
+    act: (b) async {
+      b.add(const McpConnectRequested(tabId: 't1', url: 'https://mcp.dev/'));
+      await Future<void>.delayed(Duration.zero);
+      b.add(const McpTabsClosed({'t1'}));
+    },
+    verify: (b) {
+      verify(() => conn.close()).called(1);
+      expect(
+        b.state.sessions.containsKey('t1'),
+        isFalse,
+        reason:
+            'a closed tab has nothing left to show a session for — the '
+            'entry is dropped entirely, not reset to disconnected',
+      );
+    },
+  );
+
+  blocTest<McpBloc, McpState>(
+    'McpTabsClosed for an id with no session emits nothing',
+    build: () {
+      when(
+        () => service.connect(any(), headers: any(named: 'headers')),
+      ).thenAnswer((_) async => conn);
+      return McpBloc(service: service);
+    },
+    act: (b) async {
+      b.add(const McpConnectRequested(tabId: 't1', url: 'https://mcp.dev/'));
+      await Future<void>.delayed(Duration.zero);
+      b.add(const McpTabsClosed({'ghost'}));
+    },
+    skip: 2, // the connect's connecting + connected emissions
+    expect: () => const <McpState>[],
+    verify: (b) {
+      // t1's live connection is untouched by the ghost close (bloc.close()
+      // tears it down later, so conn.close() can't be verifyNever'd here).
+      expect(b.state.sessions.keys.toList(), ['t1']);
+    },
+  );
+
+  blocTest<McpBloc, McpState>(
     'reconnecting the same tab tears down the previous connection',
     build: () {
       final conn2 = _MockConnection();

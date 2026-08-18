@@ -35,6 +35,7 @@ class RealtimeBloc extends Bloc<RealtimeEvent, RealtimeState> {
     on<Connect>(_onConnect);
     on<SendRealtimeMessage>(_onSend);
     on<Disconnect>(_onDisconnect);
+    on<RealtimeTabsClosed>(_onTabsClosed);
     on<FrameReceived>(_onFrame);
     on<_FramesBatchReceived>(_onFramesBatch);
   }
@@ -58,7 +59,7 @@ class RealtimeBloc extends Bloc<RealtimeEvent, RealtimeState> {
     await _teardown(event.tabId);
     final conn = event.kind == RequestKind.sse
         ? _service.connectSse(event.url, headers: event.headers)
-        : _service.connectWebSocket(event.url);
+        : _service.connectWebSocket(event.url, headers: event.headers);
     _connections[event.tabId] = conn;
     _subs[event.tabId] = conn.frames.listen(
       (f) => _bufferFrame(event.tabId, f),
@@ -79,6 +80,22 @@ class RealtimeBloc extends Bloc<RealtimeEvent, RealtimeState> {
     await _teardown(event.tabId);
     final session = state.sessionFor(event.tabId);
     emit(state.withSession(event.tabId, session.copyWith(connected: false)));
+  }
+
+  /// Closed tabs: tear down their live connections AND drop their session
+  /// entries — a session for a tab that no longer exists is unreachable state
+  /// that only grows (`without` had no caller before this: closing a tab left
+  /// its socket open until app exit).
+  Future<void> _onTabsClosed(
+    RealtimeTabsClosed event,
+    Emitter<RealtimeState> emit,
+  ) async {
+    var next = state;
+    for (final tabId in event.tabIds) {
+      await _teardown(tabId);
+      next = next.without(tabId);
+    }
+    if (!identical(next, state)) emit(next);
   }
 
   /// Buffers a stream frame and arms a single coalescing timer per tab. Frames

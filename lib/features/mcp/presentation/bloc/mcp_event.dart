@@ -29,6 +29,16 @@ class McpDisconnectRequested extends McpEvent {
   List<Object?> get props => [tabId];
 }
 
+/// Request tabs were CLOSED (dispatched by `TabCloseTeardownListener`): tear
+/// down any live connection for these ids and drop their session entries —
+/// unlike [McpDisconnectRequested], no tab remains to show a session for.
+class McpTabsClosed extends McpEvent {
+  const McpTabsClosed(this.tabIds);
+  final Set<String> tabIds;
+  @override
+  List<Object?> get props => [tabIds];
+}
+
 class McpToolSelected extends McpEvent {
   const McpToolSelected({required this.tabId, required this.toolName});
   final String tabId;

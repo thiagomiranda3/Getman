@@ -293,7 +293,7 @@ void main() {
       when(sink.close).thenAnswer((_) async {});
 
       final conn = RealtimeService(
-        webSocketFactory: (_) => channel,
+        webSocketFactory: (_, _) => channel,
       ).connectWebSocket('wss://api.dev/socket');
       final frames = <RealtimeFrame>[];
       conn.frames.listen(frames.add);
@@ -324,7 +324,7 @@ void main() {
         when(sink.close).thenAnswer((_) async {});
 
         final conn = RealtimeService(
-          webSocketFactory: (_) => channel,
+          webSocketFactory: (_, _) => channel,
         ).connectWebSocket('wss://api.dev/socket');
         final frames = <RealtimeFrame>[];
         conn.frames.listen(frames.add);
@@ -349,7 +349,7 @@ void main() {
         when(sink.close).thenAnswer((_) async {});
 
         final conn = RealtimeService(
-          webSocketFactory: (_) => channel,
+          webSocketFactory: (_, _) => channel,
         ).connectWebSocket('wss://api.dev/socket');
         final frames = <RealtimeFrame>[];
         conn.frames.listen(frames.add);

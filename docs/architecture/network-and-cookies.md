@@ -10,11 +10,22 @@ Networking is `dio` (cancel tokens wrapped by `NetworkCancelHandle`). The live c
 
 - A login 302's `Set-Cookie` is captured and re-matched on the next hop.
 - 303 / POST-301/302 become bodyless GETs; 307/308 keep method + body.
-- The `Authorization` header is stripped when a redirect crosses hosts.
+- Credential headers are stripped when a redirect crosses hosts — the full
+  dart:io `nonRedirectHeaders` set (`authorization`, `www-authenticate`,
+  `cookie`, `cookie2`), so a hand-typed `Cookie:` row never follows a
+  redirect to a different host. Jar cookies re-match per hop regardless.
 
 ## Adapter rebuilds, timeouts, mTLS
 
-`applyConfig` (on both `NetworkService` and `RealtimeService`) rebuilds the HTTP adapter **only when an adapter-relevant field changed** (`NetworkConfig.sameAdapterConfig`) and closes the replaced adapter. Timeout/redirect edits mutate `BaseOptions` in place.
+`applyConfig` (on `NetworkService`, `RealtimeService`, AND `McpService` — all three are pushed by `NetworkSettingsListener` and wired with the same adapter + cookie interceptor in DI) rebuilds the HTTP adapter **only when an adapter-relevant field changed** (`NetworkConfig.sameAdapterConfig`) and closes the replaced adapter. Timeout/redirect edits mutate `BaseOptions` in place.
+
+WebSocket connects send the tab's enabled headers with the handshake on
+dart:io platforms (`web_socket_connector_io.dart` → `IOWebSocketChannel`);
+the web stub ignores them (browser API limitation). Closing a request tab
+tears down its live WebSocket/SSE/MCP session via
+`TabCloseTeardownListener` (home feature) → `RealtimeTabsClosed` /
+`McpTabsClosed` — without it a closed tab's socket stayed open (and
+streaming into bloc state) until app exit.
 
 mTLS is the client-certificate trio `clientCertPath` / `clientKeyPath` / `clientCertPassphrase` on `SettingsEntity`/`NetworkConfig`. Cert config is **plain-string data** — never a `dart:io` `SecurityContext`, which is built only inside `dio_adapter_config_io.dart` (guarded with a try/catch fallback; the web stub ignores it). Proxy config lives on `NetworkConfig` and is applied the same way.
 

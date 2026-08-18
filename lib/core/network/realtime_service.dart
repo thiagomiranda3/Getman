@@ -16,6 +16,7 @@ import 'package:getman/core/network/dio_adapter_config.dart';
 import 'package:getman/core/network/network_config.dart';
 import 'package:getman/core/network/realtime_frame.dart';
 import 'package:getman/core/network/sse_parser.dart';
+import 'package:getman/core/network/web_socket_connector.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 /// A live realtime connection (WebSocket or SSE). [frames] is the session log
@@ -28,19 +29,21 @@ abstract class RealtimeConnection {
 
 /// Opens WebSocket / SSE connections.
 ///
-/// WebSocket uses `web_socket_channel` (cross-platform). Custom request headers
-/// are not supported on the browser WebSocket API, so auth on web must use a
-/// query param or subprotocol — documented limitation. SSE streams a Dio
-/// response; on web the XHR adapter may buffer rather than stream
-/// incrementally.
+/// WebSocket uses `web_socket_channel`. On dart:io platforms custom request
+/// headers ride the handshake (see `web_socket_connector_io.dart`); the
+/// browser WebSocket API cannot set them, so auth on web must use a query
+/// param or subprotocol — documented limitation. SSE streams a Dio response;
+/// on web the XHR adapter may buffer rather than stream incrementally.
 class RealtimeService {
   RealtimeService({
     Dio? dio,
-    WebSocketChannel Function(Uri uri)? webSocketFactory,
+    WebSocketChannel Function(Uri uri, Map<String, String> headers)?
+    webSocketFactory,
   }) : _dio = dio ?? buildSseDio(NetworkConfig.defaults),
-       _webSocketFactory = webSocketFactory ?? WebSocketChannel.connect;
+       _webSocketFactory = webSocketFactory ?? connectWebSocketChannel;
   final Dio _dio;
-  final WebSocketChannel Function(Uri uri) _webSocketFactory;
+  final WebSocketChannel Function(Uri uri, Map<String, String> headers)
+  _webSocketFactory;
 
   /// Adapter-relevant config of the last [applyConfig] that rebuilt the
   /// adapter; null until the first swap.
@@ -97,8 +100,10 @@ class RealtimeService {
     if (!identical(_dio.httpClientAdapter, old)) old.close();
   }
 
-  RealtimeConnection connectWebSocket(String url) =>
-      _WebSocketConnection(_webSocketFactory(Uri.parse(url)), url);
+  RealtimeConnection connectWebSocket(
+    String url, {
+    Map<String, String> headers = const {},
+  }) => _WebSocketConnection(_webSocketFactory(Uri.parse(url), headers), url);
 
   RealtimeConnection connectSse(
     String url, {

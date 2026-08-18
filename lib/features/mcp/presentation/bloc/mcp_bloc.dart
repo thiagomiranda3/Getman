@@ -15,6 +15,7 @@ class McpBloc extends Bloc<McpEvent, McpState> {
   McpBloc({required this._service}) : super(const McpState()) {
     on<McpConnectRequested>(_onConnect);
     on<McpDisconnectRequested>(_onDisconnect);
+    on<McpTabsClosed>(_onTabsClosed);
     on<McpToolSelected>(_onToolSelected);
     on<McpToolCallRequested>(_onCallTool);
   }
@@ -80,6 +81,20 @@ class McpBloc extends Bloc<McpEvent, McpState> {
         const McpTabSession(),
       ),
     );
+  }
+
+  /// Closed tabs: tear down their connections AND drop their session entries
+  /// — a session for a tab that no longer exists is unreachable state.
+  Future<void> _onTabsClosed(
+    McpTabsClosed event,
+    Emitter<McpState> emit,
+  ) async {
+    var next = state;
+    for (final tabId in event.tabIds) {
+      await _teardown(tabId);
+      next = next.without(tabId);
+    }
+    if (!identical(next, state)) emit(next);
   }
 
   void _onToolSelected(McpToolSelected event, Emitter<McpState> emit) {

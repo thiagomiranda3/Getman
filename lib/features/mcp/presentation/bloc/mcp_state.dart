@@ -74,6 +74,12 @@ class McpState extends Equatable {
   McpState withSession(String tabId, McpTabSession session) =>
       McpState(sessions: {...sessions, tabId: session});
 
+  /// Drops [tabId]'s session entirely (tab closed — nothing left to show).
+  McpState without(String tabId) {
+    final next = Map<String, McpTabSession>.of(sessions)..remove(tabId);
+    return McpState(sessions: next);
+  }
+
   @override
   List<Object?> get props => [sessions];
 }

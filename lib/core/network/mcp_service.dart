@@ -9,6 +9,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:getman/core/network/dio_adapter_config.dart';
+import 'package:getman/core/network/network_config.dart';
 import 'package:getman/core/network/sse_parser.dart';
 import 'package:getman/features/mcp/domain/entities/mcp_session.dart';
 import 'package:getman/features/mcp/domain/entities/mcp_tool.dart';
@@ -45,19 +47,63 @@ abstract class McpConnection {
 /// Opens MCP connections over Streamable HTTP (JSON-RPC 2.0). Pure `dio`, so it
 /// is web-safe (no `dart:io`). The [Dio] is injectable for tests.
 class McpService {
-  McpService({Dio? dio}) : _dio = dio ?? _buildDio();
+  McpService({Dio? dio}) : _dio = dio ?? buildMcpDio(NetworkConfig.defaults);
   final Dio _dio;
 
-  static Dio _buildDio() => Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 60),
-      // MCP servers may answer with a JSON-RPC error at HTTP 200, or with
-      // 4xx/5xx — read every status so we can surface the body either way.
-      validateStatus: (_) => true,
-      responseType: ResponseType.stream,
-    ),
-  );
+  /// Adapter-relevant config of the last [applyConfig] that rebuilt the
+  /// adapter; null until the first swap.
+  NetworkConfig? _adapterConfig;
+
+  // Wired like RealtimeService.buildSseDio: the same verify-SSL/proxy/mTLS
+  // adapter and (optional) cookie jar interceptor, so a self-signed dev MCP
+  // server or session-cookie auth that works for plain requests and SSE also
+  // works for MCP — a bare Dio here silently ignored every network setting.
+  static Dio buildMcpDio(
+    NetworkConfig config, [
+    Interceptor? cookieInterceptor,
+  ]) {
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 60),
+        // MCP servers may answer with a JSON-RPC error at HTTP 200, or with
+        // 4xx/5xx — read every status so we can surface the body either way.
+        validateStatus: (_) => true,
+        responseType: ResponseType.stream,
+      ),
+    );
+    configureHttpAdapter(
+      dio,
+      verifySsl: config.verifySsl,
+      proxyUrl: config.proxyUrl,
+      clientCertPath: config.clientCertPath,
+      clientKeyPath: config.clientKeyPath,
+      clientCertPassphrase: config.clientCertPassphrase,
+    );
+    if (cookieInterceptor != null) dio.interceptors.add(cookieInterceptor);
+    return dio;
+  }
+
+  /// Re-applies [config] to the live client without rebuilding it — mirrors
+  /// NetworkService/RealtimeService.applyConfig. Only the adapter (SSL/proxy/
+  /// client cert) is touched; interceptors (e.g. the cookie jar) survive.
+  void applyConfig(NetworkConfig config) {
+    if (_adapterConfig != null && _adapterConfig!.sameAdapterConfig(config)) {
+      return;
+    }
+    _adapterConfig = config;
+    final old = _dio.httpClientAdapter;
+    configureHttpAdapter(
+      _dio,
+      verifySsl: config.verifySsl,
+      proxyUrl: config.proxyUrl,
+      clientCertPath: config.clientCertPath,
+      clientKeyPath: config.clientKeyPath,
+      clientCertPassphrase: config.clientCertPassphrase,
+    );
+    // Web stub leaves the adapter untouched (no-op); only close on a real swap.
+    if (!identical(_dio.httpClientAdapter, old)) old.close();
+  }
 
   /// Performs the `initialize` handshake, captures the `Mcp-Session-Id`
   /// header, sends the `notifications/initialized` notification, and returns a

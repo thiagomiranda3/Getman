@@ -204,10 +204,21 @@ class NetworkService {
               return lk == 'content-type' || lk == 'content-length';
             });
           }
-          // Never leak credentials across an origin boundary (dart:io parity).
+          // Never leak credentials across an origin boundary (dart:io
+          // parity): its nonRedirectHeaders strips authorization AND the
+          // cookie headers — a hand-typed `Cookie: session=…` row must not
+          // follow a redirect to a different host any more than a bearer
+          // token does. (Jar cookies are safe either way: the interceptor
+          // re-matches them per hop.)
           if (nextUri.host.toLowerCase() != fromUri.host.toLowerCase()) {
+            const nonRedirectHeaders = {
+              'authorization',
+              'www-authenticate',
+              'cookie',
+              'cookie2',
+            };
             currentHeaders.removeWhere(
-              (k, _) => k.toLowerCase() == 'authorization',
+              (k, _) => nonRedirectHeaders.contains(k.toLowerCase()),
             );
           }
 
