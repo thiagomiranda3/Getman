@@ -245,6 +245,42 @@ void main() {
     );
 
     test(
+      'a later ENABLED duplicate header clears an earlier occurrence’s '
+      'disabled flag (parked-variant-above-live Postman pattern)',
+      () {
+        final source = jsonEncode({
+          'info': {
+            'name': 'dup',
+            'schema':
+                'https://schema.getpostman.com/json/collection/v2.1.0/'
+                'collection.json',
+          },
+          'item': [
+            {
+              'name': 'req',
+              'request': {
+                'method': 'GET',
+                'url': {'raw': 'https://x.y/a'},
+                'header': [
+                  {'key': 'X-Trace', 'value': 'off', 'disabled': true},
+                  {'key': 'X-Trace', 'value': 'on'},
+                ],
+              },
+            },
+          ],
+        });
+        final config = PostmanCollectionMapper.fromJson(
+          source,
+        ).children.first.config!;
+        // The surviving (last) value is the enabled one — it must not
+        // inherit the earlier row's disabled mark, or the header is
+        // silently never sent.
+        expect(config.headers, {'X-Trace': 'on'});
+        expect(config.disabledHeaderKeys, isEmpty);
+      },
+    );
+
+    test(
       'tied rowIndexes export in stable (non-reversed) order (Finding 1)',
       () {
         const leaf = CollectionNodeEntity(

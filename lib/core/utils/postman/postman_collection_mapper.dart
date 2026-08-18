@@ -540,7 +540,15 @@ class PostmanCollectionMapper {
         final value = entry['value'];
         if (key is! String || key.isEmpty) continue;
         result[key] = value is String ? value : (value?.toString() ?? '');
-        if (entry['disabled'] == true) disabled.add(key);
+        // Later occurrences win the flag too: a common Postman shape parks a
+        // disabled variant of a header above the live one — the surviving
+        // (last) value must not inherit the earlier row's disabled mark, or
+        // the imported header is silently never sent.
+        if (entry['disabled'] == true) {
+          disabled.add(key);
+        } else {
+          disabled.remove(key);
+        }
       }
     }
     return (headers: result, disabledKeys: disabled);

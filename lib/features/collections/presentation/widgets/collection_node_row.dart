@@ -114,19 +114,27 @@ class _CollectionNodeRowState extends State<CollectionNodeRow> {
                   padding: EdgeInsets.only(left: indent),
                   child: Row(
                     children: [
-                      context.appMotion.treeExpandFlourish(
-                        context,
-                        expanded: isExpanded,
-                        child: Icon(
-                          isExpanded
-                              ? Icons.keyboard_arrow_down
-                              : Icons.keyboard_arrow_right,
-                          size: layout.smallIconSize,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.5,
+                      // An EMPTY folder gets a blank slot, not a chevron: the
+                      // TreeView's toggleNode is a hard no-op for childless
+                      // nodes (the package forces collapsed + never fires
+                      // onNodeToggle), so a chevron there is a dead control
+                      // implying hidden content that doesn't exist.
+                      if (node.children.isEmpty)
+                        SizedBox(width: layout.smallIconSize)
+                      else
+                        context.appMotion.treeExpandFlourish(
+                          context,
+                          expanded: isExpanded,
+                          child: Icon(
+                            isExpanded
+                                ? Icons.keyboard_arrow_down
+                                : Icons.keyboard_arrow_right,
+                            size: layout.smallIconSize,
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.5,
+                            ),
                           ),
                         ),
-                      ),
                       Icon(
                         node.isFavorite ? Icons.star : Icons.folder,
                         size: layout.iconSize,
