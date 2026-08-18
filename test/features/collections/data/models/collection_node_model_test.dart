@@ -47,7 +47,10 @@ void main() {
           SavedExampleEntity(
             id: 'e1',
             name: '200 OK',
-            capturedAt: DateTime.utc(2026, 6, 14, 14, 32),
+            // Local, like production's DateTime.now() capture stamp —
+            // the round trip must preserve the instant AND come back
+            // local so the 'captured HH:MM' label survives a restart.
+            capturedAt: DateTime(2026, 6, 14, 14, 32),
             config: const HttpRequestConfigEntity(
               id: 'req',
               url: 'https://api/users',
@@ -66,7 +69,8 @@ void main() {
       final example = back.examples.single;
       expect(example.id, 'e1');
       expect(example.name, '200 OK');
-      expect(example.capturedAt, DateTime.utc(2026, 6, 14, 14, 32));
+      expect(example.capturedAt, DateTime(2026, 6, 14, 14, 32));
+      expect(example.capturedAt.isUtc, isFalse);
       expect(example.config.statusCode, 200);
       expect(example.config.responseBody, '{"ok":true}');
       expect(example.config.responseHeaders, {

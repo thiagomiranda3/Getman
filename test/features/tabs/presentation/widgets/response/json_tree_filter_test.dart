@@ -92,9 +92,37 @@ void main() {
         maxRevealed: 2,
       );
       expect(r.matchedPaths, {r'$.x', r'$.x.x_y'});
-      expect(r.ancestorPaths, isEmpty);
+      // The matched container IS in the auto-expand set (overlapping
+      // matchedPaths): excluding it left it collapsed, hiding the deeper
+      // match while the counter still announced it.
+      expect(r.ancestorPaths, {r'$.x'});
       expect(r.matchCount, 2);
       expect(r.truncated, isFalse);
+    });
+
+    test('a match nested under a MATCHED container is auto-expanded into '
+        'view (every match visible, not just counted)', () {
+      final r = filterJsonTree(
+        data: {
+          'data': {
+            'user': {
+              'profile': {'user_id': 42, 'email': 'a@b.c'},
+            },
+            'count': 7,
+          },
+        },
+        query: 'user',
+      );
+      expect(r.matchedPaths, {r'$.data.user', r'$.data.user.profile.user_id'});
+      expect(r.matchCount, 2);
+      expect(r.truncated, isFalse);
+      // The full chain to the deep match auto-expands — INCLUDING the
+      // matched container '$.data.user' itself.
+      expect(r.ancestorPaths, {
+        r'$.data',
+        r'$.data.user',
+        r'$.data.user.profile',
+      });
     });
   });
 

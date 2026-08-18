@@ -121,6 +121,14 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   // ignore: avoid_public_bloc_methods
   bool get canReopenClosedTab => _closedTabs.isNotEmpty;
 
+  /// Persists any dirty tabs NOW. Called by `ExitFlushGuard` when the app is
+  /// about to exit (or its window hides): `close()` — the only other flush of
+  /// the 10 s debounce — never runs on process exit, so quitting inside the
+  /// debounce window silently lost the last edits and responses.
+  // Persistence flush, not a state-mutation entry point (emits nothing).
+  // ignore: avoid_public_bloc_methods
+  Future<void> flushPendingSaves() => _flushDirtyTabs();
+
   /// Push a just-closed tab (with its stored strip position). Dirty tabs
   /// closed via DISCARD arrive with their dirty content — pushed as-is; that
   /// is the point. isSending is sanitized: no request survives the close.

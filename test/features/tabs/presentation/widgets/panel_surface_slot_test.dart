@@ -89,6 +89,9 @@ class _FakeRules extends Fake implements RequestRulesEntity {}
 class _FakeCollectionsBloc extends Bloc<CollectionsEvent, CollectionsState>
     implements CollectionsBloc {
   _FakeCollectionsBloc() : super(CollectionsState());
+
+  @override
+  Future<void> flushPendingSaves() async {}
 }
 
 class _FakeHistoryBloc extends Bloc<HistoryEvent, HistoryState>

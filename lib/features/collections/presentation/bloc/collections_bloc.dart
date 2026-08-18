@@ -82,6 +82,14 @@ class CollectionsBloc extends Bloc<CollectionsEvent, CollectionsState> {
     return super.close();
   }
 
+  /// Persists a pending debounced tree save NOW. Called by `ExitFlushGuard`
+  /// when the app is about to exit (or its window hides): `close()` — the
+  /// only other flush — never runs on process exit, so quitting inside the
+  /// debounce window silently lost the last tree edits.
+  // Persistence flush, not a state-mutation entry point (emits nothing).
+  // ignore: avoid_public_bloc_methods
+  Future<void> flushPendingSaves() => _flush();
+
   /// Append [newNode] to [parentId]'s children, or to the root when [parentId]
   /// is null or refers to a node that no longer exists.
   List<CollectionNodeEntity> _addToTree(
