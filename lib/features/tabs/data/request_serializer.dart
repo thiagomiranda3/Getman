@@ -29,8 +29,11 @@ class RequestSerializer {
   /// explicit `Authorization` / api-key headers are respected (skip-if-set) so
   /// a hand-written header always wins over the AUTH tab.
   ///
-  /// [AuthType.inherit] is treated as a no-op here; parent-collection auth is
-  /// resolved upstream at dispatch time before reaching the send pipeline.
+  /// [AuthType.inherit] is a no-op TODAY — folders have no auth of their own
+  /// yet (`CollectionNodeEntity` has no auth field), so there is nothing to
+  /// inherit and the request goes out unauthenticated. The AUTH tab hint says
+  /// exactly that. When folder-level auth lands (see docs/BACKLOG.md), the
+  /// ancestor walk belongs upstream at dispatch time, not here.
   static void injectAuth({
     required AuthConfig auth,
     required Map<String, String> headers,

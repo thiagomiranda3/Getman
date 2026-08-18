@@ -163,8 +163,19 @@ class CodeGenService {
       case BodyType.multipart:
         for (final f in e.formFields) {
           if (f.name.isEmpty) continue;
-          final v = f.isFile ? '@${f.filePath ?? ''}' : f.value;
-          b.write(" \\\n  --form '${_shellSq('${f.name}=$v')}'");
+          if (f.isFile) {
+            b.write(
+              " \\\n  --form '${_shellSq('${f.name}=@${f.filePath ?? ''}')}'",
+            );
+          } else {
+            // --form-string, not --form: curl reinterprets a leading @/< as
+            // a file reference and a `;type=`/`;filename=` suffix as a hint
+            // in --form values, while the real send path posts the literal
+            // text — the exported snippet must match the wire.
+            b.write(
+              " \\\n  --form-string '${_shellSq('${f.name}=${f.value}')}'",
+            );
+          }
         }
       case BodyType.binary:
         b.write(" \\\n  --data-binary '@${_shellSq(e.binaryPath ?? '')}'");

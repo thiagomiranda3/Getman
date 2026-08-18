@@ -1,20 +1,23 @@
-// Pure scanner for {{var}} tokens that resolve to NOTHING in the supplied
-// variable map — feeds the pre-send warning chip (UnresolvedVarsChip) left
-// of SEND. Scans URL, header keys+values, parked disabled params, raw/
-// graphql bodies (+ graphqlVariables), form-field name+value for
-// urlencoded/multipart bodies, and auth values. Reuses EnvironmentResolver's
-// token grammar (findVariables) and resolution rules (map lookup wins,
-// dynamic built-ins always resolve) — never fork the regex or the rules.
+// Pure scanner for {{var}} tokens that will ship UNRESOLVED on the wire —
+// feeds the pre-send warning chip (UnresolvedVarsChip) left of SEND. Scans
+// only what send actually transmits: URL, ENABLED header keys+values
+// (disabled rows and parked params never ship), raw/graphql bodies
+// (+ graphqlVariables), form-field name+value for urlencoded/multipart
+// bodies, and auth values. Header KEYS are never resolved at send, so any
+// token there counts as unresolved even when defined. Reuses
+// EnvironmentResolver's token grammar (findVariables) and resolution rules
+// (map lookup wins, dynamic built-ins always resolve) — never fork the
+// regex or the rules.
 
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/utils/environment_resolver.dart';
 
-/// Collects the `{{var}}` names a request references that resolve to
-/// nothing. Pure Dart. De-duplicated, first-occurrence order; scan order is
-/// URL, header keys, header values, parked params (key then value per row),
-/// body, graphqlVariables, form fields (name then value per row), auth
-/// values.
+/// Collects the `{{var}}` names a request will ship unresolved. Pure Dart.
+/// De-duplicated, first-occurrence order; scan order is enabled header keys
+/// (always-unresolved — send never resolves keys), then URL, enabled header
+/// values, body, graphqlVariables, form fields (name then value per row),
+/// auth values.
 class UnresolvedVariableCollector {
   const UnresolvedVariableCollector._();
 
@@ -40,11 +43,13 @@ class UnresolvedVariableCollector {
     required HttpRequestConfigEntity config,
     required Map<String, String> variables,
   }) {
+    // Only what actually hits the wire: enabledHeaders (send drops disabled
+    // rows first) and NOT disabledParams (parked rows never ship) — warning
+    // about a row the request won't send is noise, and staying silent about
+    // one it will is a miss.
     final sources = <String>[
       config.url,
-      ...config.headers.keys,
-      ...config.headers.values,
-      for (final param in config.disabledParams) ...[param.key, param.value],
+      ...config.enabledHeaders.values,
       if (_scansBody(config.bodyType)) config.body,
       if (config.bodyType == BodyType.graphql) config.graphqlVariables,
       if (_scansFormFields(config.bodyType))
@@ -54,6 +59,15 @@ class UnresolvedVariableCollector {
 
     final seen = <String>{};
     final unresolved = <String>[];
+    // Header KEYS are deliberately never resolved at send (resolveMap covers
+    // values only — see environments-and-chaining.md), so ANY {{var}} in an
+    // enabled header key ships as a literal, RFC-invalid header name — it is
+    // unresolved on the wire even when the name is defined in the env.
+    for (final key in config.enabledHeaders.keys) {
+      for (final match in EnvironmentResolver.findVariables(key)) {
+        if (seen.add(match.name)) unresolved.add(match.name);
+      }
+    }
     for (final source in sources) {
       for (final match in EnvironmentResolver.findVariables(source)) {
         final name = match.name;

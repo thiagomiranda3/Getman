@@ -1,6 +1,8 @@
 // Unit tests for UnresolvedVariableCollector: every scanned source (URL,
-// header keys+values, parked disabled params, raw/graphql bodies + graphql
-// variables, form-field name+value for urlencoded/multipart, auth values),
+// ENABLED header keys+values, raw/graphql bodies + graphql variables,
+// form-field name+value for urlencoded/multipart, auth values), the
+// never-scanned rows (parked params, disabled headers — they never ship),
+// the always-flagged enabled header KEYS (send never resolves keys),
 // body-type gating, resolved/dynamic exclusion, and cross-source dedup with
 // first-occurrence order.
 
@@ -54,7 +56,7 @@ void main() {
     );
   });
 
-  test('scans parked disabled params (key + value)', () {
+  test('IGNORES parked disabled params — they never hit the wire', () {
     expect(
       collect(
         const HttpRequestConfigEntity(
@@ -64,7 +66,34 @@ void main() {
           ],
         ),
       ),
-      ['pk', 'pv'],
+      isEmpty,
+    );
+  });
+
+  test('IGNORES disabled header rows — send drops them before resolving', () {
+    expect(
+      collect(
+        const HttpRequestConfigEntity(
+          id: 'c',
+          headers: {'X-Off': '{{off}}'},
+          disabledHeaderKeys: {'X-Off'},
+        ),
+      ),
+      isEmpty,
+    );
+  });
+
+  test('flags a {{var}} in an enabled header KEY even when it is defined — '
+      'send never resolves keys, so it ships literally', () {
+    expect(
+      collect(
+        const HttpRequestConfigEntity(
+          id: 'c',
+          headers: {'{{auth-header}}': 'v'},
+        ),
+        {'auth-header': 'X-Api-Key'},
+      ),
+      ['auth-header'],
     );
   });
 

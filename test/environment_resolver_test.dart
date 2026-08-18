@@ -110,11 +110,36 @@ void main() {
       );
     });
 
-    test('does not recursively resolve — replacement values are literal', () {
+    test('recursively resolves nested references (Postman-compatible)', () {
+      // Imported Postman environments commonly nest: baseUrl = {{host}}/api.
       expect(
         EnvironmentResolver.resolve('{{a}}', {'a': '{{b}}', 'b': 'final'}),
-        '{{b}}',
+        'final',
       );
+      expect(
+        EnvironmentResolver.resolve('{{baseUrl}}/users', {
+          'baseUrl': 'https://{{host}}/api',
+          'host': 'example.com',
+        }),
+        'https://example.com/api/users',
+      );
+    });
+
+    test('a nested UNKNOWN name stays verbatim after expansion', () {
+      expect(
+        EnvironmentResolver.resolve('{{a}}', {'a': '{{missing}}'}),
+        '{{missing}}',
+      );
+    });
+
+    test('a reference cycle terminates instead of hanging', () {
+      final out = EnvironmentResolver.resolve('{{a}}', {
+        'a': '{{b}}',
+        'b': '{{a}}',
+      });
+      // Depth-capped: whatever token it lands on, it must still be a token
+      // of the cycle, produced in bounded time.
+      expect(out == '{{a}}' || out == '{{b}}', isTrue);
     });
   });
 

@@ -44,6 +44,24 @@ class CurlUtils {
     '--limit-rate',
     '--resolve',
     '--ciphers',
+    // Common value-taking flags whose FILE argument was mistaken for the
+    // URL when unlisted (`curl -c cookies.txt https://…` imported with
+    // url == 'cookies.txt' — _looksLikeUrl accepts bare domain-ish tokens).
+    '-c',
+    '--cookie-jar',
+    '-D',
+    '--dump-header',
+    '-E',
+    '--config',
+    '-K',
+    '--trace',
+    '--trace-ascii',
+    '--output-dir',
+    '--stderr',
+    '--interface',
+    '--unix-socket',
+    '--proxy-user',
+    '-U',
   };
 
   /// Splits an argument into (flag, inlineValue): a long flag's `=value`

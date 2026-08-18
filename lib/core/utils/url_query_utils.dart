@@ -21,12 +21,12 @@ class UrlParts {
 class UrlQueryUtils {
   UrlQueryUtils._();
 
-  // Mirrors EnvironmentResolver's grammar: optional whitespace inside the
-  // braces and an optional leading $ (dynamic variables like {{$guid}}).
-  // Omitting the $ percent-mangled dynamic tokens on every params edit.
-  static final RegExp _varToken = RegExp(
-    r'\{\{\s*\$?[A-Za-z0-9_\-\.]+\s*\}\}',
-  );
+  // Mirrors EnvironmentResolver's grammar EXACTLY (`[^{}]+?` — names with
+  // spaces/`@`/`:`/unicode and the `$` dynamics are all contractually valid).
+  // A narrower character class here percent-mangled any wider token on every
+  // params edit ({{api key}} → %7B%7Bapi%20key%7D%7D), after which send-time
+  // resolution no longer matched it.
+  static final RegExp _varToken = RegExp(r'\{\{[^{}]+?\}\}');
 
   static UrlParts parse(String url) {
     final hashIndex = url.indexOf('#');
@@ -137,7 +137,12 @@ class UrlQueryUtils {
 
   static String _safeDecode(String input) {
     try {
-      return Uri.decodeComponent(input);
+      // decodeQueryComponent, not decodeComponent: in a query string `+`
+      // means SPACE (the form-encoding convention every browser/curl/server
+      // follows). decodeComponent left `+` literal, and the re-encode then
+      // shipped `%2B` — silently turning "hello world" into "hello+world"
+      // on the wire the moment any params row was edited.
+      return Uri.decodeQueryComponent(input);
     } on Object catch (_) {
       return input;
     }

@@ -143,16 +143,41 @@ void main() {
       expect(out, contains('application/x-www-form-urlencoded'));
     });
 
-    test('multipart body renders --form entries', () {
+    test('multipart text fields render --form-string (no @/< reinterpret)', () {
       const config = HttpRequestConfigEntity(
         id: 'c',
         method: 'POST',
         url: 'https://api.dev/x',
         bodyType: BodyType.multipart,
-        formFields: [MultipartFieldEntity(name: 'field', value: 'v')],
+        formFields: [
+          MultipartFieldEntity(name: 'field', value: 'v'),
+          // curl's --form reads a leading @ as "upload this file"; the send
+          // path posts the literal text, so the export must use --form-string.
+          MultipartFieldEntity(name: 'handle', value: '@ln_miranda'),
+        ],
       );
       final out = CodeGenService.generate(config, CodeGenTarget.curl);
-      expect(out, contains("--form 'field=v'"));
+      expect(out, contains("--form-string 'field=v'"));
+      expect(out, contains("--form-string 'handle=@ln_miranda'"));
+      expect(out, isNot(contains("--form 'handle=@ln_miranda'")));
+    });
+
+    test('multipart FILE fields keep --form with the @path reference', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        method: 'POST',
+        url: 'https://api.dev/x',
+        bodyType: BodyType.multipart,
+        formFields: [
+          MultipartFieldEntity(
+            name: 'doc',
+            isFile: true,
+            filePath: '/tmp/a.pdf',
+          ),
+        ],
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.curl);
+      expect(out, contains("--form 'doc=@/tmp/a.pdf'"));
     });
 
     test('api key in query is appended to the URL', () {

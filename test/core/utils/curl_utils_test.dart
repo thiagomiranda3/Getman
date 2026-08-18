@@ -504,6 +504,21 @@ curl --location 'http://test.com/dynamics/websocket-metric' \
       expect(config.url, 'https://api.dev');
       expect(config.method, 'GET');
     });
+
+    test('value-taking flags like -c/--cookie-jar consume their filename '
+        'instead of it being mistaken for the URL', () {
+      final short = CurlUtils.parse(
+        'curl -c cookies.txt https://api.example.com/login',
+        id: 'a',
+      )!;
+      expect(short.url, 'https://api.example.com/login');
+
+      final long = CurlUtils.parse(
+        'curl --dump-header headers.txt https://api.example.com/login',
+        id: 'b',
+      )!;
+      expect(long.url, 'https://api.example.com/login');
+    });
   });
 
   group('CurlUtils.generate', () {
