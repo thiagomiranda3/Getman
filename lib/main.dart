@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/di/injection_container.dart' as di;
+import 'package:getman/core/navigation/app_messenger.dart';
 import 'package:getman/core/navigation/app_router.dart';
 import 'package:getman/core/navigation/intents.dart';
 import 'package:getman/core/navigation/shortcut_catalog.dart';
@@ -280,6 +281,11 @@ class MyApp extends StatelessWidget {
                         child: MaterialApp.router(
                           title: 'GETMAN',
                           debugShowCheckedModeBanner: false,
+                          // Lets coordinators mounted ABOVE this MaterialApp
+                          // (BranchSyncListener, WorkspaceSyncListener) reach
+                          // a real ScaffoldMessenger for failure snackbars —
+                          // maybeOf(context) is null up there.
+                          scaffoldMessengerKey: appMessengerKey,
                           // Lerping ThemeData triggers ~12 full-tree rebuilds
                           // per theme change. The app's widget tree is too
                           // heavy for that; a single instant rebuild is both

@@ -657,6 +657,47 @@ void main() {
   );
 
   testWidgets(
+    'confirming ABORT REBASE while ConflictBloc is busy dispatches nothing '
+    'and tells the user to retry — the bloc would silently DROP the event, '
+    'leaving the chip armed to misread a later unrelated transition as its '
+    'own abort completing',
+    (tester) async {
+      final conflictStates = StreamController<ConflictState>();
+      addTearDown(conflictStates.close);
+      whenListen(
+        conflictBloc,
+        conflictStates.stream,
+        initialState: const ConflictState(status: ConflictStatus.resolving),
+      );
+
+      await tester.pumpWidget(host(rebasePausedState));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('rebase_paused_chip')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('rebase_menu_abort')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'ABORT REBASE'));
+      await tester.pumpAndSettle();
+
+      verifyNever(() => conflictBloc.add(const AbortRebase(root)));
+      expect(
+        find.textContaining('Another git operation is running'),
+        findsOneWidget,
+      );
+
+      // The in-flight op (e.g. a dialog-driven resolve) finishing must NOT
+      // read as "the abort completed" — the chip never dispatched one.
+      conflictStates.add(const ConflictState(status: ConflictStatus.done));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Rebase aborted.'), findsNothing);
+
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
     'a chip-initiated abort completing shows the snackbar and re-reads the '
     'branch status',
     (tester) async {

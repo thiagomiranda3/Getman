@@ -252,13 +252,25 @@ class _IoWorkspaceDataSource implements WorkspaceCollectionsDataSource {
     // Honor the recorded order first; append anything new found on disk.
     // Order entries are plain slugs, so resolve each against both kinds — a
     // merge-produced folder/file slug collision means one entry names two
-    // nodes, and both must survive.
+    // nodes, and both must survive. Resolution falls back to a
+    // case-insensitive match (exact wins): a case-insensitive filesystem
+    // (macOS/Windows defaults) can hold "Login.req.json" while the manifest
+    // records "login" — the same drift the reconcile pass above tolerates —
+    // and an exact-only lookup would silently drop the entry's recorded
+    // position, dumping it into the appended-at-the-end bucket.
     final result = <CollectionNodeEntity>[];
     final used = <String>{};
+    final byLowerKey = <String, String>{
+      for (final key in discovered) key.toLowerCase(): key,
+    };
     for (final slug in order) {
       for (final key in ['d:$slug', 'f:$slug']) {
-        final node = byKey[key];
-        if (node != null && used.add(key)) result.add(node);
+        final resolved = byKey.containsKey(key)
+            ? key
+            : byLowerKey[key.toLowerCase()];
+        if (resolved == null) continue;
+        final node = byKey[resolved];
+        if (node != null && used.add(resolved)) result.add(node);
       }
     }
     for (final key in discovered) {

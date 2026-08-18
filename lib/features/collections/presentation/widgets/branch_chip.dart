@@ -370,6 +370,18 @@ class _BranchChipState extends State<BranchChip> {
                 'the pull? Conflict resolutions made so far are discarded.',
             confirmLabel: 'ABORT REBASE',
             onConfirm: () {
+              // ConflictBloc silently DROPS events while an op is in flight
+              // (_dropWhileBusy). Arming _abortingViaChip for a dropped event
+              // would leave it stuck true, and the next unrelated done/error
+              // transition would fire a phantom "Rebase aborted." — so tell
+              // the user to retry instead of dispatching into the void.
+              if (conflictBloc.state.isBusy) {
+                showAppSnackBar(
+                  context,
+                  'Another git operation is running — try again in a moment.',
+                );
+                return;
+              }
               _abortingViaChip = true;
               conflictBloc.add(AbortRebase(root));
             },

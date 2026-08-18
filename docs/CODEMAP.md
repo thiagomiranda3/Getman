@@ -39,7 +39,7 @@ widgets + screens). Shared cross-feature code lives under `lib/core/`. See
 | `lib/core/domain/entities` | Shared entities used by >1 feature. | `request_config_entity.dart`, `auth_config.dart`, `body_type.dart`, `multipart_field_entity.dart` |
 | `lib/core/error` | Failure / Exception hierarchy. | `failures.dart`, `exceptions.dart`, `guard.dart` |
 | `lib/core/git` | Abstract `git`/`gh` CLI gateways (+ io/stub impls). | `git_service.dart`, `git_service_io.dart`, `gh_service.dart`, `gh_output_parser.dart` |
-| `lib/core/navigation` | Router + keyboard intents + shortcut labels. | `app_router.dart`, `intents.dart`, `url_focus_registry.dart`, `shortcut_catalog.dart` |
+| `lib/core/navigation` | Router + keyboard intents + shortcut labels. | `app_router.dart`, `intents.dart`, `url_focus_registry.dart`, `shortcut_catalog.dart`, `app_messenger.dart` (root ScaffoldMessenger key for coordinators above MaterialApp) |
 | `lib/core/network` | Dio client, cookies, realtime, MCP transport. | `network_service.dart`, `realtime_service.dart`, `mcp_service.dart`, `cookie_interceptor.dart`, `web_socket_connector.dart` (io/stub: WS handshake headers on desktop) |
 | `lib/core/storage` | Hive box-name constants + helpers. | `hive_boxes.dart`, `hive_helpers.dart` |
 | `lib/core/theme` | Theme registry + responsive tiers. | `theme_registry.dart`, `theme_ids.dart`, `responsive.dart`, `app_theme.dart` |

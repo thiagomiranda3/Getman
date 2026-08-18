@@ -13,6 +13,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/navigation/app_messenger.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
@@ -53,9 +54,12 @@ class BranchSyncListener extends StatelessWidget {
         // by the time a failed read needs to surface its snackbar. maybeOf,
         // NOT of: this listener mounts ABOVE MaterialApp in main.dart, so no
         // ScaffoldMessenger ancestor exists there and `.of` would throw on
-        // EVERY reload. With no messenger the failure degrades to debugPrint
+        // EVERY reload. Production reaches the app's root messenger via
+        // appMessengerKey instead; only if that too is absent (first-frame
+        // edge, bare test harness) does the failure degrade to debugPrint
         // (same contract as WorkspaceSyncListener's boot-import failure path).
-        final messenger = ScaffoldMessenger.maybeOf(context);
+        final messenger =
+            ScaffoldMessenger.maybeOf(context) ?? appMessengerKey.currentState;
         // Snapshot the saved configs *before* the reload so we can tell open
         // tabs that were untouched (safe to refresh) from those the user has
         // edited (must not be clobbered).

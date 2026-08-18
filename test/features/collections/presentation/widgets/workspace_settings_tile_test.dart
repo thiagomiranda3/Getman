@@ -345,10 +345,12 @@ void main() {
     );
 
     testWidgets(
-      'a failed mirror flush aborts CHOOSE FOLDER — nothing read, '
-      'nothing connected',
+      'a failed mirror flush aborts CHOOSE FOLDER when re-picking the '
+      'CURRENT folder — nothing read, nothing connected',
       (tester) async {
-        mockDirectoryPicker(tester, '/picked/ws');
+        // Same path as the connected workspace ('/tmp/ws' in setUp): a
+        // half-written tree there is exactly what the read must not walk.
+        mockDirectoryPicker(tester, '/tmp/ws');
         sync.flushResult = false;
 
         await pump(tester);
@@ -362,6 +364,28 @@ void main() {
           find.textContaining('Could not write the workspace'),
           findsOne,
         );
+      },
+    );
+
+    testWidgets(
+      'a failed flush does NOT veto choosing a DIFFERENT folder — the '
+      'failure only poisons the old root, and blocking here would wedge '
+      'the user on an unwritable workspace',
+      (tester) async {
+        mockDirectoryPicker(tester, '/picked/ws');
+        sync.flushResult = false;
+
+        await pump(tester);
+        await tester.tap(find.text('CHOOSE FOLDER'));
+        await tester.pumpAndSettle();
+
+        // Empty on-disk folder → export + connect, exactly as with a
+        // healthy flush.
+        expect(sync.calls, ['flushPending', 'read']);
+        verify(
+          () => settingsBloc.add(const UpdateWorkspacePath('/picked/ws')),
+        ).called(1);
+        expect(find.text('Workspace connected'), findsOneWidget);
       },
     );
 

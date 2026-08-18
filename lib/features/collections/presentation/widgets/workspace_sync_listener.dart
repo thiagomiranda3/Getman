@@ -24,6 +24,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/core/navigation/app_messenger.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
@@ -122,9 +123,11 @@ class _WorkspaceSyncListenerState extends State<WorkspaceSyncListener> {
     final collections = context.read<CollectionsBloc>();
     final settings = context.read<SettingsBloc>();
     // maybeOf, not of: in production this widget sits ABOVE MaterialApp, so
-    // there is no ScaffoldMessenger to surface a failed read through — fall
-    // back to a log. (Tests host it under a Scaffold and assert the snackbar.)
-    final messenger = ScaffoldMessenger.maybeOf(context);
+    // there is no ScaffoldMessenger ancestor — reach the app's root messenger
+    // via appMessengerKey instead, degrading to a log only if that too is
+    // absent. (Tests host it under a Scaffold and assert the snackbar.)
+    final messenger =
+        ScaffoldMessenger.maybeOf(context) ?? appMessengerKey.currentState;
     try {
       await sync.withMirroringSuspended(() async {
         final List<CollectionNodeEntity> onDisk;

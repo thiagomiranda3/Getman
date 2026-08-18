@@ -160,6 +160,29 @@ void main() {
     });
   });
 
+  test('a case-mismatched order-manifest entry still positions its node — '
+      'not dumped into the appended-at-the-end bucket', () async {
+    // Disk holds capitalized names (e.g. a case-only rename landed via git
+    // on a case-insensitive filesystem) while the manifest recorded the
+    // lower-case slugs the mirror wrote.
+    File('${tmp.path}/Zeta.req.json').writeAsStringSync(
+      '{"id":"z","name":"Zeta","request":{"id":"z","url":"https://z.dev"}}',
+    );
+    File('${tmp.path}/alpha.req.json').writeAsStringSync(
+      '{"id":"a","name":"alpha","request":{"id":"a","url":"https://a.dev"}}',
+    );
+    Directory('${tmp.path}/.getman').createSync();
+    File('${tmp.path}/.getman/workspace.json').writeAsStringSync(
+      '{"version":1,"rootOrder":["zeta","alpha"]}',
+    );
+
+    final back = await ds.read(tmp.path);
+
+    // An exact-only lookup missed "zeta" and appended Zeta AFTER alpha,
+    // silently reordering the tree on every such read.
+    expect(back.map((n) => n.name).toList(), ['Zeta', 'alpha']);
+  });
+
   test('a folder dir and a request file sharing one slug both survive a read '
       '(clean git merge shape)', () async {
     Directory('${tmp.path}/foo').createSync();

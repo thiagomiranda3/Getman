@@ -145,11 +145,18 @@ class WorkspaceSettingsTile extends StatelessWidget {
     final settings = context.read<SettingsBloc>();
     final messenger = ScaffoldMessenger.of(context);
 
-    // Land any pending mirror write first, or abort: re-picking the
-    // CURRENTLY connected folder (e.g. to restore a macOS bookmark) while a
+    // Land any pending mirror write first: re-picking the CURRENTLY
+    // connected folder (e.g. to restore a macOS bookmark) while a
     // debounced/in-flight write is still rewriting it would let the read
     // below walk a half-written tree and import a mixed old/new forest.
-    if (!await sync.flushPending()) {
+    // A failed flush only poisons THAT root — mirrors never target any
+    // other folder — so it aborts only when re-picking the same path.
+    // Vetoing a DIFFERENT folder would wedge the user: the flush failing
+    // usually means the old folder is unwritable, which is exactly when
+    // they need to switch away from it.
+    final flushed = await sync.flushPending();
+    final currentPath = settings.state.settings.workspacePath;
+    if (!flushed && picked.path == currentPath) {
       showAppSnackBarVia(
         messenger,
         'Could not write the workspace to disk — workspace not connected. '
