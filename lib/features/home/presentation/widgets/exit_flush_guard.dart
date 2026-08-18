@@ -7,6 +7,7 @@ import 'dart:ui';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 
@@ -50,6 +51,11 @@ class _ExitFlushGuardState extends State<ExitFlushGuard> {
   Future<void> _flushAll() => Future.wait([
     context.read<TabsBloc>().flushPendingSaves(),
     context.read<CollectionsBloc>().flushPendingSaves(),
+    // The workspace MIRROR too, not just Hive: its own 1 s debounce means a
+    // quit right after a tree edit would persist the edit to Hive but not
+    // to the git workspace on disk — and the boot import merges DISK-wins,
+    // so the un-mirrored edit would be deleted at next launch.
+    context.read<WorkspaceSyncService>().flushPending(),
   ]);
 
   @override

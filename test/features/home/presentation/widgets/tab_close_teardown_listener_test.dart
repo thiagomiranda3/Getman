@@ -1,9 +1,10 @@
 // Widget tests for TabCloseTeardownListener: when tab ids disappear from
 // TabsBloc's panels (close, close-others, panel close), it dispatches
-// RealtimeTabsClosed / McpTabsClosed for the closed ids that hold a live
-// realtime/MCP session — and stays silent for moves between panels (same id
-// union) and for closed tabs with no session. Recording fakes capture the
-// exact events dispatched.
+// RealtimeTabsClosed / McpTabsClosed carrying EVERY closed id — session or
+// not: a realtime connect emits no session until its first frame batch, so a
+// session-keyed filter would skip exactly the tab closed mid-connect and
+// leak its socket into a ghost session. Moves between panels (same id union)
+// stay silent. Recording fakes capture the exact events dispatched.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -110,8 +111,8 @@ void main() {
   }
 
   testWidgets(
-    'closing a tab with a realtime session dispatches RealtimeTabsClosed '
-    'for it — and leaves an McpBloc whose sessions all survive alone',
+    'closing a tab with a realtime session dispatches both teardown events '
+    'for exactly that id',
     (tester) async {
       await pumpListener(
         tester,
@@ -136,25 +137,21 @@ void main() {
       expect(realtimeBloc.added, const [
         RealtimeTabsClosed({'t1'}),
       ]);
-      expect(
-        mcpBloc.added,
-        isEmpty,
-        reason: "mcp's only session (t2) is still open — nothing to tear down",
-      );
+      // The MCP dispatch fires too even though t1 holds no MCP session —
+      // the bloc no-ops on unknown ids, and the event bumps t1's epoch so a
+      // connect still in flight is cancelled. The still-open t2 session is
+      // untouched (not in the closed set).
+      expect(mcpBloc.added, const [
+        McpTabsClosed({'t1'}),
+      ]);
     },
   );
 
   testWidgets(
-    'closing a tab with an MCP session dispatches McpTabsClosed for it',
+    'closing a tab that holds NO session still dispatches — a connect in '
+    'flight has no session entry yet and must be cancelled',
     (tester) async {
-      await pumpListener(
-        tester,
-        mcpState: const McpState(
-          sessions: {
-            't1': McpTabSession(status: McpConnectionStatus.connected),
-          },
-        ),
-      );
+      await pumpListener(tester);
 
       tabsBloc.push(
         _panelsState([
@@ -163,10 +160,12 @@ void main() {
       );
       await tester.pump();
 
+      expect(realtimeBloc.added, const [
+        RealtimeTabsClosed({'t1'}),
+      ]);
       expect(mcpBloc.added, const [
         McpTabsClosed({'t1'}),
       ]);
-      expect(realtimeBloc.added, isEmpty);
     },
   );
 
@@ -200,7 +199,28 @@ void main() {
   );
 
   testWidgets(
-    'closing a tab that holds no realtime or MCP session dispatches nothing',
+    'closing several tabs at once dispatches ONE event carrying all ids',
+    (tester) async {
+      await pumpListener(tester);
+
+      // Whole panel closes; nothing survives.
+      tabsBloc.push(
+        _panelsState([_panel('p1', [])]),
+      );
+      await tester.pump();
+
+      expect(realtimeBloc.added, const [
+        RealtimeTabsClosed({'t1', 't2'}),
+      ]);
+      expect(mcpBloc.added, const [
+        McpTabsClosed({'t1', 't2'}),
+      ]);
+    },
+  );
+
+  testWidgets(
+    'consecutive closes each diff against the PREVIOUS emission — the '
+    'second close dispatches only the newly closed id',
     (tester) async {
       await pumpListener(tester);
 
@@ -210,9 +230,19 @@ void main() {
         ]),
       );
       await tester.pump();
+      tabsBloc.push(
+        _panelsState([_panel('p1', [])]),
+      );
+      await tester.pump();
 
-      expect(realtimeBloc.added, isEmpty);
-      expect(mcpBloc.added, isEmpty);
+      expect(realtimeBloc.added, const [
+        RealtimeTabsClosed({'t1'}),
+        RealtimeTabsClosed({'t2'}),
+      ]);
+      expect(mcpBloc.added, const [
+        McpTabsClosed({'t1'}),
+        McpTabsClosed({'t2'}),
+      ]);
     },
   );
 }

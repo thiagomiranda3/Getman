@@ -102,11 +102,20 @@ class RealtimeBloc extends Bloc<RealtimeEvent, RealtimeState> {
       // WebSocket.connect validates outside its async body). Without this
       // catch the throw escaped to the zone and CONNECT visibly did nothing.
       // Surface it the way _appendFrames treats an error-direction frame:
-      // an error entry in the log, session not connected.
+      // an error entry in the log, session not connected. APPEND to the
+      // existing log (matching _appendFrames' semantics) — replacing it
+      // erased the previous session's frames on a failed reconnect, which
+      // both Disconnect and a successful reconnect carefully preserve.
+      final prior = state.sessionFor(event.tabId).frames;
+      final frames = [...prior, RealtimeFrame.error(e.toString())];
       emit(
         state.withSession(
           event.tabId,
-          RealtimeSession(frames: [RealtimeFrame.error(e.toString())]),
+          RealtimeSession(
+            frames: frames.length > _maxFrames
+                ? frames.sublist(frames.length - _maxFrames)
+                : frames,
+          ),
         ),
       );
       return;
@@ -276,14 +285,21 @@ class RealtimeBloc extends Bloc<RealtimeEvent, RealtimeState> {
     }
     _flushTimers.clear();
     _pending.clear();
-    for (final sub in _subs.values) {
-      await sub.cancel();
-    }
-    for (final conn in _connections.values) {
-      await conn.close();
-    }
+    // Snapshot + clear BEFORE awaiting (same hardening as McpBloc.close):
+    // an in-flight _onConnect parked on a slow teardown can resume during
+    // these awaits and insert into the live maps — mutating a map mid-await-
+    // iteration throws ConcurrentModificationError, and a cleared-but-open
+    // socket would leak.
+    final subs = [..._subs.values];
+    final conns = [..._connections.values];
     _subs.clear();
     _connections.clear();
+    for (final sub in subs) {
+      await sub.cancel();
+    }
+    for (final conn in conns) {
+      await conn.close();
+    }
     return super.close();
   }
 }

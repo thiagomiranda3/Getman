@@ -13,13 +13,29 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 
 /// Watches [TabsBloc] for tabs disappearing (close, close-others, panel
-/// close, …) and dispatches [RealtimeTabsClosed] / [McpTabsClosed] for any
-/// closed tab that holds a realtime or MCP session, so live connections
-/// never outlive their tab. Moves between panels keep the id present in the
-/// union and are unaffected.
-class TabCloseTeardownListener extends StatelessWidget {
+/// close, …) and dispatches [RealtimeTabsClosed] / [McpTabsClosed] with
+/// EVERY closed id — not just ids that already hold a session entry: a
+/// realtime connect emits no session until its first frame batch, so a
+/// session-keyed filter skipped exactly the tab closed while its connect was
+/// still pending, and the socket then streamed into a ghost session forever.
+/// The blocs no-op cheaply on unknown ids, and the dispatch bumps their
+/// per-tab epochs so in-flight connects are cancelled too. Moves between
+/// panels keep the id present in the union and are unaffected.
+///
+/// Stateful: the closed set is derived against the ids seen at the previous
+/// emission (a BlocListener's callback only receives the NEW state).
+class TabCloseTeardownListener extends StatefulWidget {
   const TabCloseTeardownListener({required this.child, super.key});
   final Widget child;
+
+  @override
+  State<TabCloseTeardownListener> createState() =>
+      _TabCloseTeardownListenerState();
+}
+
+class _TabCloseTeardownListenerState extends State<TabCloseTeardownListener> {
+  Set<String> _lastAlive = const {};
+  var _seeded = false;
 
   static Set<String> _allTabIds(TabsState state) => {
     for (final panel in state.panels)
@@ -28,6 +44,12 @@ class TabCloseTeardownListener extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!_seeded) {
+      // Seed from the CURRENT state so a listener firing before any build-
+      // time emission still diffs against reality, not an empty set.
+      _lastAlive = _allTabIds(context.read<TabsBloc>().state);
+      _seeded = true;
+    }
     return BlocListener<TabsBloc, TabsState>(
       listenWhen: (prev, next) {
         final before = _allTabIds(prev);
@@ -36,24 +58,16 @@ class TabCloseTeardownListener extends StatelessWidget {
       },
       listener: (context, state) {
         final alive = _allTabIds(state);
-        final realtime = context.read<RealtimeBloc>();
-        final mcp = context.read<McpBloc>();
-        final closedRealtime = {
-          for (final id in realtime.state.sessions.keys)
+        final closed = {
+          for (final id in _lastAlive)
             if (!alive.contains(id)) id,
         };
-        if (closedRealtime.isNotEmpty) {
-          realtime.add(RealtimeTabsClosed(closedRealtime));
-        }
-        final closedMcp = {
-          for (final id in mcp.state.sessions.keys)
-            if (!alive.contains(id)) id,
-        };
-        if (closedMcp.isNotEmpty) {
-          mcp.add(McpTabsClosed(closedMcp));
-        }
+        _lastAlive = alive;
+        if (closed.isEmpty) return;
+        context.read<RealtimeBloc>().add(RealtimeTabsClosed(closed));
+        context.read<McpBloc>().add(McpTabsClosed(closed));
       },
-      child: child,
+      child: widget.child,
     );
   }
 }
