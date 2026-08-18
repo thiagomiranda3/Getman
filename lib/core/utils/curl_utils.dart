@@ -1,13 +1,17 @@
 // Full cURL command PARSER: tokenizes a pasted `curl ...` string (handling
 // shell/ANSI-C/double quoting and `\`-newline line continuations), reads its
-// flags (-X/-H/-d/--data-raw/--data-urlencode/-F/-u/-b/-G/-T/...), and
+// flags (-X/-H/-d/--data-raw/--data-urlencode/--json/-F/-u/-b/-G/-T/...), and
 // resolves the method + body type into an HttpRequestConfigEntity. Powers
 // the URL bar's curl-paste shortcut (see url_bar.dart's `_handleUrlChanged`).
 //
 // Gotchas: method/body-type are INFERRED when -X/--request isn't given
-// (HEAD if -I, GET if -G, PUT if -T/--upload-file, POST if any -d/-F data,
-// else GET); -d/--data/--data-binary honor a leading `@file` reference while
-// --data-raw explicitly does not (matches curl's own semantics).
+// (HEAD if -I, GET if -G, PUT if -T/--upload-file, POST if any -d/-F/--json
+// data, else GET); -d/--data/--data-binary/--json honor a leading `@file`
+// reference while --data-raw explicitly does not (matches curl's own
+// semantics). `--next` STOPS the parse — only the first request of a chained
+// command is imported. Once an UNKNOWN dash-flag is seen, a bare domain-ish
+// token is no longer trusted as the URL (it might be that flag's value);
+// an explicit http(s) scheme or localhost is required from there on.
 // `generate()` at the bottom of this file is a one-line delegate to
 // CodeGenService.generate(..., CodeGenTarget.curl) — the actual curl-string
 // FORMATTING lives there, not here, so parse and generate are not
@@ -24,68 +28,277 @@ import 'package:getman/core/utils/code_gen_service.dart';
 
 class CurlUtils {
   /// Value-taking flags we don't model. Their argument is consumed and
-  /// discarded so it isn't mistaken for the URL (e.g. `-o <file> <url>`).
+  /// discarded so it isn't mistaken for the URL — _looksLikeUrl accepts bare
+  /// domain-ish tokens, so an unconsumed value steals the URL slot and the
+  /// real URL (arriving second) is dropped (`curl -c cookies.txt https://…`
+  /// imported with url == 'cookies.txt'; `--oauth2-bearer eyJhbG.ciOiJI.x`
+  /// imported the JWT as the URL). Sorted by long-flag name, each short
+  /// alias directly before its long form. Flags UNLISTED here still can't
+  /// steal the slot outright: seeing any unknown dash-flag flips the parse
+  /// loop into requiring an explicit scheme on the URL token.
   static const _skipValueFlags = {
-    '-o',
-    '--output',
-    '-x',
-    '--proxy',
-    '-m',
-    '--max-time',
-    '--connect-timeout',
-    '-T',
-    '--upload-file',
-    '--cert',
-    '--key',
+    '--abstract-unix-socket',
+    '--alt-svc',
+    '--aws-sigv4',
     '--cacert',
-    '-w',
-    '--write-out',
-    '--retry',
-    '--limit-rate',
-    '--resolve',
+    '--capath',
+    '-E',
+    '--cert',
+    '--cert-type',
     '--ciphers',
-    // Common value-taking flags whose FILE argument was mistaken for the
-    // URL when unlisted (`curl -c cookies.txt https://…` imported with
-    // url == 'cookies.txt' — _looksLikeUrl accepts bare domain-ish tokens).
+    '-K',
+    '--config',
+    '--connect-timeout',
+    '--connect-to',
+    '-C',
+    '--continue-at',
     '-c',
     '--cookie-jar',
+    '--crlfile',
+    '--curves',
+    '--dns-interface',
+    '--dns-ipv4-addr',
+    '--dns-ipv6-addr',
+    '--dns-servers',
+    '--doh-url',
     '-D',
     '--dump-header',
-    '-E',
-    '--config',
-    '-K',
+    '--etag-compare',
+    '--etag-save',
+    '--expect100-timeout',
+    '--happy-eyeballs-timeout-ms',
+    '--hostpubmd5',
+    '--hostpubsha256',
+    '--interface',
+    '--keepalive-time',
+    '--key',
+    '--key-type',
+    '--limit-rate',
+    '--local-port',
+    '--login-options',
+    '--mail-auth',
+    '--mail-from',
+    '--mail-rcpt',
+    '--max-filesize',
+    '--max-redirs',
+    '-m',
+    '--max-time',
+    '--netrc-file',
+    '--noproxy',
+    // The bearer token is itself domain-ish (`a.b.c` JWT shape), so before
+    // this entry it won the URL slot over the real URL.
+    '--oauth2-bearer',
+    '-o',
+    '--output',
+    '--output-dir',
+    '--pass',
+    '--pinnedpubkey',
+    '--proto',
+    '--proto-default',
+    '--proto-redir',
+    '-x',
+    '--proxy',
+    '--proxy-cacert',
+    '--proxy-capath',
+    '--proxy-cert',
+    '--proxy-cert-type',
+    '--proxy-ciphers',
+    '--proxy-crlfile',
+    '--proxy-header',
+    '--proxy-key',
+    '--proxy-key-type',
+    '--proxy-pass',
+    '--proxy-pinnedpubkey',
+    '--proxy-service-name',
+    '--proxy-tls13-ciphers',
+    '--proxy-tlsauthtype',
+    '--proxy-tlspassword',
+    '--proxy-tlsuser',
+    '-U',
+    '--proxy-user',
+    '--proxy1.0',
+    '-r',
+    '--range',
+    '--request-target',
+    '--resolve',
+    '--retry',
+    '--retry-delay',
+    '--retry-max-time',
+    '--socks4',
+    '--socks4a',
+    '--socks5',
+    '--socks5-hostname',
+    '-Y',
+    '--speed-limit',
+    '-y',
+    '--speed-time',
+    '--stderr',
+    '-t',
+    '--telnet-option',
+    '--tftp-blksize',
+    '-z',
+    '--time-cond',
+    '--tls-max',
+    '--tls13-ciphers',
+    '--tlsauthtype',
+    '--tlspassword',
+    '--tlsuser',
     '--trace',
     '--trace-ascii',
-    '--output-dir',
-    '--stderr',
-    '--interface',
     '--unix-socket',
-    '--proxy-user',
-    '-U',
+    // -T/--upload-file are shadowed by their modeled branch in the parse
+    // loop; kept here so a future reorder can't regress URL detection.
+    '-T',
+    '--upload-file',
+    '--url-query',
+    '--variable',
+    '-w',
+    '--write-out',
+  };
+
+  /// No-value flags we recognize and deliberately ignore. Being listed here
+  /// keeps them from tripping the unknown-flag URL guard in the parse loop
+  /// (an unknown flag might be value-taking, so after one appears a bare
+  /// domain token can no longer be trusted as the URL). curl's `--no-<opt>`
+  /// negation forms are matched by prefix at the call site, not listed.
+  static const _ignoredBooleanFlags = {
+    '-#',
+    '--progress-bar',
+    '-0',
+    '--http1.0',
+    '--http1.1',
+    '--http2',
+    '--http2-prior-knowledge',
+    '--http3',
+    '--http3-only',
+    '-1',
+    '--tlsv1',
+    '--tlsv1.0',
+    '--tlsv1.1',
+    '--tlsv1.2',
+    '--tlsv1.3',
+    '-2',
+    '--sslv2',
+    '-3',
+    '--sslv3',
+    '-4',
+    '--ipv4',
+    '-6',
+    '--ipv6',
+    '--anyauth',
+    '--basic',
+    '--digest',
+    '--negotiate',
+    '--ntlm',
+    '--ntlm-wb',
+    '--compressed',
+    '--tr-encoding',
+    '--create-dirs',
+    '--crlf',
+    '-q',
+    '--disable',
+    '--disallow-username-in-url',
+    '--doh-cert-status',
+    '--doh-insecure',
+    '-f',
+    '--fail',
+    '--fail-early',
+    '--fail-with-body',
+    '--false-start',
+    '-g',
+    '--globoff',
+    '--haproxy-protocol',
+    '-i',
+    '--include',
+    '-k',
+    '--insecure',
+    '-j',
+    '--junk-session-cookies',
+    '-L',
+    '--location',
+    '--location-trusted',
+    '-n',
+    '--netrc',
+    '--netrc-optional',
+    '-N',
+    '--no-buffer',
+    '-Z',
+    '--parallel',
+    '--parallel-immediate',
+    '--path-as-is',
+    '--post301',
+    '--post302',
+    '--post303',
+    '-J',
+    '--remote-header-name',
+    '-O',
+    '--remote-name',
+    '--remote-name-all',
+    '-R',
+    '--remote-time',
+    '--retry-all-errors',
+    '--retry-connrefused',
+    '-s',
+    '--silent',
+    '-S',
+    '--show-error',
+    '--ssl',
+    '--ssl-no-revoke',
+    '--ssl-reqd',
+    '--ssl-revoke-best-effort',
+    '--styled-output',
+    '--tcp-fastopen',
+    '--tcp-nodelay',
+    '--trace-time',
+    '-v',
+    '--verbose',
+    '--xattr',
   };
 
   /// Splits an argument into (flag, inlineValue): a long flag's `=value`
-  /// (`--header=X: y`), or a short flag's glued value (`-XPOST`,
-  /// `-HAccept: json`, `-dbody`) — only for value-taking short flags, so
-  /// boolean bundles like `-sS` stay untouched. Plain tokens pass through
-  /// with a null inline value.
+  /// (`--header=X: y`), or a short-flag bundle scanned left-to-right —
+  /// leading known-boolean letters are dropped (the parser ignores those
+  /// flags anyway) and the first value-taking letter claims the glued
+  /// remainder (`-XPOST`, `-sXPOST`) or, when nothing is glued (`-sX POST`,
+  /// `-sH 'K: v'`), the next token via the caller. An all-boolean bundle
+  /// (`-sS`, `-fsSL`) surfaces its last letter so it lands in
+  /// [_ignoredBooleanFlags] instead of reading as an unknown flag; a boolean
+  /// prefix ending in one unglued letter surfaces that letter so modeled
+  /// booleans keep their meaning (`-sI` -> `-I` -> HEAD). Plain tokens pass
+  /// through with a null inline value.
   static (String, String?) _splitFlag(String raw) {
     if (raw.startsWith('--') && raw.contains('=')) {
       final eq = raw.indexOf('=');
       return (raw.substring(0, eq), raw.substring(eq + 1));
     }
-    if (raw.length > 2 &&
-        raw.startsWith('-') &&
-        !raw.startsWith('--') &&
-        _gluedShortFlags.contains(raw[1])) {
-      return (raw.substring(0, 2), raw.substring(2));
+    if (raw.length > 2 && raw.startsWith('-') && !raw.startsWith('--')) {
+      var i = 1;
+      while (i < raw.length && _bundleBooleanLetters.contains(raw[i])) {
+        i++;
+      }
+      if (i < raw.length && _gluedShortFlags.contains(raw[i])) {
+        final rest = raw.substring(i + 1);
+        return ('-${raw[i]}', rest.isEmpty ? null : rest);
+      }
+      if (i == raw.length) {
+        // All-boolean bundle (-sS/-fsSL): surface the last letter so the
+        // parse loop sees a recognized ignored boolean, not an unknown flag.
+        return ('-${raw[raw.length - 1]}', null);
+      }
+      if (i == raw.length - 1 && i > 1) {
+        // Boolean prefix + one trailing letter we don't glue (-sI): surface
+        // the trailing letter so modeled booleans like -I/-G still apply.
+        return ('-${raw[i]}', null);
+      }
+      return (raw, null);
     }
     return (raw, null);
   }
 
   /// Single-letter value-taking flags that curl accepts with a glued argument
-  /// (`-XPOST`). Letters of modeled flags plus `o`/`x`/`m`/`w` (skip-flags) so
-  /// `-omyfile` doesn't leak its value into URL detection.
+  /// (`-XPOST`). Letters of modeled flags plus the short skip-flag letters
+  /// (`o`/`x`/`m`/... ) so `-omyfile` doesn't leak its value into URL
+  /// detection.
   static const _gluedShortFlags = {
     'X',
     'H',
@@ -100,6 +313,47 @@ class CurlUtils {
     'x',
     'm',
     'w',
+    'c',
+    'C',
+    'D',
+    'E',
+    'K',
+    'r',
+    't',
+    'U',
+    'y',
+    'Y',
+    'z',
+  };
+
+  /// Boolean short-flag letters that may LEAD a bundle (`-sX POST`, `-fsSL`).
+  /// Only letters the parser ignores anyway (see [_ignoredBooleanFlags]) —
+  /// never modeled letters like `G`/`I`, whose semantics would be silently
+  /// dropped if they were skipped mid-bundle.
+  static const _bundleBooleanLetters = {
+    '#',
+    '0',
+    '1',
+    '2',
+    '3',
+    '4',
+    '6',
+    'f',
+    'g',
+    'i',
+    'j',
+    'J',
+    'k',
+    'L',
+    'n',
+    'N',
+    'O',
+    'q',
+    'R',
+    's',
+    'S',
+    'v',
+    'Z',
   };
 
   static final RegExp _domainish = RegExp(r'^[\w.-]+\.[\w.-]+');
@@ -117,37 +371,7 @@ class CurlUtils {
       return null;
     }
 
-    var explicitMethod = false;
-    String? method;
-    var url = '';
-    final headers = <String, String>{};
-    final dataParts = <String>[];
-    var hasData = false; // any -d/--data* flag seen (drives POST inference)
-    // True if any data came via --data-urlencode: the user already chose the
-    // encoding, so keep it a raw body rather than re-splitting into form rows.
-    var urlencodeData = false;
-    var forceGet = false;
-    var headRequest = false;
-    var uploadFile = false; // -T/--upload-file (PUT inference)
-
-    final formFields = <MultipartFieldEntity>[];
-    var hasForm = false;
-
-    String? bodyFilePath; // set by `--data-binary @file`
-    var auth = const <String, String>{};
-
-    void addData(String data, {bool allowFileRef = false}) {
-      hasData = true;
-      // A leading `@` is a file reference for the data flags that support it
-      // (-d/--data/--data-ascii and --data-binary). --data-raw explicitly
-      // does NOT: curl's manual says it posts data without the special `@`
-      // interpretation.
-      if (allowFileRef && data.startsWith('@')) {
-        bodyFilePath = data.substring(1);
-        return;
-      }
-      dataParts.add(data);
-    }
+    final state = _CurlParseState();
 
     for (var i = 1; i < args.length; i++) {
       final raw = args[i];
@@ -164,98 +388,49 @@ class CurlUtils {
         return null;
       }
 
-      if (flag == '-X' || flag == '--request') {
-        final v = takeValue();
-        if (v != null) {
-          method = v.toUpperCase();
-          explicitMethod = true;
-        }
-      } else if (flag == '-H' || flag == '--header') {
-        final v = takeValue();
-        if (v != null) _addHeader(headers, v);
-      } else if (flag == '-d' ||
-          flag == '--data' ||
-          flag == '--data-ascii' ||
-          flag == '--data-binary') {
-        // A leading `@` is a file reference curl reads from disk. Only
-        // --data-raw (below) disables that interpretation.
-        final v = takeValue();
-        if (v != null) addData(v, allowFileRef: true);
-      } else if (flag == '--data-raw') {
-        // curl disables `@`-file interpretation for --data-raw: the value
-        // always posts as literal data.
-        final v = takeValue();
-        if (v != null) addData(v);
-      } else if (flag == '--data-urlencode') {
-        final v = takeValue();
-        if (v != null) {
-          urlencodeData = true;
-          addData(_urlEncodeData(v));
-        }
-      } else if (flag == '-F' || flag == '--form') {
-        final v = takeValue();
-        if (v != null) {
-          hasForm = true;
-          final field = _parseFormField(v);
-          if (field != null) formFields.add(field);
-        }
-      } else if (flag == '-u' || flag == '--user') {
-        final v = takeValue();
-        if (v != null) auth = _basicAuthFromUserArg(v);
-      } else if (flag == '-A' || flag == '--user-agent') {
-        final v = takeValue();
-        if (v != null) headers.putIfAbsent('User-Agent', () => v);
-      } else if (flag == '-e' || flag == '--referer') {
-        final v = takeValue();
-        if (v != null) headers.putIfAbsent('Referer', () => v);
-      } else if (flag == '-b' || flag == '--cookie') {
-        final v = takeValue();
-        // curl treats `-b name=val` (containing `=`) as a cookie; a value with
-        // no `=` is a cookie *file*, which we can't read — fold both into the
-        // Cookie header anyway (best effort) only when it looks like a pair.
-        if (v != null && v.contains('=') && !_hasHeader(headers, 'cookie')) {
-          headers['Cookie'] = v;
-        }
-      } else if (flag == '-G' || flag == '--get') {
-        forceGet = true;
-      } else if (flag == '-I' || flag == '--head') {
-        headRequest = true;
-      } else if (flag == '-T') {
-        // -T <file>: upload (PUT). Best effort: capture as a binary body.
-        final v = takeValue();
-        if (v != null) {
-          uploadFile = true;
-          bodyFilePath = v;
-        }
-      } else if (flag == '--upload-file') {
-        final v = takeValue();
-        if (v != null) {
-          uploadFile = true;
-          bodyFilePath = v;
-        }
-      } else if (flag == '--url') {
-        final v = takeValue();
-        if (v != null && url.isEmpty) url = v;
-      } else if (_skipValueFlags.contains(flag)) {
+      if (flag == '--next' || flag == '-:') {
+        // `--next` starts a SECOND independent request on the same command
+        // line; merging its flags into the first corrupts both. Import the
+        // first request only.
+        break;
+      }
+      // The three modeled flag families are disjoint sets, so dispatch order
+      // between them cannot change behavior — each token matches at most one.
+      // They MUST run before the _skipValueFlags check: -T/--upload-file are
+      // listed there too and would otherwise lose their modeled semantics.
+      if (state.applyMethodOrUrlFlag(flag, takeValue) ||
+          state.applyDataFlag(flag, takeValue) ||
+          state.applyHeaderOrAuthFlag(flag, takeValue)) {
+        continue;
+      }
+      if (_skipValueFlags.contains(flag)) {
         takeValue(); // consume + discard the unmodeled value
+      } else if (_ignoredBooleanFlags.contains(flag) ||
+          flag.startsWith('--no-')) {
+        // Recognized no-value flag (or curl's `--no-<option>` negation form):
+        // ignore it WITHOUT engaging the unknown-flag URL guard below.
       } else if (flag.startsWith('-')) {
         // Unknown flag. If it carried an inline `=value`, it's fully consumed.
         // Otherwise treat it as a boolean flag and ignore it (don't swallow the
-        // next token — it might be the URL).
-      } else if (url.isEmpty && _looksLikeUrl(raw)) {
-        url = raw;
+        // next token — it might be the URL). But it might really be
+        // value-taking, so stop trusting bare domain-ish tokens as the URL.
+        state.sawUnknownFlag = true;
+      } else if (state.url.isEmpty &&
+          _looksLikeUrl(raw, requireScheme: state.sawUnknownFlag)) {
+        state.url = raw;
       }
     }
 
     // ---- Method inference (when -X/--request was not given) ----
-    if (!explicitMethod) {
-      if (headRequest) {
+    var method = state.method;
+    if (!state.explicitMethod) {
+      if (state.headRequest) {
         method = 'HEAD';
-      } else if (forceGet) {
+      } else if (state.forceGet) {
         method = 'GET';
-      } else if (uploadFile) {
+      } else if (state.uploadFile) {
         method = 'PUT';
-      } else if (hasData || hasForm) {
+      } else if (state.hasData || state.hasForm) {
         method = 'POST';
       } else {
         method = 'GET';
@@ -266,35 +441,36 @@ class CurlUtils {
 
     // ---- Body assembly ----
     // curl concatenates plain -d/--data values with '&'.
-    var body = dataParts.join('&');
+    var body = state.dataParts.join('&');
+    var url = state.url;
 
     // -G turns accumulated data into the query string.
-    if (forceGet && body.isNotEmpty) {
+    if (state.forceGet && body.isNotEmpty) {
       final sep = url.contains('?') ? '&' : '?';
       url = '$url$sep$body';
       body = '';
-      dataParts.clear();
-      hasData = false;
+      state.dataParts.clear();
+      state.hasData = false;
     }
 
     if (url.isEmpty) return null;
 
     // ---- Body type resolution ----
     final bodyType = _resolveBodyType(
-      headers: headers,
+      headers: state.headers,
       body: body,
-      hasForm: hasForm,
-      bodyFilePath: bodyFilePath,
+      hasForm: state.hasForm,
+      bodyFilePath: state.bodyFilePath,
       // --data-urlencode is an explicit pre-encoded value: keep it raw so the
       // body editor shows it verbatim instead of re-splitting into form rows.
-      preferRaw: urlencodeData,
+      preferRaw: state.urlencodeData,
     );
 
     // For urlencoded bodies, surface the k=v pairs as form rows so the FORM
     // editor shows them; keep `body` empty so the serializer reads formFields.
     var resolvedBody = body;
-    var resolvedFields = formFields;
-    if (bodyType == BodyType.urlencoded && !hasForm) {
+    var resolvedFields = state.formFields;
+    if (bodyType == BodyType.urlencoded && !state.hasForm) {
       resolvedFields = _formFieldsFromUrlEncoded(body);
       resolvedBody = '';
     } else if (bodyType == BodyType.binary) {
@@ -305,12 +481,12 @@ class CurlUtils {
       id: id,
       method: method,
       url: url,
-      headers: headers,
+      headers: state.headers,
       body: resolvedBody,
-      auth: auth,
+      auth: state.auth,
       bodyType: bodyType,
       formFields: resolvedFields,
-      bodyFilePath: bodyFilePath,
+      bodyFilePath: state.bodyFilePath,
     );
   }
 
@@ -404,11 +580,33 @@ class CurlUtils {
   static String _clampMethod(String method) {
     final upper = method.toUpperCase();
     if (HttpMethods.all.contains(upper)) return upper;
-    // HEAD/OPTIONS aren't in HttpMethods.all but are valid curl verbs we infer;
-    // keep them verbatim rather than silently rewriting to GET.
-    if (upper == 'HEAD' || upper == 'OPTIONS') return upper;
+    if (_extendedMethods.contains(upper)) return upper;
     return 'GET';
   }
+
+  /// Verbs beyond HttpMethods.all that [_clampMethod] keeps verbatim:
+  /// HEAD/OPTIONS (curl verbs we infer ourselves) plus the common extended
+  /// family (cache purge + WebDAV + report/search/query) — parity with the
+  /// Postman importer, which stores arbitrary methods verbatim. Anything
+  /// else (typos, corrupt tokens) still clamps to GET: the entity stores a
+  /// free string, but the URL bar's method dropdown
+  /// (request_kind_method_selector.dart) only lists HttpMethods.all and
+  /// asserts on values outside its items, so arbitrary strings stay fenced
+  /// to this deliberate, Postman-parity set.
+  static const _extendedMethods = {
+    'HEAD',
+    'OPTIONS',
+    'PURGE',
+    'PROPFIND',
+    'MKCOL',
+    'COPY',
+    'MOVE',
+    'LOCK',
+    'UNLOCK',
+    'REPORT',
+    'SEARCH',
+    'QUERY',
+  };
 
   static bool _isJson(String body) {
     final trimmed = body.trim();
@@ -489,12 +687,20 @@ class CurlUtils {
     return null;
   }
 
-  static bool _looksLikeUrl(String s) =>
-      s.startsWith('http://') ||
-      s.startsWith('https://') ||
-      s.startsWith('localhost') ||
-      _domainish.hasMatch(s) ||
-      _hostPort.hasMatch(s);
+  /// True for tokens that plausibly are the request URL. With
+  /// [requireScheme] (set once an unknown dash-flag has been seen — see the
+  /// parse loop) only an explicit http(s) scheme or a localhost prefix
+  /// qualifies, because a bare domain-ish token might be the unknown flag's
+  /// value rather than the URL.
+  static bool _looksLikeUrl(String s, {bool requireScheme = false}) {
+    if (s.startsWith('http://') ||
+        s.startsWith('https://') ||
+        s.startsWith('localhost')) {
+      return true;
+    }
+    if (requireScheme) return false;
+    return _domainish.hasMatch(s) || _hostPort.hasMatch(s);
+  }
 
   /// Shell-style tokenizer. Handles:
   /// - single quotes `'...'`: literal, may span newlines, no escapes inside;
@@ -676,4 +882,171 @@ class CurlUtils {
   /// truth for code generation).
   static String generate(HttpRequestConfigEntity config) =>
       CodeGenService.generate(config, CodeGenTarget.curl);
+}
+
+/// Mutable accumulator for one [CurlUtils.parse] run. The parse loop feeds
+/// every recognized flag through the `apply*Flag` dispatch methods below
+/// (one per flag family, split out of the former single if/else-if chain so
+/// each stays under the cyclomatic-complexity gate); `parse()` then reads the
+/// fields for method inference and final body assembly. Behavior-identical to
+/// the inline chain: the families are disjoint flag sets, so per-token
+/// dispatch order between them cannot matter.
+class _CurlParseState {
+  bool explicitMethod = false;
+  String? method;
+  String url = '';
+  final Map<String, String> headers = {};
+  final List<String> dataParts = [];
+  bool hasData = false; // any -d/--data* flag seen (drives POST inference)
+
+  /// True if any data came via --data-urlencode: the user already chose the
+  /// encoding, so keep it a raw body rather than re-splitting into form rows.
+  bool urlencodeData = false;
+  bool forceGet = false;
+  bool headRequest = false;
+  bool uploadFile = false; // -T/--upload-file (PUT inference)
+
+  final List<MultipartFieldEntity> formFields = [];
+  bool hasForm = false;
+
+  String? bodyFilePath; // set by `--data-binary @file`
+  Map<String, String> auth = const {};
+
+  /// Once an UNKNOWN dash-flag is seen, it might have been value-taking and
+  /// its value can look domain-ish (`--oauth2-bearer eyJ…` — the JWT would
+  /// steal the URL slot). From then on only a token with an explicit scheme
+  /// (or localhost) is trusted as the URL.
+  bool sawUnknownFlag = false;
+
+  void _addData(String data, {bool allowFileRef = false}) {
+    hasData = true;
+    // A leading `@` is a file reference for the data flags that support it
+    // (-d/--data/--data-ascii and --data-binary). --data-raw explicitly
+    // does NOT: curl's manual says it posts data without the special `@`
+    // interpretation.
+    if (allowFileRef && data.startsWith('@')) {
+      bodyFilePath = data.substring(1);
+      return;
+    }
+    dataParts.add(data);
+  }
+
+  /// Method-, upload- and URL-selection flags: -X/--request, -G/--get,
+  /// -I/--head, -T/--upload-file and --url. Returns true when [flag] was one
+  /// of them (handled — [takeValue] consumed the value where one is taken).
+  bool applyMethodOrUrlFlag(String flag, String? Function() takeValue) {
+    if (flag == '-X' || flag == '--request') {
+      final v = takeValue();
+      if (v != null) {
+        method = v.toUpperCase();
+        explicitMethod = true;
+      }
+    } else if (flag == '-G' || flag == '--get') {
+      forceGet = true;
+    } else if (flag == '-I' || flag == '--head') {
+      headRequest = true;
+    } else if (flag == '-T') {
+      // -T <file>: upload (PUT). Best effort: capture as a binary body.
+      final v = takeValue();
+      if (v != null) {
+        uploadFile = true;
+        bodyFilePath = v;
+      }
+    } else if (flag == '--upload-file') {
+      final v = takeValue();
+      if (v != null) {
+        uploadFile = true;
+        bodyFilePath = v;
+      }
+    } else if (flag == '--url') {
+      final v = takeValue();
+      if (v != null && url.isEmpty) url = v;
+    } else {
+      return false;
+    }
+    return true;
+  }
+
+  /// Body-data flags: the -d/--data* family, --json and -F/--form. Returns
+  /// true when [flag] was one of them (handled).
+  bool applyDataFlag(String flag, String? Function() takeValue) {
+    if (flag == '-d' ||
+        flag == '--data' ||
+        flag == '--data-ascii' ||
+        flag == '--data-binary') {
+      // A leading `@` is a file reference curl reads from disk. Only
+      // --data-raw (below) disables that interpretation.
+      final v = takeValue();
+      if (v != null) _addData(v, allowFileRef: true);
+    } else if (flag == '--data-raw') {
+      // curl disables `@`-file interpretation for --data-raw: the value
+      // always posts as literal data.
+      final v = takeValue();
+      if (v != null) _addData(v);
+    } else if (flag == '--data-urlencode') {
+      final v = takeValue();
+      if (v != null) {
+        urlencodeData = true;
+        _addData(CurlUtils._urlEncodeData(v));
+      }
+    } else if (flag == '--json') {
+      // curl >= 7.82: `--json <data>` is shorthand for `--data <data>` +
+      // `Content-Type: application/json` + `Accept: application/json`.
+      // Both headers yield to an explicit -H on either side of --json
+      // (a later -H overwrites; an earlier one wins via the guard here).
+      // Shares -d's `@file` semantics and POST inference.
+      final v = takeValue();
+      if (v != null) {
+        _addData(v, allowFileRef: true);
+        if (!CurlUtils._hasHeader(headers, 'content-type')) {
+          headers['Content-Type'] = 'application/json';
+        }
+        if (!CurlUtils._hasHeader(headers, 'accept')) {
+          headers['Accept'] = 'application/json';
+        }
+      }
+    } else if (flag == '-F' || flag == '--form') {
+      final v = takeValue();
+      if (v != null) {
+        hasForm = true;
+        final field = CurlUtils._parseFormField(v);
+        if (field != null) formFields.add(field);
+      }
+    } else {
+      return false;
+    }
+    return true;
+  }
+
+  /// Header- and auth-shaped flags: -H/--header, -u/--user, -A/--user-agent,
+  /// -e/--referer and -b/--cookie. Returns true when [flag] was one of them
+  /// (handled).
+  bool applyHeaderOrAuthFlag(String flag, String? Function() takeValue) {
+    if (flag == '-H' || flag == '--header') {
+      final v = takeValue();
+      if (v != null) CurlUtils._addHeader(headers, v);
+    } else if (flag == '-u' || flag == '--user') {
+      final v = takeValue();
+      if (v != null) auth = CurlUtils._basicAuthFromUserArg(v);
+    } else if (flag == '-A' || flag == '--user-agent') {
+      final v = takeValue();
+      if (v != null) headers.putIfAbsent('User-Agent', () => v);
+    } else if (flag == '-e' || flag == '--referer') {
+      final v = takeValue();
+      if (v != null) headers.putIfAbsent('Referer', () => v);
+    } else if (flag == '-b' || flag == '--cookie') {
+      final v = takeValue();
+      // curl treats `-b name=val` (containing `=`) as a cookie; a value with
+      // no `=` is a cookie *file*, which we can't read — fold both into the
+      // Cookie header anyway (best effort) only when it looks like a pair.
+      if (v != null &&
+          v.contains('=') &&
+          !CurlUtils._hasHeader(headers, 'cookie')) {
+        headers['Cookie'] = v;
+      }
+    } else {
+      return false;
+    }
+    return true;
+  }
 }

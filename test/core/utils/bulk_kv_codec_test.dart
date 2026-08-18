@@ -142,4 +142,65 @@ void main() {
       expect(BulkKvCodec.parse('//B: 2'), const [('B', '2')]);
     });
   });
+
+  group('value escaping — newline / backslash round-trips (I12)', () {
+    test('a newline-bearing value serializes to ONE escaped line', () {
+      final text = BulkKvCodec.serializeRows(const [
+        (key: 'X-Note', value: 'line1\nline2: tail', disabled: false),
+      ]);
+      expect(text, r'X-Note: line1\nline2: tail');
+      expect(text.contains('\n'), isFalse);
+    });
+
+    test('edit→bulk→edit is identity for a newline-bearing value', () {
+      const rows = [
+        (key: 'X-Note', value: 'line1\nline2: tail', disabled: false),
+      ];
+      expect(BulkKvCodec.parseRows(BulkKvCodec.serializeRows(rows)), rows);
+    });
+
+    test('backslash-bearing values round-trip (escape/unescape inverse)', () {
+      const rows = [
+        (key: 'Path', value: r'C:\new\folder', disabled: false),
+        (key: 'Regex', value: r'\d+\\n', disabled: true),
+        (key: 'Trail', value: r'ends-with\', disabled: false),
+      ];
+      expect(BulkKvCodec.parseRows(BulkKvCodec.serializeRows(rows)), rows);
+    });
+
+    test('a disabled newline-bearing row keeps its // prefix and value', () {
+      const rows = [(key: 'B', value: 'v1\nv2', disabled: true)];
+      final text = BulkKvCodec.serializeRows(rows);
+      expect(text, r'//B: v1\nv2');
+      expect(BulkKvCodec.parseRows(text), rows);
+    });
+
+    test('leading/trailing newlines survive the D2 trim via escaping', () {
+      const rows = [(key: 'K', value: '\nx\n', disabled: false)];
+      expect(BulkKvCodec.parseRows(BulkKvCodec.serializeRows(rows)), rows);
+    });
+
+    test('legacy bulk text without escape sequences parses unchanged', () {
+      // `\t`-like pairs and a trailing lone backslash are not escapes the
+      // grammar defines — they pass through verbatim.
+      expect(BulkKvCodec.parseRows(r'K: path\to\x'), const [
+        (key: 'K', value: r'path\to\x', disabled: false),
+      ]);
+      expect(BulkKvCodec.parseRows(r'K2: raw\'), const [
+        (key: 'K2', value: r'raw\', disabled: false),
+      ]);
+      expect(BulkKvCodec.parse('A: plain value'), const [
+        ('A', 'plain value'),
+      ]);
+    });
+
+    test(r'a typed \n in bulk text is the documented newline escape', () {
+      expect(BulkKvCodec.parseRows(r'X: a\nb'), const [
+        (key: 'X', value: 'a\nb', disabled: false),
+      ]);
+      expect(BulkKvCodec.parseRows(r'X: a\\nb'), const [
+        (key: 'X', value: r'a\nb', disabled: false),
+      ]);
+    });
+  });
 }

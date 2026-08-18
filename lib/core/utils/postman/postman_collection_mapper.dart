@@ -23,6 +23,12 @@
 // entries (key in disabledHeaderKeys) with `disabled: true`; import keeps
 // disabled headers in the map + set and turns disabled query entries into
 // ParkedParamEntity at their array position (previously they were dropped).
+// Producer leniency: leaf values (names, method) are coerced via toString,
+// never `as`-cast (a numeric name must not abort the whole file import), and
+// disabled flags accept the string forms 'true'/'false' via _truthy.
+// Getman-only fidelity rides keys inert to real Postman: the `_getman_kind`
+// vendor key round-trips RequestKind (WS/SSE/MCP; absent = http), and
+// formdata entries carry Postman-native `contentType` both ways.
 
 import 'dart:convert';
 import 'package:getman/core/domain/entities/auth_config.dart';
@@ -31,6 +37,7 @@ import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/utils/param_row_composer.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
@@ -102,7 +109,7 @@ class PostmanCollectionMapper {
         'Unsupported collection schema — expected Postman v2.1.',
       );
     }
-    final name = (info['name'] as String?) ?? 'Imported Collection';
+    final name = info['name']?.toString() ?? 'Imported Collection';
     final rawItems = parsed['item'];
     final items = rawItems is List ? rawItems : const <dynamic>[];
     final children = items
@@ -204,6 +211,9 @@ class PostmanCollectionMapper {
       'method': config.method,
       'header': headers,
       'url': urlObj,
+      // Vendor key (inert to real Postman): round-trips the protocol so a
+      // WS/SSE/MCP request doesn't silently come back as HTTP. Absent = http.
+      if (config.kind != RequestKind.http) '_getman_kind': config.kind.name,
     };
     final auth = _authToPostman(config.authConfig);
     if (auth != null) result['auth'] = auth;
@@ -286,9 +296,20 @@ class PostmanCollectionMapper {
             for (final f in config.formFields)
               if (f.name.isNotEmpty)
                 if (f.isFile)
-                  {'key': f.name, 'type': 'file', 'src': f.filePath ?? ''}
+                  {
+                    'key': f.name,
+                    'type': 'file',
+                    'src': f.filePath ?? '',
+                    // Postman v2.1 supports contentType on formdata natively.
+                    if (f.contentType != null) 'contentType': f.contentType,
+                  }
                 else
-                  {'key': f.name, 'type': 'text', 'value': f.value},
+                  {
+                    'key': f.name,
+                    'type': 'text',
+                    'value': f.value,
+                    if (f.contentType != null) 'contentType': f.contentType,
+                  },
           ],
         };
       case BodyType.binary:
@@ -311,6 +332,11 @@ class PostmanCollectionMapper {
 
   // ---------- import helpers ----------
 
+  /// Postman flag values arrive from third-party exporters as booleans OR as
+  /// the strings 'true'/'false' — read both shapes, or a disabled row imports
+  /// as enabled and gets sent.
+  static bool _truthy(dynamic v) => v == true || v == 'true';
+
   static ({Map<String, String> variables, Set<String> secretKeys})
   _variablesFromPostman(
     dynamic raw,
@@ -319,7 +345,7 @@ class PostmanCollectionMapper {
     final secretKeys = <String>{};
     if (raw is List) {
       for (final entry in raw.whereType<Map<dynamic, dynamic>>()) {
-        if (entry['disabled'] == true) continue;
+        if (_truthy(entry['disabled'])) continue;
         final key = entry['key'];
         if (key is! String || key.isEmpty) continue;
         final value = entry['value'];
@@ -331,7 +357,7 @@ class PostmanCollectionMapper {
   }
 
   static CollectionNodeEntity _itemToNode(Map<String, dynamic> item) {
-    final name = (item['name'] as String?) ?? 'Untitled';
+    final name = item['name']?.toString() ?? 'Untitled';
     final nestedItems = item['item'];
     if (nestedItems is List) {
       final children = nestedItems
@@ -349,9 +375,17 @@ class PostmanCollectionMapper {
       );
     }
     final request = item['request'];
-    final config = request is Map
-        ? _requestToConfig(request.cast<String, dynamic>())
-        : HttpRequestConfigEntity(id: _uuid.v4());
+    // Postman v2.1 also allows the string shorthand `"request": "<url>"`
+    // (a bare GET at that URL) — keep the URL instead of importing an empty
+    // default config.
+    final HttpRequestConfigEntity config;
+    if (request is Map) {
+      config = _requestToConfig(request.cast<String, dynamic>());
+    } else if (request is String) {
+      config = HttpRequestConfigEntity(id: _uuid.v4(), url: request);
+    } else {
+      config = HttpRequestConfigEntity(id: _uuid.v4());
+    }
     return CollectionNodeEntity(
       id: _uuid.v4(),
       name: name,
@@ -376,7 +410,7 @@ class PostmanCollectionMapper {
   static HttpRequestConfigEntity _requestToConfig(
     Map<String, dynamic> request,
   ) {
-    final method = (request['method'] as String?)?.toUpperCase() ?? 'GET';
+    final method = request['method']?.toString().toUpperCase() ?? 'GET';
     final rawUrl = _parseUrl(request['url']);
     final structuredQuery = _parseQueryList(request['url']);
     // If Postman gave us a structured query block, it wins — merge into the
@@ -399,7 +433,20 @@ class PostmanCollectionMapper {
       formFields: body.formFields,
       bodyFilePath: body.bodyFilePath,
       graphqlVariables: body.graphqlVariables,
+      kind: _parseKind(request['_getman_kind']),
     );
+  }
+
+  /// Parses the `_getman_kind` vendor key back into a [RequestKind].
+  /// Lenient: absent, non-string, or unknown values all read as HTTP —
+  /// real Postman exports never carry the key.
+  static RequestKind _parseKind(dynamic raw) {
+    if (raw == null) return RequestKind.http;
+    final name = raw.toString().toLowerCase();
+    for (final kind in RequestKind.values) {
+      if (kind.name.toLowerCase() == name) return kind;
+    }
+    return RequestKind.http;
   }
 
   /// Inverse of [_authToPostman]. Unknown/absent types (incl. Postman's
@@ -501,7 +548,7 @@ class PostmanCollectionMapper {
       final decodedValue = _decodeQueryPart(
         value is String ? value : (value?.toString() ?? ''),
       );
-      if (entry['disabled'] == true) {
+      if (_truthy(entry['disabled'])) {
         parked.add(
           ParkedParamEntity(
             key: decodedKey,
@@ -544,7 +591,7 @@ class PostmanCollectionMapper {
         // disabled variant of a header above the live one — the surviving
         // (last) value must not inherit the earlier row's disabled mark, or
         // the imported header is silently never sent.
-        if (entry['disabled'] == true) {
+        if (_truthy(entry['disabled'])) {
           disabled.add(key);
         } else {
           disabled.remove(key);
@@ -634,9 +681,14 @@ class PostmanCollectionMapper {
     if (list is! List) return const [];
     final result = <MultipartFieldEntity>[];
     for (final entry in list.whereType<Map<dynamic, dynamic>>()) {
-      if (entry['disabled'] == true) continue;
+      if (_truthy(entry['disabled'])) continue;
       final key = entry['key'];
       if (key is! String || key.isEmpty) continue;
+      // Postman v2.1 formdata entries may carry a per-row contentType.
+      final rawContentType = entry['contentType']?.toString();
+      final contentType = (rawContentType != null && rawContentType.isNotEmpty)
+          ? rawContentType
+          : null;
       if (multipart && entry['type'] == 'file') {
         final src = entry['src'];
         result.add(
@@ -644,6 +696,7 @@ class PostmanCollectionMapper {
             name: key,
             isFile: true,
             filePath: src is String ? src : null,
+            contentType: contentType,
           ),
         );
       } else {
@@ -652,6 +705,7 @@ class PostmanCollectionMapper {
           MultipartFieldEntity(
             name: key,
             value: value is String ? value : (value?.toString() ?? ''),
+            contentType: multipart ? contentType : null,
           ),
         );
       }

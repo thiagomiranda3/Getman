@@ -205,6 +205,39 @@ void main() {
       expect(out, contains('https://api.dev/y?k=a%20b%26c'));
     });
 
+    test(
+      'api key in query is NOT appended when the URL already carries a '
+      'same-name param (hand-written wins, mirroring the send path)',
+      () {
+        const config = HttpRequestConfigEntity(
+          id: 'c',
+          url: 'https://api.dev/y?k=existing',
+          auth: {'type': 'apikey', 'key': 'k', 'value': 'v', 'addTo': 'query'},
+        );
+        final out = CodeGenService.generate(config, CodeGenTarget.curl);
+        expect(out, contains('https://api.dev/y?k=existing'));
+        expect(out, isNot(contains('k=v')));
+      },
+    );
+
+    test(
+      'api key in query checks the RESOLVED URL for the existing param',
+      () {
+        const config = HttpRequestConfigEntity(
+          id: 'c',
+          url: 'https://api.dev/y?{{p}}=existing',
+          auth: {'type': 'apikey', 'key': 'k', 'value': 'v', 'addTo': 'query'},
+        );
+        final out = CodeGenService.generate(
+          config,
+          CodeGenTarget.curl,
+          resolve: (v) => EnvironmentResolver.resolve(v, const {'p': 'k'}),
+        );
+        expect(out, contains('https://api.dev/y?k=existing'));
+        expect(out, isNot(contains('k=v')));
+      },
+    );
+
     test('escapes a single quote in a header value with the POSIX idiom', () {
       const config = HttpRequestConfigEntity(
         id: 'c',

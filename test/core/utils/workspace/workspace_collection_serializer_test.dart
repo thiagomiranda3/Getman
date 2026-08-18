@@ -180,6 +180,49 @@ void main() {
       expect(back.config!.disabledParams, isEmpty);
       expect(back.config!.disabledHeaderKeys, isEmpty);
     });
+
+    test(
+      'hand-edited non-string header/auth/disabledParam values read back as '
+      'usable strings (regression: lazy .cast views passed read() and threw '
+      'a TypeError later, bypassing the malformed-file guard)',
+      () {
+        final json = <String, dynamic>{
+          'id': 'node-edited',
+          'name': 'Edited By Hand',
+          'request': <String, dynamic>{
+            'id': 'cfg-edited',
+            'method': 'GET',
+            'url': 'https://api.dev/x',
+            'headers': <String, dynamic>{'X-Retry': 3, 'X-Ok': 'yes'},
+            'auth': <String, dynamic>{'type': 'bearer', 'attempts': 2},
+            'disabledParams': [
+              {'key': 'a', 'value': 7, 'rowIndex': 0},
+            ],
+          },
+        };
+        final back = WorkspaceCollectionSerializer.requestFromJson(json);
+        final config = back.config!;
+
+        // With the old lazy `.cast<String, String>()` views, merely READING
+        // these maps threw the deferred TypeError — the expect itself is the
+        // regression trip-wire.
+        expect(config.headers, {'X-Retry': '3', 'X-Ok': 'yes'});
+        expect(config.auth, {'type': 'bearer', 'attempts': '2'});
+        expect(config.disabledParams, [
+          const ParkedParamEntity(key: 'a', value: '7', rowIndex: 0),
+        ]);
+
+        // The entity is fully usable downstream: iterating/copying (what
+        // render/send/mirror do) must not throw, and a re-serialize writes
+        // real strings.
+        expect(() => Map<String, String>.of(config.headers), returnsNormally);
+        final rewritten =
+            WorkspaceCollectionSerializer.requestToJson(back)['request']
+                as Map<String, dynamic>;
+        expect((rewritten['headers'] as Map)['X-Retry'], '3');
+        expect((rewritten['auth'] as Map)['attempts'], '2');
+      },
+    );
   });
 
   group('folder + manifest', () {

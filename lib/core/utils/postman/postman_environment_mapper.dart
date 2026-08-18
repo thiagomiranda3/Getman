@@ -94,14 +94,20 @@ class PostmanEnvironmentMapper {
     };
   }
 
+  /// Postman flag values arrive from third-party exporters as booleans OR as
+  /// the strings 'true'/'false' — read both shapes, or a disabled variable
+  /// imports as enabled.
+  static bool _falsy(dynamic v) => v == false || v == 'false';
+
   static EnvironmentEntity _mapToEnv(Map<String, dynamic> data) {
-    final name = (data['name'] as String?) ?? 'Imported Environment';
+    // Coerce, never `as`-cast: a numeric name must not abort the import.
+    final name = data['name']?.toString() ?? 'Imported Environment';
     final rawValues = data['values'];
     final variables = <String, String>{};
     final secretKeys = <String>{};
     if (rawValues is List) {
       for (final entry in rawValues.whereType<Map<dynamic, dynamic>>()) {
-        if (entry['enabled'] == false) continue;
+        if (_falsy(entry['enabled'])) continue;
         final key = entry['key'];
         final value = entry['value'];
         if (key is! String || key.isEmpty) continue;

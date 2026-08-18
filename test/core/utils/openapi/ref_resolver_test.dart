@@ -67,4 +67,75 @@ void main() {
     final node = <String, dynamic>{r'$ref': 'other.yaml#/Thing'};
     expect(r.resolve(node), node); // unresolved; caller may warn
   });
+
+  group('node budget (fan-out guard)', () {
+    /// 10 refs per level x [levels] levels: full expansion is 10^levels
+    /// nodes — the cycle guard alone cannot stop this (sibling refs are
+    /// re-expanded on every path).
+    Map<String, dynamic> fanOutRoot(int levels) {
+      final schemas = <String, dynamic>{};
+      for (var level = 0; level < levels; level++) {
+        schemas['L$level'] = {
+          'type': 'object',
+          'properties': {
+            for (var i = 0; i < 10; i++)
+              'p$i': level == levels - 1
+                  ? {'type': 'string'}
+                  : {r'$ref': '#/components/schemas/L${level + 1}'},
+          },
+        };
+      }
+      return {
+        'components': {'schemas': schemas},
+      };
+    }
+
+    test('a tiny budget stops expansion, flags exhaustion, and returns '
+        'unexpanded refs instead of hanging', () {
+      final r = RefResolver(fanOutRoot(10), nodeBudget: 200);
+      final resolved = r.deepResolve(<String, dynamic>{
+        r'$ref': '#/components/schemas/L0',
+      });
+      expect(resolved, isA<Map<String, dynamic>>());
+      expect(r.nodeBudgetExhausted, isTrue);
+      // Somewhere in the truncated tree an internal ref survives as-is.
+      var foundRawRef = false;
+      void scan(Object? node) {
+        if (node is Map) {
+          if (node[r'$ref'] is String) foundRawRef = true;
+          node.values.forEach(scan);
+        } else if (node is List) {
+          node.forEach(scan);
+        }
+      }
+
+      scan(resolved);
+      expect(foundRawRef, isTrue);
+    });
+
+    test('a billion-laughs spec (10^10 full expansion) completes under the '
+        'default budget', () {
+      // Regression: without the budget this test hangs the isolate.
+      final r = RefResolver(fanOutRoot(10));
+      final resolved = r.deepResolve(<String, dynamic>{
+        r'$ref': '#/components/schemas/L0',
+      });
+      expect(resolved, isA<Map<String, dynamic>>());
+      expect(r.nodeBudgetExhausted, isTrue);
+    });
+
+    test('normal specs resolve identically and never exhaust the budget', () {
+      final r = RefResolver(root);
+      final resolved = r.deepResolve(<String, dynamic>{
+        r'$ref': '#/definitions/Pet',
+      });
+      expect(resolved, {
+        'type': 'object',
+        'properties': {
+          'name': {'type': 'string'},
+        },
+      });
+      expect(r.nodeBudgetExhausted, isFalse);
+    });
+  });
 }

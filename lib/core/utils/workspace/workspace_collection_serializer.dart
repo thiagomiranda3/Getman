@@ -166,11 +166,16 @@ class WorkspaceCollectionSerializer {
         (k) => k.name == json['kind'],
         orElse: () => RequestKind.http,
       ),
-      headers: ((json['headers'] as Map?) ?? const {}).cast<String, String>(),
+      // Eager coercion, never `.cast<String, String>()`: cast() is a LAZY
+      // view, so a hand-edited file with a non-string value ({"X-Retry": 3})
+      // would sail through read() — and through WorkspaceSyncService.read's
+      // malformed-file guard around it — then detonate a TypeError far later
+      // (render/send/mirror). Same convention as folderFromJson's variables.
+      headers: _stringMap(json['headers']),
       body: (json['body'] as String?) ?? '',
       bodyType: BodyType.fromWire(json['bodyType'] as String?),
       graphqlVariables: (json['graphqlVariables'] as String?) ?? '',
-      auth: ((json['auth'] as Map?) ?? const {}).cast<String, String>(),
+      auth: _stringMap(json['auth']),
       formFields: [
         for (final Map<String, dynamic> m
             in ((json['formFields'] as List?) ?? const [])
@@ -188,9 +193,11 @@ class WorkspaceCollectionSerializer {
         for (final Map<String, dynamic> m
             in ((json['disabledParams'] as List?) ?? const [])
                 .cast<Map<String, dynamic>>())
+          // Coerced like headers/auth above: a hand-edited numeric key/value
+          // reads back as its string form instead of failing the whole file.
           ParkedParamEntity(
-            key: (m['key'] as String?) ?? '',
-            value: (m['value'] as String?) ?? '',
+            key: '${m['key'] ?? ''}',
+            value: '${m['value'] ?? ''}',
             rowIndex: (m['rowIndex'] as num?)?.toInt() ?? 0,
           ),
       ],
@@ -200,4 +207,12 @@ class WorkspaceCollectionSerializer {
       // response cache fields intentionally not persisted → null on read.
     );
   }
+
+  /// Materializes a JSON map into a real `Map<String, String>`, stringifying
+  /// non-string values (`3` → `'3'`, `null` → `''`). Mirrors the coercion
+  /// [folderFromJson] applies to `variables`; see the headers/auth comment in
+  /// [_configFromJson] for why a lazy `.cast` view is never acceptable here.
+  static Map<String, String> _stringMap(Object? raw) => raw is Map
+      ? raw.map((k, v) => MapEntry('$k', v is String ? v : '${v ?? ''}'))
+      : const <String, String>{};
 }
