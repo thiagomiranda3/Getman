@@ -40,7 +40,7 @@ widgets + screens). Shared cross-feature code lives under `lib/core/`. See
 | `lib/core/error` | Failure / Exception hierarchy. | `failures.dart`, `exceptions.dart`, `guard.dart` |
 | `lib/core/git` | Abstract `git`/`gh` CLI gateways (+ io/stub impls). | `git_service.dart`, `git_service_io.dart`, `gh_service.dart`, `gh_output_parser.dart` |
 | `lib/core/navigation` | Router + keyboard intents + shortcut labels. | `app_router.dart`, `intents.dart`, `url_focus_registry.dart`, `shortcut_catalog.dart` |
-| `lib/core/network` | Dio client, cookies, realtime, MCP transport. | `network_service.dart`, `realtime_service.dart`, `mcp_service.dart`, `cookie_interceptor.dart` |
+| `lib/core/network` | Dio client, cookies, realtime, MCP transport. | `network_service.dart`, `realtime_service.dart`, `mcp_service.dart`, `cookie_interceptor.dart`, `web_socket_connector.dart` (io/stub: WS handshake headers on desktop) |
 | `lib/core/storage` | Hive box-name constants + helpers. | `hive_boxes.dart`, `hive_helpers.dart` |
 | `lib/core/theme` | Theme registry + responsive tiers. | `theme_registry.dart`, `theme_ids.dart`, `responsive.dart`, `app_theme.dart` |
 | `lib/core/theme/extensions` | The 8 `ThemeExtension`s + `context.app*` accessors. | `app_palette.dart`, `app_components.dart`, `app_theme_access.dart`, `app_layout.dart` |
@@ -138,7 +138,7 @@ widgets + screens). Shared cross-feature code lives under `lib/core/`. See
 |---|---|
 | `lib/features/home/domain/usecases` | `tab_dirty_checker.dart` (unsaved-changes detection). |
 | `lib/features/home/presentation/screens` | `main_screen.dart` (app shell; hosts every keyboard `Action` + tab strip). |
-| `lib/features/home/presentation/widgets` | `side_menu.dart`, `request_tab_chip.dart`, `tab_content_stack.dart`, `tab_chip.dart`, `add_tab_button.dart`, `tab_strip_double_click.dart`, `empty_tabs_placeholder.dart`. |
+| `lib/features/home/presentation/widgets` | `side_menu.dart`, `request_tab_chip.dart`, `tab_content_stack.dart`, `tab_chip.dart`, `add_tab_button.dart`, `tab_strip_double_click.dart`, `empty_tabs_placeholder.dart`, `exit_flush_guard.dart` (flush debounced saves on app exit/hide), `tab_close_teardown_listener.dart` (close realtime/MCP sessions when their tab closes). |
 
 ### `mcp` — Model Context Protocol client (bloc-over-service)
 
