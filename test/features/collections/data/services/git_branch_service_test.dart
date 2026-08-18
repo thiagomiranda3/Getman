@@ -158,7 +158,7 @@ void main() {
     );
   });
 
-  test('isDirty is true when git reports any entry', () async {
+  test('isDirty is true when git reports a workspace entry', () async {
     when(() => git.status(root)).thenAnswer(
       (_) async => const [
         GitStatusEntry(
@@ -172,9 +172,41 @@ void main() {
     expect(await service.isDirty(root), isTrue);
   });
 
+  test('isDirty is true for a modified request nested in a folder', () async {
+    when(() => git.status(root)).thenAnswer(
+      (_) async => const [
+        GitStatusEntry(
+          indexStatus: ' ',
+          worktreeStatus: 'M',
+          path: 'folder/x.req.json',
+        ),
+      ],
+    );
+
+    expect(await service.isDirty(root), isTrue);
+  });
+
   test('isDirty is false when git reports a clean tree', () async {
     expect(await service.isDirty(root), isFalse);
   });
+
+  test(
+    'isDirty ignores non-workspace files — an untracked .DS_Store must not '
+    'refuse a branch switch that Review then reports as empty',
+    () async {
+      when(() => git.status(root)).thenAnswer(
+        (_) async => const [
+          GitStatusEntry(
+            indexStatus: '?',
+            worktreeStatus: '?',
+            path: '.DS_Store',
+          ),
+        ],
+      );
+
+      expect(await service.isDirty(root), isFalse);
+    },
+  );
 
   test('switchTo delegates to git', () async {
     await service.switchTo(root, 'feat/x');

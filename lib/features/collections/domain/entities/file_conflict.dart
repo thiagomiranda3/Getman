@@ -69,4 +69,14 @@ class FileResolution extends Equatable {
 }
 
 /// Outcome of asking the conflict service to continue an in-progress rebase.
-enum RebaseStep { done, moreConflicts }
+enum RebaseStep {
+  done,
+  moreConflicts,
+
+  /// The rebase finished, but re-applying the user's uncommitted edits (the
+  /// pull's `--autostash`) conflicted. The working tree was restored to the
+  /// clean rebased state and the edits are preserved in `stash@{0}` — the
+  /// same shape as `PullOutcome.cleanEditsStashed`. Callers should reload
+  /// AND tell the user where their edits went.
+  doneEditsStashed,
+}

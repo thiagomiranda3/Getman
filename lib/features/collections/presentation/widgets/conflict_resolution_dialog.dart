@@ -211,7 +211,18 @@ class _ConflictResolutionBodyState extends State<ConflictResolutionBody> {
           final messenger = ScaffoldMessenger.of(context);
           final gitBloc = context.read<GitSyncBloc>();
           unawaited(Navigator.of(context).maybePop());
-          showAppSnackBarVia(messenger, 'Conflicts resolved.');
+          showAppSnackBarVia(
+            messenger,
+            state.editsStashed
+                // Mirrors GitSyncBloc's PullOutcome.cleanEditsStashed message:
+                // the rebase finished but the autostash re-apply conflicted,
+                // so the edits were parked in the stash instead of the tree.
+                ? 'Conflicts resolved, but your uncommitted local edits '
+                      'conflicted with the merged changes. They were kept in '
+                      'the git stash — open STASHES in the branch menu to '
+                      're-apply or drop them.'
+                : 'Conflicts resolved.',
+          );
           // ConflictsResolved (not LoadBranchStatus) both refreshes branch
           // status AND bumps reloadToken so BranchSyncListener reloads the
           // merged tree — otherwise the resolved files sit on disk while

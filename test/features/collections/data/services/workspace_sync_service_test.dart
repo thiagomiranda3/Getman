@@ -458,4 +458,66 @@ void main() {
       verify(() => ds.write('/ws', any())).called(1);
     });
   });
+
+  group('a failed reload blocks mirroring for that root', () {
+    WorkspaceSyncService build() {
+      final service = WorkspaceSyncService(
+        ds,
+        debounce: const Duration(milliseconds: 5),
+      );
+      addTearDown(service.dispose);
+      return service;
+    }
+
+    test(
+      'scheduleMirror never writes after a failed read — even once the '
+      'debounce elapses (disk holds state Hive could not load)',
+      () async {
+        when(() => ds.read('/ws')).thenThrow(Exception('malformed req'));
+        final service = build();
+
+        await expectLater(service.read('/ws'), throwsException);
+        expect(service.isReloadBlocked('/ws'), isTrue);
+
+        // Mirroring the stale in-memory forest here would silently revert
+        // the files git just changed on disk.
+        service.scheduleMirror('/ws', const []);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        verifyNever(() => ds.write(any(), any()));
+      },
+    );
+
+    test(
+      'a later successful read clears the block and mirroring resumes',
+      () async {
+        when(() => ds.read('/ws')).thenThrow(Exception('malformed req'));
+        final service = build();
+        await expectLater(service.read('/ws'), throwsException);
+        expect(service.isReloadBlocked('/ws'), isTrue);
+
+        when(() => ds.read('/ws')).thenAnswer((_) async => const []);
+        await service.read('/ws');
+        expect(service.isReloadBlocked('/ws'), isFalse);
+
+        service.scheduleMirror('/ws', const []);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        verify(() => ds.write('/ws', any())).called(1);
+      },
+    );
+
+    test('the block is root-scoped: a different root still mirrors', () async {
+      when(() => ds.read('/ws')).thenThrow(Exception('malformed req'));
+      final service = build();
+      await expectLater(service.read('/ws'), throwsException);
+
+      expect(service.isReloadBlocked('/other'), isFalse);
+      service.scheduleMirror('/other', const []);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      verify(() => ds.write('/other', any())).called(1);
+      verifyNever(() => ds.write('/ws', any()));
+    });
+  });
 }

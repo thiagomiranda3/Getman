@@ -74,7 +74,29 @@ class WorkspaceSyncService {
   /// Whether mirroring is currently gated off. See [suspendMirroring].
   bool get isMirroringSuspended => _suspendCount > 0;
 
-  Future<List<CollectionNodeEntity>> read(String root) => dataSource.read(root);
+  /// Roots whose last [read] FAILED. While a root is in here, disk holds
+  /// state that Hive could not load (e.g. a pulled tree with one malformed
+  /// `.req.json`), so mirroring to it is blocked: the next debounced mirror
+  /// would write the stale in-memory forest over the files git just changed —
+  /// silently reverting (and deleting) teammates' pulled work. Cleared by the
+  /// first successful [read] of that root.
+  final Set<String> _reloadBlockedRoots = {};
+
+  /// Whether mirroring to [root] is blocked by a failed reload. See
+  /// [_reloadBlockedRoots].
+  bool isReloadBlocked(String root) => _reloadBlockedRoots.contains(root);
+
+  Future<List<CollectionNodeEntity>> read(String root) async {
+    try {
+      final forest = await dataSource.read(root);
+      _reloadBlockedRoots.remove(root);
+      return forest;
+    } on Object {
+      _reloadBlockedRoots.add(root);
+      _cancelPending();
+      rethrow;
+    }
+  }
 
   /// Turns [scheduleMirror] into a no-op (and drops anything already armed)
   /// until the matching [resumeMirroring].
@@ -129,6 +151,9 @@ class WorkspaceSyncService {
       _cancelPending();
       return;
     }
+    // A root whose reload failed must not be written to — Hive's forest is
+    // stale relative to what git put on disk (see _reloadBlockedRoots).
+    if (isReloadBlocked(root)) return;
     _timer?.cancel();
     _pendingRoot = root;
     _pendingForest = forest;

@@ -10,9 +10,10 @@
 // triggering WorkspaceSyncListener's mirror (a reload -> mirror -> reload
 // loop). This relies on CollectionsBloc emitting synchronously before its
 // awaited save — see the inline comment before changing that ordering.
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
@@ -48,6 +49,9 @@ class BranchSyncListener extends StatelessWidget {
         final sync = context.read<WorkspaceSyncService>();
         final collections = context.read<CollectionsBloc>();
         final tabs = context.read<TabsBloc>();
+        // Captured before the awaits below — the listener context may be gone
+        // by the time a failed read needs to surface its snackbar.
+        final messenger = ScaffoldMessenger.of(context);
         // Snapshot the saved configs *before* the reload so we can tell open
         // tabs that were untouched (safe to refresh) from those the user has
         // edited (must not be clobbered).
@@ -69,7 +73,20 @@ class BranchSyncListener extends StatelessWidget {
           try {
             onDisk = await sync.read(path);
           } on Object catch (_) {
-            return; // best-effort: a failed read must not break the session
+            // A failed read must not break the session — but it must not be
+            // SILENT either: Hive now holds a tree that no longer matches
+            // disk, and a resumed mirror would overwrite the pulled/switched
+            // files with it (deleting teammates' new requests). sync.read has
+            // already blocked mirroring for this root until a reload
+            // succeeds; tell the user how to unwedge it.
+            showAppSnackBarVia(
+              messenger,
+              'Git succeeded, but the workspace could not be reloaded — '
+              'the in-app tree was left unchanged and mirroring to this '
+              'workspace is paused. Fix or remove the malformed file, then '
+              'RELOAD FROM DISK in Settings → Workspace.',
+            );
+            return;
           }
           // Secret variable values (masked to '' on disk) and saved examples
           // exist only in the app — carry them over or every git op wipes

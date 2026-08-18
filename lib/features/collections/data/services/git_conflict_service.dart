@@ -42,9 +42,19 @@ class GitConflictService implements ConflictService {
       authorName: authorName,
       authorEmail: authorEmail,
     );
-    return await _git.isRebaseInProgress(root)
-        ? RebaseStep.moreConflicts
-        : RebaseStep.done;
+    if (await _git.isRebaseInProgress(root)) return RebaseStep.moreConflicts;
+    // `rebase --continue` exits 0 even when the now-finished rebase's
+    // autostash re-apply conflicted ("Applying autostash resulted in
+    // conflicts") — the tree is left with conflict markers and an unmerged
+    // index, which would masquerade as the resolved state, wedge every later
+    // commit on "unmerged files", and let the next mirror overwrite the merge.
+    // Same shape as pull()'s PullOutcome.cleanEditsStashed: restore the clean
+    // rebased tree (the edits stay safely in stash@{0}) and tell the caller.
+    if ((await _git.conflictedPaths(root)).isNotEmpty) {
+      await _git.resetHard(root);
+      return RebaseStep.doneEditsStashed;
+    }
+    return RebaseStep.done;
   });
 
   @override

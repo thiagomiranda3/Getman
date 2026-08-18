@@ -834,9 +834,34 @@ void main() {
         ),
       ).thenAnswer((_) async {});
       when(() => git.isRebaseInProgress(root)).thenAnswer((_) async => false);
+      when(() => git.conflictedPaths(root)).thenAnswer((_) async => const []);
 
       expect(await service.continueRebase(root), RebaseStep.done);
     });
+
+    test(
+      'a finished rebase whose autostash re-apply conflicted restores the '
+      'clean tree and maps to doneEditsStashed',
+      () async {
+        when(
+          () => git.rebaseContinue(
+            root,
+            authorName: any(named: 'authorName'),
+            authorEmail: any(named: 'authorEmail'),
+          ),
+        ).thenAnswer((_) async {});
+        when(() => git.isRebaseInProgress(root)).thenAnswer((_) async => false);
+        // `rebase --continue` exits 0, but the tree was left with an unmerged
+        // index ("Applying autostash resulted in conflicts").
+        when(
+          () => git.conflictedPaths(root),
+        ).thenAnswer((_) async => const ['a.req.json']);
+        when(() => git.resetHard(root)).thenAnswer((_) async {});
+
+        expect(await service.continueRebase(root), RebaseStep.doneEditsStashed);
+        verify(() => git.resetHard(root)).called(1);
+      },
+    );
 
     // FIX I1: same gate must be held across `rebase --continue`.
     test('holds mirroring suspended for its whole duration', () async {
@@ -852,6 +877,7 @@ void main() {
         expect(sync.isMirroringSuspended, isTrue);
       });
       when(() => git.isRebaseInProgress(root)).thenAnswer((_) async => false);
+      when(() => git.conflictedPaths(root)).thenAnswer((_) async => const []);
 
       expect(sync.isMirroringSuspended, isFalse);
       await svc.continueRebase(root);
