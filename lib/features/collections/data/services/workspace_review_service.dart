@@ -156,7 +156,10 @@ class WorkspaceReviewService implements ReviewService {
         changeType: changeType,
         displayName: (after ?? before)?.name ?? 'Request',
         staged: s.isStaged,
-        diff: RequestConfigDiff.diff(before?.config, after?.config),
+        // RequestNodeDiff, not RequestConfigDiff: a request's description
+        // lives on the NODE, and the config-only diff made a
+        // description-only change review as an empty diff.
+        diff: RequestNodeDiff.diff(before, after),
       );
     }
     return null; // non-workspace file — ignore

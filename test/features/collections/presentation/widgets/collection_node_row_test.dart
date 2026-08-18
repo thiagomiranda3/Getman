@@ -59,19 +59,31 @@ void main() {
 
   Widget host({required bool isSelected}) {
     final bloc = buildBloc();
-    return MaterialApp(
-      theme: resolveTheme('brutalist')(Brightness.light, isCompact: false),
-      home: Scaffold(
-        body: BlocProvider<CollectionsBloc>.value(
-          value: bloc,
-          child: CollectionNodeRow(
-            node: requestNode,
-            isExpanded: false,
-            depth: 0,
-            onToggle: () {},
-            rowWidth: 300,
-            rowHeight: 44,
-            isSelected: isSelected,
+    // TabsBloc above the MaterialApp, mirroring main.dart: the context
+    // menu's RENAME carries the new name to open linked tabs
+    // (renameOpenTabsForNode reads TabsBloc from the menu's context).
+    final tabs = MockTabsBloc();
+    whenListen(
+      tabs,
+      const Stream<TabsState>.empty(),
+      initialState: const TabsState(),
+    );
+    return BlocProvider<TabsBloc>.value(
+      value: tabs,
+      child: MaterialApp(
+        theme: resolveTheme('brutalist')(Brightness.light, isCompact: false),
+        home: Scaffold(
+          body: BlocProvider<CollectionsBloc>.value(
+            value: bloc,
+            child: CollectionNodeRow(
+              node: requestNode,
+              isExpanded: false,
+              depth: 0,
+              onToggle: () {},
+              rowWidth: 300,
+              rowHeight: 44,
+              isSelected: isSelected,
+            ),
           ),
         ),
       ),

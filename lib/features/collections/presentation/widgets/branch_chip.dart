@@ -6,16 +6,26 @@
 // Gotcha: a pull halted on conflicts opens ConflictResolutionDialog exactly
 // once per bump of GitSyncState.conflictToken, tracked via
 // _lastConflictToken (seeded from bloc state on first build, not read in
-// initState — GitSyncBloc may not be provided above this chip yet).
+// initState — GitSyncBloc may not be provided above this chip yet). That
+// token is edge-delivered: if the chip is unmounted when it bumps (HISTORY
+// tab, closed drawer), the seed consumes it silently — so the durable
+// BranchStatus.rebaseInProgress flag renders a REBASE PAUSED chip (even with
+// current == null, i.e. detached HEAD mid-rebase) that keeps the resolver
+// and abort reachable after any remount or app restart.
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
+import 'package:getman/core/ui/widgets/app_snack_bar.dart';
+import 'package:getman/core/ui/widgets/confirm_dialog.dart';
 import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/entities/branch_status.dart';
+import 'package:getman/features/collections/presentation/bloc/conflict_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/conflict_event.dart';
+import 'package:getman/features/collections/presentation/bloc/conflict_state.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_event.dart';
 import 'package:getman/features/collections/presentation/bloc/git_sync_state.dart';
@@ -59,6 +69,12 @@ class _BranchChipState extends State<BranchChip> {
   // in a screen that never renders it) so a BranchChip remount after an
   // earlier, already-resolved conflict doesn't replay a stale open.
   int? _lastConflictToken;
+
+  // True between the REBASE PAUSED chip's ABORT REBASE confirm and the
+  // abort's terminal ConflictBloc state, so the chip's ConflictBloc listener
+  // only reacts to the abort *it* dispatched — never to transitions driven by
+  // an open ConflictResolutionDialog (which handles its own completion).
+  bool _abortingViaChip = false;
 
   @override
   void initState() {
@@ -141,9 +157,16 @@ class _BranchChipState extends State<BranchChip> {
             // is the only thing that can ever pop the dialog.
             _lastConflictToken ??= state.conflictToken;
             final branch = state.branch;
-            if (!branch.isRepo || branch.current == null) {
-              return const SizedBox.shrink();
+            if (!branch.isRepo) return const SizedBox.shrink();
+            // A paused rebase detaches HEAD (current == null) — hiding the
+            // chip here would make the resolver AND the branch menu
+            // unreachable (the conflictToken bump is edge-delivered and may
+            // already be consumed after a remount or app restart). The
+            // durable flag keeps a way back on screen.
+            if (branch.rebaseInProgress) {
+              return _rebasePausedChip(context, root, state);
             }
+            if (branch.current == null) return const SizedBox.shrink();
             return _chip(context, root, state);
           },
         );
@@ -248,6 +271,111 @@ class _BranchChipState extends State<BranchChip> {
         ),
       ),
     );
+  }
+
+  /// Rendered instead of [_chip] while a rebase is paused mid-conflict
+  /// (`BranchStatus.rebaseInProgress`) — HEAD is detached then, so the normal
+  /// chip's `current == null` guard would blank the whole branch UI and leave
+  /// the user wedged until they reach for a terminal. Offers the two ways
+  /// out: the conflict resolver (same open path as the conflictToken
+  /// listener) and aborting the rebase.
+  Widget _rebasePausedChip(
+    BuildContext context,
+    String root,
+    GitSyncState state,
+  ) {
+    final layout = context.appLayout;
+    final theme = Theme.of(context);
+
+    return BlocListener<ConflictBloc, ConflictState>(
+      listenWhen: (p, n) => p.status != n.status,
+      listener: (context, conflictState) {
+        // Only the abort dispatched from THIS chip's menu — a transition
+        // driven by an open ConflictResolutionDialog is that dialog's to
+        // handle (it pops, snackbars, and refreshes on its own).
+        if (!_abortingViaChip) return;
+        if (conflictState.status == ConflictStatus.done) {
+          _abortingViaChip = false;
+          showAppSnackBar(context, 'Rebase aborted.');
+          // The abort restored the pre-pull tree (which already matches
+          // Hive — nothing to reload); only the branch status must be
+          // re-read so this chip flips back to the normal one.
+          _refresh(root);
+        } else if (conflictState.status == ConflictStatus.error) {
+          _abortingViaChip = false;
+          _showError(
+            context,
+            conflictState.errorMessage ?? 'Aborting the rebase failed.',
+          );
+        }
+      },
+      child: PopupMenuButton<String>(
+        key: const ValueKey('rebase_paused_chip'),
+        tooltip: 'Rebase paused on conflicts',
+        enabled: !state.isBusy,
+        onSelected: (value) => _onRebaseAction(context, root, value),
+        itemBuilder: (context) => [
+          const PopupMenuItem<String>(
+            key: ValueKey('rebase_menu_resolve'),
+            value: 'resolve',
+            child: Text('RESOLVE CONFLICTS…'),
+          ),
+          const PopupMenuItem<String>(
+            key: ValueKey('rebase_menu_abort'),
+            value: 'abort',
+            child: Text('ABORT REBASE'),
+          ),
+        ],
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: layout.tabSpacing),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.warning_amber,
+                size: layout.smallIconSize,
+                color: theme.colorScheme.error,
+              ),
+              SizedBox(width: layout.tabSpacing),
+              Text(
+                'REBASE PAUSED',
+                style: TextStyle(
+                  fontSize: layout.fontSizeSmall,
+                  fontWeight: context.appTypography.titleWeight,
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _onRebaseAction(BuildContext context, String root, String value) {
+    switch (value) {
+      case 'resolve':
+        // Same open path the conflictToken listener uses — the dialog
+        // dispatches LoadConflicts itself and owns the resolve/abort flows
+        // from there.
+        unawaited(ConflictResolutionDialog.show(context, root: root));
+      case 'abort':
+        final conflictBloc = context.read<ConflictBloc>();
+        unawaited(
+          ConfirmDialog.show(
+            context,
+            title: 'ABORT REBASE',
+            message:
+                'Abort the paused rebase and restore the state from before '
+                'the pull? Conflict resolutions made so far are discarded.',
+            confirmLabel: 'ABORT REBASE',
+            onConfirm: () {
+              _abortingViaChip = true;
+              conflictBloc.add(AbortRebase(root));
+            },
+          ),
+        );
+    }
   }
 
   void _onSelected(

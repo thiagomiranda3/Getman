@@ -50,8 +50,12 @@ class BranchSyncListener extends StatelessWidget {
         final collections = context.read<CollectionsBloc>();
         final tabs = context.read<TabsBloc>();
         // Captured before the awaits below — the listener context may be gone
-        // by the time a failed read needs to surface its snackbar.
-        final messenger = ScaffoldMessenger.of(context);
+        // by the time a failed read needs to surface its snackbar. maybeOf,
+        // NOT of: this listener mounts ABOVE MaterialApp in main.dart, so no
+        // ScaffoldMessenger ancestor exists there and `.of` would throw on
+        // EVERY reload. With no messenger the failure degrades to debugPrint
+        // (same contract as WorkspaceSyncListener's boot-import failure path).
+        final messenger = ScaffoldMessenger.maybeOf(context);
         // Snapshot the saved configs *before* the reload so we can tell open
         // tabs that were untouched (safe to refresh) from those the user has
         // edited (must not be clobbered).
@@ -79,13 +83,16 @@ class BranchSyncListener extends StatelessWidget {
             // files with it (deleting teammates' new requests). sync.read has
             // already blocked mirroring for this root until a reload
             // succeeds; tell the user how to unwedge it.
-            showAppSnackBarVia(
-              messenger,
-              'Git succeeded, but the workspace could not be reloaded — '
-              'the in-app tree was left unchanged and mirroring to this '
-              'workspace is paused. Fix or remove the malformed file, then '
-              'RELOAD FROM DISK in Settings → Workspace.',
-            );
+            const failureMessage =
+                'Git succeeded, but the workspace could not be reloaded — '
+                'the in-app tree was left unchanged and mirroring to this '
+                'workspace is paused. Fix or remove the malformed file, then '
+                'RELOAD FROM DISK in Settings → Workspace.';
+            if (messenger != null) {
+              showAppSnackBarVia(messenger, failureMessage);
+            } else {
+              debugPrint(failureMessage);
+            }
             return;
           }
           // Secret variable values (masked to '' on disk) and saved examples

@@ -11,10 +11,14 @@ import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/mcp_service.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/network/realtime_service.dart';
+import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
+import 'package:getman/features/chaining/data/models/request_rules_model.dart';
 import 'package:getman/features/chaining/domain/repositories/request_rules_repository.dart';
 import 'package:getman/features/chaining/domain/usecases/request_rules_usecases.dart';
 import 'package:getman/features/chaining/presentation/bloc/rules_bloc.dart';
+import 'package:getman/features/collections/data/models/collection_node_model.dart';
+import 'package:getman/features/collections/data/models/saved_example_model.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/branch_service.dart';
 import 'package:getman/features/collections/domain/conflict_service.dart';
@@ -29,6 +33,7 @@ import 'package:getman/features/collections/presentation/bloc/pull_requests_bloc
 import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
 import 'package:getman/features/environments/domain/repositories/environments_repository.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
+import 'package:getman/features/history/data/models/request_config_model.dart';
 import 'package:getman/features/history/domain/repositories/history_repository.dart';
 import 'package:getman/features/history/domain/usecases/history_usecases.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
@@ -39,12 +44,14 @@ import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/domain/repositories/settings_repository.dart';
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/tabs/data/models/request_tab_model.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_section_index.dart';
 import 'package:getman/features/updates/domain/repositories/update_repository.dart';
 import 'package:getman/features/updates/presentation/update_controller.dart';
+import 'package:hive_ce/hive.dart';
 
 /// Boots the real dependency graph (`di.init`) against a throwaway Hive
 /// directory and resolves every root registration. Lazy singletons only run
@@ -156,6 +163,72 @@ void main() {
 
     expect(settings.historyLimit, 42);
     expect(settings.isDarkMode, isTrue);
+  });
+
+  test('boot sweeps orphaned request rules and keeps every live owner '
+      '(H4)', () async {
+    // First boot opens the boxes; seed rule owners + rules through them.
+    await di.init(storageDirectoryOverride: tempDir.path);
+
+    await Hive.box<HttpRequestTabModel>(HiveBoxes.tabs).put(
+      't1',
+      HttpRequestTabModel(
+        config: HttpRequestConfig(id: 'cfg-tab'),
+        tabId: 't1',
+      ),
+    );
+    await Hive.box<HttpRequestConfig>(
+      HiveBoxes.history,
+    ).add(HttpRequestConfig(id: 'cfg-history'));
+    await Hive.box<CollectionNode>(HiveBoxes.collections).put(
+      'root',
+      CollectionNode(
+        id: 'root',
+        name: 'ROOT',
+        children: [
+          CollectionNode(
+            id: 'leaf',
+            name: 'LEAF',
+            isFolder: false,
+            config: HttpRequestConfig(id: 'cfg-node'),
+            examples: [
+              SavedExampleModel(
+                name: 'EX',
+                capturedAtMs: 1,
+                config: HttpRequestConfig(id: 'cfg-example'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    final rulesBox = Hive.box<RequestRulesModel>(HiveBoxes.requestRules);
+    for (final id in [
+      'cfg-tab',
+      'cfg-history',
+      'cfg-node',
+      'cfg-example',
+      'cfg-orphan',
+    ]) {
+      await rulesBox.put(
+        id,
+        RequestRulesModel(
+          configId: id,
+          extractionRules: const [],
+          assertions: const [],
+        ),
+      );
+    }
+
+    // Second boot in the same directory runs the sweep over the seeded state.
+    await di.reset();
+    await di.init(storageDirectoryOverride: tempDir.path);
+
+    expect(
+      Hive.box<RequestRulesModel>(HiveBoxes.requestRules).keys.toSet(),
+      {'cfg-tab', 'cfg-history', 'cfg-node', 'cfg-example'},
+      reason: 'only the entry with no live owner in any box may be swept',
+    );
   });
 
   test(

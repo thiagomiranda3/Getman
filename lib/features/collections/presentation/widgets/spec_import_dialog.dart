@@ -84,6 +84,10 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
       });
     } on FormatException catch (e) {
       setState(() => _error = e.message);
+    } on Object catch (e) {
+      // A JSON-valid but type-wrong spec can throw TypeError out of the
+      // normalizers — surface it instead of silently doing nothing.
+      setState(() => _error = 'Import failed: $e');
     }
   }
 
@@ -94,14 +98,17 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
         allowedExtensions: ['json', 'yaml', 'yml'],
         withData: true,
       );
+      if (!mounted) return;
       if (result == null || result.files.isEmpty) return;
       final content = await readPickedFile(result.files.first);
+      if (!mounted) return;
       if (content == null) {
         setState(() => _error = 'Unable to read the selected file.');
         return;
       }
       _parse(content);
     } on Object catch (e) {
+      if (!mounted) return; // an await may have thrown after CANCEL disposed us
       setState(() => _error = 'File import failed: $e');
     }
   }
@@ -120,8 +127,10 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
     setState(() => _fetching = true);
     try {
       final response = await service.request(url: url, method: 'GET');
+      if (!mounted) return;
       _parse(response.body);
     } on Object catch (e) {
+      if (!mounted) return; // CANCEL during a slow fetch disposes this State
       setState(() => _error = 'Fetch failed: $e');
     } finally {
       if (mounted) setState(() => _fetching = false);

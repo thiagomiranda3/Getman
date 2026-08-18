@@ -34,6 +34,7 @@ void main() {
     when(() => git.currentBranch(root)).thenAnswer((_) async => 'main');
     when(() => git.branches(root)).thenAnswer((_) async => ['main', 'feat/x']);
     when(() => git.hasRemote(root)).thenAnswer((_) async => true);
+    when(() => git.isRebaseInProgress(root)).thenAnswer((_) async => false);
     when(
       () => git.aheadBehind(root),
     ).thenAnswer((_) async => const AheadBehind(ahead: 2, behind: 1));
@@ -126,7 +127,25 @@ void main() {
     expect(s.isRepo, isTrue);
     expect(s.stashCount, 1);
     expect(s.stashes.single.message, 'WIP on main');
+    expect(s.rebaseInProgress, isFalse);
   });
+
+  test(
+    'status maps isRebaseInProgress into BranchStatus.rebaseInProgress — the '
+    'durable rebase-paused signal the branch chip renders even with a '
+    'detached HEAD (current == null)',
+    () async {
+      when(() => git.isRebaseInProgress(root)).thenAnswer((_) async => true);
+      // A paused rebase detaches HEAD: `git branch --show-current` is empty.
+      when(() => git.currentBranch(root)).thenAnswer((_) async => null);
+
+      final s = await service.status(root);
+
+      expect(s.rebaseInProgress, isTrue);
+      expect(s.current, isNull);
+      expect(s.isRepo, isTrue);
+    },
+  );
 
   test('status on a non-repo reports isRepo false and no branch', () async {
     when(() => git.isRepo(root)).thenAnswer((_) async => false);

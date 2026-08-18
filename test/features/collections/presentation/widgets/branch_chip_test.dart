@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -582,6 +584,114 @@ void main() {
 
     expect(find.text('Resolving conflicts — commit 1'), findsOneWidget);
   });
+
+  // A paused rebase detaches HEAD, so BranchStatus.current is null — the
+  // state that used to render SizedBox.shrink() and wedge the user out of
+  // the resolver whenever the edge-delivered conflictToken bump was missed
+  // (chip unmounted on the HISTORY tab / closed drawer) or consumed by the
+  // remount seed, including after an app restart.
+  const rebasePausedState = GitSyncState(
+    status: GitSyncStatus.ready,
+    branch: BranchStatus(isRepo: true, rebaseInProgress: true),
+  );
+
+  testWidgets(
+    'a paused rebase with a detached HEAD (current == null) still renders '
+    'the REBASE PAUSED chip',
+    (tester) async {
+      await tester.pumpWidget(host(rebasePausedState));
+      // First frame the user sees (testing.md Rule 1) — no settling that
+      // could heal a wrong intermediate state.
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('rebase_paused_chip')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(find.text('REBASE PAUSED').hitTestable(), findsOneWidget);
+      // The normal chip must NOT render — there is no current branch.
+      expect(find.byKey(const ValueKey('branch_chip')), findsNothing);
+
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'REBASE PAUSED → RESOLVE CONFLICTS… opens the conflict resolver '
+    '(the durable path back after a missed conflictToken bump)',
+    (tester) async {
+      await tester.pumpWidget(host(rebasePausedState));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('rebase_paused_chip')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('rebase_menu_resolve')));
+      await tester.pumpAndSettle();
+
+      // Same open path as the conflictToken listener: the dialog loads the
+      // conflict batch itself.
+      verify(() => conflictBloc.add(const LoadConflicts(root))).called(1);
+      expect(find.text('Resolving conflicts — commit 1'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'REBASE PAUSED → ABORT REBASE confirms first, then dispatches AbortRebase',
+    (tester) async {
+      await tester.pumpWidget(host(rebasePausedState));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('rebase_paused_chip')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('rebase_menu_abort')));
+      await tester.pumpAndSettle();
+
+      // Irreversible action → ConfirmDialog atom; nothing dispatched yet.
+      verifyNever(() => conflictBloc.add(const AbortRebase(root)));
+
+      await tester.tap(find.widgetWithText(TextButton, 'ABORT REBASE'));
+      await tester.pumpAndSettle();
+
+      verify(() => conflictBloc.add(const AbortRebase(root))).called(1);
+    },
+  );
+
+  testWidgets(
+    'a chip-initiated abort completing shows the snackbar and re-reads the '
+    'branch status',
+    (tester) async {
+      final conflictStates = StreamController<ConflictState>();
+      addTearDown(conflictStates.close);
+      whenListen(
+        conflictBloc,
+        conflictStates.stream,
+        initialState: const ConflictState(status: ConflictStatus.ready),
+      );
+
+      await tester.pumpWidget(host(rebasePausedState));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('rebase_paused_chip')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('rebase_menu_abort')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'ABORT REBASE'));
+      await tester.pumpAndSettle();
+
+      conflictStates
+        ..add(const ConflictState(status: ConflictStatus.resolving))
+        ..add(const ConflictState(status: ConflictStatus.done));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Rebase aborted.'), findsOneWidget);
+      // Once from the post-frame boot, once from the abort completing — the
+      // second read is what flips the chip back to the normal one.
+      verify(() => bloc.add(const LoadBranchStatus(root))).called(2);
+
+      await tester.pumpAndSettle();
+    },
+  );
 
   testWidgets('auto-fetches silently every kAutoFetchInterval', (
     tester,

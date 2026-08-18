@@ -93,4 +93,60 @@ void main() {
     expect(box.length, 2);
     expect(box.get('a')!.name, 'A2');
   });
+
+  test('migrateLegacyKeysIfNeeded preserves nested children, config and '
+      'examples', () async {
+    final root = CollectionNode(
+      id: 'root',
+      name: 'ROOT',
+      children: [
+        CollectionNode(
+          id: 'leaf',
+          name: 'LEAF',
+          isFolder: false,
+          config: HttpRequestConfig(id: 'cfg-leaf', url: 'https://x.dev'),
+          examples: [
+            SavedExampleModel(
+              id: 'ex-1',
+              name: 'EXAMPLE',
+              capturedAtMs: 123,
+              config: HttpRequestConfig(id: 'cfg-example'),
+            ),
+          ],
+        ),
+      ],
+    );
+    await box.addAll([root]); // legacy auto int key
+
+    await CollectionsLocalDataSourceImpl.migrateLegacyKeysIfNeeded();
+
+    expect(box.keys.toSet(), {'root'});
+    final migrated = box.get('root')!;
+    expect(migrated.children.single.id, 'leaf');
+    expect(migrated.children.single.config!.id, 'cfg-leaf');
+    expect(migrated.children.single.config!.url, 'https://x.dev');
+    expect(migrated.children.single.examples.single.config.id, 'cfg-example');
+  });
+
+  test('migrateLegacyKeysIfNeeded heals a partially migrated box (root '
+      'present under both its int and id key)', () async {
+    // Simulates a crash between the migration's putAll and deleteAll phases:
+    // the same logical root exists under the legacy int key AND its id key.
+    await box.addAll([node('a', 'A')]);
+    await box.put('a', node('a', 'A'));
+    expect(box.length, 2);
+
+    await CollectionsLocalDataSourceImpl.migrateLegacyKeysIfNeeded();
+
+    expect(box.keys.toSet(), {'a'});
+    expect(box.length, 1);
+  });
+
+  test('saveCollections with an empty list empties the box', () async {
+    await dataSource.saveCollections([node('a', 'A')]);
+
+    await dataSource.saveCollections([]);
+
+    expect(box.isEmpty, isTrue);
+  });
 }

@@ -9,6 +9,7 @@ import 'package:collection/collection.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/git/git_service.dart';
+import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/utils/workspace/workspace_collection_serializer.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/conflict_service.dart';
@@ -262,10 +263,22 @@ class GitConflictService implements ConflictService {
         node = node.copyWith(name: value);
       } else if (field == 'favorite') {
         node = node.copyWith(isFavorite: value == 'true');
+      } else if (field == 'description') {
+        // '' (a pick of the side without one) clears it — the serializer
+        // omits empty descriptions, so '' and null agree on the wire.
+        node = node.copyWith(description: value);
       } else if (field == 'method') {
         config = config?.copyWith(method: value);
       } else if (field == 'url') {
         config = config?.copyWith(url: value);
+      } else if (field == 'kind') {
+        // Lenient parse mirroring the serializer: unknown/blank names read
+        // as http, the same default as an absent `kind` key on disk.
+        config = config?.copyWith(
+          kind:
+              RequestKind.values.firstWhereOrNull((k) => k.name == value) ??
+              RequestKind.http,
+        );
       } else if (field == 'body type') {
         config = config?.copyWith(bodyType: BodyType.fromWire(value));
       } else if (field == 'body') {
@@ -331,6 +344,9 @@ class GitConflictService implements ConflictService {
         node = node.copyWith(name: value);
       } else if (field == 'favorite') {
         node = node.copyWith(isFavorite: value == 'true');
+      } else if (field == 'description') {
+        // '' clears — see _applyRequestChoices.
+        node = node.copyWith(description: value);
       } else if (field == 'secret keys') {
         secretKeys =
             (value == 'yours' ? yours : incoming)?.secretKeys ?? const {};

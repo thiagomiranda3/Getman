@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/network/http_response.dart';
@@ -132,6 +134,48 @@ void main() {
     expect(captured!.root.children.single.name, 'Pets');
   });
 
+  testWidgets(
+    'a JSON-valid but type-wrong paste that cannot be coerced surfaces an '
+    'error instead of a silent no-op',
+    (tester) async {
+      // schema {"type": 5} throws TypeError (not FormatException) deep in
+      // the sampler — the paste path must message-ify it, not swallow it.
+      const uncoercible =
+          '{"openapi":"3.0.0","info":{"title":"T"},"paths":{"/x":{"post":'
+          '{"requestBody":{"content":{"application/json":'
+          '{"schema":{"type":5}}}}}}}}';
+      await _open(tester, (_) {});
+      await tester.tap(find.text('PASTE'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, uncoercible);
+      await tester.tap(find.widgetWithText(TextButton, 'PARSE'));
+      await tester.pump();
+
+      expect(find.byType(SpecImportErrorText), findsOneWidget);
+      expect(find.textContaining('Import failed'), findsOneWidget);
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'a coercible type-wrong paste ({"info":{"title":5}}) imports what it '
+    'can instead of silently doing nothing',
+    (tester) async {
+      const coercible = '{"openapi":"3.0.0","info":{"title":5},"paths":{}}';
+      await _open(tester, (_) {});
+      await tester.tap(find.text('PASTE'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, coercible);
+      await tester.tap(find.widgetWithText(TextButton, 'PARSE'));
+      await tester.pump();
+
+      // Parse succeeded: step 2 (preview) is shown, no error text.
+      expect(find.text('LOAD ANOTHER'), findsOneWidget);
+      expect(find.byType(SpecImportErrorText), findsNothing);
+      await tester.pumpAndSettle();
+    },
+  );
+
   testWidgets('a malformed paste shows the error and disables IMPORT', (
     tester,
   ) async {
@@ -255,5 +299,71 @@ void main() {
 
       expect(find.text('Remote fetch is unavailable.'), findsOneWidget);
     });
+
+    testWidgets(
+      'CANCEL during a slow fetch that later succeeds does not setState a '
+      'defunct State',
+      (tester) async {
+        final completer = Completer<HttpResponseEntity>();
+        final service = _MockNetworkService();
+        when(
+          () => service.request(
+            url: any(named: 'url'),
+            method: any(named: 'method'),
+          ),
+        ).thenAnswer((_) => completer.future);
+
+        await _open(tester, (_) {}, networkService: service);
+        await tester.tap(find.text('URL'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField).first, 'https://x/slow');
+        await tester.tap(find.widgetWithText(TextButton, 'FETCH'));
+        await tester.pump();
+
+        // Close the dialog mid-fetch, then let the fetch complete.
+        await tester.tap(find.widgetWithText(TextButton, 'CANCEL'));
+        await tester.pumpAndSettle();
+        completer.complete(
+          const HttpResponseEntity(
+            statusCode: 200,
+            body: _spec,
+            headers: {},
+            durationMs: 5,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'CANCEL during a slow fetch that later fails does not setState a '
+      'defunct State',
+      (tester) async {
+        final completer = Completer<HttpResponseEntity>();
+        final service = _MockNetworkService();
+        when(
+          () => service.request(
+            url: any(named: 'url'),
+            method: any(named: 'method'),
+          ),
+        ).thenAnswer((_) => completer.future);
+
+        await _open(tester, (_) {}, networkService: service);
+        await tester.tap(find.text('URL'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField).first, 'https://x/slow');
+        await tester.tap(find.widgetWithText(TextButton, 'FETCH'));
+        await tester.pump();
+
+        await tester.tap(find.widgetWithText(TextButton, 'CANCEL'));
+        await tester.pumpAndSettle();
+        completer.completeError(Exception('offline'));
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }

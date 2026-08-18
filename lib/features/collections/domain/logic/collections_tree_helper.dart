@@ -1,8 +1,10 @@
 // Pure functional helpers over the collections tree: sort/addToParent/
 // removeFromTree/renameInTree/toggleFavoriteInTree/updateConfigInTree/
 // describeInTree/setVariablesInTree, saved-example CRUD, ancestor/parent
-// lookups, overlayLocalOnly (restores app-only data after a disk reload),
-// and insertIntoTree/insertExampleInNode/siblingIndexOf — the UNDO side of
+// lookups, overlayLocalOnly (restores app-only data after a disk reload) +
+// harvestLocalOnly/reapplyLocalOnly (CollectionsBloc's session side-store of
+// the same data, covering nodes absent from the live forest — M6), and
+// insertIntoTree/insertExampleInNode/siblingIndexOf — the UNDO side of
 // removeFromTree/removeExampleFromNode, restoring a captured node or example
 // back to a remembered position.
 //
@@ -15,6 +17,15 @@
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
+
+/// One node's app-only data, as captured by
+/// [CollectionsTreeHelper.harvestLocalOnly]: a leaf's saved examples and a
+/// folder's non-empty secret variable values — exactly the field set
+/// [CollectionsTreeHelper.overlayLocalOnly] preserves.
+typedef LocalOnlyNodeData = ({
+  List<SavedExampleEntity> examples,
+  Map<String, String> secretValues,
+});
 
 class CollectionsTreeHelper {
   static List<CollectionNodeEntity> sort(
@@ -275,6 +286,15 @@ class CollectionsTreeHelper {
   /// disk pass through untouched. Call before `ReplaceCollections` on any
   /// disk reload (branch switch, pull, stash, RELOAD FROM DISK), or every git
   /// operation silently destroys them.
+  ///
+  /// Layering (M6): this overlay can only preserve nodes present in
+  /// [inMemory] — the *belt*. A node absent from the CURRENT forest (switch
+  /// to a branch without request R, then back: R returns from disk but the
+  /// live forest no longer has it) is out of its reach. The *braces* is
+  /// CollectionsBloc's session-level harvest store
+  /// ([harvestLocalOnly]/[reapplyLocalOnly]), applied inside every
+  /// `ReplaceCollections`. Callers keep calling this with their live forest;
+  /// the bloc covers the rest.
   static List<CollectionNodeEntity> overlayLocalOnly(
     List<CollectionNodeEntity> onDisk,
     List<CollectionNodeEntity> inMemory,
@@ -322,6 +342,90 @@ class CollectionsTreeHelper {
     }
 
     return walk(onDisk);
+  }
+
+  /// Harvests every node's app-only data from [forest], keyed by node id:
+  /// a leaf's saved examples (when non-empty) and, for folders, the
+  /// non-empty values of variables flagged secret. Nodes carrying neither
+  /// are omitted, so the result is compact. Mirrors exactly the field set
+  /// [overlayLocalOnly] preserves — the session-store side of the M6 fix
+  /// (see the layering note there); CollectionsBloc calls this on the
+  /// OUTGOING forest before applying a `ReplaceCollections`.
+  static Map<String, LocalOnlyNodeData> harvestLocalOnly(
+    List<CollectionNodeEntity> forest,
+  ) {
+    final out = <String, LocalOnlyNodeData>{};
+    void walk(List<CollectionNodeEntity> nodes) {
+      for (final node in nodes) {
+        final examples = !node.isFolder && node.examples.isNotEmpty
+            ? node.examples
+            : const <SavedExampleEntity>[];
+        final secretValues = <String, String>{};
+        if (node.isFolder) {
+          for (final key in node.secretKeys) {
+            final value = node.variables[key];
+            if (value != null && value.isNotEmpty) secretValues[key] = value;
+          }
+        }
+        if (examples.isNotEmpty || secretValues.isNotEmpty) {
+          out[node.id] = (examples: examples, secretValues: secretValues);
+        }
+        walk(node.children);
+      }
+    }
+
+    walk(forest);
+    return out;
+  }
+
+  /// Second-layer overlay from a harvested [store] (see [harvestLocalOnly]):
+  /// fills a leaf's EMPTY examples list and a folder's still-masked (`''`)
+  /// secret values from the store, matching by node id. Unlike
+  /// [overlayLocalOnly] it never replaces data already present — the
+  /// caller's own overlay ran against the live forest and is fresher, so it
+  /// must win; the store only covers nodes that were ABSENT from the live
+  /// forest when the caller overlaid (the M6 branch round-trip hole). As in
+  /// [overlayLocalOnly], a non-empty disk value for a secret is a deliberate
+  /// upstream change and wins, and the incoming node's `secretKeys` decides
+  /// which names are secret.
+  static List<CollectionNodeEntity> reapplyLocalOnly(
+    List<CollectionNodeEntity> forest,
+    Map<String, LocalOnlyNodeData> store,
+  ) {
+    if (store.isEmpty) return forest;
+    List<CollectionNodeEntity> walk(List<CollectionNodeEntity> nodes) {
+      return nodes.map((node) {
+        var merged = node;
+        final stored = store[node.id];
+        if (stored != null) {
+          if (!node.isFolder &&
+              node.examples.isEmpty &&
+              stored.examples.isNotEmpty) {
+            merged = merged.copyWith(examples: stored.examples);
+          }
+          if (node.isFolder && node.secretKeys.isNotEmpty) {
+            final vars = Map<String, String>.of(node.variables);
+            var changed = false;
+            for (final key in node.secretKeys) {
+              final storedValue = stored.secretValues[key];
+              if (vars[key] == '' &&
+                  storedValue != null &&
+                  storedValue.isNotEmpty) {
+                vars[key] = storedValue;
+                changed = true;
+              }
+            }
+            if (changed) merged = merged.copyWith(variables: vars);
+          }
+        }
+        if (merged.children.isNotEmpty) {
+          merged = merged.copyWith(children: walk(merged.children));
+        }
+        return merged;
+      }).toList();
+    }
+
+    return walk(forest);
   }
 
   static CollectionNodeEntity? findNode(

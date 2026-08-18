@@ -54,6 +54,12 @@ class GitBranchService implements BranchService {
       stashes: [
         for (final s in stashes) StashInfo(index: s.index, message: s.message),
       ],
+      // Durable rebase-paused signal: a halted pull leaves HEAD detached
+      // (currentBranch == null), and the edge-delivered conflictToken bump is
+      // lost if the branch chip was unmounted (or the app restarts). Every
+      // status load re-reads this flag so the chip can always offer the
+      // conflict resolver / abort while the rebase is paused.
+      rebaseInProgress: await _git.isRebaseInProgress(root),
     );
   }
 

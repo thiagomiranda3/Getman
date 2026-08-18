@@ -3,6 +3,7 @@ import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/domain/logic/three_way_merge.dart';
 
@@ -10,12 +11,14 @@ CollectionNodeEntity _leaf({
   String id = 'r1',
   String name = 'Req',
   bool isFavorite = false,
+  String? description,
   String method = 'GET',
   String url = '',
   Map<String, String> headers = const {},
   String body = '',
   Map<String, String> auth = const {},
   BodyType bodyType = BodyType.raw,
+  RequestKind kind = RequestKind.http,
   List<MultipartFieldEntity> formFields = const [],
   String? bodyFilePath,
   String graphqlVariables = '',
@@ -26,6 +29,7 @@ CollectionNodeEntity _leaf({
   name: name,
   isFolder: false,
   isFavorite: isFavorite,
+  description: description,
   config: HttpRequestConfigEntity(
     id: id,
     method: method,
@@ -34,6 +38,7 @@ CollectionNodeEntity _leaf({
     body: body,
     auth: auth,
     bodyType: bodyType,
+    kind: kind,
     formFields: formFields,
     bodyFilePath: bodyFilePath,
     graphqlVariables: graphqlVariables,
@@ -46,6 +51,7 @@ CollectionNodeEntity _folder({
   String id = 'f1',
   String name = 'Folder',
   bool isFavorite = false,
+  String? description,
   Map<String, String> variables = const {},
   Set<String> secretKeys = const {},
   List<CollectionNodeEntity> children = const [],
@@ -53,6 +59,7 @@ CollectionNodeEntity _folder({
   id: id,
   name: name,
   isFavorite: isFavorite,
+  description: description,
   variables: variables,
   secretKeys: secretKeys,
   children: children,
@@ -113,6 +120,89 @@ void main() {
       expect(r.conflicts, isEmpty);
       expect(r.merged.config!.bodyType, BodyType.graphql);
     });
+  });
+
+  // Regression: description and kind ARE round-tripped by the workspace
+  // serializer but were previously never merged, so the resolved file
+  // silently took the INCOMING side's value even when only yours changed it
+  // — while the dialog reported the node as auto-merged.
+  group('ThreeWayMerge.mergeRequest — description & kind', () {
+    test('description changed only on yours wins with no conflict', () {
+      final base = _leaf(description: 'committed');
+      final incoming = _leaf(description: 'committed');
+      final yours = _leaf(description: 'improved');
+      final r = ThreeWayMerge.mergeRequest(base, incoming, yours);
+      expect(r.conflicts, isEmpty);
+      expect(r.merged.description, 'improved');
+    });
+
+    test('description changed on both sides is a scalar conflict', () {
+      final r = ThreeWayMerge.mergeRequest(
+        _leaf(description: 'a'),
+        _leaf(description: 'b'),
+        _leaf(description: 'c'),
+      );
+      expect(r.conflicts.map((c) => c.field), ['description']);
+      expect(r.conflicts.single.kind, FieldConflictKind.scalar);
+      expect(r.conflicts.single.incoming, 'b');
+      expect(r.conflicts.single.yours, 'c');
+      expect(r.merged.description, 'b');
+    });
+
+    test(
+      'description deleted on yours actually clears the merged value '
+      "(copyWith's ?? cannot clear, so the merge must normalize to '')",
+      () {
+        final base = _leaf(description: 'gone');
+        final incoming = _leaf(description: 'gone');
+        final yours = _leaf(); // deleted the description
+        final r = ThreeWayMerge.mergeRequest(base, incoming, yours);
+        expect(r.conflicts, isEmpty);
+        expect(r.merged.description, isEmpty);
+      },
+    );
+
+    test(
+      'description deleted on incoming but edited on yours conflicts, with '
+      "the deleted side rendered as '' (never null) in the tile",
+      () {
+        final r = ThreeWayMerge.mergeRequest(
+          _leaf(description: 'old'),
+          _leaf(), // incoming deleted the description
+          _leaf(description: 'your notes'), // yours edited it
+        );
+        final c = r.conflicts.single;
+        expect(c.field, 'description');
+        expect(c.incoming, '');
+        expect(c.yours, 'your notes');
+      },
+    );
+
+    test('kind changed only on yours wins with no conflict', () {
+      final base = _leaf();
+      final incoming = _leaf();
+      final yours = _leaf(kind: RequestKind.webSocket);
+      final r = ThreeWayMerge.mergeRequest(base, incoming, yours);
+      expect(r.conflicts, isEmpty);
+      expect(r.merged.config!.kind, RequestKind.webSocket);
+    });
+
+    test(
+      'kind changed differently on both sides conflicts, rendered via the '
+      'serialized enum names',
+      () {
+        final r = ThreeWayMerge.mergeRequest(
+          _leaf(),
+          _leaf(kind: RequestKind.webSocket),
+          _leaf(kind: RequestKind.sse),
+        );
+        expect(r.conflicts.map((c) => c.field), ['kind']);
+        expect(r.conflicts.single.kind, FieldConflictKind.scalar);
+        expect(r.conflicts.single.incoming, 'webSocket');
+        expect(r.conflicts.single.yours, 'sse');
+        expect(r.merged.config!.kind, RequestKind.webSocket);
+      },
+    );
   });
 
   group('ThreeWayMerge.mergeRequest — maps', () {
@@ -416,6 +506,38 @@ void main() {
         expect(r.conflicts, isEmpty);
       },
     );
+
+    test('folder description changed only on yours wins with no conflict', () {
+      final base = _folder(description: 'committed');
+      final incoming = _folder(description: 'committed');
+      final yours = _folder(description: 'improved');
+      final r = ThreeWayMerge.mergeFolder(
+        base,
+        const [],
+        incoming,
+        const [],
+        yours,
+        const [],
+      );
+      expect(r.conflicts, isEmpty);
+      expect(r.merged.description, 'improved');
+    });
+
+    test('folder description changed on both sides is a scalar conflict', () {
+      final r = ThreeWayMerge.mergeFolder(
+        _folder(description: 'a'),
+        const [],
+        _folder(description: 'b'),
+        const [],
+        _folder(description: 'c'),
+        const [],
+      );
+      expect(r.conflicts.map((c) => c.field), ['description']);
+      expect(r.conflicts.single.kind, FieldConflictKind.scalar);
+      expect(r.conflicts.single.incoming, 'b');
+      expect(r.conflicts.single.yours, 'c');
+      expect(r.merged.description, 'b');
+    });
 
     test('secretKeys collision carries null values (whole-field)', () {
       final base = _folder();

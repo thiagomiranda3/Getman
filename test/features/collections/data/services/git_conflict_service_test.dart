@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/git/git_service.dart';
+import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/utils/workspace/workspace_collection_serializer.dart';
 import 'package:getman/features/collections/data/datasources/workspace_collections_data_source.dart';
 import 'package:getman/features/collections/data/services/git_conflict_service.dart';
@@ -31,11 +32,13 @@ CollectionNodeEntity _leaf({
   String id = 'r1',
   String name = 'Req',
   bool isFavorite = false,
+  String? description,
   String method = 'GET',
   String url = '',
   Map<String, String> headers = const {},
   String body = '',
   Map<String, String> auth = const {},
+  RequestKind kind = RequestKind.http,
   List<ParkedParamEntity> disabledParams = const [],
   Set<String> disabledHeaderKeys = const {},
 }) => CollectionNodeEntity(
@@ -43,6 +46,7 @@ CollectionNodeEntity _leaf({
   name: name,
   isFolder: false,
   isFavorite: isFavorite,
+  description: description,
   config: HttpRequestConfigEntity(
     id: id,
     method: method,
@@ -50,6 +54,7 @@ CollectionNodeEntity _leaf({
     headers: headers,
     body: body,
     auth: auth,
+    kind: kind,
     disabledParams: disabledParams,
     disabledHeaderKeys: disabledHeaderKeys,
   ),
@@ -59,12 +64,14 @@ CollectionNodeEntity _folder({
   String id = 'f1',
   String name = 'Folder',
   bool isFavorite = false,
+  String? description,
   Map<String, String> variables = const {},
   Set<String> secretKeys = const {},
 }) => CollectionNodeEntity(
   id: id,
   name: name,
   isFavorite: isFavorite,
+  description: description,
   variables: variables,
   secretKeys: secretKeys,
 );
@@ -585,6 +592,153 @@ void main() {
           jsonDecode(written!) as Map<String, dynamic>,
         );
         expect(node.config!.disabledHeaderKeys, const {'A'});
+      },
+    );
+
+    // Regression: description/kind are round-tripped by the serializer but
+    // _applyRequestChoices/_applyFolderChoices had no branch for either, so
+    // a pick was silently dropped — and with no merge branch at all, the
+    // resolved file took the INCOMING value even when only yours changed it.
+    test(
+      'regression: resolving an unrelated url conflict keeps a description '
+      'only yours changed',
+      () async {
+        when(() => git.showStage(root, 'a.req.json', 1)).thenAnswer(
+          (_) async =>
+              _reqStage(_leaf(url: 'https://a', description: 'committed')),
+        );
+        // Incoming changed the url only — collides with yours' url change.
+        when(() => git.showStage(root, 'a.req.json', 2)).thenAnswer(
+          (_) async =>
+              _reqStage(_leaf(url: 'https://b', description: 'committed')),
+        );
+        // Yours changed the url AND the description.
+        when(() => git.showStage(root, 'a.req.json', 3)).thenAnswer(
+          (_) async =>
+              _reqStage(_leaf(url: 'https://c', description: 'improved')),
+        );
+        String? written;
+        when(
+          () => git.writeWorkingFile(root, 'a.req.json', any()),
+        ).thenAnswer((i) async {
+          written = i.positionalArguments[2] as String;
+        });
+        when(() => git.add(root, 'a.req.json')).thenAnswer((_) async {});
+
+        await service.resolve(root, const [
+          FileResolution(
+            path: 'a.req.json',
+            fieldChoices: {'url': 'https://b'},
+          ),
+        ]);
+
+        final node = WorkspaceCollectionSerializer.requestFromJson(
+          jsonDecode(written!) as Map<String, dynamic>,
+        );
+        expect(
+          node.description,
+          'improved',
+          reason:
+              'a description only yours changed must auto-merge, not be '
+              "silently overwritten by incoming's copy",
+        );
+      },
+    );
+
+    test("a 'description' pick is applied to the resolved request", () async {
+      when(() => git.showStage(root, 'a.req.json', 1)).thenAnswer(
+        (_) async => _reqStage(_leaf(description: 'base notes')),
+      );
+      when(() => git.showStage(root, 'a.req.json', 2)).thenAnswer(
+        (_) async => _reqStage(_leaf(description: 'incoming notes')),
+      );
+      when(() => git.showStage(root, 'a.req.json', 3)).thenAnswer(
+        (_) async => _reqStage(_leaf(description: 'your notes')),
+      );
+      String? written;
+      when(
+        () => git.writeWorkingFile(root, 'a.req.json', any()),
+      ).thenAnswer((i) async {
+        written = i.positionalArguments[2] as String;
+      });
+      when(() => git.add(root, 'a.req.json')).thenAnswer((_) async {});
+
+      await service.resolve(root, const [
+        FileResolution(
+          path: 'a.req.json',
+          fieldChoices: {'description': 'your notes'},
+        ),
+      ]);
+
+      final node = WorkspaceCollectionSerializer.requestFromJson(
+        jsonDecode(written!) as Map<String, dynamic>,
+      );
+      expect(node.description, 'your notes');
+    });
+
+    test(
+      "a 'kind' pick is parsed leniently from the serialized enum name",
+      () async {
+        when(() => git.showStage(root, 'a.req.json', 1)).thenAnswer(
+          (_) async => _reqStage(_leaf()),
+        );
+        when(() => git.showStage(root, 'a.req.json', 2)).thenAnswer(
+          (_) async => _reqStage(_leaf(kind: RequestKind.webSocket)),
+        );
+        when(() => git.showStage(root, 'a.req.json', 3)).thenAnswer(
+          (_) async => _reqStage(_leaf(kind: RequestKind.sse)),
+        );
+        String? written;
+        when(
+          () => git.writeWorkingFile(root, 'a.req.json', any()),
+        ).thenAnswer((i) async {
+          written = i.positionalArguments[2] as String;
+        });
+        when(() => git.add(root, 'a.req.json')).thenAnswer((_) async {});
+
+        await service.resolve(root, const [
+          FileResolution(
+            path: 'a.req.json',
+            fieldChoices: {'kind': 'sse'},
+          ),
+        ]);
+
+        final node = WorkspaceCollectionSerializer.requestFromJson(
+          jsonDecode(written!) as Map<String, dynamic>,
+        );
+        expect(node.config!.kind, RequestKind.sse);
+      },
+    );
+
+    test(
+      "a folder 'description' pick is applied to the resolved folder",
+      () async {
+        when(() => git.showStage(root, 'x/.folder.json', 1)).thenAnswer(
+          (_) async => _folderStage(_folder(description: 'base'), ['a']),
+        );
+        when(() => git.showStage(root, 'x/.folder.json', 2)).thenAnswer(
+          (_) async => _folderStage(_folder(description: 'incoming'), ['a']),
+        );
+        when(() => git.showStage(root, 'x/.folder.json', 3)).thenAnswer(
+          (_) async => _folderStage(_folder(description: 'yours'), ['a']),
+        );
+        String? written;
+        when(
+          () => git.writeWorkingFile(root, 'x/.folder.json', any()),
+        ).thenAnswer((i) async {
+          written = i.positionalArguments[2] as String;
+        });
+        when(() => git.add(root, 'x/.folder.json')).thenAnswer((_) async {});
+
+        await service.resolve(root, const [
+          FileResolution(
+            path: 'x/.folder.json',
+            fieldChoices: {'description': 'yours'},
+          ),
+        ]);
+
+        final decoded = jsonDecode(written!) as Map<String, dynamic>;
+        expect(decoded['description'], 'yours');
       },
     );
 

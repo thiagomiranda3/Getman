@@ -506,6 +506,101 @@ void main() {
       );
       expect(find.text('UNDO'), findsOneWidget);
     });
+
+    testWidgets(
+      'A10: folder mutated while the confirm dialog is up — UNDO restores '
+      'the delete-time snapshot, keeping the interim mutation',
+      (tester) async {
+        final bloc = await openMenu(
+          tester,
+          _folderNode,
+          seedTree: [_folderNode],
+        );
+        addTearDown(bloc.close);
+
+        await tester.tap(find.text('DELETE'));
+        await tester.pumpAndSettle();
+        expect(find.text('Delete folder?'), findsOneWidget);
+
+        // Background mutation while the dialog is open (e.g. a git-pull
+        // reload or Cmd+S saving into the folder — shortcuts fire above the
+        // modal): a request lands inside the folder.
+        const interimChild = CollectionNodeEntity(
+          id: 'r-new',
+          name: 'Added While Confirming',
+          isFolder: false,
+          config: HttpRequestConfigEntity(
+            id: 'r-new',
+            url: 'https://interim.dev',
+          ),
+        );
+        bloc.add(
+          ReplaceCollections([
+            _folderNode.copyWith(children: const [interimChild]),
+          ]),
+        );
+        await tester.pump();
+        expect(
+          CollectionsTreeHelper.findNode(bloc.state.collections, 'r-new'),
+          isNotNull,
+          reason: 'the interim mutation must land before the confirm',
+        );
+
+        await tester.tap(find.widgetWithText(TextButton, 'DELETE'));
+        await tester.pumpAndSettle();
+        expect(
+          CollectionsTreeHelper.findNode(bloc.state.collections, 'f1'),
+          isNull,
+        );
+
+        await tester.tap(find.text('UNDO'));
+        await tester.pumpAndSettle();
+
+        final restored = CollectionsTreeHelper.findNode(
+          bloc.state.collections,
+          'f1',
+        );
+        expect(restored, isNotNull);
+        expect(
+          restored!.children,
+          contains(interimChild),
+          reason:
+              'the restore snapshot must be captured at delete time, not at '
+              'dialog-open time — a pre-await snapshot silently drops the '
+              'interim mutation',
+        );
+      },
+    );
+
+    testWidgets(
+      'A10: folder vanished while the confirm dialog is up — confirming is '
+      'a no-op with an informational snackbar and no UNDO',
+      (tester) async {
+        final bloc = await openMenu(
+          tester,
+          _folderNode,
+          seedTree: [_folderNode],
+        );
+        addTearDown(bloc.close);
+
+        await tester.tap(find.text('DELETE'));
+        await tester.pumpAndSettle();
+        expect(find.text('Delete folder?'), findsOneWidget);
+
+        // The folder is removed while the dialog is open (e.g. a git pull
+        // deleted it upstream).
+        bloc.add(const ReplaceCollections([]));
+        await tester.pump();
+
+        await tester.tap(find.widgetWithText(TextButton, 'DELETE'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('"My Folder" no longer exists'), findsOneWidget);
+        expect(find.text('Deleted "My Folder"'), findsNothing);
+        expect(find.text('UNDO'), findsNothing);
+        expect(bloc.state.collections, isEmpty);
+      },
+    );
   });
 
   group('showCollectionNodeMenuAt (right-click entry point)', () {

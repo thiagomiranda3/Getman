@@ -8,11 +8,17 @@
 // Gotchas: writes are chained, never fired in parallel, so two overlapping
 // debounce cycles can't race each other onto disk. flushPending() must be
 // awaited before any git op reads the tree, and callers MUST abort when it
-// returns false (a failed write leaves disk stale). suspendMirroring/
+// returns false (a failed write leaves disk stale); it drains the WHOLE
+// write chain in a loop, re-reading the tail each pass — a debounce timer
+// firing mid-flush chains a new write onto the tail, and awaiting only the
+// tail captured at entry would return with that write still queued, letting
+// it land after git rewrote the tree. suspendMirroring/
 // resumeMirroring (prefer withMirroringSuspended — leak-safe on throw) gate
 // mirroring off during git working-tree ops and the disk reload that
 // follows them, since a Hive mutation mid-checkout would otherwise be
-// mirrored back onto the wrong branch.
+// mirrored back onto the wrong branch; _mirror re-checks the gate at
+// execution time and drops (without recording a failure) a write that was
+// queued before the suspension began.
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -39,8 +45,10 @@ class WorkspaceSyncService {
   /// Tail of the serialized chain of `_mirror` writes, or null when no write is
   /// outstanding. Every write is chained after the previous one rather than
   /// started alongside it, so two overlapping debounce cycles can never race
-  /// each other onto disk — and awaiting the tail awaits *all* outstanding
-  /// writes, which is what lets [flushPending] guarantee a quiet tree.
+  /// each other onto disk. Awaiting the tail awaits every write queued *so
+  /// far* — but a write chained afterwards replaces the tail, which is why
+  /// [flushPending] drains in a loop (re-reading this field each pass)
+  /// instead of awaiting a single snapshot of it.
   Future<void>? _inFlight;
 
   final StreamController<String> _mirrored =
@@ -171,16 +179,20 @@ class WorkspaceSyncService {
     _takePending();
   }
 
-  /// Runs any pending or in-flight debounced write to completion, now.
+  /// Runs every pending or in-flight debounced write to completion, now.
   ///
   /// Callers that read the mirrored files through git (branch switch, pull,
   /// push, stash) MUST await this first: otherwise a write scheduled moments
   /// earlier has not landed, `git status` reports a clean tree, and the timer
   /// fires *after* the checkout — writing the user's edit onto the branch
-  /// they switched to. This also covers the narrower window where the
-  /// debounce timer has *already* fired and `dataSource.write` is mid-flight:
-  /// awaiting [_inFlight] (the tail of the serialized write chain) awaits
-  /// every outstanding write, not just the not-yet-started pending one.
+  /// they switched to. This also covers the window where the debounce timer
+  /// has *already* fired and `dataSource.write` is mid-flight, because the
+  /// whole chain is drained in a loop, re-reading [_inFlight] each pass: an
+  /// edit made *while* this method awaits a slow write arms a fresh debounce
+  /// whose timer can fire mid-flush and chain a new write onto the tail.
+  /// Awaiting only the tail captured at entry would return with that write
+  /// still queued — it would then land after the caller's git op rewrote the
+  /// tree, writing the pre-op forest over it.
   ///
   /// Returns `false` when a mirror write failed and the tree on disk is
   /// therefore stale (`_mirror` swallows the error — it must never break the
@@ -192,10 +204,13 @@ class WorkspaceSyncService {
     _timer = null;
     final pending = _takePending();
     if (pending != null) unawaited(_startMirror(pending.$1, pending.$2));
-    // Read the tail *after* starting the pending write: it now sits at the end
-    // of the chain, so this single await covers both it and anything already
-    // writing ahead of it.
-    await _inFlight;
+    // Drain the WHOLE chain: each iteration re-reads the tail, so a write
+    // chained during a previous iteration's await is awaited too. The loop
+    // ends when the last write's completion clears the field (see
+    // _startMirror).
+    while (_inFlight != null) {
+      await _inFlight;
+    }
     return !_lastMirrorFailed;
   }
 
@@ -236,6 +251,18 @@ class WorkspaceSyncService {
   }
 
   Future<void> _mirror(String root, List<CollectionNodeEntity> forest) async {
+    // Execution-time re-check of the suspension gate. [scheduleMirror] checks
+    // it at schedule time, but a write chained behind a slow predecessor can
+    // reach its turn *after* a git op has suspended mirroring — the forest it
+    // carries predates the op and is about to be invalidated, so it is
+    // dropped rather than written (same rationale as the schedule-time drop).
+    // Dropping is NOT a failure: the tree on disk now belongs to git, so
+    // `_lastMirrorFailed` must stay untouched — recording a failure here
+    // would make [flushPending] refuse to certify a tree that is not stale.
+    // The reload-blocked-roots gate stays schedule-time only: a failed [read]
+    // runs inside a suspended scope in production wiring (the post-op reload
+    // is what reads), so this check already covers that window.
+    if (isMirroringSuspended) return;
     try {
       await dataSource.write(root, forest);
       _lastMirrorFailed = false;
