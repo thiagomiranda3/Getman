@@ -130,8 +130,9 @@ class KeyValueListEditor<T extends Object> extends StatefulWidget {
   /// (oldIndex, newIndex) in decoded-row space AFTER the editor has moved
   /// its own row controllers; the host must apply the same move to its
   /// canonical value (list order / insertion-ordered map) and emit it.
-  /// Indices match the host's decoded rows except in the transient state
-  /// where an interior row's key was cleared — hosts must range-guard.
+  /// The editor translates its own row indices into decoded space first
+  /// (skipping empty-key rows, which every host's encode drops but the
+  /// echo-suppressed editor keeps alive) — see `_hostIndexFor`.
   final void Function(int oldIndex, int newIndex)? onReorder;
 
   /// When non-null, every row except the trailing auto-blank one shows a
@@ -252,11 +253,29 @@ class _KeyValueListEditorState<T extends Object>
     widget.onSecretKeysChanged?.call(next);
   }
 
+  /// Translates an editor row index into the host's decoded-row space by
+  /// skipping rows with an empty key. Every host's encode drops empty-key
+  /// rows from its canonical value, while echo suppression deliberately
+  /// keeps them alive here (so clearing an interior key doesn't eat the row
+  /// mid-edit) — after such a clear, raw editor indices sit one past the
+  /// host's for everything below it, and index-based host ops (reorder /
+  /// duplicate / params' toggle) would hit the WRONG row.
+  int _hostIndexFor(int editorIndex) {
+    var count = 0;
+    for (var i = 0; i < editorIndex; i++) {
+      if (_keyControllers[i].text.isNotEmpty) count++;
+    }
+    return count;
+  }
+
   void _toggleEnabled(int index) {
     final next = !_rowEnabledFlags[index];
     setState(() => _rowEnabledFlags[index] = next);
+    // An empty-key row exists only in this editor — there is no canonical
+    // row for the host to toggle.
+    if (_keyControllers[index].text.isEmpty) return;
     widget.onToggleEnabled?.call(
-      index,
+      _hostIndexFor(index),
       _keyControllers[index].text,
       _valControllers[index].text,
       next,
@@ -279,8 +298,23 @@ class _KeyValueListEditorState<T extends Object>
     if (target >= blankIndex) target = blankIndex - 1;
     if (target < 0) target = 0;
     if (target == oldIndex) return;
+    // Translate into decoded space BEFORE the local pre-move mutates the
+    // controller lists (see _hostIndexFor). hostNew counts over the
+    // post-removal sequence — the same space the host applies newIndex in.
+    final draggedHasKey = _keyControllers[oldIndex].text.isNotEmpty;
+    final hostOld = _hostIndexFor(oldIndex);
+    // `target` indexes the POST-removal editor list; its first `target`
+    // entries are original rows [0, target) for a backward drag, and
+    // original rows [0, target] minus the dragged row for a forward one.
+    final hostNew = oldIndex < target
+        ? _hostIndexFor(target + 1) - (draggedHasKey ? 1 : 0)
+        : _hostIndexFor(target);
     _repositionWithinEnabledRows(oldIndex, target, blankIndex);
-    host(oldIndex, target);
+    // A keyless dragged row, or a drag that only crossed keyless rows, has
+    // no canonical counterpart to move — the local pre-move above already
+    // matches what the host's decoded rows will echo back.
+    if (!draggedHasKey || hostNew == hostOld) return;
+    host(hostOld, hostNew);
   }
 
   /// Locally reflects a reorder, but ONLY within the enabled-row
@@ -371,16 +405,24 @@ class _KeyValueListEditorState<T extends Object>
               secrets.contains(keyText),
           onToggleSecret: secrets == null ? null : () => _toggleSecret(index),
           variableContext: widget.variableContext,
+          // Gate on the TRACKED flags (not widget.rowEnabled, whose indices
+          // are decoded-space and drift from editor rows after an interior
+          // key is cleared — flags follow rows through every local edit).
           showDragHandle:
               widget.onReorder != null &&
               !isTrailingBlankRow &&
-              (widget.rowEnabled?.call(index) ?? true),
+              _rowEnabledFlags[index],
           onDuplicate:
               onDuplicate == null ||
                   isTrailingBlankRow ||
-                  !(widget.rowEnabled?.call(index) ?? true)
+                  !_rowEnabledFlags[index]
               ? null
-              : () => onDuplicate(index),
+              : () {
+                  // A keyless row has no canonical counterpart to duplicate;
+                  // translate the rest into decoded space (_hostIndexFor).
+                  if (_keyControllers[index].text.isEmpty) return;
+                  onDuplicate(_hostIndexFor(index));
+                },
           onKeyChanged: (val) {
             if (index == _keyControllers.length - 1 && val.isNotEmpty) {
               setState(_addEmptyRow);

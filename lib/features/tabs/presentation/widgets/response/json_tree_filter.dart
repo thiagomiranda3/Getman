@@ -42,7 +42,10 @@ class JsonTreeFilterResult extends Equatable {
   /// Paths of revealed matching nodes (capped by the reveal limit).
   final Set<String> matchedPaths;
 
-  /// Ancestor container paths of revealed matches — auto-expand these.
+  /// Every chain entry of a revealed match — auto-expand these. Includes
+  /// containers that are themselves matches (they overlap [matchedPaths]):
+  /// a matched container with a matching descendant must still expand, or
+  /// the descendant match is counted but invisible.
   final Set<String> ancestorPaths;
 
   /// Total matches in the document, including ones beyond the reveal cap.
@@ -75,6 +78,13 @@ JsonTreeFilterResult filterJsonTree({
 
   final matched = <String>{};
   final ancestors = <String>{};
+  // Budget = revealed ROWS (matched ∪ ancestors). Tracked as a separate
+  // union set because `ancestors` deliberately overlaps `matched`: a matched
+  // container that is also the ancestor of a deeper match must appear in
+  // BOTH — excluding it from `ancestors` (the auto-expand set) left it
+  // collapsed, hiding its matching descendants while the match counter still
+  // announced them ("2 MATCHES" with one invisible).
+  final revealed = <String>{};
   final chain = <String>[];
   var matchCount = 0;
   var truncated = false;
@@ -88,20 +98,18 @@ JsonTreeFilterResult filterJsonTree({
 
   void record(String path) {
     matchCount++;
-    // A chain entry already revealed as a *match* (a matched container that
-    // is also the ancestor of a deeper match) must not be re-budgeted as an
-    // ancestor — otherwise the same node id is counted twice toward the cap
-    // and the walk truncates before the reveal set actually fills up.
-    final newAncestors = chain
-        .where((a) => !ancestors.contains(a) && !matched.contains(a))
-        .length;
-    if (matched.length + ancestors.length + 1 + newAncestors > maxRevealed) {
+    final newReveals =
+        (revealed.contains(path) ? 0 : 1) +
+        chain.where((a) => !revealed.contains(a)).length;
+    if (revealed.length + newReveals > maxRevealed) {
       truncated = true;
       return;
     }
     matched.add(path);
+    revealed.add(path);
     for (final a in chain) {
-      if (!matched.contains(a)) ancestors.add(a);
+      ancestors.add(a);
+      revealed.add(a);
     }
   }
 

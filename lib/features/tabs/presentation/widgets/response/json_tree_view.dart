@@ -219,7 +219,15 @@ class _JsonTreeViewState extends State<JsonTreeView> {
     }
   }
 
+  /// Last filter text acted on — a TextEditingController also notifies on
+  /// SELECTION-only changes (clicking back into the field to refine the
+  /// query), which must not clear the collapse overrides or re-run the
+  /// filter: only an actual text change starts a new filter session.
+  String? _lastFilterText;
+
   void _onFilterChanged() {
+    if (_filterQuery.text == _lastFilterText) return;
+    _lastFilterText = _filterQuery.text;
     setState(() {
       final next = _filterQuery.text.trim().isEmpty
           ? null

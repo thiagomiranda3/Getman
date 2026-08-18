@@ -102,7 +102,15 @@ class _LargeBodyFindViewState extends State<LargeBodyFindView> {
     }
   }
 
+  /// Last text a scan was scheduled for — a TextEditingController also
+  /// notifies on SELECTION-only changes (clicking into the field, arrow-key
+  /// caret moves); rescanning identical text reset the current match to 1/N
+  /// mid-stepping. Same guard as CodeFindPanel._onQueryChanged.
+  String? _lastScheduledText;
+
   void _onQueryChanged() {
+    if (_query.text == _lastScheduledText) return;
+    _lastScheduledText = _query.text;
     _debounce?.cancel();
     _debounce = Timer(kFindDebounce, () => unawaited(_scan()));
     setState(() {}); // reflect the pending state immediately

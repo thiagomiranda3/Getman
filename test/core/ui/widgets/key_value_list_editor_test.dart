@@ -56,6 +56,26 @@ void main() {
   Finder keyFieldAt(int index) =>
       find.widgetWithText(TextField, 'KEY').at(index);
 
+  Future<void> dragHandleBy(
+    WidgetTester tester,
+    Finder handle,
+    double dy,
+  ) async {
+    final gesture = await tester.startGesture(tester.getCenter(handle));
+    await tester.pump(const Duration(milliseconds: 20));
+    await gesture.moveBy(Offset(0, dy / 2));
+    await tester.pump(const Duration(milliseconds: 20));
+    await gesture.moveBy(Offset(0, dy / 2));
+    await tester.pump(const Duration(milliseconds: 20));
+    await gesture.up();
+    await tester.pumpAndSettle();
+  }
+
+  String keyTextAt(WidgetTester tester, int index) => tester
+      .widget<TextField>(find.byKey(ValueKey('kv_key_$index')))
+      .controller!
+      .text;
+
   testWidgets('renders one row per item plus a trailing empty row', (
     tester,
   ) async {
@@ -471,26 +491,6 @@ void main() {
   });
 
   group('reorder + duplicate (B2)', () {
-    Future<void> dragHandleBy(
-      WidgetTester tester,
-      Finder handle,
-      double dy,
-    ) async {
-      final gesture = await tester.startGesture(tester.getCenter(handle));
-      await tester.pump(const Duration(milliseconds: 20));
-      await gesture.moveBy(Offset(0, dy / 2));
-      await tester.pump(const Duration(milliseconds: 20));
-      await gesture.moveBy(Offset(0, dy / 2));
-      await tester.pump(const Duration(milliseconds: 20));
-      await gesture.up();
-      await tester.pumpAndSettle();
-    }
-
-    String keyTextAt(WidgetTester tester, int index) => tester
-        .widget<TextField>(find.byKey(ValueKey('kv_key_$index')))
-        .controller!
-        .text;
-
     testWidgets(
       'no drag handles or duplicate buttons when the callbacks are null '
       '(existing hosts unchanged)',
@@ -655,6 +655,135 @@ void main() {
           findsOneWidget,
           reason: "the enabled neighbour ('a') keeps its drag handle",
         );
+      },
+    );
+  });
+
+  group('cleared interior KEY rows translate host indices (_hostIndexFor)', () {
+    // Clearing an interior row's KEY keeps the row alive in the editor
+    // (echo suppression) while every host's encode drops it — raw editor
+    // indices then sit one past the host's for every row below the cleared
+    // one, so index-based host ops must translate through _hostIndexFor.
+    Future<void> clearInteriorKey(WidgetTester tester) async {
+      await tester.enterText(find.byKey(const ValueKey('kv_key_1')), '');
+      await tester.pump();
+      // Unfocus: dragging the still-focused row into the reorder overlay
+      // trips the LeaderLayer-before-FollowerLayer paint assertion.
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
+    }
+
+    testWidgets(
+      "dragging the row below a cleared-key row reports the host's decoded "
+      "indices — (1, 0), not the editor's raw (2, 0)",
+      (tester) async {
+        final calls = <(int, int)>[];
+        await pump(
+          tester,
+          _ReorderDuplicateHarness(
+            initial: const {'a': '1', 'b': '2', 'c': '3'},
+            onReorderCalls: calls,
+          ),
+        );
+        await clearInteriorKey(tester);
+
+        // Editor rows: a, '' (cleared b, editor-only), c, blank. Drag 'c'
+        // (editor row 2, handle icon 2) to the top slot.
+        await dragHandleBy(
+          tester,
+          find.byIcon(Icons.drag_indicator).at(2),
+          -1000,
+        );
+
+        expect(
+          calls,
+          [(1, 0)],
+          reason:
+              "the host's decoded rows are [a, c] — 'c' is host index 1, "
+              'not raw editor index 2',
+        );
+        expect(keyTextAt(tester, 0), 'c');
+        expect(keyTextAt(tester, 1), 'a');
+      },
+    );
+
+    testWidgets(
+      'dragging the cleared-key row itself never reaches the host — it has '
+      'no canonical counterpart to move',
+      (tester) async {
+        final calls = <(int, int)>[];
+        await pump(
+          tester,
+          _ReorderDuplicateHarness(
+            initial: const {'a': '1', 'b': '2', 'c': '3'},
+            onReorderCalls: calls,
+          ),
+        );
+        await clearInteriorKey(tester);
+
+        // The cleared row (editor row 1, handle icon 1) drags to the top.
+        await dragHandleBy(
+          tester,
+          find.byIcon(Icons.drag_indicator).at(1),
+          -1000,
+        );
+
+        expect(calls, isEmpty);
+      },
+    );
+
+    testWidgets(
+      'duplicate on the row below a cleared-key row reports the decoded '
+      'index — 1, not raw 2 — and the cleared row itself is a no-op',
+      (tester) async {
+        final calls = <int>[];
+        await pump(
+          tester,
+          _ReorderDuplicateHarness(
+            initial: const {'a': '1', 'b': '2', 'c': '3'},
+            onDuplicateCalls: calls,
+          ),
+        );
+        await clearInteriorKey(tester);
+
+        // The cleared row's duplicate button is inert — no canonical row.
+        await tester.tap(find.byIcon(Icons.content_copy).at(1));
+        await tester.pump();
+        expect(calls, isEmpty);
+
+        // 'c' (editor row 2) duplicates as host index 1.
+        await tester.tap(find.byIcon(Icons.content_copy).at(2));
+        await tester.pumpAndSettle();
+
+        expect(calls, [1]);
+        expect(find.text('c-copy'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'toggling the checkbox of a row below a cleared-key row reports the '
+      'decoded index — 1, not raw 2',
+      (tester) async {
+        (int, String, String, bool)? reported;
+        await pump(
+          tester,
+          _ToggleHarness(
+            initial: const {'a': '1', 'b': '2', 'c': '3'},
+            initiallyDisabled: const {},
+            onToggle: (index, key, value, enabled) =>
+                reported = (index, key, value, enabled),
+          ),
+        );
+
+        // Clear the interior 'b' key (no fieldPrefix here — find by text).
+        await tester.enterText(find.widgetWithText(TextField, 'b'), '');
+        await tester.pump();
+
+        // Rows: a, '' (cleared), c, blank — checkboxes on the first three.
+        await tester.tap(find.byType(Checkbox).at(2));
+        await tester.pump();
+
+        expect(reported, (1, 'c', '3', false));
       },
     );
   });
