@@ -261,6 +261,73 @@ void main() {
   );
 
   testWidgets(
+    'move mode excludes the panel that owns the dropped tab (the bloc '
+    'rejects same-panel moves, so its row was a silently-eaten no-op) and '
+    'hides the reorder handles (filtered indices no longer map to the bloc '
+    'panel list)',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: resolveTheme('brutalist')(Brightness.light, isCompact: false),
+          home: Scaffold(
+            body: BlocProvider<TabsBloc>.value(
+              value: bloc,
+              child: const Row(
+                children: [
+                  // Drags t2, owned by the NON-active 'Work' panel (p2) — the
+                  // exclusion must key off ownership, not the active panel.
+                  LongPressDraggable<TabDragData>(
+                    key: ValueKey('drag_source3'),
+                    data: TabDragData('t2'),
+                    feedback: Material(child: Text('t2')),
+                    child: SizedBox(
+                      width: 100,
+                      height: 50,
+                      child: ColoredBox(
+                        color: Colors.red,
+                        child: Text('drag me'),
+                      ),
+                    ),
+                  ),
+                  PanelSelector(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final sourceCenter = tester.getCenter(
+        find.byKey(const ValueKey('drag_source3')),
+      );
+      final targetCenter = tester.getCenter(
+        find.byKey(const ValueKey('panel_selector_button')),
+      );
+      final gesture = await tester.startGesture(sourceCenter);
+      await tester.pump(const Duration(milliseconds: 600));
+      await gesture.moveTo(targetCenter);
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      // The owner panel's row is absent; every other panel is offered.
+      expect(
+        find.byKey(const ValueKey('panel_row_$_workPanelId')),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('panel_row_p1')), findsOneWidget);
+      // Move mode is a target picker: no reorder handles.
+      expect(find.byIcon(Icons.drag_handle), findsNothing);
+
+      // The remaining row still dispatches the move.
+      await tester.tap(find.byKey(const ValueKey('panel_row_p1')));
+      await tester.pumpAndSettle();
+      verify(() => bloc.add(const MoveTabToPanel('t2', 'p1'))).called(1);
+    },
+  );
+
+  testWidgets(
     'D4: a collection-node drag (NodeDragData) is rejected by the panel '
     'selector — no menu opens, no bloc event dispatched',
     (tester) async {

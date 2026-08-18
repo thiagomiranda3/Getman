@@ -68,12 +68,18 @@ class AppPalette extends ThemeExtension<AppPalette> {
       methodColors[method.toUpperCase()] ?? methodFallback;
 
   Color statusColor(int code) {
+    // < 100 is not a real HTTP status: 0 is the transport-failure sentinel
+    // (a NetworkFailure with no response — see tabs_repository_impl), which
+    // must read as an error, not fall into the 1xx/3xx warning bucket.
+    if (code < 100) return statusError;
     if (code >= 200 && code < 300) return statusSuccess;
     if (code >= 400) return statusError;
     return statusWarning;
   }
 
   Color statusAccent(int code) {
+    // Mirrors statusColor: < 100 (transport-failure sentinel 0) → error.
+    if (code < 100) return statusAccentError;
     if (code >= 200 && code < 300) return statusAccentSuccess;
     if (code >= 400) return statusAccentError;
     return statusAccentWarning;

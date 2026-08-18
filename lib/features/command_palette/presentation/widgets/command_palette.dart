@@ -21,6 +21,7 @@ import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:uuid/uuid.dart';
 
 /// Cmd/Ctrl+K palette: fuzzy-jump to a saved request, switch environment, or
 /// change theme. Reads bloc state at open time (passed in by [show]) and
@@ -208,14 +209,22 @@ class _CommandPaletteState extends State<CommandPalette> {
     // matching history_list.dart verbatim (no collectionNodeId/Name) so a
     // re-send never compares against / overwrites a collection node, and the
     // {{var}} placeholders stay unresolved for re-sending under another env.
+    // Fresh config id per open (copyWith would PIN the stored id): chaining
+    // rules are keyed by config id, so two tabs opened from the same history
+    // entry must not alias each other's rules — same reason
+    // TabsBloc._onDuplicateTab mints withId(uuid). matchExtra folds in the
+    // status code so the palette finds history by '404' etc., matching the
+    // HISTORY tab's own search (URL/method/status code).
     for (final config in widget.historyBloc.state.history) {
       cmds.add(
         _Command(
           label: config.url.isEmpty ? '(NO URL)' : config.url,
           subtitle: 'History',
           icon: Icons.history,
-          matchExtra: config.method,
-          run: () => widget.tabsBloc.add(AddTab(config: config.copyWith())),
+          matchExtra: '${config.method} ${config.statusCode ?? ''}',
+          run: () => widget.tabsBloc.add(
+            AddTab(config: config.withId(const Uuid().v4())),
+          ),
         ),
       );
     }
@@ -423,9 +432,9 @@ class _Command {
   final VoidCallback run;
 
   /// Extra text folded into the fuzzy-match string but NOT displayed — lets a
-  /// saved request match by method + URL (and a history entry by method)
-  /// without changing the visible label/subtitle. Default `''` keeps
-  /// environment/theme commands matching on label + subtitle only.
+  /// saved request match by method + URL (and a history entry by method +
+  /// status code) without changing the visible label/subtitle. Default `''`
+  /// keeps environment/theme commands matching on label + subtitle only.
   final String matchExtra;
 }
 

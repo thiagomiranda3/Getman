@@ -83,6 +83,8 @@ void main() {
     single<CloseTabIntent>(LogicalKeyboardKey.keyW);
     single<SaveRequestIntent>(LogicalKeyboardKey.keyS);
     single<SendRequestIntent>(LogicalKeyboardKey.enter);
+    // K5: numpad Enter is a distinct LogicalKeyboardKey — it must send too.
+    single<SendRequestIntent>(LogicalKeyboardKey.numpadEnter);
     single<BeautifyJsonIntent>(LogicalKeyboardKey.keyB);
     single<CommandPaletteIntent>(LogicalKeyboardKey.keyK);
     single<SwitchEnvironmentIntent>(LogicalKeyboardKey.keyE);
@@ -216,6 +218,8 @@ void main() {
       single<CloseTabIntent>(LogicalKeyboardKey.keyW);
       single<SaveRequestIntent>(LogicalKeyboardKey.keyS);
       single<SendRequestIntent>(LogicalKeyboardKey.enter);
+      // K5: numpad Enter must send off macOS too.
+      single<SendRequestIntent>(LogicalKeyboardKey.numpadEnter);
       single<BeautifyJsonIntent>(LogicalKeyboardKey.keyB);
       single<CommandPaletteIntent>(LogicalKeyboardKey.keyK);
       single<SwitchEnvironmentIntent>(LogicalKeyboardKey.keyE);
@@ -276,18 +280,18 @@ void main() {
     });
   });
 
-  test('each platform map has exactly 34 single-modifier bindings', () {
-    // 8 primary (N,W,S,Enter,B,K,E,L) + reopen-tab (Shift+T) + save-all
-    // (Alt+S) + shortcuts-help (/) + 2 tab-switch (Ctrl+Tab, Ctrl+Shift+Tab)
-    // + 9 jump-to-tab + 3 panel (Shift+N, Shift+], Shift+[)
+  test('each platform map has exactly 35 single-modifier bindings', () {
+    // 9 primary (N,W,S,Enter,NumpadEnter,B,K,E,L) + reopen-tab (Shift+T) +
+    // save-all (Alt+S) + shortcuts-help (/) + 2 tab-switch (Ctrl+Tab,
+    // Ctrl+Shift+Tab) + 9 jump-to-tab + 3 panel (Shift+N, Shift+], Shift+[)
     // + 9 jump-to-panel.
-    expect(buildAppShortcuts(useMeta: true).length, 34);
-    expect(buildAppShortcuts(useMeta: false).length, 34);
+    expect(buildAppShortcuts(useMeta: true).length, 35);
+    expect(buildAppShortcuts(useMeta: false).length, 35);
   });
 
   test('runtime appShortcuts is non-empty (built for the host platform)', () {
     expect(appShortcuts, isNotEmpty);
-    expect(appShortcuts.length, 34);
+    expect(appShortcuts.length, 35);
   });
 
   group(

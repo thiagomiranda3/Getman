@@ -147,6 +147,10 @@ Map<ShortcutActivator, Intent> buildAppShortcuts({required bool useMeta}) {
     primary(LogicalKeyboardKey.keyW): const CloseTabIntent(),
     primary(LogicalKeyboardKey.keyS): const SaveRequestIntent(),
     primary(LogicalKeyboardKey.enter): const SendRequestIntent(),
+    // Numpad Enter is a distinct LogicalKeyboardKey — without this row
+    // Cmd/Ctrl+numpad-Enter is dead outside the code editors (K5; the
+    // editor-side strip lives in AppCodeShortcutsActivatorsBuilder).
+    primary(LogicalKeyboardKey.numpadEnter): const SendRequestIntent(),
     primary(LogicalKeyboardKey.keyB): const BeautifyJsonIntent(),
     primary(LogicalKeyboardKey.keyK): const CommandPaletteIntent(),
     primary(LogicalKeyboardKey.keyE): const SwitchEnvironmentIntent(),

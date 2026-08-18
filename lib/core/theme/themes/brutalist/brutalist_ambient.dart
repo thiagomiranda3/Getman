@@ -11,7 +11,10 @@
 // AnimationController is created once and start/stopped (never
 // disposed+recreated, since SingleTickerProviderState allows only one
 // ticker), and pulse is resolved unconditionally in didChangeDependencies so
-// a false->true animate toggle picks up the real provider.
+// a false->true animate toggle picks up the real provider. The dot grid is
+// bounded (40×28) but coverage-preserving: past the base 26px pitch the cell
+// scales UP (brutalistHalftoneGridFor) so the grid always spans the window —
+// a hard pixel cap left a drifting seam on windows over 1040×728px.
 
 import 'dart:async';
 import 'dart:math' as math;
@@ -290,18 +293,29 @@ class _HalftonePainter extends CustomPainter {
         ..color = base,
     );
 
+    // Coverage-preserving grid: the cell pitch scales up beyond the base
+    // _kCell once the bounded dot budget would run out, so the halftone
+    // always spans the whole window (see brutalistHalftoneGridFor). The dot
+    // radius and ghost offset scale with the cell so ink density is
+    // unchanged — just a coarser halftone screen on big windows.
+    final grid = brutalistHalftoneGridFor(size);
+    final cell = grid.cell;
+    final dotScale = cell / _kCell;
+    final maxRadius = _kMaxRadius * dotScale;
+
     // Two slow phases (a slight x/y drift) so the grid breathes rather than
     // marching. _wave is C0-continuous in -1..1 (no dart:math in the hot path
     // beyond the cheap sin used for the radius swell below).
-    final driftX = _wave(v) * _kCell * 0.5;
-    final driftY = _wave(v + 0.27) * _kCell * 0.5;
+    final driftX = _wave(v) * cell * 0.5;
+    final driftY = _wave(v + 0.27) * cell * 0.5;
     // Registration ghost offset: a couple of px of misalignment that itself
-    // wobbles — the riso "two plates don't line up" tell.
-    final ghostDx = 1.5 + _wave(v + 0.5) * 1.2;
-    final ghostDy = 1.5 + _wave(v + 0.13) * 1.2;
+    // wobbles — the riso "two plates don't line up" tell. Scales with the
+    // cell so the visible ghost crescent keeps its proportion to the dot.
+    final ghostDx = (1.5 + _wave(v + 0.5) * 1.2) * dotScale;
+    final ghostDy = (1.5 + _wave(v + 0.13) * 1.2) * dotScale;
 
-    final cols = math.min(_kMaxCols, (size.width / _kCell).ceil() + 2);
-    final rows = math.min(_kMaxRows, (size.height / _kCell).ceil() + 2);
+    final cols = grid.cols;
+    final rows = grid.rows;
 
     _inkPath.reset();
     _ghostPath.reset();
@@ -316,8 +330,8 @@ class _HalftonePainter extends CustomPainter {
 
     for (var c = 0; c < cols; c++) {
       for (var r = 0; r < rows; r++) {
-        var cx = c * _kCell + driftX;
-        var cy = r * _kCell + driftY;
+        var cx = c * cell + driftX;
+        var cy = r * cell + driftY;
 
         // Cursor force: push the dot away from the pointer position.
         if (ptrPx != null) {
@@ -335,9 +349,9 @@ class _HalftonePainter extends CustomPainter {
         // Radius swells on a diagonal wave so dots pulse in soft bands.
         final phase = (c + r) * 0.45 + v * math.pi * 2;
         final swell = 0.5 + 0.5 * math.sin(phase);
-        final radius = (_kMaxRadius * (0.35 + 0.65 * swell)).clamp(
+        final radius = (maxRadius * (0.35 + 0.65 * swell)).clamp(
           0.0,
-          _kMaxRadius,
+          maxRadius,
         );
         if (radius <= 0) continue;
         _inkPath.addOval(
@@ -383,6 +397,43 @@ class _HalftonePainter extends CustomPainter {
       old.isDark != isDark ||
       old.hasPulse != hasPulse ||
       old.signals != signals;
+}
+
+/// @visibleForTesting seam-coverage geometry — the halftone grid for a
+/// viewport: the dot pitch `cell` plus the bounded `cols`×`rows` dot counts
+/// painted by `_HalftonePainter`.
+///
+/// Dots cost O(cols × rows) per frame (unlike AURIS's O(cols + rows)
+/// gridlines), so instead of raising the dot budget for big windows the CELL
+/// scales up once the base 26px pitch would exhaust the 40×28 cap: the same
+/// bounded dot count always spans the whole window (coverage-preserving at
+/// constant per-frame cost — a riso print at poster size keeps its ink
+/// coverage with a coarser halftone screen). Previously the loop just stopped
+/// at 1040×728px, leaving a hard, drifting seam on any modern window.
+///
+/// The pitch divides by cap−2 so the paint loop's +2 column/row over-scan
+/// (which keeps the drifting grid covering the window edges) survives the
+/// cap: `(cols - 1) * cell >= size.width` always holds (same for rows).
+@visibleForTesting
+({double cell, int cols, int rows}) brutalistHalftoneGridFor(Size size) {
+  final cell = math.max(
+    _HalftonePainter._kCell,
+    math.max(
+      size.width / (_HalftonePainter._kMaxCols - 2),
+      size.height / (_HalftonePainter._kMaxRows - 2),
+    ),
+  );
+  return (
+    cell: cell,
+    cols: math.min(
+      _HalftonePainter._kMaxCols,
+      (size.width / cell).ceil() + 2,
+    ),
+    rows: math.min(
+      _HalftonePainter._kMaxRows,
+      (size.height / cell).ceil() + 2,
+    ),
+  );
 }
 
 // C0-continuous oscillation in -1..1 (cheap, no trig for the drift).

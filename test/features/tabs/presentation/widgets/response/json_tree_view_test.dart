@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/features/tabs/presentation/widgets/response/json_tree_filter.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/json_tree_view.dart';
 
 Widget _host(Object? data) => MaterialApp(
@@ -493,6 +496,113 @@ void main() {
         await tester.pump(const Duration(seconds: 3));
       },
     );
+  });
+
+  group('kTreeMaxDepth depth guard (I10)', () {
+    // A ~400KB `[[[[…]]]]` body: under the 512 KiB TREE gate, jsonDecode
+    // survives it, but the unguarded recursive walks overflowed the stack.
+    final deep = jsonDecode('${'[' * 200000}1${']' * 200000}');
+
+    test('flattenVisibleJsonTree renders a 200k-deep body as capped rows '
+        'plus one marker leaf', () {
+      final plan = planExpandAll(data: deep);
+      final nodes = flattenVisibleJsonTree(
+        data: deep,
+        expanded: plan.containerPaths,
+      );
+      // Real rows at depths 0..kTreeMaxDepth-1, then the single marker.
+      expect(nodes.length, kTreeMaxDepth + 1);
+      final marker = nodes.last;
+      expect(marker.isDepthTruncation, isTrue);
+      expect(marker.depth, kTreeMaxDepth);
+      expect(marker.isContainer, isFalse);
+      expect(marker.preview, '');
+      // 200k nesting levels minus the kTreeMaxDepth rendered ones.
+      expect(marker.label, '[nested too deep — 199488 more levels]');
+    });
+
+    test('flattenVisibleJsonTree maxDepth override emits the marker with '
+        'the remaining-level count', () {
+      final data = jsonDecode('${'[' * 6}1${']' * 6}');
+      final plan = planExpandAll(data: data, maxDepth: 3);
+      final nodes = flattenVisibleJsonTree(
+        data: data,
+        expanded: plan.containerPaths,
+        maxDepth: 3,
+      );
+      expect(
+        nodes.map((n) => n.label).toList(),
+        ['[0]', '[0]', '[0]', '[nested too deep — 3 more levels]'],
+      );
+      expect(nodes.last.path, r'$[0][0][0]#truncated');
+    });
+
+    test(
+      'marker pluralization: a single hidden level reads "1 more level"',
+      () {
+        final data = jsonDecode('[[[1]]]');
+        final nodes = flattenVisibleJsonTree(
+          data: data,
+          expanded: {r'$[0]', r'$[0][0]'},
+          maxDepth: 2,
+        );
+        expect(nodes.last.label, '[nested too deep — 1 more level]');
+      },
+    );
+
+    testWidgets('TREE mode survives the pathological deep body: initial '
+        'render, EXPAND ALL, and filtering all stay bounded', (tester) async {
+      // Wide, short surface: EXPAND ALL builds rows of increasing indent —
+      // keep every built row inside the viewport width.
+      tester.view.physicalSize = const Size(2400, 600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(_host(deep));
+      expect(find.text('[0]'), findsWidgets);
+
+      await tester.tap(find.byKey(const ValueKey('tree_expand_all')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('tree_filter_field')),
+        'needle',
+      );
+      await tester.pumpAndSettle();
+      // Nothing above the cap matches; the skipped subtree surfaces the
+      // refine hint instead of a crash.
+      expect(find.text('Refine filter to see more'), findsOneWidget);
+    });
+
+    testWidgets('EXPAND ALL reveals the depth marker leaf without an '
+        'actions menu (small @visibleForTesting cap)', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: brutalistTheme(Brightness.light),
+          home: Scaffold(
+            body: JsonTreeView(
+              data: jsonDecode('[[[[[[1]]]]]]'),
+              maxDepth: 3,
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('tree_expand_all')));
+      await tester.pumpAndSettle();
+
+      expect(
+        _row('[nested too deep — 3 more levels]'),
+        findsOneWidget,
+      );
+      // Three real rows get a menu; the marker leaf does not.
+      expect(find.byType(PopupMenuButton<String>), findsNWidgets(3));
+      expect(
+        find.byKey(const ValueKey(r'tree_menu_$[0][0][0]#truncated')),
+        findsNothing,
+      );
+    });
   });
 
   group('JsonTreeView scalar root', () {

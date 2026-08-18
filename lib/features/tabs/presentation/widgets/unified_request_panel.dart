@@ -199,7 +199,10 @@ class _StatusRibbon extends StatelessWidget {
         final n = next.tabs.byId(tabId);
         return p?.response != n?.response ||
             p?.isSending != n?.isSending ||
-            p?.responseHistory.length != n?.responseHistory.length;
+            p?.responseHistory.length != n?.responseHistory.length ||
+            // Time-travel between value-equal responses only moves the
+            // viewed-entry id — without this the timeline badge never flips.
+            p?.viewedHistoryEntryId != n?.viewedHistoryEntryId;
       },
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
@@ -232,7 +235,7 @@ class _StatusRibbon extends StatelessWidget {
                 ResponseHistoryTimeline(
                   tabId: tabId,
                   history: tab.responseHistory,
-                  current: response,
+                  viewedHistoryEntryId: tab.viewedHistoryEntryId,
                 ),
               ],
             ],

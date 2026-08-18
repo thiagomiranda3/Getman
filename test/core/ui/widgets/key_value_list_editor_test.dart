@@ -8,6 +8,14 @@ import 'package:getman/core/ui/widgets/key_value_list_editor.dart';
 import 'package:getman/core/utils/layered_variable_context.dart';
 
 const _mapEquality = MapEquality<String, String>();
+const _stringListEquality = ListEquality<String>();
+
+/// Order-SIGNIFICANT map equality mirroring the production map hosts'
+/// `_orderedHeadersEqual` / `_orderedVariablesEqual` — a pure reorder must
+/// compare unequal so the editor's didUpdateWidget rebuild path runs.
+bool _orderedMapEquals(Map<String, String> a, Map<String, String> b) =>
+    _mapEquality.equals(a, b) &&
+    _stringListEquality.equals(a.keys.toList(), b.keys.toList());
 
 /// Harness that echoes every emission back into the editor, mimicking the
 /// BLoC round-trip the real editors live in.
@@ -73,6 +81,11 @@ void main() {
 
   String keyTextAt(WidgetTester tester, int index) => tester
       .widget<TextField>(find.byKey(ValueKey('kv_key_$index')))
+      .controller!
+      .text;
+
+  String valTextAt(WidgetTester tester, int index) => tester
+      .widget<TextField>(find.byKey(ValueKey('kv_val_$index')))
       .controller!
       .text;
 
@@ -788,6 +801,336 @@ void main() {
     );
   });
 
+  group('keyless-row reconcile: cleared-key rows survive genuine rebuilds', () {
+    // Echo suppression alone cannot keep a cleared-key row alive across a
+    // host mutation whose echo genuinely differs (params toggle, any
+    // reorder/duplicate): didUpdateWidget rebuilds from canonical items,
+    // which dropped the keyless row when its clear was emitted. The
+    // reconcile snapshots such rows and reinserts them — the typed VALUE is
+    // the data being protected.
+    testWidgets(
+      'params-style toggle (echo genuinely differs) keeps a cleared-key '
+      "row's value alive at its position",
+      (tester) async {
+        await pump(
+          tester,
+          const _ParamsStyleToggleHarness(
+            initial: [('a', '1', true), ('b', '2', true), ('c', '3', true)],
+          ),
+        );
+
+        // Clear b's key: the row now lives only inside the editor.
+        await tester.enterText(find.byKey(const ValueKey('kv_key_1')), '');
+        await tester.pump();
+
+        // Toggle a's checkbox — enabled is part of the canonical rows, so
+        // the echo differs and didUpdateWidget takes the full rebuild path.
+        await tester.tap(find.byType(Checkbox).first);
+        await tester.pump();
+
+        expect(find.widgetWithText(TextField, 'KEY'), findsNWidgets(4));
+        expect(keyTextAt(tester, 0), 'a');
+        expect(keyTextAt(tester, 1), '');
+        expect(
+          valTextAt(tester, 1),
+          '2',
+          reason: "the cleared-key row's typed value must survive the rebuild",
+        );
+        expect(keyTextAt(tester, 2), 'c');
+        final checkboxes = tester
+            .widgetList<Checkbox>(find.byType(Checkbox))
+            .toList();
+        expect(checkboxes[0].value, isFalse, reason: "a's toggle applied");
+        expect(
+          checkboxes[1].value,
+          isTrue,
+          reason: "the keyless row's own enabled flag survives the rebuild",
+        );
+      },
+    );
+
+    testWidgets(
+      "reorder on an order-significant map host keeps a cleared-key row's "
+      'value alive at its position across the rebuild',
+      (tester) async {
+        final calls = <(int, int)>[];
+        await pump(
+          tester,
+          _ReorderDuplicateHarness(
+            initial: const {'a': '1', 'b': '2', 'c': '3'},
+            onReorderCalls: calls,
+            orderedEquals: true,
+          ),
+        );
+
+        await tester.enterText(find.byKey(const ValueKey('kv_key_1')), '');
+        await tester.pump();
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pump();
+
+        // Drag c (editor row 2) to the top; the ordered-equals echo differs
+        // from what was emitted, so the editor rebuilds from canonical
+        // [c, a] — the ''=2 row must be reinserted, not eaten.
+        await dragHandleBy(
+          tester,
+          find.byIcon(Icons.drag_indicator).at(2),
+          -1000,
+        );
+
+        expect(calls, [(1, 0)]);
+        expect(find.widgetWithText(TextField, 'KEY'), findsNWidgets(4));
+        expect(keyTextAt(tester, 0), 'c');
+        expect(keyTextAt(tester, 1), 'a');
+        expect(keyTextAt(tester, 2), '');
+        expect(
+          valTextAt(tester, 2),
+          '2',
+          reason: "the cleared-key row's typed value must survive the rebuild",
+        );
+      },
+    );
+
+    testWidgets(
+      "duplicate keeps a cleared-key row's value alive at its position "
+      'across the rebuild',
+      (tester) async {
+        final calls = <int>[];
+        await pump(
+          tester,
+          _ReorderDuplicateHarness(
+            initial: const {'a': '1', 'b': '2', 'c': '3'},
+            onDuplicateCalls: calls,
+          ),
+        );
+
+        await tester.enterText(find.byKey(const ValueKey('kv_key_1')), '');
+        await tester.pump();
+
+        // Duplicate 'a' — the echo ({a, a-copy, c}) genuinely differs even
+        // under a plain MapEquality, forcing the rebuild path.
+        await tester.tap(find.byIcon(Icons.content_copy).first);
+        await tester.pumpAndSettle();
+
+        expect(calls, [0]);
+        expect(find.widgetWithText(TextField, 'KEY'), findsNWidgets(5));
+        expect(keyTextAt(tester, 0), 'a');
+        expect(keyTextAt(tester, 1), '');
+        expect(
+          valTextAt(tester, 1),
+          '2',
+          reason: "the cleared-key row's typed value must survive the rebuild",
+        );
+        expect(keyTextAt(tester, 2), 'a-copy');
+        expect(keyTextAt(tester, 3), 'c');
+      },
+    );
+  });
+
+  group('map-host index translation with duplicate keys '
+      '(KeyValueHostIndexing)', () {
+    // Map hosts collapse duplicate keys: the entry's POSITION is the first
+    // occurrence's, its VALUE the last's. With a duplicate-key row alive
+    // above (echo suppression keeps it), skipping only empty keys reports
+    // host indices one past the entry list — reorder/duplicate then hit the
+    // wrong row or silently no-op with a persistent visual desync.
+    Future<void> renameRowOneTo(WidgetTester tester, String key) async {
+      await tester.enterText(find.byKey(const ValueKey('kv_key_1')), key);
+      await tester.pump();
+      // Unfocus: dragging the still-focused row into the reorder overlay
+      // trips the LeaderLayer-before-FollowerLayer paint assertion.
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
+    }
+
+    testWidgets(
+      'with a duplicate-key row alive above, dragging a lower row reports '
+      "the ENTRY index — (1, 0), not the editor's non-empty-key count (2, 0)",
+      (tester) async {
+        final calls = <(int, int)>[];
+        await pump(
+          tester,
+          _ReorderDuplicateHarness(
+            initial: const {'a': '1', 'b': '2', 'c': '3'},
+            onReorderCalls: calls,
+            orderedEquals: true,
+          ),
+        );
+
+        // Rename b → a: encode collapses to {a: 2, c: 3}, the echo matches
+        // what was emitted, and BOTH 'a' rows stay alive via suppression.
+        await renameRowOneTo(tester, 'a');
+        expect(find.widgetWithText(TextField, 'KEY'), findsNWidgets(4));
+
+        // Drag c (editor row 2) to the top. Canonical entries are [a, c]:
+        // c is entry 1. Empty-only skipping would report (2, 0) — an
+        // out-of-range index the host silently drops (persistent desync).
+        await dragHandleBy(
+          tester,
+          find.byIcon(Icons.drag_indicator).at(2),
+          -1000,
+        );
+
+        expect(calls, [(1, 0)]);
+        // Canonical and visual agree: [c, a], with 'a' carrying the
+        // last-write value '2' (the duplicate rows collapse on this
+        // genuine rebuild).
+        expect(keyTextAt(tester, 0), 'c');
+        expect(keyTextAt(tester, 1), 'a');
+        expect(valTextAt(tester, 1), '2');
+      },
+    );
+
+    testWidgets(
+      'with a duplicate-key row alive above, duplicating a lower row hits '
+      'the right entry — 1, not the non-empty-key count 2',
+      (tester) async {
+        final calls = <int>[];
+        await pump(
+          tester,
+          _ReorderDuplicateHarness(
+            initial: const {'a': '1', 'b': '2', 'c': '3'},
+            onDuplicateCalls: calls,
+            orderedEquals: true,
+          ),
+        );
+
+        await renameRowOneTo(tester, 'a');
+
+        await tester.tap(find.byIcon(Icons.content_copy).at(2));
+        await tester.pumpAndSettle();
+
+        expect(calls, [1]);
+        expect(find.text('c-copy'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'dragging the collapsed duplicate row itself never reaches the host — '
+      'its map entry belongs to the first occurrence',
+      (tester) async {
+        final calls = <(int, int)>[];
+        await pump(
+          tester,
+          _ReorderDuplicateHarness(
+            initial: const {'a': '1', 'b': '2', 'c': '3'},
+            onReorderCalls: calls,
+            orderedEquals: true,
+          ),
+        );
+
+        await renameRowOneTo(tester, 'a');
+
+        // Editor row 1 is the second 'a' occurrence — canonically it is the
+        // same entry as row 0, so there is nothing for the host to move.
+        await dragHandleBy(
+          tester,
+          find.byIcon(Icons.drag_indicator).at(1),
+          -1000,
+        );
+
+        expect(calls, isEmpty);
+      },
+    );
+
+    testWidgets(
+      'env-style trimming host: keys equal after trim collapse — the '
+      'translation derives that from the codec, not a hardcoded rule',
+      (tester) async {
+        final calls = <(int, int)>[];
+        await pump(
+          tester,
+          _ReorderDuplicateHarness(
+            initial: const {'a': '1', 'b': '2', 'c': '3'},
+            onReorderCalls: calls,
+            orderedEquals: true,
+            trimKeys: true,
+          ),
+        );
+
+        // Rename b → ' a ' — trims to a duplicate of 'a', collapsing in
+        // encode exactly like the env editor's trimming codec.
+        await renameRowOneTo(tester, ' a ');
+
+        await dragHandleBy(
+          tester,
+          find.byIcon(Icons.drag_indicator).at(2),
+          -1000,
+        );
+
+        expect(calls, [(1, 0)]);
+        expect(keyTextAt(tester, 0), 'c');
+        expect(keyTextAt(tester, 1), 'a');
+        expect(valTextAt(tester, 1), '2');
+      },
+    );
+
+    testWidgets(
+      'env-style trimming host: a whitespace-only key row is editor-only — '
+      'dragging it never reaches the host',
+      (tester) async {
+        final calls = <(int, int)>[];
+        await pump(
+          tester,
+          _ReorderDuplicateHarness(
+            initial: const {'a': '1', 'b': '2'},
+            onReorderCalls: calls,
+            trimKeys: true,
+          ),
+        );
+
+        // Type a whitespace-only key into the trailing blank row: encode
+        // drops it, echo suppression keeps it alive.
+        await tester.enterText(find.byKey(const ValueKey('kv_key_2')), ' ');
+        await tester.pump();
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pump();
+        expect(find.widgetWithText(TextField, 'KEY'), findsNWidgets(4));
+
+        await dragHandleBy(
+          tester,
+          find.byIcon(Icons.drag_indicator).at(2),
+          -1000,
+        );
+
+        expect(calls, isEmpty);
+      },
+    );
+
+    testWidgets(
+      'list host (auto infers list for non-Map items): duplicate keys are '
+      'all real host rows — no first-occurrence collapse',
+      (tester) async {
+        final calls = <(int, int)>[];
+        await pump(
+          tester,
+          _ListHostReorderHarness(
+            initial: const [('a', '1'), ('a', '2'), ('c', '3')],
+            onReorderCalls: calls,
+          ),
+        );
+
+        await dragHandleBy(
+          tester,
+          find.byIcon(Icons.drag_indicator).at(2),
+          -1000,
+        );
+
+        expect(
+          calls,
+          [(2, 0)],
+          reason:
+              'a list-backed host keeps every duplicate-key row; map-style '
+              'first-occurrence counting would report (1, 0)',
+        );
+        expect(keyTextAt(tester, 0), 'c');
+        expect(keyTextAt(tester, 1), 'a');
+        expect(valTextAt(tester, 1), '1');
+        expect(keyTextAt(tester, 2), 'a');
+        expect(valTextAt(tester, 2), '2');
+      },
+    );
+  });
+
   group('phone layout + row hover', () {
     testWidgets('phone width stacks the value field under the key row', (
       tester,
@@ -997,11 +1340,22 @@ class _ReorderDuplicateHarness extends StatefulWidget {
     this.onReorderCalls,
     this.onDuplicateCalls,
     this.disabledKeys,
+    this.orderedEquals = false,
+    this.trimKeys = false,
   });
   final Map<String, String> initial;
   final List<(int, int)>? onReorderCalls;
   final List<int>? onDuplicateCalls;
   final Set<String>? disabledKeys;
+
+  /// Mirrors the production hosts' order-SIGNIFICANT `equals` (headers/env)
+  /// so a pure reorder echo triggers the editor's rebuild path instead of
+  /// slipping past a plain MapEquality.
+  final bool orderedEquals;
+
+  /// Mirrors the env editor's encode, which trims keys (whitespace-only keys
+  /// drop; keys equal after trim collapse onto the first occurrence).
+  final bool trimKeys;
 
   @override
   State<_ReorderDuplicateHarness> createState() =>
@@ -1019,11 +1373,16 @@ class _ReorderDuplicateHarnessState extends State<_ReorderDuplicateHarness> {
       items: items,
       fieldPrefix: 'kv',
       decode: (map) => [for (final e in map.entries) (e.key, e.value)],
-      encode: (rows) => {
-        for (final (key, value) in rows)
-          if (key.isNotEmpty) key: value,
-      },
-      equals: _mapEquality.equals,
+      encode: widget.trimKeys
+          ? (rows) => {
+              for (final (key, value) in rows)
+                if (key.trim().isNotEmpty) key.trim(): value,
+            }
+          : (rows) => {
+              for (final (key, value) in rows)
+                if (key.isNotEmpty) key: value,
+            },
+      equals: widget.orderedEquals ? _orderedMapEquals : _mapEquality.equals,
       onChanged: (map) => setState(() => items = map),
       rowEnabled: widget.disabledKeys == null
           ? null
@@ -1053,6 +1412,95 @@ class _ReorderDuplicateHarnessState extends State<_ReorderDuplicateHarness> {
           MapEntry('${source.key}-copy', source.value),
         );
         setState(() => items = Map.fromEntries(entries));
+      },
+    );
+  }
+}
+
+/// Params-mirror harness for the keyless-row reconcile: T is an ordered list
+/// of (key, value, enabled) records whose equality is enabled-SIGNIFICANT —
+/// exactly like `ParamRow.enabled` inside params' ListEquality — so a
+/// checkbox toggle produces an echo that genuinely differs and forces
+/// didUpdateWidget's full rebuild path (a map host's toggle leaves items
+/// untouched and never rebuilds).
+class _ParamsStyleToggleHarness extends StatefulWidget {
+  const _ParamsStyleToggleHarness({required this.initial});
+  final List<(String, String, bool)> initial;
+
+  @override
+  State<_ParamsStyleToggleHarness> createState() =>
+      _ParamsStyleToggleHarnessState();
+}
+
+class _ParamsStyleToggleHarnessState extends State<_ParamsStyleToggleHarness> {
+  static const ListEquality<(String, String, bool)> _rowsEquality =
+      ListEquality<(String, String, bool)>();
+  late List<(String, String, bool)> items = List.of(widget.initial);
+
+  @override
+  Widget build(BuildContext context) {
+    return KeyValueListEditor<List<(String, String, bool)>>(
+      items: items,
+      fieldPrefix: 'kv',
+      decode: (list) => [for (final r in list) (r.$1, r.$2)],
+      encode: (rows) {
+        // Re-attach enabled flags by key (params re-attaches via parked
+        // matching); rows with new keys default to enabled.
+        final flagByKey = {for (final r in items) r.$1: r.$3};
+        return [
+          for (final (key, value) in rows)
+            if (key.isNotEmpty) (key, value, flagByKey[key] ?? true),
+        ];
+      },
+      equals: _rowsEquality.equals,
+      rowEnabled: (index) => index >= items.length || items[index].$3,
+      onToggleEnabled: (index, key, value, enabled) => setState(() {
+        items = [
+          for (final (i, r) in items.indexed)
+            i == index ? (r.$1, r.$2, enabled) : r,
+        ];
+      }),
+      onChanged: (rows) => setState(() => items = rows),
+    );
+  }
+}
+
+/// List-backed host (params-style): duplicate keys are all real host rows —
+/// locks `KeyValueHostIndexing.auto`'s list inference for non-Map items.
+class _ListHostReorderHarness extends StatefulWidget {
+  const _ListHostReorderHarness({required this.initial, this.onReorderCalls});
+  final List<(String, String)> initial;
+  final List<(int, int)>? onReorderCalls;
+
+  @override
+  State<_ListHostReorderHarness> createState() =>
+      _ListHostReorderHarnessState();
+}
+
+class _ListHostReorderHarnessState extends State<_ListHostReorderHarness> {
+  static const ListEquality<(String, String)> _rowsEquality =
+      ListEquality<(String, String)>();
+  late List<(String, String)> items = List.of(widget.initial);
+
+  @override
+  Widget build(BuildContext context) {
+    return KeyValueListEditor<List<(String, String)>>(
+      items: items,
+      fieldPrefix: 'kv',
+      decode: List.of,
+      encode: (rows) => [
+        for (final row in rows)
+          if (row.$1.isNotEmpty) row,
+      ],
+      equals: _rowsEquality.equals,
+      onChanged: (rows) => setState(() => items = rows),
+      onReorder: (oldIndex, newIndex) {
+        widget.onReorderCalls?.add((oldIndex, newIndex));
+        if (oldIndex < 0 || oldIndex >= items.length) return;
+        final next = List.of(items);
+        final row = next.removeAt(oldIndex);
+        next.insert(newIndex.clamp(0, next.length), row);
+        setState(() => items = next);
       },
     );
   }

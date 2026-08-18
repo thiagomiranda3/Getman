@@ -50,7 +50,10 @@ class ResponseSection extends StatelessWidget {
             p.response?.statusCode != n.response?.statusCode ||
             p.response?.durationMs != n.response?.durationMs ||
             p.response?.body.length != n.response?.body.length ||
-            p.responseHistory.length != n.responseHistory.length;
+            p.responseHistory.length != n.responseHistory.length ||
+            // Time-travel between value-equal responses only moves the
+            // viewed-entry id — without this the timeline badge never flips.
+            p.viewedHistoryEntryId != n.viewedHistoryEntryId;
       },
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
@@ -114,7 +117,7 @@ class ResponseSection extends StatelessWidget {
                     ResponseHistoryTimeline(
                       tabId: tabId,
                       history: tab.responseHistory,
-                      current: response,
+                      viewedHistoryEntryId: tab.viewedHistoryEntryId,
                     ),
                   ],
                 ),

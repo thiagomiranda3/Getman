@@ -5,7 +5,9 @@
 // snackbar), and a CLEAR ALL toolbar button (ConfirmDialog, then UNDO
 // snackbar restoring the captured list) — the A1 undo patterns. Tapping an
 // entry opens it as a new (unlinked) tab via AddTab with the stored,
-// templated config — re-sending stays free to pick up whatever environment
+// templated config under a FRESH config id (withId — chaining rules are
+// keyed by config id, so two opens of the same entry must never alias each
+// other's rules) — re-sending stays free to pick up whatever environment
 // is active. Zero-history first-run shows guidance copy, distinct from the
 // search-miss 'NO RESULTS FOUND'.
 
@@ -26,6 +28,7 @@ import 'package:getman/features/history/presentation/bloc/history_event.dart';
 import 'package:getman/features/history/presentation/bloc/history_state.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:uuid/uuid.dart';
 
 class HistoryList extends StatefulWidget {
   const HistoryList({super.key});
@@ -241,7 +244,13 @@ class _HistoryListState extends State<HistoryList> {
           key: ValueKey(config.id),
           config: config,
           onTap: () {
-            context.read<TabsBloc>().add(AddTab(config: config.copyWith()));
+            // Fresh config id per open (copyWith would PIN the stored id):
+            // chaining rules are keyed by config id, so two tabs opened from
+            // the same history row must not alias each other's rules — same
+            // reason TabsBloc._onDuplicateTab mints withId(uuid).
+            context.read<TabsBloc>().add(
+              AddTab(config: config.withId(const Uuid().v4())),
+            );
             Scaffold.maybeOf(context)?.closeDrawer();
           },
           onDelete: () => _deleteEntry(context, config),

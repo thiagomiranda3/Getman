@@ -1,5 +1,7 @@
 // Widget tests for ResponseHistoryTimeline: hidden when < 2 entries,
-// visible with 2+, and tapping an entry dispatches ViewResponseHistoryEntry.
+// visible with 2+, tapping an entry dispatches ViewResponseHistoryEntry, and
+// the viewed entry is tracked BY ID (viewedHistoryEntryId) so value-equal
+// responses in the history still highlight the picked row (G2).
 // Uses a real TabsBloc with mocked repository + use case.
 
 import 'package:flutter/material.dart';
@@ -15,6 +17,7 @@ import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_history_timeline.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -77,7 +80,7 @@ Future<void> _pump(
   TabsBloc bloc, {
   required String tabId,
   required List<ResponseHistoryEntry> history,
-  HttpResponseEntity? current,
+  String? viewedHistoryEntryId,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -88,7 +91,39 @@ Future<void> _pump(
           child: ResponseHistoryTimeline(
             tabId: tabId,
             history: history,
-            current: current,
+            viewedHistoryEntryId: viewedHistoryEntryId,
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+/// Pumps the timeline the way production hosts it: under a BlocBuilder that
+/// re-reads the tab's history + viewedHistoryEntryId from every TabsBloc
+/// emission — so a suppressed emission (the G2 bug) is visible as a badge
+/// that never flips.
+Future<void> _pumpLive(
+  WidgetTester tester,
+  TabsBloc bloc, {
+  required String tabId,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: brutalistTheme(Brightness.light),
+      home: Scaffold(
+        body: BlocProvider.value(
+          value: bloc,
+          child: BlocBuilder<TabsBloc, TabsState>(
+            builder: (context, state) {
+              final tab = state.tabs.byId(tabId)!;
+              return ResponseHistoryTimeline(
+                tabId: tabId,
+                history: tab.responseHistory,
+                viewedHistoryEntryId: tab.viewedHistoryEntryId,
+              );
+            },
           ),
         ),
       ),
@@ -154,7 +189,6 @@ void main() {
       bloc,
       tabId: 'rh2',
       history: [_entry1, _entry2],
-      current: _response1,
     );
 
     expect(
@@ -184,7 +218,6 @@ void main() {
         bloc,
         tabId: 'rh3',
         history: [_entry1, _entry2],
-        current: _response1,
       );
 
       // Open the popup.
@@ -204,7 +237,7 @@ void main() {
   );
 
   testWidgets(
-    'current response matching no history entry does not falsely label '
+    'a viewed-entry id matching no history entry does not falsely label '
     '"Latest" — regression guard (A6)',
     (tester) async {
       const tab = HttpRequestTabEntity(
@@ -214,21 +247,14 @@ void main() {
       final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
       addTearDown(bloc.close);
 
-      // `current` intentionally matches neither history entry — indexWhere
+      // The id intentionally matches neither history entry — indexWhere
       // misses (-1).
-      const currentNotInHistory = HttpResponseEntity(
-        statusCode: 500,
-        body: 'not in history',
-        headers: {},
-        durationMs: 999,
-      );
-
       await _pump(
         tester,
         bloc,
         tabId: 'rh5',
         history: [_entry1, _entry2],
-        current: currentNotInHistory,
+        viewedHistoryEntryId: 'stale-id-not-in-history',
       );
 
       // The button must show plain 'HISTORY', not 'HISTORY: #1' (the old
@@ -256,9 +282,76 @@ void main() {
       bloc,
       tabId: 'rh4',
       history: [_entry1, _entry2],
-      current: _response1,
     );
 
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'picking entry #2 whose response value-equals the latest still flips the '
+    'badge and checkmark to #2 — id identity, not value equality (G2)',
+    (tester) async {
+      // Two history entries holding VALUE-EQUAL responses (identical
+      // status/body/headers/duration — trivial against localhost), distinct
+      // only by entry id.
+      const same = HttpResponseEntity(
+        statusCode: 200,
+        body: 'same',
+        headers: {},
+        durationMs: 7,
+      );
+      final head = ResponseHistoryEntry(
+        id: 'eq-head',
+        response: same,
+        capturedAt: DateTime(2024, 1, 2).millisecondsSinceEpoch,
+      );
+      final older = ResponseHistoryEntry(
+        id: 'eq-older',
+        response: same,
+        capturedAt: DateTime(2024).millisecondsSinceEpoch,
+      );
+      final tab = HttpRequestTabEntity(
+        tabId: 'rh6',
+        config: const HttpRequestConfigEntity(id: 'rh6'),
+        response: same,
+        responseHistory: [head, older],
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      await _pumpLive(tester, bloc, tabId: 'rh6');
+      expect(find.text('HISTORY'), findsOneWidget);
+
+      // Pick the older (#2) entry.
+      await tester.tap(find.byKey(const ValueKey('response_history_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('#2'));
+      await tester.pump(); // close route starts
+      await tester.pump(); // first frame after the bloc emission
+
+      // The emission must not be suppressed: the responses are value-equal,
+      // so only viewedHistoryEntryId distinguishes the states.
+      expect(bloc.state.tabs.byId('rh6')!.viewedHistoryEntryId, 'eq-older');
+      expect(find.text('HISTORY: #2'), findsOneWidget);
+      await tester.pumpAndSettle();
+
+      // Reopen: the checkmark must sit on the #2 row, not on "Latest".
+      await tester.tap(find.byKey(const ValueKey('response_history_button')));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.radio_button_checked), findsOneWidget);
+      final checkedRow = find.ancestor(
+        of: find.byIcon(Icons.radio_button_checked),
+        matching: find.byType(Row),
+      );
+      expect(
+        find.descendant(of: checkedRow.first, matching: find.text('#2  ')),
+        findsOneWidget,
+      );
+
+      // Drain the bloc's 10s debounced-save timer before teardown.
+      await tester.tap(find.text('HISTORY: #2'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
 }

@@ -2,11 +2,15 @@
 // nav on compact layouts. Hosts every tab/panel keyboard Action — including
 // NewTabIntent, moved here from the root Actions in main.dart (see the D8
 // comment below) — plus the dialog-openers CommandPaletteIntent /
-// SwitchEnvironmentIntent, EXCEPT SaveRequestIntent/BeautifyJsonIntent (those
-// live inside RequestView). Also hosts ReopenClosedTabIntent (checks
-// TabsBloc.canReopenClosedTab, showing a 'Nothing to reopen' snackbar on an
-// empty stack) and SaveAllTabsIntent (delegates to the saveAllTabs
-// coordinator). This class sits below MaterialApp + the router's
+// SwitchEnvironmentIntent, EXCEPT BeautifyJsonIntent (it needs RequestView's
+// body editor). SaveRequestIntent is hosted BOTH here (fallback when focus is
+// outside the RequestView subtree — K2) and in RequestView, whose nearer
+// handler wins while focus is inside the tab. Also hosts
+// ReopenClosedTabIntent (checks TabsBloc.canReopenClosedTab, showing a
+// 'Nothing to reopen' snackbar on an empty stack) and SaveAllTabsIntent
+// (delegates to the saveAllTabs coordinator). Index-reading intents live-read
+// TabsBloc state at press time — never the builder snapshot (K4).
+// This class sits below MaterialApp + the router's
 // Navigator, which dialog-opening actions need for showDialog to find
 // MaterialLocalizations, and which keeps every shortcut here correctly dead
 // while a modal dialog is up. `_buildTabBar` IS the desktop/tablet tab strip
@@ -28,6 +32,7 @@ import 'package:getman/core/ui/widgets/splitter.dart';
 import 'package:getman/core/utils/request_variable_resolver.dart';
 import 'package:getman/features/chaining/presentation/widgets/chaining_write_back_listener.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
+import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/command_palette/presentation/widgets/command_palette.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/widgets/environment_selector.dart';
@@ -198,6 +203,52 @@ class _MainScreenState extends State<MainScreen> {
     tabsBloc.add(RemoveTab(tabId));
   }
 
+  /// Shell-level Cmd/Ctrl+S (K2): saves the active tab when focus is outside
+  /// the RequestView subtree. Mirrors [planSaveAllTabs]'s single-tab
+  /// semantics exactly — dirty-check via [TabDirtyChecker] first, then dirty
+  /// + linked + node-still-exists → one [UpdateNodeRequest]; the snackbar
+  /// texts ride [saveAllSnackBarMessage] so both save paths stay in sync.
+  ///
+  /// A dirty UNLINKED tab (or a stale link whose node was deleted) needs the
+  /// SAVE TO COLLECTION name prompt, which is RequestView's flow (it also
+  /// links the tab to the new node) — so instead of silently doing nothing we
+  /// point the user at the request with an informational snackbar.
+  void _saveActiveTabFromShell(BuildContext context) {
+    // Live-read, same rule as the other intents (K4): the builder snapshot
+    // can be one frame stale.
+    final tabsState = context.read<TabsBloc>().state;
+    if (tabsState.activeIndex < 0 ||
+        tabsState.activeIndex >= tabsState.tabs.length) {
+      return; // no tab in sight — nothing a save could target
+    }
+    final tab = tabsState.tabs[tabsState.activeIndex];
+
+    final collectionsBloc = context.read<CollectionsBloc>();
+    final savedConfigs = collectionsBloc.state.configById;
+    final isDirty = context.read<TabDirtyChecker>()(
+      tab: tab,
+      savedConfigs: savedConfigs,
+    );
+    if (!isDirty) {
+      // Clean → ignored, exactly like planSaveAllTabs ('Nothing to save').
+      showAppSnackBar(
+        context,
+        saveAllSnackBarMessage(savedCount: 0, skippedCount: 0),
+      );
+      return;
+    }
+    final nodeId = tab.collectionNodeId;
+    if (nodeId == null || !savedConfigs.containsKey(nodeId)) {
+      showAppSnackBar(context, 'Focus the request to save it to a collection');
+      return;
+    }
+    collectionsBloc.add(UpdateNodeRequest(nodeId, tab.config.copyWith()));
+    showAppSnackBar(
+      context,
+      saveAllSnackBarMessage(savedCount: 1, skippedCount: 0),
+    );
+  }
+
   /// True when the shell must re-layout: loading flips, the active tab moves,
   /// or the set/order of tabs changes. Per-tab content (titles, dirty stars)
   /// rebuilds inside [RequestTabChip] / [TabChip] with their own narrow
@@ -276,11 +327,16 @@ class _MainScreenState extends State<MainScreen> {
                 ),
                 CloseTabIntent: CallbackAction<CloseTabIntent>(
                   onInvoke: (_) {
-                    if (activeIndex < 0 || activeIndex >= tabs.length) {
+                    // Live-read, same rule as SendRequestIntent below: the
+                    // builder snapshot is one frame stale, so a Ctrl+Tab +
+                    // Cmd/Ctrl+W chord inside one frame would close the tab
+                    // the user just LEFT (K4).
+                    final s = context.read<TabsBloc>().state;
+                    if (s.activeIndex < 0 || s.activeIndex >= s.tabs.length) {
                       return null;
                     }
                     unawaited(
-                      _confirmAndClose(context, tabs[activeIndex].tabId),
+                      _confirmAndClose(context, s.tabs[s.activeIndex].tabId),
                     );
                     return null;
                   },
@@ -301,6 +357,25 @@ class _MainScreenState extends State<MainScreen> {
                 SaveAllTabsIntent: CallbackAction<SaveAllTabsIntent>(
                   onInvoke: (_) {
                     saveAllTabs(context);
+                    return null;
+                  },
+                ),
+                // Cmd/Ctrl+S fallback for when focus sits OUTSIDE the
+                // RequestView subtree (HISTORY search box, collections
+                // filter field, ...) — without this entry the chord is dead
+                // there while Cmd+Enter/Cmd+W still work (K2). Actions
+                // dispatch picks the NEAREST enclosing handler, so
+                // RequestView's richer SaveRequestIntent action (which can
+                // open the save-to-collection dialog) still wins whenever
+                // focus is inside the tab.
+                //
+                // BeautifyJsonIntent deliberately has NO entry here: beautify
+                // formats the request-body editor's
+                // CodeLineEditingController, which only RequestView owns — a
+                // shell-level handler would have no editor text to format.
+                SaveRequestIntent: CallbackAction<SaveRequestIntent>(
+                  onInvoke: (_) {
+                    _saveActiveTabFromShell(context);
                     return null;
                   },
                 ),
@@ -350,19 +425,25 @@ class _MainScreenState extends State<MainScreen> {
                 ),
                 NextTabIntent: CallbackAction<NextTabIntent>(
                   onInvoke: (_) {
-                    if (tabs.length < 2) return null;
+                    // Live-read (K4): stepping from a stale activeIndex lands
+                    // on the wrong neighbor when chords arrive within one
+                    // frame (e.g. two rapid Ctrl+Tab presses).
+                    final s = context.read<TabsBloc>().state;
+                    if (s.tabs.length < 2) return null;
                     context.read<TabsBloc>().add(
-                      SetActiveIndex((activeIndex + 1) % tabs.length),
+                      SetActiveIndex((s.activeIndex + 1) % s.tabs.length),
                     );
                     return null;
                   },
                 ),
                 PrevTabIntent: CallbackAction<PrevTabIntent>(
                   onInvoke: (_) {
-                    if (tabs.length < 2) return null;
+                    // Live-read (K4) — see NextTabIntent above.
+                    final s = context.read<TabsBloc>().state;
+                    if (s.tabs.length < 2) return null;
                     context.read<TabsBloc>().add(
                       SetActiveIndex(
-                        (activeIndex - 1 + tabs.length) % tabs.length,
+                        (s.activeIndex - 1 + s.tabs.length) % s.tabs.length,
                       ),
                     );
                     return null;
@@ -378,11 +459,14 @@ class _MainScreenState extends State<MainScreen> {
                 ),
                 FocusUrlIntent: CallbackAction<FocusUrlIntent>(
                   onInvoke: (_) {
-                    if (activeIndex < 0 || activeIndex >= tabs.length) {
+                    // Live-read (K4): a stale snapshot would focus the URL
+                    // bar of the tab the user just switched away from.
+                    final s = context.read<TabsBloc>().state;
+                    if (s.activeIndex < 0 || s.activeIndex >= s.tabs.length) {
                       return null;
                     }
                     context.read<UrlFocusRegistry>().focus(
-                      tabs[activeIndex].tabId,
+                      s.tabs[s.activeIndex].tabId,
                     );
                     return null;
                   },
@@ -478,7 +562,13 @@ class _MainScreenState extends State<MainScreen> {
   ) {
     return Column(
       children: [
-        _buildTabBar(context, activeIndex, tabs, includeMenuButton: true),
+        _buildTabBar(
+          context,
+          activeIndex,
+          tabs,
+          panelId: tabsState.activePanelId,
+          includeMenuButton: true,
+        ),
         Expanded(
           child: _buildContent(context, theme, tabsState, activeIndex, tabs),
         ),
@@ -533,6 +623,7 @@ class _MainScreenState extends State<MainScreen> {
                 context,
                 activeIndex,
                 tabs,
+                panelId: tabsState.activePanelId,
                 includeMenuButton: false,
               ),
               Expanded(
@@ -581,6 +672,7 @@ class _MainScreenState extends State<MainScreen> {
     BuildContext context,
     int activeIndex,
     List<HttpRequestTabEntity> tabs, {
+    required String panelId,
     required bool includeMenuButton,
   }) {
     final theme = Theme.of(context);
@@ -637,9 +729,19 @@ class _MainScreenState extends State<MainScreen> {
                           scrollDirection: Axis.horizontal,
                           itemCount: tabs.length,
                           buildDefaultDragHandles: false,
-                          onReorderItem: (oldIndex, newIndex) => context
-                              .read<TabsBloc>()
-                              .add(ReorderTabs(oldIndex, newIndex)),
+                          // panelId pins the reorder to the strip actually
+                          // dragged (the builder snapshot's panel — it IS
+                          // this strip): a mid-drag panel switch (Cmd+Shift+],
+                          // reopen-tab) must not apply these indices to
+                          // whichever panel is active at drop time.
+                          onReorderItem: (oldIndex, newIndex) =>
+                              context.read<TabsBloc>().add(
+                                ReorderTabs(
+                                  oldIndex,
+                                  newIndex,
+                                  panelId: panelId,
+                                ),
+                              ),
                           proxyDecorator: (child, index, animation) => Material(
                             color: theme.scaffoldBackgroundColor,
                             elevation: 4,

@@ -81,4 +81,47 @@ void main() {
     expect(find.text('app'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  group('brutalistHalftoneGridFor (seam coverage at constant dot budget)', () {
+    test('small windows keep the base 26px pitch (unchanged look)', () {
+      final grid = brutalistHalftoneGridFor(const Size(800, 600));
+      expect(grid.cell, 26);
+      // The +2 over-scan keeps the drifting grid covering the edges.
+      expect((grid.cols - 1) * grid.cell, greaterThanOrEqualTo(800));
+      expect((grid.rows - 1) * grid.cell, greaterThanOrEqualTo(600));
+    });
+
+    test('large windows scale the cell so the grid always spans them', () {
+      // Regression: the old hard cap (40×28 dots at a fixed 26px cell)
+      // stopped painting at 1040×728px — a drifting halftone seam on any
+      // modern window. The cell now scales up so the same bounded dot count
+      // covers the viewport.
+      for (final size in const [
+        Size(1512, 982), // default macOS laptop window
+        Size(2560, 1440),
+        Size(3840, 2160),
+      ]) {
+        final grid = brutalistHalftoneGridFor(size);
+        expect(
+          (grid.cols - 1) * grid.cell,
+          greaterThanOrEqualTo(size.width),
+          reason: 'columns must span $size',
+        );
+        expect(
+          (grid.rows - 1) * grid.cell,
+          greaterThanOrEqualTo(size.height),
+          reason: 'rows must span $size',
+        );
+        // Constant per-frame budget: never more dots than the original cap.
+        expect(grid.cols, lessThanOrEqualTo(40));
+        expect(grid.rows, lessThanOrEqualTo(28));
+      }
+    });
+
+    test('an extreme aspect ratio still gets full coverage', () {
+      final grid = brutalistHalftoneGridFor(const Size(500, 2400));
+      expect((grid.cols - 1) * grid.cell, greaterThanOrEqualTo(500));
+      expect((grid.rows - 1) * grid.cell, greaterThanOrEqualTo(2400));
+    });
+  });
 }

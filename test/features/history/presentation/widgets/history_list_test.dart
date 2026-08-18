@@ -1,5 +1,7 @@
-// Widget tests for HistoryList: renders entries, tap opens a tab, search
-// filters results, day-header grouping/ordering (TODAY/YESTERDAY), hover
+// Widget tests for HistoryList: renders entries, tap opens a tab under a
+// FRESH config id (chaining rules are keyed by config id — see
+// TabsBloc._onDuplicateTab), search filters results, day-header
+// grouping/ordering (TODAY/YESTERDAY), hover
 // delete + UNDO tap-through (restores the captured record via
 // RestoreHistoryEntries), CLEAR ALL confirm + UNDO tap-through (restores the
 // captured list), and the two distinct empty states — first-run guidance
@@ -135,6 +137,43 @@ void main() {
 
     verify(() => tabsBloc.add(any(that: isA<AddTab>()))).called(1);
   });
+
+  testWidgets(
+    'opening an entry mints a FRESH config id; two opens yield two '
+    'different ids',
+    (tester) async {
+      // Chaining rules are keyed by config id (TabsBloc._onDuplicateTab mints
+      // withId(uuid) for the same reason). copyWith PINS the id, so two tabs
+      // opened from the same history row would silently alias each other's
+      // rules — the opened tab must carry a fresh id, never the row's.
+      final c1 = _config('row-id');
+      when(() => historyBloc.state).thenReturn(HistoryState(history: [c1]));
+
+      await tester.pumpWidget(
+        _host(historyBloc: historyBloc, tabsBloc: tabsBloc),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+
+      await tester.tap(find.text('https://example.com/row-id'));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.text('https://example.com/row-id'));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      final captured = verify(
+        () => tabsBloc.add(captureAny(that: isA<AddTab>())),
+      ).captured.cast<AddTab>();
+      expect(captured, hasLength(2));
+      final firstId = captured[0].config?.id;
+      final secondId = captured[1].config?.id;
+      expect(firstId, isNotNull);
+      expect(firstId, isNot('row-id'));
+      expect(secondId, isNot('row-id'));
+      expect(firstId, isNot(secondId));
+      // Only the id is re-minted — the payload is carried over verbatim.
+      expect(captured[0].config?.url, 'https://example.com/row-id');
+      expect(captured[0].config?.method, 'GET');
+    },
+  );
 
   testWidgets('search filters entries matching the query', (tester) async {
     final cGet = _config('get-req');

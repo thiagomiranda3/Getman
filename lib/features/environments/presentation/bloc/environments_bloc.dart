@@ -130,6 +130,8 @@ class EnvironmentsBloc extends Bloc<EnvironmentsEvent, EnvironmentsState> {
     final next = _sortedByName([...state.environments, ...event.environments]);
     emit(state.copyWith(environments: next));
     // Import is rare and arrives as a batch — one whole-list write is fine.
+    // The data source replaces via putAll+deleteAll (never clear), so a
+    // chaining write-back's putEnvironment landing mid-save survives it.
     await _persist(() => _saveEnvironmentsUseCase(next));
   }
 

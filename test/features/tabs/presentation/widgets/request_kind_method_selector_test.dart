@@ -52,6 +52,7 @@ Future<void> _pump(
   TabsBloc bloc,
   String tabId, {
   bool isNarrow = false,
+  bool settle = true,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -80,7 +81,9 @@ Future<void> _pump(
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  // settle=false leaves the tree at its FIRST FRAME so tests can assert what
+  // the user actually sees before any animation lands (testing.md Rule 1).
+  if (settle) await tester.pumpAndSettle();
 }
 
 void main() {
@@ -192,6 +195,70 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'custom method PURGE (Postman/curl import) renders without asserting',
+    (tester) async {
+      // Reachable today: the Postman mapper stores arbitrary methods verbatim
+      // and the curl parser's clamp passes HEAD/OPTIONS/PURGE/PROPFIND/...
+      // through. DropdownButton asserts ('exactly one item with value') when
+      // its value isn't among the items, so the selector must append the
+      // current out-of-list method for the build.
+      const tab = HttpRequestTabEntity(
+        tabId: 't6',
+        config: HttpRequestConfigEntity(id: 't6', method: 'PURGE'),
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      // First-frame assert (testing.md Rule 1): no settle before expecting.
+      await _pump(tester, bloc, 't6', settle: false);
+
+      expect(tester.takeException(), isNull);
+      expect(
+        find.byKey(const ValueKey('method_selector')).hitTestable(),
+        findsOneWidget,
+      );
+      // The selected face renders the custom method's badge.
+      expect(find.text('PURGE').hitTestable(), findsOneWidget);
+
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
+
+  testWidgets(
+    'picking GET while a custom method is selected dispatches normally',
+    (tester) async {
+      const tab = HttpRequestTabEntity(
+        tabId: 't7',
+        config: HttpRequestConfigEntity(id: 't7', method: 'PURGE'),
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+
+      await _pump(tester, bloc, 't7');
+
+      // Open the method dropdown: canonical methods plus the appended PURGE
+      // are all offered.
+      await tester.tap(find.byKey(const ValueKey('method_selector')));
+      await tester.pumpAndSettle();
+      expect(find.text('GET').hitTestable(), findsWidgets);
+
+      // Select GET.
+      await tester.tap(find.text('GET').last);
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(tester.takeException(), isNull);
+      await tester.pumpAndSettle();
+
+      expect(bloc.state.tabs.byId('t7')!.config.method, 'GET');
+      // The custom method was a per-build append, not a mutation of
+      // HttpMethods.all: once replaced it is gone from the selector.
+      expect(find.text('PURGE'), findsNothing);
+
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
 
   testWidgets(
     'no overflow when isNarrow=true and selected method is DELETE (wide badge)',

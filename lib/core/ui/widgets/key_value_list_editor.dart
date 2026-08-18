@@ -37,12 +37,75 @@
 // any case the pre-move doesn't cover (e.g. an external replace) — the two
 // mechanisms agree by construction, since both ultimately mirror the host's
 // own display-index composition.
+//
+// Keyless-row reconcile (didUpdateWidget): echo suppression alone cannot
+// keep a cleared-key row alive across a host mutation whose echo genuinely
+// differs (params toggle — ParamRow.enabled is order-significant in its
+// equals — or any reorder/duplicate): the full rebuild re-seeds from
+// canonical items, which already dropped the keyless row when its clear was
+// emitted, destroying the row AND its typed value. didUpdateWidget therefore
+// snapshots editor-only rows first (empty key text, excluding the trailing
+// auto-blank) — their positions, value TEXTS and enabled flags, never the
+// controller instances (those are disposed by _disposeControllers) — and
+// reinserts equivalent fresh controllers at the clamped remembered positions
+// after _initControllers. Data preservation is the contract; focus is not
+// (row identity is the controller, so a rebuilt row re-mounts).
+//
+// Host indexing is host-parameterized (KeyValueHostIndexing): map-backed
+// hosts collapse duplicate keys — the map entry's POSITION comes from the
+// FIRST occurrence, its VALUE from the last (Dart map-literal semantics) —
+// and the env editor's encode also trims keys, so translating editor→host
+// indices by skipping only empty-key rows goes off by one as soon as a
+// duplicate-key (or, for env, whitespace-key) row is alive above the
+// operated row (echo suppression keeps such rows alive on purpose).
+// _hostIndexFor therefore counts map-host rows through the host's own codec
+// (decode(encode(prefix)).length — first-occurrence + canonicalization for
+// free); `auto` infers map hosts from the runtime type of items, so list
+// hosts (params) keep the original every-non-empty-key-counts rule.
 import 'package:flutter/material.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/responsive.dart';
 import 'package:getman/core/ui/widgets/variable_highlight_controller.dart';
 import 'package:getman/core/ui/widgets/variable_text_field.dart';
 import 'package:getman/core/utils/layered_variable_context.dart';
+
+/// How [KeyValueListEditor] translates its own row indices into the host's
+/// canonical row indices for [KeyValueListEditor.onReorder],
+/// [KeyValueListEditor.onDuplicate] and [KeyValueListEditor.onToggleEnabled]
+/// (see `_hostIndexFor`). Host-parameterized because list- and map-backed
+/// hosts disagree on which editor rows exist canonically.
+enum KeyValueHostIndexing {
+  /// Infer from the runtime type of [KeyValueListEditor.items]: `Map`-backed
+  /// items get [map], everything else gets [list]. The default — it selects
+  /// exactly the right semantics for every current host (params →
+  /// `List<ParamRow>` → [list]; headers / env vars / collection vars →
+  /// `Map<String, String>` → [map]) without any host wiring.
+  ///
+  /// Host wiring note (later task): hosts may pin this explicitly —
+  /// `params_tab_view.dart` → [list]; `headers_tab_view.dart`,
+  /// `environment_editor.dart`, `collection_variables_dialog.dart` → [map].
+  /// Until then [auto]'s inference already yields those values.
+  auto,
+
+  /// List-backed host (params): every non-empty-key row is one host row,
+  /// duplicate keys included (duplicates are legal in a query string).
+  /// Matches the original empty-key-skipping translation exactly.
+  list,
+
+  /// Insertion-ordered-map-backed host (headers / env vars): encode collapses
+  /// duplicate keys into a single entry whose POSITION is the first
+  /// occurrence's and whose VALUE is the last occurrence's (Dart map-literal
+  /// semantics), so a row counts for host indexing iff it is encode-visible
+  /// AND the first occurrence of its canonical key. Both properties are
+  /// derived through the host's own [KeyValueListEditor.encode]/
+  /// [KeyValueListEditor.decode] codec rather than re-implemented, so
+  /// per-host key canonicalization (the env editor trims keys in encode)
+  /// comes along for free. Requires `encode` to be a pure function of the
+  /// rows it is given — true for every map host; params' encode is not
+  /// (it re-attaches parked rows), which is why [list] never counts through
+  /// the codec.
+  map,
+}
 
 /// Generic editable key/value row list backing the params, headers, and
 /// environment-variable editors. The canonical value type [T] (ordered list,
@@ -73,6 +136,7 @@ class KeyValueListEditor<T extends Object> extends StatefulWidget {
     this.disabledRowsReadOnly = false,
     this.onReorder,
     this.onDuplicate,
+    this.hostIndexing = KeyValueHostIndexing.auto,
   });
   final T items;
   final ValueChanged<T> onChanged;
@@ -131,8 +195,10 @@ class KeyValueListEditor<T extends Object> extends StatefulWidget {
   /// its own row controllers; the host must apply the same move to its
   /// canonical value (list order / insertion-ordered map) and emit it.
   /// The editor translates its own row indices into decoded space first
-  /// (skipping empty-key rows, which every host's encode drops but the
-  /// echo-suppressed editor keeps alive) — see `_hostIndexFor`.
+  /// (skipping rows the host's canonical value doesn't contain — empty-key
+  /// rows for every host, plus collapsed duplicate-key rows for map hosts —
+  /// which the echo-suppressed editor keeps alive) — see `_hostIndexFor`
+  /// and [hostIndexing].
   final void Function(int oldIndex, int newIndex)? onReorder;
 
   /// When non-null, every row except the trailing auto-blank one shows a
@@ -141,6 +207,14 @@ class KeyValueListEditor<T extends Object> extends StatefulWidget {
   /// (params: exact copy; map-backed hosts: a '-copy'-suffixed key) and the
   /// new items arrive as an external change.
   final void Function(int index)? onDuplicate;
+
+  /// Editor-row → host-row index translation semantics for [onReorder],
+  /// [onDuplicate] and [onToggleEnabled] — see [KeyValueHostIndexing].
+  /// Defaults to [KeyValueHostIndexing.auto], which infers
+  /// [KeyValueHostIndexing.list] vs [KeyValueHostIndexing.map] from the
+  /// runtime type of [items]; no current host needs to pass this
+  /// explicitly (see the wiring note on [KeyValueHostIndexing.auto]).
+  final KeyValueHostIndexing hostIndexing;
 
   @override
   State<KeyValueListEditor<T>> createState() => _KeyValueListEditorState<T>();
@@ -195,9 +269,52 @@ class _KeyValueListEditorState<T extends Object>
         _sameDecodedOrder(widget.items, oldWidget.items)) {
       return;
     }
+    // Genuine external change: rebuild from canonical items — but first
+    // snapshot editor-only (cleared-key) rows, which canonical items have
+    // already dropped, and reinsert them after the rebuild. See the file
+    // header's "keyless-row reconcile" gotcha.
+    final editorOnlyRows = _snapshotEditorOnlyRows();
     _disposeControllers();
     _initControllers(widget.decode(widget.items));
+    _restoreEditorOnlyRows(editorOnlyRows);
     _lastEmitted = null;
+  }
+
+  /// Snapshots rows that exist only in this editor — empty key text,
+  /// excluding the trailing auto-blank row — as plain data (position, value
+  /// TEXT, enabled flag). Deliberately not the controller instances: those
+  /// are disposed by [_disposeControllers], so reusing them would be a
+  /// use-after-dispose.
+  List<({int position, String valueText, bool enabled})>
+  _snapshotEditorOnlyRows() {
+    final trailingBlankIndex = _keyControllers.length - 1;
+    return [
+      for (var i = 0; i < trailingBlankIndex; i++)
+        if (_keyControllers[i].text.isEmpty)
+          (
+            position: i,
+            valueText: _valControllers[i].text,
+            enabled: _rowEnabledFlags[i],
+          ),
+    ];
+  }
+
+  /// Reinserts snapshotted editor-only rows (see [_snapshotEditorOnlyRows])
+  /// with equivalent FRESH controllers at their clamped remembered
+  /// positions, always before the trailing auto-blank row. Ascending
+  /// snapshot order keeps multiple keyless rows in their original relative
+  /// order. Runs after [_initControllers], so [_rowEnabledFlags] seeded in
+  /// decoded space stays aligned — inserting into all three lists shifts
+  /// them identically.
+  void _restoreEditorOnlyRows(
+    List<({int position, String valueText, bool enabled})> rows,
+  ) {
+    for (final row in rows) {
+      final insertAt = row.position.clamp(0, _keyControllers.length - 1);
+      _keyControllers.insert(insertAt, TextEditingController());
+      _valControllers.insert(insertAt, _newValueController(row.valueText));
+      _rowEnabledFlags.insert(insertAt, row.enabled);
+    }
   }
 
   /// Stricter than `widget.equals`: true only when [a] and [b] decode to
@@ -253,19 +370,63 @@ class _KeyValueListEditorState<T extends Object>
     widget.onSecretKeysChanged?.call(next);
   }
 
+  /// Whether host-index translation should use map semantics — explicit via
+  /// [KeyValueListEditor.hostIndexing], or inferred from the runtime type of
+  /// [KeyValueListEditor.items] under [KeyValueHostIndexing.auto].
+  bool get _useMapHostIndexing => switch (widget.hostIndexing) {
+    KeyValueHostIndexing.list => false,
+    KeyValueHostIndexing.map => true,
+    KeyValueHostIndexing.auto => widget.items is Map<Object?, Object?>,
+  };
+
+  /// How many canonical (host) rows the first [endExclusive] editor rows
+  /// produce, derived through the host's own codec: encode the prefix, count
+  /// the decoded result. For an insertion-ordered map host this is exactly
+  /// the number of distinct canonical keys in the prefix — first-occurrence
+  /// collapse and key canonicalization (env trims) both come from the real
+  /// encode, not a re-implementation. Only meaningful when
+  /// [_useMapHostIndexing] (map encodes are pure row functions; see
+  /// [KeyValueHostIndexing.map]).
+  int _canonicalPrefixCount(int endExclusive) {
+    final prefix = [
+      for (var i = 0; i < endExclusive; i++)
+        (_keyControllers[i].text, _valControllers[i].text),
+    ];
+    return widget.decode(widget.encode(prefix)).length;
+  }
+
   /// Translates an editor row index into the host's decoded-row space by
-  /// skipping rows with an empty key. Every host's encode drops empty-key
-  /// rows from its canonical value, while echo suppression deliberately
-  /// keeps them alive here (so clearing an interior key doesn't eat the row
-  /// mid-edit) — after such a clear, raw editor indices sit one past the
-  /// host's for everything below it, and index-based host ops (reorder /
-  /// duplicate / params' toggle) would hit the WRONG row.
+  /// skipping rows the host's canonical value does not contain. Echo
+  /// suppression deliberately keeps such rows alive here (so clearing an
+  /// interior key doesn't eat the row mid-edit) — after a clear, raw editor
+  /// indices sit one past the host's for everything below it, and
+  /// index-based host ops (reorder / duplicate / params' toggle) would hit
+  /// the WRONG row. List hosts skip empty-key rows only (every host's
+  /// encode drops those); map hosts additionally collapse duplicate /
+  /// canonically-equal keys, counted via [_canonicalPrefixCount] — see
+  /// [KeyValueHostIndexing].
   int _hostIndexFor(int editorIndex) {
+    if (_useMapHostIndexing) return _canonicalPrefixCount(editorIndex);
     var count = 0;
     for (var i = 0; i < editorIndex; i++) {
       if (_keyControllers[i].text.isNotEmpty) count++;
     }
     return count;
+  }
+
+  /// Whether the editor row at [editorIndex] has a canonical counterpart the
+  /// host can operate on. List hosts: any non-empty key. Map hosts: the row
+  /// must grow the canonical prefix count — i.e. be encode-visible AND the
+  /// first occurrence of its canonical key; a collapsed duplicate (or, for
+  /// env, whitespace-only key) row exists only in this editor, exactly like
+  /// a keyless row, so reorder/duplicate sourced from it must not reach the
+  /// host (the index would point at some OTHER row's entry).
+  bool _rowCountsInHost(int editorIndex) {
+    if (_useMapHostIndexing) {
+      return _canonicalPrefixCount(editorIndex + 1) >
+          _canonicalPrefixCount(editorIndex);
+    }
+    return _keyControllers[editorIndex].text.isNotEmpty;
   }
 
   void _toggleEnabled(int index) {
@@ -301,19 +462,24 @@ class _KeyValueListEditorState<T extends Object>
     // Translate into decoded space BEFORE the local pre-move mutates the
     // controller lists (see _hostIndexFor). hostNew counts over the
     // post-removal sequence — the same space the host applies newIndex in.
-    final draggedHasKey = _keyControllers[oldIndex].text.isNotEmpty;
+    final draggedCountsInHost = _rowCountsInHost(oldIndex);
     final hostOld = _hostIndexFor(oldIndex);
     // `target` indexes the POST-removal editor list; its first `target`
     // entries are original rows [0, target) for a backward drag, and
     // original rows [0, target] minus the dragged row for a forward one.
+    // (Map hosts: when the dragged row shares its canonical key with a row
+    // it crossed, this prefix arithmetic can undercount by one — such a
+    // drag is canonically meaningless anyway and degrades to hostNew ==
+    // hostOld, i.e. no host call.)
     final hostNew = oldIndex < target
-        ? _hostIndexFor(target + 1) - (draggedHasKey ? 1 : 0)
+        ? _hostIndexFor(target + 1) - (draggedCountsInHost ? 1 : 0)
         : _hostIndexFor(target);
     _repositionWithinEnabledRows(oldIndex, target, blankIndex);
-    // A keyless dragged row, or a drag that only crossed keyless rows, has
-    // no canonical counterpart to move — the local pre-move above already
-    // matches what the host's decoded rows will echo back.
-    if (!draggedHasKey || hostNew == hostOld) return;
+    // A dragged row without a canonical counterpart (keyless, or a map
+    // host's collapsed duplicate — see _rowCountsInHost), or a drag that
+    // only crossed such rows, has nothing for the host to move — the local
+    // pre-move above already matches what the host's decoded rows echo.
+    if (!draggedCountsInHost || hostNew == hostOld) return;
     host(hostOld, hostNew);
   }
 
@@ -418,9 +584,11 @@ class _KeyValueListEditorState<T extends Object>
                   !_rowEnabledFlags[index]
               ? null
               : () {
-                  // A keyless row has no canonical counterpart to duplicate;
-                  // translate the rest into decoded space (_hostIndexFor).
-                  if (_keyControllers[index].text.isEmpty) return;
+                  // A row without a canonical counterpart (keyless, or a map
+                  // host's collapsed duplicate — see _rowCountsInHost) has
+                  // nothing to duplicate; translate the rest into decoded
+                  // space (_hostIndexFor).
+                  if (!_rowCountsInHost(index)) return;
                   onDuplicate(_hostIndexFor(index));
                 },
           onKeyChanged: (val) {

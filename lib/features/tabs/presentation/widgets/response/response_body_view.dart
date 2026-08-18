@@ -528,22 +528,61 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Banner row — extracted to ResponseLargeBodyView.
-        ResponseLargeBodyView(
-          body: body,
-          showFullPreview: _showFullPreview,
-          highlightingOptedIn: _highlightingOptedIn,
-          onPrettifyAndOptIn: _prettifyAndOptIn,
-          onShowFull: () => setState(() => _showFullPreview = true),
-          controls: ResponseBodyControls(
-            tabId: widget.tabId,
-            getCopyableText: _copyableText,
-            onFind: _onFindPressed,
-            // Only the opted-in editor wraps; the plain SelectableText view
-            // always soft-wraps, so the toggle is hidden there.
-            wordWrap: _highlightingOptedIn ? _effectiveWordWrap : null,
-            onToggleWordWrap: _highlightingOptedIn ? _toggleWordWrap : null,
-          ),
+        // Banner row (extracted to ResponseLargeBodyView) + the prettify-cap
+        // disclosure note. Both live inside children[0] so the Expanded body
+        // below keeps its children[1] position (see next comment).
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ResponseLargeBodyView(
+              body: body,
+              showFullPreview: _showFullPreview,
+              highlightingOptedIn: _highlightingOptedIn,
+              onPrettifyAndOptIn: _prettifyAndOptIn,
+              onShowFull: () => setState(() => _showFullPreview = true),
+              controls: ResponseBodyControls(
+                tabId: widget.tabId,
+                getCopyableText: _copyableText,
+                onFind: _onFindPressed,
+                // Only the opted-in editor wraps; the plain SelectableText
+                // view always soft-wraps, so the toggle is hidden there.
+                wordWrap: _highlightingOptedIn ? _effectiveWordWrap : null,
+                onToggleWordWrap: _highlightingOptedIn ? _toggleWordWrap : null,
+              ),
+            ),
+            // Disclosure for ALWAYS PRETTIFY LARGE RESPONSES over the 3 MiB
+            // kMaxHighlightChars freeze-guard: the setting is deliberately
+            // ignored there (loading a multi-MB string into re_editor
+            // rebuilds its line model synchronously and hangs the app), but
+            // silently showing plain text reads as a bug — say why.
+            BlocSelector<SettingsBloc, SettingsState, bool>(
+              selector: (state) => state.settings.alwaysPrettifyLargeResponses,
+              builder: (context, prettifySettingOn) {
+                if (!prettifySettingOn ||
+                    _highlightingOptedIn ||
+                    canHighlightBody(body.length)) {
+                  return const SizedBox.shrink();
+                }
+                final layout = context.appLayout;
+                return Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: layout.pagePadding,
+                    vertical: layout.pagePadding / 4,
+                  ),
+                  child: Text(
+                    'Too large to prettify (over 3 MB) — shown as plain text',
+                    key: const ValueKey('prettify_cap_note'),
+                    style: TextStyle(
+                      fontSize: layout.fontSizeSmall,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
         // Body — editor when opted-in, plain text otherwise. Kept here so the
         // editor widget occupies the same Column.children[1] position in both

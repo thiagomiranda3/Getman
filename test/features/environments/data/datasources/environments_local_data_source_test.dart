@@ -58,6 +58,63 @@ void main() {
     expect(box.keys.toSet(), {'x', 'y'});
   });
 
+  // Regression: saveEnvironments used to be a destructive clear+putAll. The
+  // chaining write-back (MergeEnvironmentVariables -> putEnvironment) can run
+  // while an import's save is awaiting, and its keyed put landed in the
+  // clear/putAll gap — erased by the clear, then overwritten by the stale
+  // pre-merge snapshot — so captured variables silently vanished on restart.
+  // These two tests interleave a putEnvironment with an in-flight
+  // saveEnvironments and fail under the old clear+putAll implementation.
+  group('saveEnvironments concurrent-write safety', () {
+    test(
+      'a putEnvironment interleaved with an in-flight saveEnvironments '
+      'survives the replace (chaining write-back vs import race)',
+      () async {
+        // Active environment on disk, pre-merge.
+        await dataSource.putEnvironment(model('active', 'Active'));
+
+        // The import persists a whole-list snapshot still holding the
+        // PRE-merge copy of 'active'. Start it but don't await, so the put
+        // below lands while the replace is in flight — exactly where the
+        // chaining write-back can run.
+        final save = dataSource.saveEnvironments([
+          model('active', 'Active'),
+          model('imported', 'Imported'),
+        ]);
+        final merged = EnvironmentModel(
+          id: 'active',
+          name: 'Active',
+          variables: const {'token': 'captured'},
+        );
+        final concurrentPut = dataSource.putEnvironment(merged);
+        await Future.wait([save, concurrentPut]);
+
+        // The merged write must win: clear+putAll wiped it (clear emptied the
+        // box under it, putAll re-wrote the pre-merge copy).
+        expect(box.get('active')!.variables['token'], 'captured');
+        expect(box.keys.toSet(), {'active', 'imported'});
+      },
+    );
+
+    test(
+      'a NEW environment put during an in-flight saveEnvironments is neither '
+      'cleared nor swept by the removed-keys phase',
+      () async {
+        await dataSource.putEnvironment(model('stale', 'Stale'));
+
+        final save = dataSource.saveEnvironments([model('x', 'X')]);
+        final concurrentPut = dataSource.putEnvironment(
+          model('fresh', 'Fresh'),
+        );
+        await Future.wait([save, concurrentPut]);
+
+        // 'stale' (absent from the new list) is removed; 'fresh' (put after
+        // the save started, so absent from its removed-keys snapshot) stays.
+        expect(box.keys.toSet(), {'x', 'fresh'});
+      },
+    );
+  });
+
   test(
     'getEnvironments returns entries sorted case-insensitively by name, '
     'independent of Hive key order',

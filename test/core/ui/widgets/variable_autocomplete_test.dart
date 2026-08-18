@@ -310,6 +310,132 @@ void main() {
     );
   });
 
+  group('controller/focusNode swap (didUpdateWidget)', () {
+    // Regression: the parent can rebuild this un-keyed element with a
+    // DIFFERENT controller/focusNode instance (AUTH tab type switch
+    // bearer→basic; FormDataEditor external resets). Without didUpdateWidget
+    // the listeners stay on the old instances and autocomplete goes dead.
+    Widget harness(TextEditingController c, FocusNode f) => MaterialApp(
+      theme: brutalistTheme(Brightness.light),
+      home: Scaffold(
+        body: VariableAutocomplete(
+          controller: c,
+          focusNode: f,
+          suggestionsFor: _suggest,
+          child: TextField(controller: c, focusNode: f),
+        ),
+      ),
+    );
+
+    testWidgets(
+      'rebuilding with a different controller keeps autocomplete alive — '
+      'typing {{ into the field bound to controller B opens the menu',
+      (tester) async {
+        final controllerB = TextEditingController();
+        final focusNodeB = FocusNode();
+        addTearDown(() {
+          controllerB.dispose();
+          focusNodeB.dispose();
+        });
+
+        await tester.pumpWidget(harness(controller, focusNode));
+        // Same element, new controller/focusNode instances (no keys change).
+        await tester.pumpWidget(harness(controllerB, focusNodeB));
+
+        await tester.enterText(find.byType(TextField), '{{');
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('baseUrl'),
+          findsOneWidget,
+          reason:
+              'the state must re-subscribe to controller B in '
+              'didUpdateWidget — with listeners still on controller A the '
+              'menu never opens',
+        );
+      },
+    );
+
+    testWidgets(
+      'a swap after the old controller was disposed does not throw and '
+      'autocomplete works on the new controller (FormDataEditor reset flow)',
+      (tester) async {
+        final controllerA = TextEditingController();
+        final focusNodeA = FocusNode();
+        final controllerB = TextEditingController();
+        final focusNodeB = FocusNode();
+        addTearDown(() {
+          controllerB.dispose();
+          focusNodeB.dispose();
+        });
+
+        await tester.pumpWidget(harness(controllerA, focusNodeA));
+        // FormDataEditor disposes the old row controllers inside setState,
+        // BEFORE the rebuild that hands this element the new instances.
+        controllerA.dispose();
+        focusNodeA.dispose();
+        await tester.pumpWidget(harness(controllerB, focusNodeB));
+
+        await tester.enterText(find.byType(TextField), '{{to');
+        await tester.pumpAndSettle();
+
+        expect(find.text('token'), findsOneWidget);
+      },
+    );
+
+    testWidgets('an open menu closes when the controller is swapped', (
+      tester,
+    ) async {
+      final controllerB = TextEditingController();
+      final focusNodeB = FocusNode();
+      addTearDown(() {
+        controllerB.dispose();
+        focusNodeB.dispose();
+      });
+
+      await tester.pumpWidget(harness(controller, focusNode));
+      await tester.enterText(find.byType(TextField), '{{');
+      await tester.pumpAndSettle();
+      expect(find.text('baseUrl'), findsOneWidget);
+
+      await tester.pumpWidget(harness(controllerB, focusNodeB));
+      await tester.pump();
+
+      expect(
+        find.text('baseUrl'),
+        findsNothing,
+        reason:
+            'the open menu belongs to the old field state — a controller '
+            'swap must close it',
+      );
+    });
+
+    testWidgets(
+      'after a swap, the re-subscribed focusNode still closes the menu on '
+      'focus loss',
+      (tester) async {
+        final controllerB = TextEditingController();
+        final focusNodeB = FocusNode();
+        addTearDown(() {
+          controllerB.dispose();
+          focusNodeB.dispose();
+        });
+
+        await tester.pumpWidget(harness(controller, focusNode));
+        await tester.pumpWidget(harness(controllerB, focusNodeB));
+
+        await tester.enterText(find.byType(TextField), '{{');
+        await tester.pumpAndSettle();
+        expect(find.text('baseUrl'), findsOneWidget);
+
+        focusNodeB.unfocus();
+        await tester.pumpAndSettle();
+
+        expect(find.text('baseUrl'), findsNothing);
+      },
+    );
+  });
+
   group('URL suggestion mode (B4)', () {
     List<String> urlSuggest(String text) => buildUrlSuggestions(
       query: text,

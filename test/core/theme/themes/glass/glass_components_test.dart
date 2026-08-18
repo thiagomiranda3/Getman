@@ -200,6 +200,29 @@ void main() {
     expect(find.text('PANEL'), findsOneWidget);
   });
 
+  testWidgets('FrostedTile does not frost again — the consumer owns the blur', (
+    tester,
+  ) async {
+    // Full-effects glass wires a real BackdropFilter into appDecoration.frost,
+    // and the panel consumers (request_config_section, response_section,
+    // unified_request_panel, realtime_panel) apply it AROUND the surface slot.
+    // The tile itself must not add a second one — that stacked two σ18
+    // backdrop blurs on every glass panel, per frame (the double-frost
+    // regression; see the frost-ownership rule in glass_components.dart).
+    await _pump(
+      tester,
+      dark,
+      (c) => c.appComponents.surface(c, title: 'PANEL', child: const Text('B')),
+    );
+    expect(
+      find.descendant(
+        of: find.byType(FrostedTile),
+        matching: find.byType(BackdropFilter),
+      ),
+      findsNothing,
+    );
+  });
+
   testWidgets('metric is inline-safe in a tight Wrap', (tester) async {
     await _pump(
       tester,
@@ -364,6 +387,16 @@ void main() {
       // No overflow / build exception; the status code is visible.
       expect(tester.takeException(), isNull);
       expect(find.textContaining('200'), findsWidgets);
+
+      // Exactly ONE backdrop blur for the panel: the section-owned frost.
+      // A second one inside FrostedTile was the double-frost regression.
+      expect(
+        find.descendant(
+          of: find.byType(ResponseSection),
+          matching: find.byType(BackdropFilter),
+        ),
+        findsOneWidget,
+      );
     },
   );
 

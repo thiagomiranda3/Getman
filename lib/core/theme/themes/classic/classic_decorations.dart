@@ -38,7 +38,8 @@ BoxDecoration classicPanelBox(
 }
 
 /// Browser/editor-style tab: active = surface fill + accent bottom indicator;
-/// hovered = subtle bg tint; inactive = transparent. No per-column rules.
+/// hovered = subtle bg tint; inactive = alpha-0 of the active surfaces. No
+/// per-column rules.
 BoxDecoration classicTabShape(
   BuildContext context, {
   required bool active,
@@ -48,19 +49,26 @@ BoxDecoration classicTabShape(
   final theme = Theme.of(context);
   final layout = context.appLayout;
   final accent = theme.colorScheme.primary;
+  // The inactive fill/indicator are a *same-hue, zero-alpha* color, NOT
+  // `Colors.transparent`. The tab's `AnimatedContainer` lerps this fill toward
+  // the opaque active/hover surfaces; `Color.lerp` from premultiplied black
+  // (`Colors.transparent` is RGB 0,0,0) lands on a muddy mid-gray that flashes
+  // dark on every tab switch (the documented AURIS transparent-lerp gotcha —
+  // see auris_decorations.dart's tabShape). Keeping the same RGB at alpha 0
+  // makes the fade alpha-only. Visually identical at rest.
   final Color bg;
   if (active) {
     bg = theme.cardColor;
   } else if (hovered) {
     bg = theme.hoverColor;
   } else {
-    bg = Colors.transparent;
+    bg = theme.cardColor.withValues(alpha: 0);
   }
   return BoxDecoration(
     color: bg,
     border: Border(
       bottom: BorderSide(
-        color: active ? accent : Colors.transparent,
+        color: active ? accent : accent.withValues(alpha: 0),
         width: layout.borderThick,
       ),
     ),

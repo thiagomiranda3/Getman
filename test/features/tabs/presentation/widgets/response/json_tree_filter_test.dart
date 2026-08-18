@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/json_tree_filter.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/json_tree_view.dart';
@@ -249,6 +251,74 @@ void main() {
       );
       expect(plan.containerPaths, {r'$[0]', r'$[1]'});
       expect(plan.limitedToDepth, isFalse);
+    });
+  });
+
+  group('kTreeMaxDepth depth guard (I10)', () {
+    // A ~400KB `[[[[…]]]]` body: under the 512 KiB TREE gate, jsonDecode
+    // survives it, but an unguarded recursive walk overflowed the stack.
+    final deep = jsonDecode('${'[' * 200000}1${']' * 200000}');
+
+    test('filterJsonTree walks a 200k-deep body without overflowing and '
+        'flags the skipped subtree as truncated', () {
+      final r = filterJsonTree(data: deep, query: '1');
+      // The only matchable value (the scalar 1) sits ~200k levels down —
+      // past the cap, so it is not matched; the skip is surfaced instead.
+      expect(r.matchCount, 0);
+      expect(r.matchedPaths, isEmpty);
+      expect(r.truncated, isTrue);
+    });
+
+    test('planExpandAll walks a 200k-deep body without overflowing and '
+        'plans only renderable containers', () {
+      final plan = planExpandAll(data: deep);
+      // One container per renderable depth 0..kTreeMaxDepth-1; nodes past
+      // the cap are neither counted toward maxNodes nor expandable.
+      expect(plan.containerPaths.length, kTreeMaxDepth);
+      expect(plan.limitedToDepth, isFalse);
+    });
+
+    test('filterJsonTree maxDepth override: a match under the cap is found, '
+        'past the cap it is skipped and flagged', () {
+      final data = jsonDecode('${'[' * 10}"needle"${']' * 10}');
+      final unbounded = filterJsonTree(data: data, query: 'needle');
+      expect(unbounded.matchCount, 1);
+      expect(unbounded.truncated, isFalse);
+
+      final capped = filterJsonTree(
+        data: data,
+        query: 'needle',
+        maxDepth: 4,
+      );
+      expect(capped.matchCount, 0);
+      expect(capped.matchedPaths, isEmpty);
+      expect(capped.truncated, isTrue);
+    });
+
+    test('planExpandAll maxDepth override caps collected containers', () {
+      final data = jsonDecode('${'[' * 10}"needle"${']' * 10}');
+      final plan = planExpandAll(data: data, maxDepth: 4);
+      expect(plan.containerPaths, {
+        r'$[0]',
+        r'$[0][0]',
+        r'$[0][0][0]',
+        r'$[0][0][0][0]',
+      });
+      expect(plan.limitedToDepth, isFalse);
+    });
+
+    test('an empty container sitting exactly at the cap boundary does not '
+        'flag truncation (nothing was skipped)', () {
+      final r = filterJsonTree(
+        data: {
+          'a': {
+            'b': <String, Object?>{},
+          },
+        },
+        query: 'zzz',
+        maxDepth: 2,
+      );
+      expect(r.truncated, isFalse);
     });
   });
 }

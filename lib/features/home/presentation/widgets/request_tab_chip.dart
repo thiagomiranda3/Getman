@@ -137,7 +137,14 @@ class _RequestTabChipState extends State<RequestTabChip>
       builder: (_) => Positioned(
         left: left,
         top: top,
-        child: _TabTooltipCard(tab: tab),
+        // The bloc is passed explicitly (not looked up via the overlay's
+        // context, which sits outside this chip's providers) so the card can
+        // read the LIVE tab — the 500ms timer's `tab` is a builder-time
+        // snapshot that goes stale if the URL is edited while hovering.
+        child: _TabTooltipCard(
+          tabsBloc: context.read<TabsBloc>(),
+          snapshot: tab,
+        ),
       ),
     );
     overlay.insert(_tooltipEntry!);
@@ -779,58 +786,87 @@ class _TabDragFeedback extends StatelessWidget {
 /// The hover tooltip card: the tab's display title with the URL beneath it in a
 /// muted color. Themed via the active theme's `panelBox`; the URL line is
 /// omitted when the request has no URL.
+///
+/// Reads the LIVE tab from [tabsBloc] at build time (falling back to
+/// [snapshot] if the tab vanished mid-hover): both the 500ms tooltip timer
+/// and the OverlayEntry capture a builder-time snapshot, so without this a
+/// URL edited while the pointer rests on the chip would keep showing the
+/// pre-edit URL.
 class _TabTooltipCard extends StatelessWidget {
-  const _TabTooltipCard({required this.tab});
+  const _TabTooltipCard({required this.tabsBloc, required this.snapshot});
 
-  final HttpRequestTabEntity tab;
+  /// Passed explicitly: the overlay's context sits outside the chip's
+  /// providers, so a `context.read` lookup here would fail.
+  final TabsBloc tabsBloc;
+
+  /// The tab as captured when the tooltip was scheduled — the id source and
+  /// the fallback if the tab is closed while the tooltip is visible.
+  final HttpRequestTabEntity snapshot;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final layout = context.appLayout;
     final typography = context.appTypography;
-    final url = tab.config.url;
 
-    return Material(
-      type: MaterialType.transparency,
-      child: context.appDecoration.frost(
-        context,
-        borderRadius: BorderRadius.circular(context.appShape.panelRadius),
-        child: Container(
-          key: ValueKey('tab_tooltip_${tab.tabId}'),
-          constraints: const BoxConstraints(maxWidth: _tabTooltipMaxWidth),
-          padding: EdgeInsets.all(layout.isCompact ? 8 : 12),
-          decoration: context.appDecoration.panelBox(context),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                tab.displayTitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: layout.fontSizeNormal,
-                  fontWeight: typography.titleWeight,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-              if (url.isNotEmpty) ...[
-                SizedBox(height: layout.tabSpacing),
-                Text(
-                  url,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: layout.fontSizeSmall,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+    return BlocBuilder<TabsBloc, TabsState>(
+      bloc: tabsBloc,
+      // Same chrome discipline as the chip's own buildWhen: only the
+      // title/URL sources matter — never response arrival / isSending.
+      buildWhen: (prev, next) {
+        final p = prev.tabs.byId(snapshot.tabId);
+        final n = next.tabs.byId(snapshot.tabId);
+        if (identical(p, n)) return false;
+        if (p == null || n == null) return p != n;
+        return p.config != n.config || p.collectionName != n.collectionName;
+      },
+      builder: (context, state) {
+        final tab = state.tabs.byId(snapshot.tabId) ?? snapshot;
+        final url = tab.config.url;
+        return Material(
+          type: MaterialType.transparency,
+          child: context.appDecoration.frost(
+            context,
+            borderRadius: BorderRadius.circular(context.appShape.panelRadius),
+            child: Container(
+              key: ValueKey('tab_tooltip_${tab.tabId}'),
+              constraints: const BoxConstraints(maxWidth: _tabTooltipMaxWidth),
+              padding: EdgeInsets.all(layout.isCompact ? 8 : 12),
+              decoration: context.appDecoration.panelBox(context),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tab.displayTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: layout.fontSizeNormal,
+                      fontWeight: typography.titleWeight,
+                      color: theme.colorScheme.onSurface,
+                    ),
                   ),
-                ),
-              ],
-            ],
+                  if (url.isNotEmpty) ...[
+                    SizedBox(height: layout.tabSpacing),
+                    Text(
+                      url,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: layout.fontSizeSmall,
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

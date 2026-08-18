@@ -24,6 +24,9 @@ class _FakeRulesDataSource implements RequestRulesLocalDataSource {
 
   @override
   Future<void> deleteRules(String configId) async => deletedConfigId = configId;
+
+  @override
+  Future<int> sweepOrphans(Set<String> liveConfigIds) async => 0;
 }
 
 void main() {

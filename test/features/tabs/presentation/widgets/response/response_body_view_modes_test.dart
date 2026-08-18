@@ -425,6 +425,48 @@ void main() {
       },
     );
 
+    testWidgets(
+      'alwaysPrettifyLargeResponses over the 3 MB cap discloses why the '
+      'body stays plain text',
+      (tester) async {
+        final controller = CodeLineEditingController();
+        addTearDown(controller.dispose);
+        final huge = 'x' * (kMaxHighlightChars + 10);
+        await _pump(
+          tester,
+          body: huge,
+          controller: controller,
+          settings: const SettingsEntity(alwaysPrettifyLargeResponses: true),
+        );
+
+        // The freeze-guard keeps the body plain text (deliberate)…
+        expect(find.byType(SelectableText), findsOneWidget);
+        expect(find.byType(JsonCodeEditor), findsNothing);
+        // …but the setting being silently ignored must be disclosed.
+        expect(
+          find.text(
+            'Too large to prettify (over 3 MB) — shown as plain text',
+          ),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'no prettify-cap note when the setting is off',
+      (tester) async {
+        final controller = CodeLineEditingController();
+        addTearDown(controller.dispose);
+        final huge = 'x' * (kMaxHighlightChars + 10);
+        await _pump(tester, body: huge, controller: controller);
+
+        expect(
+          find.byKey(const ValueKey('prettify_cap_note')),
+          findsNothing,
+        );
+      },
+    );
+
     testWidgets('PRETTIFY ANYWAY under the cap opts into the editor', (
       tester,
     ) async {

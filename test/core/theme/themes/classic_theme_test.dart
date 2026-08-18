@@ -124,7 +124,22 @@ void main() {
                 hovered: false,
                 isFirst: false,
               );
-              expect(inactive.color, Colors.transparent);
+              // Regression (AURIS transparent-lerp gotcha): the inactive fill
+              // and indicator must be alpha-0 of the ACTIVE surfaces, never
+              // Colors.transparent — the tab's AnimatedContainer lerp from
+              // premultiplied black flashed a muddy mid-gray on every tab
+              // switch.
+              final card = Theme.of(ctx).cardColor;
+              expect(inactive.color!.a, 0.0);
+              expect(inactive.color!.r, card.r);
+              expect(inactive.color!.g, card.g);
+              expect(inactive.color!.b, card.b);
+              final accent = Theme.of(ctx).colorScheme.primary;
+              final inactiveIndicator = inactive.border!.bottom.color;
+              expect(inactiveIndicator.a, 0.0);
+              expect(inactiveIndicator.r, accent.r);
+              expect(inactiveIndicator.g, accent.g);
+              expect(inactiveIndicator.b, accent.b);
               return const SizedBox.shrink();
             },
           ),

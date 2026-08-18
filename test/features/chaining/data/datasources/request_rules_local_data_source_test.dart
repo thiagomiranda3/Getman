@@ -62,4 +62,49 @@ void main() {
     await Hive.box<RequestRulesModel>(HiveBoxes.requestRules).close();
     expect(() => ds.getRules('cfg-1'), throwsA(isA<PersistenceException>()));
   });
+
+  group('sweepOrphans (H4 boot housekeeping)', () {
+    test('deletes entries whose config id is not live and keeps live '
+        'ones', () async {
+      await ds.saveRules(makeRules('cfg-live'));
+      await ds.saveRules(makeRules('cfg-orphan'));
+
+      final removed = await ds.sweepOrphans({'cfg-live', 'cfg-never-ruled'});
+
+      expect(removed, 1);
+      expect(ds.getRules('cfg-live'), isNotNull);
+      expect(ds.getRules('cfg-orphan'), isNull);
+    });
+
+    test('is a no-op when every entry is live', () async {
+      await ds.saveRules(makeRules('cfg-1'));
+      await ds.saveRules(makeRules('cfg-2'));
+
+      final removed = await ds.sweepOrphans({'cfg-1', 'cfg-2'});
+
+      expect(removed, 0);
+      expect(ds.getRules('cfg-1'), isNotNull);
+      expect(ds.getRules('cfg-2'), isNotNull);
+    });
+
+    test('an empty live set empties the box', () async {
+      await ds.saveRules(makeRules('cfg-1'));
+
+      final removed = await ds.sweepOrphans(const {});
+
+      expect(removed, 1);
+      expect(
+        Hive.box<RequestRulesModel>(HiveBoxes.requestRules).isEmpty,
+        isTrue,
+      );
+    });
+
+    test('wraps a Hive failure in PersistenceException', () async {
+      await Hive.box<RequestRulesModel>(HiveBoxes.requestRules).close();
+      await expectLater(
+        ds.sweepOrphans({'cfg-1'}),
+        throwsA(isA<PersistenceException>()),
+      );
+    });
+  });
 }

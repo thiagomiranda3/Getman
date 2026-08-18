@@ -1,6 +1,7 @@
-// Web stub half of writeMediaTempFile — throws, since media_kit playback
-// needs a filesystem path; MediaResponseView catches this and shows the
-// binary fallback card. See media_temp_file.dart for the routing.
+// Web stub half of the media temp-file helpers — writeMediaTempFile throws,
+// since media_kit playback needs a filesystem path; MediaResponseView catches
+// this and shows the binary fallback card. deleteMediaTempFile is a no-op
+// (no file can ever exist here). See media_temp_file.dart for the routing.
 import 'dart:typed_data';
 
 /// Web (and any non-dart:io) build: writing a temp media file is unavailable.
@@ -8,3 +9,7 @@ import 'dart:typed_data';
 Future<String> writeMediaTempFile(Uint8List bytes, String ext) async {
   throw UnsupportedError('temp file unavailable on web');
 }
+
+/// Web (and any non-dart:io) build: nothing to delete — the write stub above
+/// always throws, so no temp file can exist.
+Future<void> deleteMediaTempFile(String path) async {}

@@ -55,7 +55,7 @@ Every op that reads or mutates the working tree first flushes the pending Hive �
 
 ### Pull outcomes
 
-`pull` is `git pull --rebase --autostash` (the tree is routinely dirty because in-app edits mirror to disk). A true rebase conflict is left **paused** (`PullOutcome.conflicted`) for the resolver. A conflicted *autostash re-apply* restores the clean rebased tree and keeps the edits safely in `stash@{0}` (`PullOutcome.cleanEditsStashed`). Any other failure (auth/network) aborts the rebase before throwing. `GitSyncBloc._onPull` bumps `reloadToken` on a clean pull and `conflictToken` (never reload) on a conflicted one.
+`pull` is `git pull --rebase --autostash` (the tree is routinely dirty because in-app edits mirror to disk). A true rebase conflict is left **paused** (`PullOutcome.conflicted`) for the resolver. A conflicted *autostash re-apply* restores the clean rebased tree and keeps the edits safely in `stash@{0}` (`PullOutcome.cleanEditsStashed`). Any other failure (auth/network) aborts the rebase before throwing. `GitSyncBloc._onPull` bumps `reloadToken` on a clean pull and `conflictToken` (never reload) on a conflicted one. The `conflictToken` bump is **edge-delivered** (BranchChip must be mounted to see it — the HISTORY tab / a closed drawer unmounts it, and its remount seed consumes the bump); the durable path back is `BranchStatus.rebaseInProgress` (populated on every `GitBranchService.status()` from `GitService.isRebaseInProgress`), which makes BranchChip render a REBASE PAUSED chip offering RESOLVE CONFLICTS… / ABORT REBASE even while HEAD is detached mid-rebase (`current == null`), so the resolver stays reachable after any remount or app restart.
 
 ### Semantic conflict resolution
 

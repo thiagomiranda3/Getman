@@ -38,7 +38,7 @@ Each successful/error send is prepended (newest-first) to `HttpRequestTabEntity.
 
 Two independent size treatments apply — do not conflate them:
 
-- **The `saveLargeResponsesInHistory: false` downgrade happens in `TabsBloc._recordResponse`.** It downgrades only *superseded* entries over `kLargeResponseViewerChars` to `kHistoryBodyNotKeptPlaceholder` at the next record. The **newest entry always keeps its full body** — it is what "Latest" restores after time-travelling. In-session entries otherwise keep full bodies.
+- **The `saveLargeResponsesInHistory: false` downgrade happens in `TabsBloc._recordResponse`.** It downgrades *superseded* entries that are large — body over `kLargeResponseViewerChars` OR carrying `bodyBytes` (media buffers up to 50 MiB) — to `kHistoryBodyNotKeptPlaceholder` with bytes dropped, at the next record. The **newest entry always keeps its full body** — it is what "Latest" restores after time-travelling. In-session entries otherwise keep full bodies.
 - **The unconditional 1 MiB cap happens separately in `tabs_repository_impl._toPersistableModel`.** It caps the current response body *and* every `responseHistory` entry over `kMaxPersistedResponseBodyChars` (1 MiB) at persist time.
 
 The metadata-row timeline is `ResponseHistoryTimeline` (hidden under 2 entries); earlier responses also appear in the Compare picker (`CompareTargetSource.timeline`).

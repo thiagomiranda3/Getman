@@ -7,8 +7,9 @@
 // Gotchas: colors come ONLY from jsonHighlightSpanBuilder via the
 // controller's spanBuilder — never set CodeEditorStyle.codeTheme, re_editor's
 // isolate highlighter never delivers colored results here and it silently
-// reverts to single-colour. AppCodeShortcutsActivatorsBuilder strips three
-// chords: `save` (so Cmd/Ctrl+S fires), the Cmd/Ctrl+Enter chord from
+// reverts to single-colour. AppCodeShortcutsActivatorsBuilder strips four
+// chords: `save` (so Cmd/Ctrl+S fires), `lineSelect` (so Cmd/Ctrl+L focuses
+// the URL bar), the Cmd/Ctrl+Enter AND Cmd/Ctrl+NumpadEnter chords from
 // `newLine` (so SendRequestIntent fires), and Cmd/Ctrl+/ from
 // `singleLineComment` (so ShowShortcutsIntent fires) while this editor has
 // focus. The editor is keyed by GlobalObjectKey(controller) so a theme
@@ -26,17 +27,24 @@ import 'package:re_highlight/re_highlight.dart';
 import 'package:re_highlight/styles/atom-one-dark.dart';
 import 'package:re_highlight/styles/atom-one-light.dart';
 
-/// Adapts re_editor's default shortcut map so three chords the editor would
+/// Adapts re_editor's default shortcut map so four chords the editor would
 /// otherwise *consume* bubble up to the app's global shortcuts instead:
 ///
 /// * **Cmd/Ctrl+S** — re_editor binds it to a no-op `save` action and swallows
 ///   the key, so the app's own `SaveRequestIntent` never fired (on macOS Cmd+S
 ///   did nothing; only the leaked Ctrl+S saved). We drop the `save` activator
 ///   entirely.
-/// * **Cmd/Ctrl+Enter** — re_editor lists it under `newLine`, so while the body
-///   editor held focus the app's `SendRequestIntent` never fired (the chord
-///   just inserted a newline). We strip that one activator from `newLine` while
-///   keeping plain Enter / Shift+Enter / numpad-Enter for normal newlines.
+/// * **Cmd/Ctrl+L** — re_editor binds it to `lineSelect`, so while any code
+///   editor held focus (the body editor autofocuses!) the app's
+///   `FocusUrlIntent` never fired — and jumping from the body to the URL bar
+///   is that shortcut's primary use. Line-select is not a supported editing
+///   affordance in Getman's editors, so we drop the activator entirely — same
+///   treatment as `save`.
+/// * **Cmd/Ctrl+Enter and Cmd/Ctrl+NumpadEnter** — re_editor lists both under
+///   `newLine`, so while the body editor held focus the app's
+///   `SendRequestIntent` never fired (the chord just inserted a newline). We
+///   strip those activators from `newLine` while keeping plain / Shift-ed
+///   Enter and numpad-Enter for normal newlines.
 /// * **Cmd/Ctrl+/** — re_editor binds it to `singleLineComment`, but
 ///   comment-toggle is not a supported editing affordance in any of
 ///   Getman's editors (JSON, RAW, GraphQL bodies, the response viewer,
@@ -51,6 +59,12 @@ class AppCodeShortcutsActivatorsBuilder extends CodeShortcutsActivatorsBuilder {
   @override
   List<ShortcutActivator>? build(CodeShortcutType type) {
     if (type == CodeShortcutType.save) return null;
+    // Cmd/Ctrl+L is bound to lineSelect, but the app binds the chord to
+    // focusing the URL bar (FocusUrlIntent) — jumping from the (autofocused)
+    // body editor to the URL field is that shortcut's primary use, and
+    // line-select is not a supported editing affordance in Getman's editors,
+    // so drop the activator entirely — same treatment as `save`.
+    if (type == CodeShortcutType.lineSelect) return null;
     // Cmd/Ctrl+/ is bound to singleLineComment, but comment-toggle is not a
     // supported editing affordance in any of Getman's editors (JSON, RAW,
     // GraphQL bodies, the response viewer, conflict dialogs); the app binds
@@ -67,11 +81,17 @@ class AppCodeShortcutsActivatorsBuilder extends CodeShortcutsActivatorsBuilder {
   }
 
   /// The app binds Cmd+Enter (macOS) / Ctrl+Enter (elsewhere) to sending the
-  /// request. Matches exactly that chord so it is removed from `newLine`;
-  /// Shift/Alt or numpad-Enter variants are left alone.
+  /// request, and the numpad Enter key must behave identically — re_editor's
+  /// `newLine` activators list both `enter` and `numpadEnter` with the
+  /// primary modifier. Matches exactly those chords so they are removed from
+  /// `newLine`; Shift/Alt variants and unmodified (numpad-)Enter are left
+  /// alone.
   static bool _isSendRequestChord(ShortcutActivator activator) {
     if (activator is! SingleActivator) return false;
-    if (activator.trigger != LogicalKeyboardKey.enter) return false;
+    if (activator.trigger != LogicalKeyboardKey.enter &&
+        activator.trigger != LogicalKeyboardKey.numpadEnter) {
+      return false;
+    }
     if (activator.shift || activator.alt) return false;
     return activator.meta || activator.control;
   }
@@ -202,7 +222,8 @@ class JsonCodeEditor extends StatelessWidget {
         readOnly: readOnly,
         wordWrap: wordWrap,
         autofocus: autofocus,
-        // Let the app's global Cmd/Ctrl+S (save) and Cmd/Ctrl+Enter (send)
+        // Let the app's global Cmd/Ctrl+S (save), Cmd/Ctrl+(Numpad)Enter
+        // (send), Cmd/Ctrl+L (focus URL), and Cmd/Ctrl+/ (cheat sheet)
         // shortcuts fire even while this editor has focus
         // (see [AppCodeShortcutsActivatorsBuilder]).
         shortcutsActivatorsBuilder: const AppCodeShortcutsActivatorsBuilder(),
