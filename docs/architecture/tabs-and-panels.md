@@ -47,6 +47,7 @@ The metadata-row timeline is `ResponseHistoryTimeline` (hidden under 2 entries);
 
 - The cURL paste shortcut: `_handleUrlChanged` in `url_bar.dart` treats URL input starting with `curl ` as a full request spec, runs it through `CurlUtils.parse`, and pushes a single `UpdateTab` with the parsed method/url/headers/body. Body is then prettified off the UI thread via `JsonUtils.prettify` (runs in `compute`).
 - The PARAMS/HEADERS/BODY tab bodies live in `params_tab_view.dart` / `headers_tab_view.dart` / `body_tab_view.dart` (with `bulk_mode_toggle.dart` for the bulk key/value paste mode) and are composed by both the split-pane `RequestConfigSection` and the phone `UnifiedRequestPanel` — edit them once, both layouts follow.
+- **The section strips follow the shared `RequestSectionIndex` by RECREATING their `TabController`, never by setting `.index`** — external changes arrive while the instance is offstage in `TabContentStack` with muted tickers, and a muted `TabBarView` warp stalls mid-flight (non-adjacent jumps with the children swapped), showing the wrong section under the right label. Same rule for the phone panel's auto-jump to RESPONSE when a send completes offstage. See docs/architecture/testing.md Rule 3 before touching any controller inside `RequestView`'s subtree.
 - `_setControllerPreservingEnd` (in `url_bar.dart`) is the only safe way to push text into a `TextEditingController` without jumping the cursor during an echo-write.
 
 ## JSON code editor

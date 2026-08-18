@@ -48,21 +48,17 @@ class UnifiedRequestPanel extends StatefulWidget {
 }
 
 class _UnifiedRequestPanelState extends State<UnifiedRequestPanel>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const int _responseTabIndex = 5;
-  late final TabController _tabController;
+  late TabController _tabController;
   late final RequestSectionIndex _sectionIndex;
 
   @override
   void initState() {
     super.initState();
     _sectionIndex = context.read<RequestSectionIndex>();
-    _tabController = TabController(
-      length: 6,
-      vsync: this,
-      // The shared index only ever holds a section (0–4), never RESPONSE.
-      initialIndex: _sectionIndex.value.clamp(0, _responseTabIndex - 1),
-    )..addListener(_onTabChanged);
+    // The shared index only ever holds a section (0–4), never RESPONSE.
+    _tabController = _createController(_sectionIndex.value);
     _sectionIndex.addListener(_onSectionIndexChanged);
   }
 
@@ -73,6 +69,24 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel>
       ..removeListener(_onTabChanged)
       ..dispose();
     super.dispose();
+  }
+
+  TabController _createController(int index) => TabController(
+    length: 6,
+    vsync: this,
+    initialIndex: index.clamp(0, _responseTabIndex),
+  )..addListener(_onTabChanged);
+
+  /// Replaces the controller so TabBarView jumps synchronously to [index].
+  /// Setting `.index` instead would start a warp animation that a muted
+  /// ticker (this view offstage in TabContentStack) stalls mid-flight — for
+  /// non-adjacent jumps with the children left swapped, i.e. the wrong
+  /// section's content under the right label.
+  void _recreateControllerAt(int index) {
+    final old = _tabController..removeListener(_onTabChanged);
+    _tabController = _createController(index);
+    old.dispose();
+    setState(() {});
   }
 
   void _onTabChanged() {
@@ -86,9 +100,8 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel>
   /// Another request tab's strip picked a section — follow it (even off the
   /// RESPONSE tab, so every strip lands on the same section).
   void _onSectionIndexChanged() {
-    if (_sectionIndex.value != _tabController.index) {
-      _tabController.index = _sectionIndex.value;
-    }
+    if (_sectionIndex.value == _tabController.index) return;
+    _recreateControllerAt(_sectionIndex.value);
   }
 
   @override
@@ -108,8 +121,14 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel>
             !identical(p?.response, n?.response);
       },
       listener: (context, state) {
-        if (_tabController.index != _responseTabIndex) {
+        if (_tabController.index == _responseTabIndex) return;
+        // A send can complete while this view is offstage (the user switched
+        // request tabs mid-send). animateTo with muted tickers stalls the
+        // TabBarView warp — swap the controller instead for a clean jump.
+        if (TickerMode.getValuesNotifier(context).value.enabled) {
           _tabController.animateTo(_responseTabIndex);
+        } else {
+          _recreateControllerAt(_responseTabIndex);
         }
       },
       child: Column(
