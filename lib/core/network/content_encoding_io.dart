@@ -9,6 +9,12 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+/// Native platforms do NOT transparently decompress every negotiated
+/// Content-Encoding (dart:io handles only exactly-lowercase 'gzip'), so an
+/// unsupported residual encoding (br/zstd) really is undecodable here and
+/// the caller must surface its placeholder.
+const bool platformDecompressesTransparently = false;
+
 /// Decodes [bytes] per the lowercased Content-Encoding token [encoding]
 /// (`gzip` / `x-gzip` / `deflate`). Returns null for any other token or when
 /// decoding fails — callers must treat null as "keep the bytes as-is".

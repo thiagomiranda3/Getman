@@ -674,6 +674,67 @@ curl --location 'http://test.com/dynamics/websocket-metric' \
       expect(config.method, 'HEAD');
     });
 
+    // ---- Bundles with a LEADING modeled letter (regression: the old scan
+    // surfaced a modeled letter only at the END of a bundle, so -Is/-IL/-Gd
+    // read as ONE unknown flag, tripped the URL scheme guard, and a common
+    // paste like `curl -Is example.com` returned null) ----
+
+    test('-Is bundle: HEAD inferred and the bare domain still imports', () {
+      final config = CurlUtils.parse('curl -Is example.com', id: 'a');
+      expect(config, isNotNull);
+      expect(config!.method, 'HEAD');
+      expect(config.url, 'example.com');
+    });
+
+    test('-IL bundle infers HEAD', () {
+      final config = CurlUtils.parse('curl -IL https://x', id: 'a')!;
+      expect(config.method, 'HEAD');
+      expect(config.url, 'https://x');
+    });
+
+    test(
+      '-Gd bundle: d takes the next token and -G folds it into the query, '
+      'matching -G -d',
+      () {
+        final config = CurlUtils.parse("curl -Gd 'a=1' https://x", id: 'a')!;
+        expect(config.method, 'GET');
+        expect(config.url, 'https://x?a=1');
+        expect(config.body, isEmpty);
+      },
+    );
+
+    test(
+      'a bundle containing an unknown letter stays ONE unknown flag '
+      '(no partial expansion; scheme guard engaged)',
+      () {
+        // `M` is not a modeled/ignored/value-taking letter, so `-sMx` must
+        // NOT expand into `-s -M -x` (the trailing -x would swallow the next
+        // token). It reads as one unknown boolean-ish flag: the next token
+        // is not consumed, and the URL scheme guard engages — a schemed URL
+        // still imports, a bare domain no longer does.
+        final schemed = CurlUtils.parse(
+          'curl -sMx https://api.dev/x',
+          id: 'a',
+        )!;
+        expect(schemed.url, 'https://api.dev/x');
+        expect(CurlUtils.parse('curl -sMx example.com', id: 'b'), isNull);
+      },
+    );
+
+    test(
+      '-sZx bundle: every letter is known (-Z --parallel is an ignored '
+      'boolean), so the trailing -x consumes the next token as its proxy '
+      'value — unchanged from the old scan',
+      () {
+        final config = CurlUtils.parse(
+          'curl -sZx proxy.local:8080 https://api.dev/x',
+          id: 'a',
+        )!;
+        expect(config.url, 'https://api.dev/x');
+        expect(config.method, 'GET');
+      },
+    );
+
     // ---- F4: --json (curl >= 7.82) ----
 
     test('--json implies POST, sets the body and both JSON headers', () {

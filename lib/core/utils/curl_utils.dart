@@ -9,9 +9,14 @@
 // data, else GET); -d/--data/--data-binary/--json honor a leading `@file`
 // reference while --data-raw explicitly does not (matches curl's own
 // semantics). `--next` STOPS the parse — only the first request of a chained
-// command is imported. Once an UNKNOWN dash-flag is seen, a bare domain-ish
-// token is no longer trusted as the URL (it might be that flag's value);
-// an explicit http(s) scheme or localhost is required from there on.
+// command is imported. Short-flag bundles whose letters are ALL known
+// (`-Is`, `-fsSL`, `-sXPOST`) are pre-expanded into individual flags before
+// dispatch (`_expandShortBundle`), so modeled letters like -I/-G keep their
+// meaning anywhere in the bundle; a bundle containing any unknown letter
+// stays whole and counts as one unknown flag. Once an UNKNOWN dash-flag is
+// seen, a bare domain-ish token is no longer trusted as the URL (it might be
+// that flag's value); an explicit http(s) scheme or localhost is required
+// from there on.
 // `generate()` at the bottom of this file is a one-line delegate to
 // CodeGenService.generate(..., CodeGenTarget.curl) — the actual curl-string
 // FORMATTING lives there, not here, so parse and generate are not
@@ -256,43 +261,60 @@ class CurlUtils {
   };
 
   /// Splits an argument into (flag, inlineValue): a long flag's `=value`
-  /// (`--header=X: y`), or a short-flag bundle scanned left-to-right —
-  /// leading known-boolean letters are dropped (the parser ignores those
-  /// flags anyway) and the first value-taking letter claims the glued
-  /// remainder (`-XPOST`, `-sXPOST`) or, when nothing is glued (`-sX POST`,
-  /// `-sH 'K: v'`), the next token via the caller. An all-boolean bundle
-  /// (`-sS`, `-fsSL`) surfaces its last letter so it lands in
-  /// [_ignoredBooleanFlags] instead of reading as an unknown flag; a boolean
-  /// prefix ending in one unglued letter surfaces that letter so modeled
-  /// booleans keep their meaning (`-sI` -> `-I` -> HEAD). Plain tokens pass
-  /// through with a null inline value.
+  /// (`--header=X: y`) or a short flag's glued value (`-XPOST` ->
+  /// (`-X`, `POST`)). Fully-known short bundles never arrive here —
+  /// [_expandShortBundle] breaks them apart before dispatch — so a
+  /// multi-letter short token whose first letter is NOT value-taking is a
+  /// bundle with an unknown letter and passes through whole, landing in the
+  /// parse loop's unknown-flag arm. Plain tokens pass through with a null
+  /// inline value.
   static (String, String?) _splitFlag(String raw) {
     if (raw.startsWith('--') && raw.contains('=')) {
       final eq = raw.indexOf('=');
       return (raw.substring(0, eq), raw.substring(eq + 1));
     }
-    if (raw.length > 2 && raw.startsWith('-') && !raw.startsWith('--')) {
-      var i = 1;
-      while (i < raw.length && _bundleBooleanLetters.contains(raw[i])) {
-        i++;
-      }
-      if (i < raw.length && _gluedShortFlags.contains(raw[i])) {
-        final rest = raw.substring(i + 1);
-        return ('-${raw[i]}', rest.isEmpty ? null : rest);
-      }
-      if (i == raw.length) {
-        // All-boolean bundle (-sS/-fsSL): surface the last letter so the
-        // parse loop sees a recognized ignored boolean, not an unknown flag.
-        return ('-${raw[raw.length - 1]}', null);
-      }
-      if (i == raw.length - 1 && i > 1) {
-        // Boolean prefix + one trailing letter we don't glue (-sI): surface
-        // the trailing letter so modeled booleans like -I/-G still apply.
-        return ('-${raw[i]}', null);
-      }
-      return (raw, null);
+    if (raw.length > 2 &&
+        raw.startsWith('-') &&
+        !raw.startsWith('--') &&
+        _gluedShortFlags.contains(raw[1])) {
+      return ('-${raw[1]}', raw.substring(2));
     }
     return (raw, null);
+  }
+
+  /// Pre-expands a fully-known short-flag bundle into individual flags
+  /// processed in order. Every letter must be a known single-letter flag:
+  /// ignored booleans ([_bundleBooleanLetters]), modeled booleans
+  /// ([_modeledBooleanLetters]) and at most one TRAILING value-taking letter
+  /// from [_gluedShortFlags], which keeps its glued remainder (`-sXPOST` ->
+  /// `-s` + `-XPOST`) or, bare (`-sX POST`, `-sH 'K: v'`), takes the next
+  /// token via the caller — exactly like an unbundled short flag. So `-Is`
+  /// -> `-I -s` (HEAD), `-Gd` -> `-G -d` (query fold), `-fsSL` -> four
+  /// ignored booleans. Anything else — long flags, plain tokens, and
+  /// notably a bundle containing an UNKNOWN letter — comes back as a single
+  /// element, unchanged: the whole token then reads as one unknown flag in
+  /// the parse loop (engaging the URL scheme guard) rather than silently
+  /// applying a partial prefix.
+  static List<String> _expandShortBundle(String raw) {
+    if (raw.length <= 2 || !raw.startsWith('-') || raw.startsWith('--')) {
+      return [raw];
+    }
+    final flags = <String>[];
+    for (var i = 1; i < raw.length; i++) {
+      final letter = raw[i];
+      if (_bundleBooleanLetters.contains(letter) ||
+          _modeledBooleanLetters.contains(letter)) {
+        flags.add('-$letter');
+        continue;
+      }
+      if (_gluedShortFlags.contains(letter)) {
+        // Value-taking letter: ends the bundle, keeping any glued remainder.
+        flags.add('-${raw.substring(i)}');
+        return flags;
+      }
+      return [raw]; // unknown letter: surface the whole token untouched
+    }
+    return flags;
   }
 
   /// Single-letter value-taking flags that curl accepts with a glued argument
@@ -326,10 +348,12 @@ class CurlUtils {
     'z',
   };
 
-  /// Boolean short-flag letters that may LEAD a bundle (`-sX POST`, `-fsSL`).
-  /// Only letters the parser ignores anyway (see [_ignoredBooleanFlags]) —
-  /// never modeled letters like `G`/`I`, whose semantics would be silently
-  /// dropped if they were skipped mid-bundle.
+  /// Boolean short-flag letters that may appear in a short bundle
+  /// (`-sX POST`, `-fsSL`): the single-letter spellings of
+  /// [_ignoredBooleanFlags]. [_expandShortBundle] expands each into its own
+  /// `-x` token, which the parse loop then ignores. Modeled boolean letters
+  /// (`I`/`G`) live in [_modeledBooleanLetters] instead so their semantics
+  /// are applied, never ignored.
   static const _bundleBooleanLetters = {
     '#',
     '0',
@@ -356,6 +380,17 @@ class CurlUtils {
     'Z',
   };
 
+  /// Modeled boolean short-flag letters — `-I` (--head -> HEAD inference)
+  /// and `-G` (--get -> query fold). Kept apart from
+  /// [_bundleBooleanLetters] because these letters carry semantics: they may
+  /// sit ANYWHERE in a bundle (`-Is`, `-IL`, `-Gd`) and [_expandShortBundle]
+  /// surfaces each as its own token so the modeled branch in
+  /// `_CurlParseState.applyMethodOrUrlFlag` still fires. (The old
+  /// trailing-letter-only bundle scan turned `-Is example.com` into one
+  /// unknown flag, tripping the URL scheme guard and killing the import.)
+  /// Add any future modeled boolean short flag here too.
+  static const _modeledBooleanLetters = {'G', 'I'};
+
   static final RegExp _domainish = RegExp(r'^[\w.-]+\.[\w.-]+');
   static final RegExp _hostPort = RegExp(r'^[\w.-]+:\d+');
 
@@ -373,51 +408,62 @@ class CurlUtils {
 
     final state = _CurlParseState();
 
+    outer:
     for (var i = 1; i < args.length; i++) {
-      final raw = args[i];
+      // Fully-known short bundles (`-Is`, `-Gd`, `-fsSL`, `-sXPOST`) expand
+      // into individual flags processed in order, so modeled letters (I/G)
+      // keep their meaning anywhere in the bundle; any other token comes
+      // back as a single element, unchanged.
+      for (final raw in _expandShortBundle(args[i])) {
+        // Split a long flag's inline value (`--header=X: y` ->
+        // (`--header`, `X: y`)) or a short flag's glued value (`-XPOST`).
+        final (flag, inlineValue) = _splitFlag(raw);
 
-      // Split a long flag's inline value: `--header=X: y` ->
-      // (`--header`, `X: y`).
-      final (flag, inlineValue) = _splitFlag(raw);
+        // Reads the value for a value-taking flag: the inline/glued value if
+        // present, else the next token. Returns null if neither exists.
+        // Bundle expansion guarantees only the LAST flag of a bundle can be
+        // value-taking, so consuming args[i + 1] here never skips an
+        // expanded flag.
+        String? takeValue() {
+          if (inlineValue != null) return inlineValue;
+          if (i + 1 < args.length) return args[++i];
+          return null;
+        }
 
-      // Reads the value for a value-taking flag: the inline `=value` if
-      // present, else the next token. Returns null if neither exists.
-      String? takeValue() {
-        if (inlineValue != null) return inlineValue;
-        if (i + 1 < args.length) return args[++i];
-        return null;
-      }
-
-      if (flag == '--next' || flag == '-:') {
-        // `--next` starts a SECOND independent request on the same command
-        // line; merging its flags into the first corrupts both. Import the
-        // first request only.
-        break;
-      }
-      // The three modeled flag families are disjoint sets, so dispatch order
-      // between them cannot change behavior — each token matches at most one.
-      // They MUST run before the _skipValueFlags check: -T/--upload-file are
-      // listed there too and would otherwise lose their modeled semantics.
-      if (state.applyMethodOrUrlFlag(flag, takeValue) ||
-          state.applyDataFlag(flag, takeValue) ||
-          state.applyHeaderOrAuthFlag(flag, takeValue)) {
-        continue;
-      }
-      if (_skipValueFlags.contains(flag)) {
-        takeValue(); // consume + discard the unmodeled value
-      } else if (_ignoredBooleanFlags.contains(flag) ||
-          flag.startsWith('--no-')) {
-        // Recognized no-value flag (or curl's `--no-<option>` negation form):
-        // ignore it WITHOUT engaging the unknown-flag URL guard below.
-      } else if (flag.startsWith('-')) {
-        // Unknown flag. If it carried an inline `=value`, it's fully consumed.
-        // Otherwise treat it as a boolean flag and ignore it (don't swallow the
-        // next token — it might be the URL). But it might really be
-        // value-taking, so stop trusting bare domain-ish tokens as the URL.
-        state.sawUnknownFlag = true;
-      } else if (state.url.isEmpty &&
-          _looksLikeUrl(raw, requireScheme: state.sawUnknownFlag)) {
-        state.url = raw;
+        if (flag == '--next' || flag == '-:') {
+          // `--next` starts a SECOND independent request on the same command
+          // line; merging its flags into the first corrupts both. Import the
+          // first request only.
+          break outer;
+        }
+        // The three modeled flag families are disjoint sets, so dispatch
+        // order between them cannot change behavior — each token matches at
+        // most one. They MUST run before the _skipValueFlags check:
+        // -T/--upload-file are listed there too and would otherwise lose
+        // their modeled semantics.
+        if (state.applyMethodOrUrlFlag(flag, takeValue) ||
+            state.applyDataFlag(flag, takeValue) ||
+            state.applyHeaderOrAuthFlag(flag, takeValue)) {
+          continue;
+        }
+        if (_skipValueFlags.contains(flag)) {
+          takeValue(); // consume + discard the unmodeled value
+        } else if (_ignoredBooleanFlags.contains(flag) ||
+            flag.startsWith('--no-')) {
+          // Recognized no-value flag (or curl's `--no-<option>` negation
+          // form): ignore it WITHOUT engaging the unknown-flag URL guard
+          // below.
+        } else if (flag.startsWith('-')) {
+          // Unknown flag. If it carried an inline `=value`, it's fully
+          // consumed. Otherwise treat it as a boolean flag and ignore it
+          // (don't swallow the next token — it might be the URL). But it
+          // might really be value-taking, so stop trusting bare domain-ish
+          // tokens as the URL.
+          state.sawUnknownFlag = true;
+        } else if (state.url.isEmpty &&
+            _looksLikeUrl(raw, requireScheme: state.sawUnknownFlag)) {
+          state.url = raw;
+        }
       }
     }
 

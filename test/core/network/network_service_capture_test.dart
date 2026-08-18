@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/network/content_encoding.dart';
 import 'package:getman/core/network/network_service.dart';
 
 class _FakeAdapter implements HttpClientAdapter {
@@ -252,6 +253,30 @@ void main() {
       final r = await svc.request(url: 'https://x/y', method: 'GET');
       expect(r.body, contains('content-encoding: zstd'));
       expect(r.body, contains('unsupported'));
+    });
+
+    test('a gzip-TYPED payload (application/gzip .tar.gz with '
+        'Content-Encoding: gzip) is never attempt-decoded a second time — '
+        'the user gets the .gz bytes, not the silently-unwrapped inner '
+        'archive', () async {
+      // These bytes ARE the payload: the transfer encoding was already
+      // removed by the platform; a second successful decode would corrupt
+      // the download.
+      final gzPayload = gzip.encode(utf8.encode('inner tar bytes'));
+      final svc = serviceReturning(gzPayload, {
+        'content-type': ['application/gzip'],
+        'content-encoding': ['gzip'],
+      });
+      final r = await svc.request(url: 'https://x/f.tar.gz', method: 'GET');
+      expect(r.bodyBytes, isNotNull);
+      expect(r.bodyBytes, equals(gzPayload));
+    });
+
+    test('the native seam reports it does NOT decompress transparently — '
+        'the br/zstd unsupported placeholder stays reachable on desktop '
+        '(the web stub flips this so browsers keep their pre-decoded '
+        'bytes)', () {
+      expect(platformDecompressesTransparently, isFalse);
     });
 
     test("uppercase 'GZIP' (which dart:io's exact-match auto-decompress "

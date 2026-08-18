@@ -35,7 +35,12 @@ class BulkKvCodec {
 
   /// Inverse of [_escapeValue]: `\\` → `\`, `\n` → newline. Any other `\x`
   /// pair (and a trailing lone `\`) passes through verbatim, so legacy bulk
-  /// text that never went through [_escapeValue] parses unchanged.
+  /// text that never went through [_escapeValue] parses unchanged —
+  /// EXCEPT the two sequences the escape grammar claims: a raw-typed `\n`
+  /// now means a newline and `\\` a single backslash (type `\\` for a
+  /// literal backslash, e.g. Windows paths). That is the inherent cost of
+  /// making newline-bearing values round-trip at all; most bulk formats
+  /// share the convention.
   static String _unescapeValue(String value) {
     if (!value.contains(r'\')) return value;
     final buffer = StringBuffer();

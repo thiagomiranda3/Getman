@@ -336,11 +336,20 @@ class NetworkService {
     // may echo the representation's Content-Encoding with zero body bytes.
     final encoding = _residualContentEncoding(headersMap);
     if (bytes.isNotEmpty && encoding != null) {
+      // A gzip-typed PAYLOAD (.tar.gz served as application/gzip with
+      // Content-Encoding: gzip) must not be attempt-decoded a second time:
+      // the transfer layer already removed the transfer encoding, and a
+      // second successful decode would silently hand the user the inner
+      // archive instead of the .gz file they requested.
+      final gzipTypedPayload = (contentTypeOf(headersMap)?.toLowerCase() ?? '')
+          .contains('gzip');
       if (encoding == 'gzip' || encoding == 'x-gzip' || encoding == 'deflate') {
         // Attempt-decode: when the platform already decompressed (dart:io on
         // lowercase 'gzip'), decoding again fails and null keeps bytes as-is.
         // The web stub always returns null (the browser already decoded).
-        final decoded = decodeContentEncoding(bytes, encoding);
+        final decoded = gzipTypedPayload
+            ? null
+            : decodeContentEncoding(bytes, encoding);
         if (decoded != null) {
           if (decoded.length > _maxResponseBytes) {
             // Decompressed size busts the render cap even though the wire
@@ -354,11 +363,14 @@ class NetworkService {
           }
           bytes = decoded;
         }
-      } else {
+      } else if (!platformDecompressesTransparently) {
         // br / zstd / unknown (or a multi-token chain): surface a clear
         // placeholder instead of feeding compressed bytes to the textual
         // decoder — mirrors the too-large placeholder shape (no bodyBytes),
-        // so nothing downstream tries to parse or preview it.
+        // so nothing downstream tries to parse or preview it. On web this
+        // branch is SKIPPED: the browser transparently decompresses every
+        // encoding it negotiated (incl. br/zstd), so the bytes here are
+        // already plain despite the residual header.
         return HttpResponseEntity(
           statusCode: status,
           body:

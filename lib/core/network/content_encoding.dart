@@ -6,4 +6,4 @@
 // `dart:io` never reaches the web build.
 export 'content_encoding_stub.dart'
     if (dart.library.io) 'content_encoding_io.dart'
-    show decodeContentEncoding;
+    show decodeContentEncoding, platformDecompressesTransparently;
