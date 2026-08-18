@@ -306,9 +306,19 @@ class _MainScreenState extends State<MainScreen> {
                 ),
                 SendRequestIntent: CallbackAction<SendRequestIntent>(
                   onInvoke: (_) {
-                    if (activeIndex >= 0 &&
-                        activeIndex < tabs.length &&
-                        !tabs[activeIndex].isSending) {
+                    // Read the CURRENT tab at press time, not the builder
+                    // snapshot: _shellNeedsRebuild deliberately skips
+                    // content-only emissions, so the captured `tabs` can hold
+                    // a stale collectionNodeId (set by a save — the send
+                    // would then drop collection-scoped variables) or a stale
+                    // isSending (deading the shortcut). Same live-read rule
+                    // as url_bar's _sendEvent.
+                    final tabsState = context.read<TabsBloc>().state;
+                    final liveTabs = tabsState.tabs;
+                    final liveIndex = tabsState.activeIndex;
+                    if (liveIndex >= 0 &&
+                        liveIndex < liveTabs.length &&
+                        !liveTabs[liveIndex].isSending) {
                       final settings = context
                           .read<SettingsBloc>()
                           .state
@@ -323,11 +333,11 @@ class _MainScreenState extends State<MainScreen> {
                             .read<CollectionsBloc>()
                             .state
                             .collections,
-                        collectionNodeId: tabs[activeIndex].collectionNodeId,
+                        collectionNodeId: liveTabs[liveIndex].collectionNodeId,
                       );
                       context.read<TabsBloc>().add(
                         SendRequest(
-                          tabId: tabs[activeIndex].tabId,
+                          tabId: liveTabs[liveIndex].tabId,
                           envVars: envVars,
                           responseHistoryLimit: settings.responseHistoryLimit,
                           saveLargeResponsesInHistory:
