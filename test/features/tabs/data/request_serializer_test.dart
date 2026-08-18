@@ -104,6 +104,24 @@ void main() {
       expect(headers, isEmpty);
     });
 
+    test('apikey in query skips when a same-name param already exists', () {
+      // Query mirror of the header skip-if-set: the hand-written param wins,
+      // instead of shipping `?api_key=OVERRIDE&api_key=v`.
+      query['api_key'] = ['OVERRIDE'];
+      inject(
+        const AuthConfig(
+          type: AuthType.apiKey,
+          apiKeyName: 'api_key',
+          apiKeyValue: 'v',
+          apiKeyLocation: ApiKeyLocation.query,
+        ),
+      );
+      expect(query, {
+        'api_key': ['OVERRIDE'],
+      });
+      expect(headers, isEmpty);
+    });
+
     test('apikey with empty name is a no-op', () {
       inject(const AuthConfig(type: AuthType.apiKey, apiKeyValue: 'v'));
       expect(headers, isEmpty);
@@ -355,7 +373,8 @@ void main() {
 
   group('RequestSerializer.buildBody graphql', () {
     test(
-      'builds {query, variables} envelope and forces application/json',
+      'builds the {query, variables} envelope as a pre-encoded JSON string '
+      'and forces application/json',
       () async {
         const config = HttpRequestConfigEntity(
           id: 'g1',
@@ -370,11 +389,39 @@ void main() {
           headers: headers,
           envVars: const {},
         );
-        expect(data, {
+        // A String, not a Map: Dio passes a String through verbatim regardless
+        // of content-type, while a Map gets form-urlencoded under any non-JSON
+        // Content-Type the user set (application/graphql, text/plain).
+        expect(data, isA<String>());
+        expect(jsonDecode(data as String), {
           'query': 'query { me { id } }',
           'variables': {'limit': 5},
         });
         expect(headers['Content-Type'], 'application/json');
+      },
+    );
+
+    test(
+      'keeps a user-chosen non-JSON content type and still ships the '
+      'JSON envelope string',
+      () async {
+        const config = HttpRequestConfigEntity(
+          id: 'g5',
+          bodyType: BodyType.graphql,
+          body: 'query { x }',
+          headers: {},
+        );
+        final headers = <String, String>{'Content-Type': 'application/graphql'};
+        final data = await RequestSerializer.buildBody(
+          config: config,
+          headers: headers,
+          envVars: const {},
+        );
+        expect(headers['Content-Type'], 'application/graphql');
+        expect(jsonDecode(data as String), {
+          'query': 'query { x }',
+          'variables': <String, dynamic>{},
+        });
       },
     );
 
@@ -391,7 +438,10 @@ void main() {
         headers: <String, String>{},
         envVars: const {},
       );
-      expect(data, {'query': 'query { x }', 'variables': <String, dynamic>{}});
+      expect(jsonDecode(data as String), {
+        'query': 'query { x }',
+        'variables': <String, dynamic>{},
+      });
     });
 
     test('invalid variables JSON throws GraphqlVariablesException', () async {
@@ -425,7 +475,7 @@ void main() {
         headers: <String, String>{},
         envVars: const {'id': '42', 'name': 'ada'},
       );
-      expect(data, {
+      expect(jsonDecode(data as String), {
         'query': 'query { u(id: "42") }',
         'variables': {'n': 'ada'},
       });

@@ -27,7 +27,8 @@ class RequestSerializer {
 
   /// Injects auth into [headers] / [query] (both mutated in place). Existing
   /// explicit `Authorization` / api-key headers are respected (skip-if-set) so
-  /// a hand-written header always wins over the AUTH tab.
+  /// a hand-written header always wins over the AUTH tab; a query-located
+  /// api-key likewise skips when [query] already carries a same-name param.
   ///
   /// [AuthType.inherit] is a no-op TODAY — folders have no auth of their own
   /// yet (`CollectionNodeEntity` has no auth field), so there is nothing to
@@ -44,6 +45,7 @@ class RequestSerializer {
       auth: auth,
       currentHeaders: headers,
       resolve: (value) => EnvironmentResolver.resolve(value, envVars),
+      hasQueryParam: query.containsKey,
     );
     headers.addAll(app.headers);
     final queryParam = app.queryParam;
@@ -57,6 +59,8 @@ class RequestSerializer {
   /// - urlencoded → forces `application/x-www-form-urlencoded`;
   /// - multipart → strips Content-Type so Dio sets it with a boundary;
   /// - binary → `application/octet-stream` unless a non-default type is set;
+  /// - graphql → `application/json` unless a non-default type is set (the
+  ///   envelope ships as a pre-encoded JSON string either way);
   /// - raw → untouched (the user owns the Content-Type);
   /// - none → null body, untouched headers.
   ///
@@ -132,10 +136,15 @@ class RequestSerializer {
             throw GraphqlVariablesException(e.message);
           }
         }
-        return <String, dynamic>{
+        // Return the JSON STRING, not a Map: Dio's transformer only
+        // json-encodes a Map when the content-type is a JSON mime type — with
+        // a user-set non-JSON Content-Type (application/graphql, text/plain)
+        // it would form-urlencode the Map into garbage. A String passes
+        // through verbatim regardless of content-type.
+        return jsonEncode(<String, dynamic>{
           'query': r(config.body),
           'variables': variables,
-        };
+        });
     }
   }
 

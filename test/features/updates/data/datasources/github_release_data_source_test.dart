@@ -60,6 +60,25 @@ void main() {
     expect(info.assetUrl, 'https://example.com/linux.AppImage');
   });
 
+  test(
+    'default Dio carries connect/receive timeouts so CHECK FOR UPDATES '
+    'cannot hang forever on a silently-dropping network',
+    () {
+      // The updater deliberately bypasses the app's proxy config, so on
+      // proxy-only networks the request is dropped silently — without
+      // timeouts it never completes and the UI stays in `checking`.
+      final defaultDs = GithubReleaseDataSource();
+      expect(
+        defaultDs.dio.options.connectTimeout,
+        const Duration(seconds: 10),
+      );
+      expect(
+        defaultDs.dio.options.receiveTimeout,
+        const Duration(seconds: 20),
+      );
+    },
+  );
+
   test('assetUrl is null when no asset matches the platform', () async {
     when(() => dio.get<dynamic>(any())).thenAnswer(
       (_) async => _resp({

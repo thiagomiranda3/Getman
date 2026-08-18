@@ -2,8 +2,11 @@
 // Streamable HTTP (JSON-RPC 2.0), pure `dio` so it stays web-safe. Runs the
 // `initialize` handshake (capturing the `Mcp-Session-Id` response header),
 // then exposes listTools/callTool over the resulting McpConnection.
-// Responses may arrive as a plain JSON body or a `text/event-stream` body
-// (via SseParser); either way the reply matching `id` is picked out.
+// Responses may arrive as a plain JSON body or a `text/event-stream` body.
+// SSE bodies are parsed incrementally (SseParser) and complete as soon as
+// the id-matching reply (one carrying `result`/`error`) arrives — the MCP
+// spec says a server SHOULD (not MUST) close the POST's SSE stream, so
+// waiting for EOF would hang against servers that hold it open.
 
 import 'dart:async';
 import 'dart:convert';
@@ -64,8 +67,11 @@ class McpService {
   ]) {
     final dio = Dio(
       BaseOptions(
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 60),
+        // Direct mapping like NetworkService.buildDio — 0 means disabled via
+        // dio's own `> Duration.zero` gate.
+        connectTimeout: Duration(milliseconds: config.connectTimeoutMs),
+        sendTimeout: Duration(milliseconds: config.sendTimeoutMs),
+        receiveTimeout: Duration(milliseconds: config.receiveTimeoutMs),
         // MCP servers may answer with a JSON-RPC error at HTTP 200, or with
         // 4xx/5xx — read every status so we can surface the body either way.
         validateStatus: (_) => true,
@@ -85,9 +91,16 @@ class McpService {
   }
 
   /// Re-applies [config] to the live client without rebuilding it — mirrors
-  /// NetworkService/RealtimeService.applyConfig. Only the adapter (SSL/proxy/
-  /// client cert) is touched; interceptors (e.g. the cookie jar) survive.
+  /// NetworkService/RealtimeService.applyConfig: timeouts mutate
+  /// [BaseOptions] in place BEFORE the adapter early-return, so a
+  /// timeout-only edit still lands; only an adapter-relevant change
+  /// (SSL/proxy/client cert) swaps the adapter. Interceptors (e.g. the
+  /// cookie jar) survive.
   void applyConfig(NetworkConfig config) {
+    _dio.options
+      ..connectTimeout = Duration(milliseconds: config.connectTimeoutMs)
+      ..sendTimeout = Duration(milliseconds: config.sendTimeoutMs)
+      ..receiveTimeout = Duration(milliseconds: config.receiveTimeoutMs);
     if (_adapterConfig != null && _adapterConfig!.sameAdapterConfig(config)) {
       return;
     }
@@ -220,9 +233,13 @@ class _HttpMcpConnection implements McpConnection {
     }
     final error = message['error'];
     if (error is Map<String, dynamic>) {
+      // Non-conformant servers send e.g. `'code': 'TOOL_NOT_FOUND'` or a
+      // non-String message — surface the server's text instead of throwing
+      // a Dart TypeError at the user.
+      final code = error['code'];
       throw McpException(
-        (error['message'] as String?) ?? 'Unknown error',
-        code: error['code'] as int?,
+        error['message']?.toString() ?? 'Unknown error',
+        code: code is num ? code.toInt() : null,
       );
     }
     final result = (message['result'] as Map?)?.cast<String, dynamic>();
@@ -243,16 +260,16 @@ class _HttpMcpConnection implements McpConnection {
     await _drain(response.data);
   }
 
-  /// Reads a JSON-RPC message from either an `application/json` body or a
-  /// `text/event-stream` body, returning the message whose `id` matches
-  /// [expectedId] (or the first message that has no id match for json).
+  /// Reads the JSON-RPC reply to [expectedId] from either an
+  /// `application/json` body or a `text/event-stream` body. SSE bodies are
+  /// parsed incrementally and complete as soon as the reply arrives — see
+  /// [_readSseReply]. Plain JSON bodies are drained to EOF (they close).
   Future<Map<String, dynamic>?> _readMessage(
     Response<ResponseBody> response,
     int expectedId,
   ) async {
     final body = response.data;
     if (body == null) return null;
-    final text = await _drain(body);
     // In real Dio (streaming), Content-Type appears in both Response.headers
     // and ResponseBody.headers. In tests, only one side may be set.
     final headerValues =
@@ -262,28 +279,118 @@ class _HttpMcpConnection implements McpConnection {
     final contentType = headerValues.isNotEmpty ? headerValues.first : '';
 
     if (contentType.contains('text/event-stream')) {
-      final parser = SseParser();
-      final events = [...parser.addChunk(text), ...parser.flush()];
-      for (final raw in events) {
-        final decoded = _tryDecode(raw);
-        if (decoded != null && decoded['id'] == expectedId) return decoded;
-      }
-      // Fall back to the last decodable event if no id matched.
-      for (final raw in events.reversed) {
-        final decoded = _tryDecode(raw);
-        if (decoded != null) return decoded;
-      }
-      return null;
+      return _readSseReply(body, expectedId);
     }
 
-    return _tryDecode(text);
+    final decoded = _tryDecode(await _drain(body));
+    return _replyIn(decoded, expectedId) ?? _fallbackMessage(decoded);
   }
 
-  Map<String, dynamic>? _tryDecode(String raw) {
+  /// Incrementally parses a `text/event-stream` [body], completing as soon
+  /// as an event decodes to the reply for [expectedId], then cancelling the
+  /// body subscription. The MCP spec says the server SHOULD close the
+  /// POST's SSE stream after the reply — not MUST — so draining to EOF
+  /// hangs forever against servers that hold it open (keep-alive comments
+  /// defeat the inter-chunk receiveTimeout, too). Non-matching events are
+  /// notifications/server-initiated requests: they are skipped, with the
+  /// last decodable message kept as a bounded fallback used only if the
+  /// stream ends without a proper id-matched reply.
+  Future<Map<String, dynamic>?> _readSseReply(
+    ResponseBody body,
+    int expectedId,
+  ) {
+    final completer = Completer<Map<String, dynamic>?>();
+    final parser = SseParser();
+    Map<String, dynamic>? lastMessage;
+    late final StreamSubscription<String> subscription;
+
+    void deliver(Map<String, dynamic>? message) {
+      if (completer.isCompleted) return;
+      completer.complete(message);
+      unawaited(subscription.cancel());
+    }
+
+    void scan(List<String> events) {
+      for (final raw in events) {
+        if (completer.isCompleted) return;
+        final decoded = _tryDecode(raw);
+        final reply = _replyIn(decoded, expectedId);
+        if (reply != null) {
+          deliver(reply);
+          return;
+        }
+        lastMessage = _fallbackMessage(decoded) ?? lastMessage;
+      }
+    }
+
+    subscription = utf8.decoder
+        .bind(body.stream)
+        .listen(
+          (chunk) => scan(parser.addChunk(chunk)),
+          onDone: () {
+            scan(parser.flush());
+            deliver(lastMessage);
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (!completer.isCompleted) {
+              completer.completeError(error, stackTrace);
+            }
+          },
+          cancelOnError: true,
+        );
+    return completer.future;
+  }
+
+  /// True when [message] is the JSON-RPC reply to [expectedId]: id-equal
+  /// (compared as strings, so a server echoing the id as `'1'` still
+  /// matches `1`) AND carrying `result` or `error`. A server-initiated
+  /// request (e.g. `ping`) may collide on id but has neither — it must not
+  /// be mistaken for the reply.
+  bool _isReplyTo(Map<String, dynamic> message, int expectedId) =>
+      message['id']?.toString() == expectedId.toString() &&
+      (message.containsKey('result') || message.containsKey('error'));
+
+  /// Picks the reply to [expectedId] out of [decoded]: the Map itself when
+  /// it satisfies [_isReplyTo], or — for a top-level batch List — its first
+  /// reply element.
+  Map<String, dynamic>? _replyIn(Object? decoded, int expectedId) {
+    if (decoded is Map<String, dynamic>) {
+      return _isReplyTo(decoded, expectedId) ? decoded : null;
+    }
+    if (decoded is List<dynamic>) {
+      for (final element in decoded) {
+        if (element is Map<String, dynamic> &&
+            _isReplyTo(element, expectedId)) {
+          return element;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Last-resort message when nothing id-matched: the Map itself, or the
+  /// last Map element of a batch List. Lets `_request` surface a Malformed
+  /// error (or a non-conformant server's un-id'd reply) instead of
+  /// "empty response".
+  Map<String, dynamic>? _fallbackMessage(Object? decoded) {
+    if (decoded is Map<String, dynamic>) return decoded;
+    if (decoded is List<dynamic>) {
+      for (final element in decoded.reversed) {
+        if (element is Map<String, dynamic>) return element;
+      }
+    }
+    return null;
+  }
+
+  /// Decodes [raw] as JSON, returning a Map or a top-level batch List
+  /// (anything else is not a JSON-RPC payload), or null on empty/garbage.
+  Object? _tryDecode(String raw) {
     if (raw.trim().isEmpty) return null;
     try {
       final decoded = jsonDecode(raw);
-      return decoded is Map<String, dynamic> ? decoded : null;
+      return decoded is Map<String, dynamic> || decoded is List<dynamic>
+          ? decoded
+          : null;
     } on FormatException {
       return null;
     }

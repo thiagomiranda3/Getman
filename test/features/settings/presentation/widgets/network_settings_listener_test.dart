@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/network/mcp_service.dart';
 import 'package:getman/core/network/network_config.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/network/realtime_service.dart';
@@ -15,6 +16,8 @@ class MockNetworkService extends Mock implements NetworkService {}
 
 class MockRealtimeService extends Mock implements RealtimeService {}
 
+class MockMcpService extends Mock implements McpService {}
+
 class MockSaveSettingsUseCase extends Mock implements SaveSettingsUseCase {}
 
 void main() {
@@ -25,11 +28,13 @@ void main() {
 
   late MockNetworkService network;
   late MockRealtimeService realtime;
+  late MockMcpService mcp;
   late SettingsBloc bloc;
 
   setUp(() {
     network = MockNetworkService();
     realtime = MockRealtimeService();
+    mcp = MockMcpService();
     final save = MockSaveSettingsUseCase();
     when(() => save.call(any())).thenAnswer((_) async {});
     bloc = SettingsBloc(
@@ -46,9 +51,12 @@ void main() {
         value: network,
         child: RepositoryProvider<RealtimeService>.value(
           value: realtime,
-          child: BlocProvider.value(
-            value: bloc,
-            child: const NetworkSettingsListener(child: SizedBox()),
+          child: RepositoryProvider<McpService>.value(
+            value: mcp,
+            child: BlocProvider.value(
+              value: bloc,
+              child: const NetworkSettingsListener(child: SizedBox()),
+            ),
           ),
         ),
       ),
@@ -68,6 +76,7 @@ void main() {
 
     verify(() => network.applyConfig(any())).called(1);
     verify(() => realtime.applyConfig(any())).called(1);
+    verify(() => mcp.applyConfig(any())).called(1);
   });
 
   testWidgets('applies config when maxRedirects changes', (tester) async {
@@ -81,6 +90,7 @@ void main() {
 
     verify(() => network.applyConfig(any())).called(1);
     verify(() => realtime.applyConfig(any())).called(1);
+    verify(() => mcp.applyConfig(any())).called(1);
   });
 
   testWidgets('applies config when the client certificate changes', (
@@ -100,6 +110,7 @@ void main() {
 
     verify(() => network.applyConfig(any())).called(1);
     verify(() => realtime.applyConfig(any())).called(1);
+    verify(() => mcp.applyConfig(any())).called(1);
   });
 
   testWidgets('ignores non-network setting changes', (tester) async {
@@ -113,5 +124,6 @@ void main() {
 
     verifyNever(() => network.applyConfig(any()));
     verifyNever(() => realtime.applyConfig(any()));
+    verifyNever(() => mcp.applyConfig(any()));
   });
 }

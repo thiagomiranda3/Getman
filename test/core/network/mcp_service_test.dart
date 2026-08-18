@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/network/mcp_service.dart';
+import 'package:getman/core/network/network_config.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockDio extends Mock implements Dio {}
@@ -45,6 +46,22 @@ ResponseBody _rawBody(String text, String contentType, {int status = 200}) {
     },
   );
 }
+
+/// An SSE response body backed by [controller] — the test controls when (and
+/// whether) chunks arrive and whether the stream ever closes, so it can model
+/// a server that holds the POST's SSE stream open after the reply.
+ResponseBody _openSseBody(StreamController<Uint8List> controller) =>
+    ResponseBody(
+      controller.stream,
+      200,
+      headers: {
+        Headers.contentTypeHeader: ['text/event-stream'],
+      },
+    );
+
+/// A single UTF-8 encoded SSE `data:` frame carrying [json].
+Uint8List _sseFrame(Map<String, dynamic> json) =>
+    Uint8List.fromList(utf8.encode('data: ${jsonEncode(json)}\n\n'));
 
 /// The `initialize` JSON-RPC result shape, reused by the multi-POST stubs.
 Map<String, dynamic> _initResult() => {
@@ -405,4 +422,302 @@ void main() {
       ).called(1);
     },
   );
+
+  test(
+    'callTool completes as soon as the SSE reply arrives even though the '
+    'server never closes the stream, and cancels the body subscription',
+    () async {
+      final controller = StreamController<Uint8List>();
+      var cancelled = false;
+      controller.onCancel = () {
+        cancelled = true;
+      };
+      stubPosts([
+        resp(
+          _jsonBody(_initResult()),
+          headers: {
+            'mcp-session-id': ['s1'],
+          },
+        ),
+        resp(_jsonBody({'jsonrpc': '2.0'})),
+        resp(_openSseBody(controller)),
+      ]);
+
+      final conn = await service.connect('https://mcp.dev/');
+      final pending = conn.callTool('echo', const {'msg': 'hi'});
+      // A keep-alive comment first (real servers send these between events),
+      // then the reply — and the stream stays open after it. Draining to EOF
+      // would hang here forever.
+      controller
+        ..add(Uint8List.fromList(utf8.encode(': keep-alive\n\n')))
+        ..add(
+          _sseFrame({
+            'jsonrpc': '2.0',
+            'id': 2,
+            'result': {
+              'content': [
+                {'type': 'text', 'text': 'hello'},
+              ],
+            },
+          }),
+        );
+
+      final result = await pending.timeout(const Duration(seconds: 5));
+      expect(result.textBlocks, ['hello']);
+      // The reply is in hand — the still-open body stream must be released.
+      await pumpEventQueue();
+      expect(cancelled, isTrue);
+      await controller.close();
+    },
+  );
+
+  test(
+    'connect completes when initialize arrives over an SSE stream that '
+    'stays open',
+    () async {
+      final controller = StreamController<Uint8List>();
+      stubPosts([
+        resp(
+          _openSseBody(controller),
+          headers: {
+            'mcp-session-id': ['sse-sess'],
+          },
+        ),
+        // initialized notification ack
+        resp(_jsonBody({'jsonrpc': '2.0'})),
+      ]);
+
+      final pending = service.connect('https://mcp.dev/');
+      controller.add(_sseFrame(_initResult()));
+
+      final conn = await pending.timeout(const Duration(seconds: 5));
+      expect(conn.session.sessionId, 'sse-sess');
+      expect(conn.session.serverName, 'demo');
+      await controller.close();
+    },
+  );
+
+  test(
+    'a server-initiated request with a colliding id is skipped and the real '
+    'reply that follows wins',
+    () async {
+      // Same id as the tools/call request, but no result/error: a
+      // server-initiated `ping` REQUEST, not the reply. Mistaking it for the
+      // reply produced a bogus "Malformed" error before the real reply.
+      final ping = {'jsonrpc': '2.0', 'id': 2, 'method': 'ping'};
+      final reply = {
+        'jsonrpc': '2.0',
+        'id': 2,
+        'result': {
+          'content': [
+            {'type': 'text', 'text': 'real'},
+          ],
+        },
+      };
+      stubPosts([
+        resp(
+          _jsonBody(_initResult()),
+          headers: {
+            'mcp-session-id': ['s1'],
+          },
+        ),
+        resp(_jsonBody({'jsonrpc': '2.0'})),
+        resp(
+          _rawBody(
+            'data: ${jsonEncode(ping)}\n\ndata: ${jsonEncode(reply)}\n\n',
+            'text/event-stream',
+          ),
+        ),
+      ]);
+
+      final conn = await service.connect('https://mcp.dev/');
+      final result = await conn.callTool('echo', const {});
+      expect(result.textBlocks, ['real']);
+      expect(result.isError, isFalse);
+    },
+  );
+
+  test('a reply whose id is echoed as a String still matches', () async {
+    final controller = StreamController<Uint8List>();
+    stubPosts([
+      resp(
+        _jsonBody(_initResult()),
+        headers: {
+          'mcp-session-id': ['s1'],
+        },
+      ),
+      resp(_jsonBody({'jsonrpc': '2.0'})),
+      resp(_openSseBody(controller)),
+    ]);
+
+    final conn = await service.connect('https://mcp.dev/');
+    final pending = conn.callTool('echo', const {});
+    controller.add(
+      _sseFrame({
+        'jsonrpc': '2.0',
+        // Echoed as a String — must still match the int request id 2.
+        'id': '2',
+        'result': {
+          'content': [
+            {'type': 'text', 'text': 'string-id'},
+          ],
+        },
+      }),
+    );
+
+    // The stream never closes, so only a true id match (not the stream-end
+    // fallback) can complete this future.
+    final result = await pending.timeout(const Duration(seconds: 5));
+    expect(result.textBlocks, ['string-id']);
+    await controller.close();
+  });
+
+  test(
+    'a top-level batch array body is unwrapped and scanned for the reply',
+    () async {
+      stubPosts([
+        resp(
+          _jsonBody(_initResult()),
+          headers: {
+            'mcp-session-id': ['s1'],
+          },
+        ),
+        resp(_jsonBody({'jsonrpc': '2.0'})),
+        resp(
+          _rawBody(
+            jsonEncode([
+              {'jsonrpc': '2.0', 'method': 'notifications/progress'},
+              {
+                'jsonrpc': '2.0',
+                'id': 2,
+                'result': {
+                  'tools': [
+                    {'name': 'batched'},
+                  ],
+                },
+              },
+            ]),
+            'application/json',
+          ),
+        ),
+      ]);
+
+      final conn = await service.connect('https://mcp.dev/');
+      final tools = await conn.listTools();
+      expect(tools.single.name, 'batched');
+    },
+  );
+
+  test(
+    'a non-conformant error (string code / numeric message) surfaces the '
+    "server's text instead of a Dart TypeError",
+    () async {
+      stubPosts([
+        resp(
+          _jsonBody(_initResult()),
+          headers: {
+            'mcp-session-id': ['s1'],
+          },
+        ),
+        resp(_jsonBody({'jsonrpc': '2.0'})),
+        // String code: must not throw a cast error; the message survives.
+        resp(
+          _jsonBody({
+            'jsonrpc': '2.0',
+            'id': 2,
+            'error': {'code': 'TOOL_NOT_FOUND', 'message': 'no such tool'},
+          }),
+        ),
+        // Double code + numeric message: code truncates, message stringifies.
+        resp(
+          _jsonBody({
+            'jsonrpc': '2.0',
+            'id': 3,
+            'error': {'code': -32601.0, 'message': 404},
+          }),
+        ),
+      ]);
+
+      final conn = await service.connect('https://mcp.dev/');
+      await expectLater(
+        conn.listTools(),
+        throwsA(
+          isA<McpException>()
+              .having((e) => e.code, 'code', isNull)
+              .having((e) => e.message, 'message', contains('no such tool')),
+        ),
+      );
+      await expectLater(
+        conn.listTools(),
+        throwsA(
+          isA<McpException>()
+              .having((e) => e.code, 'code', -32601)
+              .having((e) => e.message, 'message', '404'),
+        ),
+      );
+    },
+  );
+
+  group('MCP Dio wiring (network settings)', () {
+    test('buildMcpDio honors the configured connect/send/receive '
+        'timeouts', () {
+      final built = McpService.buildMcpDio(
+        const NetworkConfig(
+          connectTimeoutMs: 5000,
+          sendTimeoutMs: 6000,
+          receiveTimeoutMs: 7000,
+        ),
+      );
+
+      expect(built.options.connectTimeout, const Duration(seconds: 5));
+      expect(built.options.sendTimeout, const Duration(seconds: 6));
+      expect(built.options.receiveTimeout, const Duration(seconds: 7));
+    });
+
+    test('buildMcpDio maps 0 straight through (dio treats a non-positive '
+        'timeout as disabled)', () {
+      final built = McpService.buildMcpDio(
+        const NetworkConfig(
+          connectTimeoutMs: 0,
+          sendTimeoutMs: 0,
+          receiveTimeoutMs: 0,
+        ),
+      );
+
+      expect(built.options.connectTimeout, Duration.zero);
+      expect(built.options.sendTimeout, Duration.zero);
+      expect(built.options.receiveTimeout, Duration.zero);
+    });
+
+    test(
+      'applyConfig updates all three timeouts in place on a timeout-only '
+      'change (no adapter swap)',
+      () {
+        final built = McpService.buildMcpDio(NetworkConfig.defaults);
+        final mcpService = McpService(dio: built)
+          ..applyConfig(NetworkConfig.defaults);
+        final adapter = built.httpClientAdapter;
+
+        mcpService.applyConfig(
+          const NetworkConfig(
+            connectTimeoutMs: 1111,
+            sendTimeoutMs: 2222,
+            receiveTimeoutMs: 3333,
+          ),
+        );
+
+        expect(
+          built.options.connectTimeout,
+          const Duration(milliseconds: 1111),
+        );
+        expect(built.options.sendTimeout, const Duration(milliseconds: 2222));
+        expect(
+          built.options.receiveTimeout,
+          const Duration(milliseconds: 3333),
+        );
+        // A timeout-only change must not drop the adapter's socket pool.
+        expect(built.httpClientAdapter, same(adapter));
+      },
+    );
+  });
 }

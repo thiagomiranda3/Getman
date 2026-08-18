@@ -247,6 +247,46 @@ void main() {
               as Map<String, List<String>>;
       expect(query['api_key'], ['v']);
     });
+
+    test(
+      'api-key in query skips when the URL already carries a same-name '
+      'param (hand-written wins)',
+      () async {
+        stubRequest();
+        const config = HttpRequestConfigEntity(
+          id: 'c',
+          url: 'https://api.dev/x?api_key=OVERRIDE',
+          auth: {
+            'type': 'apikey',
+            'key': 'api_key',
+            'value': 'authValue',
+            'addTo': 'query',
+          },
+        );
+
+        await repository.sendRequest(config);
+
+        final query =
+            verify(
+                  () => networkService.request(
+                    url: any(named: 'url'),
+                    method: any(named: 'method'),
+                    queryParameters: captureAny(named: 'queryParameters'),
+                    data: any<dynamic>(named: 'data'),
+                    headers: any(named: 'headers'),
+                    cancelHandle: any(named: 'cancelHandle'),
+                  ),
+                ).captured.single
+                as Map<String, List<String>>;
+        expect(
+          query['api_key'],
+          ['OVERRIDE'],
+          reason:
+              'appending would ship two conflicting credentials '
+              '(?api_key=OVERRIDE&api_key=authValue)',
+        );
+      },
+    );
   });
 
   group('sendRequest disabled headers (B1)', () {
@@ -531,26 +571,30 @@ void main() {
   });
 
   group('sendRequest query assembly', () {
+    void stubRequest() {
+      when(
+        () => networkService.request(
+          url: any(named: 'url'),
+          method: any(named: 'method'),
+          queryParameters: any(named: 'queryParameters'),
+          data: any<dynamic>(named: 'data'),
+          headers: any(named: 'headers'),
+          cancelHandle: any(named: 'cancelHandle'),
+        ),
+      ).thenAnswer(
+        (_) async => const HttpResponseEntity(
+          statusCode: 200,
+          body: '',
+          headers: {},
+          durationMs: 1,
+        ),
+      );
+    }
+
     test(
       'duplicate query keys ride through as list values, env-resolved',
       () async {
-        when(
-          () => networkService.request(
-            url: any(named: 'url'),
-            method: any(named: 'method'),
-            queryParameters: any(named: 'queryParameters'),
-            data: any<dynamic>(named: 'data'),
-            headers: any(named: 'headers'),
-            cancelHandle: any(named: 'cancelHandle'),
-          ),
-        ).thenAnswer(
-          (_) async => const HttpResponseEntity(
-            statusCode: 200,
-            body: '',
-            headers: {},
-            durationMs: 1,
-          ),
-        );
+        stubRequest();
         const config = HttpRequestConfigEntity(
           id: 'c',
           url: 'https://{{host}}/x?k=1&k=2&env={{v}}',
@@ -576,6 +620,59 @@ void main() {
           'k': ['1', '2'],
           'env': ['resolved'],
         });
+      },
+    );
+
+    test('resolves {{var}} in a query-param KEY, matching code-gen', () async {
+      stubRequest();
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        url: 'https://api.dev/x?{{k}}=1',
+      );
+
+      await repository.sendRequest(config, envVars: {'k': 'filter'});
+
+      final query =
+          verify(
+                () => networkService.request(
+                  url: any(named: 'url'),
+                  method: any(named: 'method'),
+                  queryParameters: captureAny(named: 'queryParameters'),
+                  data: any<dynamic>(named: 'data'),
+                  headers: any(named: 'headers'),
+                  cancelHandle: any(named: 'cancelHandle'),
+                ),
+              ).captured.single
+              as Map<String, List<String>>;
+      expect(query, {
+        'filter': ['1'],
+      });
+    });
+
+    test(
+      'trims stray whitespace off the URL at the wire level only',
+      () async {
+        stubRequest();
+        // A pasted trailing space used to ship as %20 (silent 404); a LEADING
+        // space made Uri.parse throw an opaque FormatException.
+        const config = HttpRequestConfigEntity(
+          id: 'c',
+          url: ' https://x/api ',
+        );
+
+        await repository.sendRequest(config);
+
+        final url = verify(
+          () => networkService.request(
+            url: captureAny(named: 'url'),
+            method: any(named: 'method'),
+            queryParameters: any(named: 'queryParameters'),
+            data: any<dynamic>(named: 'data'),
+            headers: any(named: 'headers'),
+            cancelHandle: any(named: 'cancelHandle'),
+          ),
+        ).captured.single;
+        expect(url, 'https://x/api');
       },
     );
   });
