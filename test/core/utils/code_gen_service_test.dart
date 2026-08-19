@@ -143,16 +143,41 @@ void main() {
       expect(out, contains('application/x-www-form-urlencoded'));
     });
 
-    test('multipart body renders --form entries', () {
+    test('multipart text fields render --form-string (no @/< reinterpret)', () {
       const config = HttpRequestConfigEntity(
         id: 'c',
         method: 'POST',
         url: 'https://api.dev/x',
         bodyType: BodyType.multipart,
-        formFields: [MultipartFieldEntity(name: 'field', value: 'v')],
+        formFields: [
+          MultipartFieldEntity(name: 'field', value: 'v'),
+          // curl's --form reads a leading @ as "upload this file"; the send
+          // path posts the literal text, so the export must use --form-string.
+          MultipartFieldEntity(name: 'handle', value: '@ln_miranda'),
+        ],
       );
       final out = CodeGenService.generate(config, CodeGenTarget.curl);
-      expect(out, contains("--form 'field=v'"));
+      expect(out, contains("--form-string 'field=v'"));
+      expect(out, contains("--form-string 'handle=@ln_miranda'"));
+      expect(out, isNot(contains("--form 'handle=@ln_miranda'")));
+    });
+
+    test('multipart FILE fields keep --form with the @path reference', () {
+      const config = HttpRequestConfigEntity(
+        id: 'c',
+        method: 'POST',
+        url: 'https://api.dev/x',
+        bodyType: BodyType.multipart,
+        formFields: [
+          MultipartFieldEntity(
+            name: 'doc',
+            isFile: true,
+            filePath: '/tmp/a.pdf',
+          ),
+        ],
+      );
+      final out = CodeGenService.generate(config, CodeGenTarget.curl);
+      expect(out, contains("--form 'doc=@/tmp/a.pdf'"));
     });
 
     test('api key in query is appended to the URL', () {
@@ -179,6 +204,39 @@ void main() {
       final out = CodeGenService.generate(config, CodeGenTarget.curl);
       expect(out, contains('https://api.dev/y?k=a%20b%26c'));
     });
+
+    test(
+      'api key in query is NOT appended when the URL already carries a '
+      'same-name param (hand-written wins, mirroring the send path)',
+      () {
+        const config = HttpRequestConfigEntity(
+          id: 'c',
+          url: 'https://api.dev/y?k=existing',
+          auth: {'type': 'apikey', 'key': 'k', 'value': 'v', 'addTo': 'query'},
+        );
+        final out = CodeGenService.generate(config, CodeGenTarget.curl);
+        expect(out, contains('https://api.dev/y?k=existing'));
+        expect(out, isNot(contains('k=v')));
+      },
+    );
+
+    test(
+      'api key in query checks the RESOLVED URL for the existing param',
+      () {
+        const config = HttpRequestConfigEntity(
+          id: 'c',
+          url: 'https://api.dev/y?{{p}}=existing',
+          auth: {'type': 'apikey', 'key': 'k', 'value': 'v', 'addTo': 'query'},
+        );
+        final out = CodeGenService.generate(
+          config,
+          CodeGenTarget.curl,
+          resolve: (v) => EnvironmentResolver.resolve(v, const {'p': 'k'}),
+        );
+        expect(out, contains('https://api.dev/y?k=existing'));
+        expect(out, isNot(contains('k=v')));
+      },
+    );
 
     test('escapes a single quote in a header value with the POSIX idiom', () {
       const config = HttpRequestConfigEntity(

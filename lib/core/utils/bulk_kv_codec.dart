@@ -3,6 +3,12 @@
 // A leading `//` marks a disabled row (Postman's convention), carried by
 // the BulkKvRow record API (serializeRows/parseRows); the legacy
 // serialize/parse pair is an enabled-only view over the same grammar.
+// VALUES are escaped on serialize (`\` -> `\\`, newline -> the two-char
+// `\n`) and unescaped on parse, so a newline-bearing value round-trips as
+// one row instead of splitting into bogus extra lines; any other `\x` pair
+// passes through verbatim, keeping legacy escape-free text parsing
+// unchanged. Keys are never escaped (the row editor keeps them
+// single-line).
 
 /// A bulk-editor line: key/value plus whether the row is disabled
 /// (Postman's leading-`//` convention).
@@ -21,9 +27,44 @@ class BulkKvCodec {
 
   static const String _disabledPrefix = '//';
 
+  /// One line is one row, so a VALUE containing `\` or a newline is escaped
+  /// (`\` → `\\`, newline → the two-char `\n`) — otherwise a newline-bearing
+  /// value would serialize into extra lines and round-trip as bogus rows.
+  static String _escapeValue(String value) =>
+      value.replaceAll(r'\', r'\\').replaceAll('\n', r'\n');
+
+  /// Inverse of [_escapeValue]: `\\` → `\`, `\n` → newline. Any other `\x`
+  /// pair (and a trailing lone `\`) passes through verbatim, so legacy bulk
+  /// text that never went through [_escapeValue] parses unchanged —
+  /// EXCEPT the two sequences the escape grammar claims: a raw-typed `\n`
+  /// now means a newline and `\\` a single backslash (type `\\` for a
+  /// literal backslash, e.g. Windows paths). That is the inherent cost of
+  /// making newline-bearing values round-trip at all; most bulk formats
+  /// share the convention.
+  static String _unescapeValue(String value) {
+    if (!value.contains(r'\')) return value;
+    final buffer = StringBuffer();
+    var i = 0;
+    while (i < value.length) {
+      final char = value[i];
+      if (char == r'\' && i + 1 < value.length) {
+        final next = value[i + 1];
+        if (next == r'\' || next == 'n') {
+          buffer.write(next == 'n' ? '\n' : r'\');
+          i += 2;
+          continue;
+        }
+      }
+      buffer.write(char);
+      i++;
+    }
+    return buffer.toString();
+  }
+
   /// Rows → text block. One `key: value` line per pair (disabled rows
-  /// prefixed `//`), canonical order, value emitted verbatim (no trimming).
-  /// Empty-key rows are skipped — they never reach canonical state anyway.
+  /// prefixed `//`), canonical order, value emitted untrimmed with `\` and
+  /// newline escaped (see [_escapeValue]). Empty-key rows are skipped — they
+  /// never reach canonical state anyway.
   static String serializeRows(List<BulkKvRow> rows) {
     final buffer = StringBuffer();
     var first = true;
@@ -34,7 +75,7 @@ class BulkKvCodec {
       buffer
         ..write(row.key)
         ..write(': ')
-        ..write(row.value);
+        ..write(_escapeValue(row.value));
       first = false;
     }
     return buffer.toString();
@@ -46,6 +87,7 @@ class BulkKvCodec {
   ///   - no colon                      → (trimmedLine, '')          (D3)
   ///   - colon present                 → (key.trim(), value.trim()) (D2)
   ///   - empty key after trim          → dropped                    (D5)
+  /// Values are unescaped after the trim (see [_unescapeValue]).
   static List<BulkKvRow> parseRows(String text) {
     final rows = <BulkKvRow>[];
     for (final rawLine in text.split('\n')) {
@@ -65,7 +107,7 @@ class BulkKvCodec {
       if (key.isEmpty) continue; // D5
       rows.add((
         key: key,
-        value: line.substring(colon + 1).trim(), // D2
+        value: _unescapeValue(line.substring(colon + 1).trim()), // D2
         disabled: disabled,
       ));
     }

@@ -71,6 +71,9 @@ class _FakeRules extends Fake implements RequestRulesEntity {}
 class _FakeCollectionsBloc extends Bloc<CollectionsEvent, CollectionsState>
     implements CollectionsBloc {
   _FakeCollectionsBloc() : super(CollectionsState());
+
+  @override
+  Future<void> flushPendingSaves() async {}
 }
 
 class _FakeHistoryBloc extends Bloc<HistoryEvent, HistoryState>
@@ -342,22 +345,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(sectionIndex.value, 1);
 
-    // Switch request tabs: the other strip is already on AUTH.
+    // Switch request tabs: the other strip is already on AUTH — on the FIRST
+    // frame (pump, not pumpAndSettle: settling would let a stalled offstage
+    // warp finish and hide exactly the desync this test exists to catch).
     await tester.pumpWidget(stack(showFirst: false));
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('host_b')),
-        matching: find.byType(AuthTabView),
-      ),
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('host_b')),
+            matching: find.byType(AuthTabView),
+          )
+          .hitTestable(),
       findsOneWidget,
     );
     expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('host_b')),
-        matching: find.byType(ParamsTabView),
-      ),
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('host_b')),
+            matching: find.byType(ParamsTabView),
+          )
+          .hitTestable(),
       findsNothing,
     );
   });

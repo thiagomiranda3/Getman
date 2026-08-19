@@ -5,7 +5,11 @@
 // media panel keys viewers by kind rather than by response, a re-send reuses
 // this element — didUpdateWidget compares widget.bytes by identity and
 // restarts the player on change; every async step re-checks that identity
-// before touching state so a stale load can't clobber a newer one.
+// before touching state so a stale load can't clobber a newer one. Temp files
+// are best-effort deleted (deleteMediaTempFile) on restart, dispose, failure,
+// and stale-load abandonment, so repeated re-sends don't accumulate multi-MB
+// files for the whole session; files orphaned anyway (e.g. a crash) are swept
+// by the helpers' once-per-session purge of the getman_media directory.
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -44,6 +48,12 @@ class _MediaResponseViewState extends State<MediaResponseView> {
   VideoController? _videoController;
   bool _failed = false;
 
+  /// Path of the temp file the current player is playing from — tracked so it
+  /// can be deleted when the player restarts (didUpdateWidget) or unmounts.
+  /// Only set once a load wins the identity race; abandoned loads delete
+  /// their own file locally in [_start].
+  String? _tempFilePath;
+
   @override
   void initState() {
     super.initState();
@@ -58,9 +68,12 @@ class _MediaResponseViewState extends State<MediaResponseView> {
     if (!identical(oldWidget.bytes, widget.bytes)) {
       final old = _player;
       if (old != null) unawaited(old.dispose());
+      final oldPath = _tempFilePath;
+      if (oldPath != null) unawaited(deleteMediaTempFile(oldPath));
       setState(() {
         _player = null;
         _videoController = null;
+        _tempFilePath = null;
         _failed = false;
       });
       unawaited(_start());
@@ -70,24 +83,34 @@ class _MediaResponseViewState extends State<MediaResponseView> {
   Future<void> _start() async {
     // Guards a stale _start finishing after a newer response replaced it.
     final bytes = widget.bytes;
+    // Hoisted above the try so the catch can dispose a Player whose
+    // VideoController/open step threw (otherwise the native mpv handle leaks)
+    // and delete a temp file that was written before the failure.
+    String? path;
+    Player? player;
     try {
       final ext = mediaExtension(
         contentType: widget.contentType,
         url: widget.url,
       );
-      final path = await writeMediaTempFile(bytes, ext);
-      final player = Player();
+      path = await writeMediaTempFile(bytes, ext);
+      player = Player();
       final vc = widget.isVideo ? VideoController(player) : null;
       await player.open(Media('file://$path'), play: false);
       if (!mounted || !identical(bytes, widget.bytes)) {
         unawaited(player.dispose());
+        unawaited(deleteMediaTempFile(path));
         return;
       }
       setState(() {
         _player = player;
         _videoController = vc;
+        _tempFilePath = path;
       });
     } on Object {
+      unawaited(player?.dispose());
+      final orphan = path;
+      if (orphan != null) unawaited(deleteMediaTempFile(orphan));
       if (mounted && identical(bytes, widget.bytes)) {
         setState(() => _failed = true);
       }
@@ -98,6 +121,8 @@ class _MediaResponseViewState extends State<MediaResponseView> {
   void dispose() {
     final player = _player;
     if (player != null) unawaited(player.dispose());
+    final path = _tempFilePath;
+    if (path != null) unawaited(deleteMediaTempFile(path));
     super.dispose();
   }
 

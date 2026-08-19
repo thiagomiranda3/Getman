@@ -161,7 +161,13 @@ class HttpRequestConfig extends HiveObject {
       final legacy = params.entries
           .map((e) => QueryParamEntity(key: e.key, value: e.value))
           .toList(growable: false);
-      entityUrl = UrlQueryUtils.replaceQuery(url, legacy);
+      // MERGE, not replace: keep the URL's own query (a legacy record can
+      // carry both) and append the legacy map entries after it — replacing
+      // silently dropped the URL's inline params.
+      entityUrl = UrlQueryUtils.replaceQuery(url, [
+        ...UrlQueryUtils.parseQuery(url),
+        ...legacy,
+      ]);
     }
     return HttpRequestConfigEntity(
       id: id,

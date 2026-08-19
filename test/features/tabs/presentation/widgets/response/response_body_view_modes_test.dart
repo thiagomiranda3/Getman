@@ -38,11 +38,17 @@ class _FakeTabsBloc extends Bloc<TabsEvent, TabsState> implements TabsBloc {
 
   @override
   bool get canReopenClosedTab => false;
+
+  @override
+  Future<void> flushPendingSaves() async {}
 }
 
 class _FakeCollectionsBloc extends Bloc<CollectionsEvent, CollectionsState>
     implements CollectionsBloc {
   _FakeCollectionsBloc(super.initialState);
+
+  @override
+  Future<void> flushPendingSaves() async {}
 }
 
 class _FakeHistoryBloc extends Bloc<HistoryEvent, HistoryState>
@@ -416,6 +422,48 @@ void main() {
         expect(find.byType(SelectableText), findsOneWidget);
         expect(find.byType(JsonCodeEditor), findsNothing);
         await tester.pump(const Duration(seconds: 3));
+      },
+    );
+
+    testWidgets(
+      'alwaysPrettifyLargeResponses over the 3 MB cap discloses why the '
+      'body stays plain text',
+      (tester) async {
+        final controller = CodeLineEditingController();
+        addTearDown(controller.dispose);
+        final huge = 'x' * (kMaxHighlightChars + 10);
+        await _pump(
+          tester,
+          body: huge,
+          controller: controller,
+          settings: const SettingsEntity(alwaysPrettifyLargeResponses: true),
+        );
+
+        // The freeze-guard keeps the body plain text (deliberate)…
+        expect(find.byType(SelectableText), findsOneWidget);
+        expect(find.byType(JsonCodeEditor), findsNothing);
+        // …but the setting being silently ignored must be disclosed.
+        expect(
+          find.text(
+            'Too large to prettify (over 3 MB) — shown as plain text',
+          ),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'no prettify-cap note when the setting is off',
+      (tester) async {
+        final controller = CodeLineEditingController();
+        addTearDown(controller.dispose);
+        final huge = 'x' * (kMaxHighlightChars + 10);
+        await _pump(tester, body: huge, controller: controller);
+
+        expect(
+          find.byKey(const ValueKey('prettify_cap_note')),
+          findsNothing,
+        );
       },
     );
 

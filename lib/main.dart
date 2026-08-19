@@ -17,11 +17,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/di/injection_container.dart' as di;
+import 'package:getman/core/navigation/app_messenger.dart';
 import 'package:getman/core/navigation/app_router.dart';
 import 'package:getman/core/navigation/intents.dart';
 import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/network/cookie_store.dart';
+import 'package:getman/core/network/mcp_service.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/network/realtime_service.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -43,6 +45,8 @@ import 'package:getman/features/environments/presentation/bloc/environments_bloc
 import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
+import 'package:getman/features/home/presentation/widgets/exit_flush_guard.dart';
+import 'package:getman/features/home/presentation/widgets/tab_close_teardown_listener.dart';
 import 'package:getman/features/mcp/presentation/bloc/mcp_bloc.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
@@ -144,6 +148,10 @@ Map<ShortcutActivator, Intent> buildAppShortcuts({required bool useMeta}) {
     primary(LogicalKeyboardKey.keyW): const CloseTabIntent(),
     primary(LogicalKeyboardKey.keyS): const SaveRequestIntent(),
     primary(LogicalKeyboardKey.enter): const SendRequestIntent(),
+    // Numpad Enter is a distinct LogicalKeyboardKey — without this row
+    // Cmd/Ctrl+numpad-Enter is dead outside the code editors (K5; the
+    // editor-side strip lives in AppCodeShortcutsActivatorsBuilder).
+    primary(LogicalKeyboardKey.numpadEnter): const SendRequestIntent(),
     primary(LogicalKeyboardKey.keyB): const BeautifyJsonIntent(),
     primary(LogicalKeyboardKey.keyK): const CommandPaletteIntent(),
     primary(LogicalKeyboardKey.keyE): const SwitchEnvironmentIntent(),
@@ -205,6 +213,7 @@ class MyApp extends StatelessWidget {
         RepositoryProvider<RealtimeService>.value(
           value: di.sl<RealtimeService>(),
         ),
+        RepositoryProvider<McpService>.value(value: di.sl<McpService>()),
         RepositoryProvider<CookieStore>.value(value: di.sl<CookieStore>()),
         RepositoryProvider<WorkspaceSyncService>.value(
           value: di.sl<WorkspaceSyncService>(),
@@ -238,72 +247,82 @@ class MyApp extends StatelessWidget {
           BlocProvider(create: (_) => di.sl<PullRequestsBloc>()),
           BlocProvider(create: (_) => di.sl<ConflictBloc>()),
         ],
-        child: NetworkSettingsListener(
-          child: WorkspaceSyncListener(
-            child: BranchSyncListener(
-              child: BlocBuilder<SettingsBloc, SettingsState>(
-                // Rebuilding here re-runs the theme builder and rebuilds the
-                // entire MaterialApp — gate it to the three settings that
-                // actually feed it.
-                buildWhen: (prev, next) =>
-                    prev.settings.themeId != next.settings.themeId ||
-                    prev.settings.isDarkMode != next.settings.isDarkMode ||
-                    prev.settings.isCompactMode != next.settings.isCompactMode,
-                builder: (context, state) {
-                  final settings = state.settings;
-                  // NewTabIntent (and every other tab-strip shortcut) is
-                  // wired in MainScreen, not here — see the D8 note there.
-                  // A root Actions above MaterialApp/the Navigator is
-                  // reachable from focused widgets INSIDE every modal dialog
-                  // (showDialog pushes onto the same root Navigator this
-                  // Shortcuts wraps), so Cmd/Ctrl+N used to fire from inside
-                  // e.g. the settings dialog or the command palette's search
-                  // field, silently stacking new tabs behind the modal
-                  // barrier. MainScreen's Actions sits BELOW the router (a
-                  // sibling of the dialog's overlay route, not an ancestor of
-                  // it), so shortcuts wired there are correctly unreachable
-                  // from a dialog — exactly like CloseTabIntent etc. already
-                  // were.
-                  return Shortcuts(
-                    shortcuts: appShortcuts,
-                    child: MaterialApp.router(
-                      title: 'GETMAN',
-                      debugShowCheckedModeBanner: false,
-                      // Lerping ThemeData triggers ~12 full-tree rebuilds per
-                      // theme change. The app's widget tree is too heavy for
-                      // that; a single instant rebuild is both faster and
-                      // visually cleaner.
-                      themeAnimationDuration: Duration.zero,
-                      theme: resolveThemeData(
-                        settings.themeId,
-                        Brightness.light,
-                        isCompact: settings.isCompactMode,
-                      ),
-                      darkTheme: resolveThemeData(
-                        settings.themeId,
-                        Brightness.dark,
-                        isCompact: settings.isCompactMode,
-                      ),
-                      themeMode: settings.isDarkMode
-                          ? ThemeMode.dark
-                          : ThemeMode.light,
-                      routerConfig: di.sl<AppRouter>().router,
-                      builder: (context, child) {
-                        return Focus(
-                          autofocus: true,
-                          child: ThemeSwitchTransition(
-                            themeId: settings.themeId,
-                            reduceEffects: false,
-                            child: context.appDecoration.scaffoldBackground(
-                              context,
-                              child: child ?? const SizedBox.shrink(),
-                            ),
+        child: ExitFlushGuard(
+          child: TabCloseTeardownListener(
+            child: NetworkSettingsListener(
+              child: WorkspaceSyncListener(
+                child: BranchSyncListener(
+                  child: BlocBuilder<SettingsBloc, SettingsState>(
+                    // Rebuilding here re-runs the theme builder and rebuilds
+                    // the entire MaterialApp — gate it to the three settings
+                    // that actually feed it.
+                    buildWhen: (prev, next) =>
+                        prev.settings.themeId != next.settings.themeId ||
+                        prev.settings.isDarkMode != next.settings.isDarkMode ||
+                        prev.settings.isCompactMode !=
+                            next.settings.isCompactMode,
+                    builder: (context, state) {
+                      final settings = state.settings;
+                      // NewTabIntent (and every other tab-strip shortcut) is
+                      // wired in MainScreen, not here — see the D8 note
+                      // there. A root Actions above MaterialApp/the Navigator
+                      // is reachable from focused widgets INSIDE every modal
+                      // dialog (showDialog pushes onto the same root
+                      // Navigator this Shortcuts wraps), so Cmd/Ctrl+N used
+                      // to fire from inside e.g. the settings dialog or the
+                      // command palette's search field, silently stacking new
+                      // tabs behind the modal barrier. MainScreen's Actions
+                      // sits BELOW the router (a sibling of the dialog's
+                      // overlay route, not an ancestor of it), so shortcuts
+                      // wired there are correctly unreachable from a dialog —
+                      // exactly like CloseTabIntent etc. already were.
+                      return Shortcuts(
+                        shortcuts: appShortcuts,
+                        child: MaterialApp.router(
+                          title: 'GETMAN',
+                          debugShowCheckedModeBanner: false,
+                          // Lets coordinators mounted ABOVE this MaterialApp
+                          // (BranchSyncListener, WorkspaceSyncListener) reach
+                          // a real ScaffoldMessenger for failure snackbars —
+                          // maybeOf(context) is null up there.
+                          scaffoldMessengerKey: appMessengerKey,
+                          // Lerping ThemeData triggers ~12 full-tree rebuilds
+                          // per theme change. The app's widget tree is too
+                          // heavy for that; a single instant rebuild is both
+                          // faster and visually cleaner.
+                          themeAnimationDuration: Duration.zero,
+                          theme: resolveThemeData(
+                            settings.themeId,
+                            Brightness.light,
+                            isCompact: settings.isCompactMode,
                           ),
-                        );
-                      },
-                    ),
-                  );
-                },
+                          darkTheme: resolveThemeData(
+                            settings.themeId,
+                            Brightness.dark,
+                            isCompact: settings.isCompactMode,
+                          ),
+                          themeMode: settings.isDarkMode
+                              ? ThemeMode.dark
+                              : ThemeMode.light,
+                          routerConfig: di.sl<AppRouter>().router,
+                          builder: (context, child) {
+                            return Focus(
+                              autofocus: true,
+                              child: ThemeSwitchTransition(
+                                themeId: settings.themeId,
+                                reduceEffects: false,
+                                child: context.appDecoration.scaffoldBackground(
+                                  context,
+                                  child: child ?? const SizedBox.shrink(),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
           ),

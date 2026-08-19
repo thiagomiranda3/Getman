@@ -179,6 +179,46 @@ void main() {
       },
     );
 
+    test(
+      'an oversized SSE event dispatched in a single chunk is truncated '
+      'with a marker (SseParser only caps text awaiting a terminator)',
+      () async {
+        final body = StreamController<Uint8List>();
+        final dio = _MockDio();
+        when(
+          () => dio.get<ResponseBody>(
+            any(),
+            options: any(named: 'options'),
+            cancelToken: any(named: 'cancelToken'),
+          ),
+        ).thenAnswer(
+          (_) async => Response<ResponseBody>(
+            data: ResponseBody(body.stream, 200),
+            requestOptions: RequestOptions(path: '/'),
+          ),
+        );
+
+        final conn = RealtimeService(
+          dio: dio,
+        ).connectSse('https://api.dev/events');
+        final frames = <RealtimeFrame>[];
+        conn.frames.listen(frames.add);
+        await Future<void>.delayed(Duration.zero);
+
+        final huge = 'c' * (kRealtimeMaxFrameTextChars + 100);
+        body.add(Uint8List.fromList(utf8.encode('data: $huge\n\n')));
+        await Future<void>.delayed(Duration.zero);
+
+        final frame = frames
+            .where((f) => f.direction == RealtimeDirection.incoming)
+            .single;
+        expect(frame.text, endsWith('… [+100 B truncated]'));
+        expect(frame.text.length, lessThan(huge.length));
+        expect(frame.text, startsWith('ccc'));
+        await body.close();
+      },
+    );
+
     test('close cancels the request before the response resolves', () async {
       CancelToken? captured;
       final dio = _MockDio();
@@ -215,6 +255,41 @@ void main() {
       expect(dio.options.validateStatus(404), isTrue);
       expect(dio.httpClientAdapter, isA<IOHttpClientAdapter>());
     });
+
+    test(
+      'buildSseDio honors the configured connect timeout and leaves the '
+      'receive timeout unlimited for the long-lived stream',
+      () {
+        final dio = RealtimeService.buildSseDio(
+          const NetworkConfig(connectTimeoutMs: 5000, receiveTimeoutMs: 9000),
+        );
+
+        expect(dio.options.connectTimeout, const Duration(seconds: 5));
+        // SSE is a long-lived stream — a receive timeout would kill it.
+        expect(dio.options.receiveTimeout, isNull);
+      },
+    );
+
+    test(
+      'applyConfig updates the connect timeout in place on a timeout-only '
+      'change (no adapter swap)',
+      () {
+        final dio = RealtimeService.buildSseDio(NetworkConfig.defaults);
+        final service = RealtimeService(dio: dio)
+          ..applyConfig(NetworkConfig.defaults);
+        final adapter = dio.httpClientAdapter;
+
+        service.applyConfig(
+          const NetworkConfig(connectTimeoutMs: 1234, receiveTimeoutMs: 9000),
+        );
+
+        expect(dio.options.connectTimeout, const Duration(milliseconds: 1234));
+        // Receive stays unlimited — SSE is a long-lived stream.
+        expect(dio.options.receiveTimeout, isNull);
+        // A timeout-only change must not drop the adapter's socket pool.
+        expect(dio.httpClientAdapter, same(adapter));
+      },
+    );
 
     test('buildSseDio adds the given cookie interceptor', () {
       final store = _FakeCookieStore()..header = 'sid=abc';
@@ -293,7 +368,7 @@ void main() {
       when(sink.close).thenAnswer((_) async {});
 
       final conn = RealtimeService(
-        webSocketFactory: (_) => channel,
+        webSocketFactory: (_, _, _) => channel,
       ).connectWebSocket('wss://api.dev/socket');
       final frames = <RealtimeFrame>[];
       conn.frames.listen(frames.add);
@@ -324,7 +399,7 @@ void main() {
         when(sink.close).thenAnswer((_) async {});
 
         final conn = RealtimeService(
-          webSocketFactory: (_) => channel,
+          webSocketFactory: (_, _, _) => channel,
         ).connectWebSocket('wss://api.dev/socket');
         final frames = <RealtimeFrame>[];
         conn.frames.listen(frames.add);
@@ -349,7 +424,7 @@ void main() {
         when(sink.close).thenAnswer((_) async {});
 
         final conn = RealtimeService(
-          webSocketFactory: (_) => channel,
+          webSocketFactory: (_, _, _) => channel,
         ).connectWebSocket('wss://api.dev/socket');
         final frames = <RealtimeFrame>[];
         conn.frames.listen(frames.add);
@@ -364,6 +439,248 @@ void main() {
 
         await conn.close();
         await incoming.close();
+      },
+    );
+
+    test(
+      'a text frame over kRealtimeMaxFrameTextChars is truncated with a '
+      'size marker (the bloc frame-count cap does not bound bytes)',
+      () async {
+        final incoming = StreamController<dynamic>();
+        final sink = _MockWsSink();
+        final channel = _MockWsChannel();
+        when(() => channel.stream).thenAnswer((_) => incoming.stream);
+        when(() => channel.sink).thenReturn(sink);
+        when(sink.close).thenAnswer((_) async {});
+
+        final conn = RealtimeService(
+          webSocketFactory: (_, _, _) => channel,
+        ).connectWebSocket('wss://api.dev/socket');
+        final frames = <RealtimeFrame>[];
+        conn.frames.listen(frames.add);
+
+        final huge = 'a' * (kRealtimeMaxFrameTextChars + 100);
+        incoming.add(huge);
+        await Future<void>.delayed(Duration.zero);
+
+        final frame = frames
+            .where((f) => f.direction == RealtimeDirection.incoming)
+            .single;
+        expect(frame.text, endsWith('… [+100 B truncated]'));
+        expect(frame.text, startsWith('aaa'));
+        expect(frame.text.length, lessThan(huge.length));
+
+        await conn.close();
+        await incoming.close();
+      },
+    );
+
+    test('a text frame exactly at the cap passes through untouched', () async {
+      final incoming = StreamController<dynamic>();
+      final sink = _MockWsSink();
+      final channel = _MockWsChannel();
+      when(() => channel.stream).thenAnswer((_) => incoming.stream);
+      when(() => channel.sink).thenReturn(sink);
+      when(sink.close).thenAnswer((_) async {});
+
+      final conn = RealtimeService(
+        webSocketFactory: (_, _, _) => channel,
+      ).connectWebSocket('wss://api.dev/socket');
+      final frames = <RealtimeFrame>[];
+      conn.frames.listen(frames.add);
+
+      final atCap = 'b' * kRealtimeMaxFrameTextChars;
+      incoming.add(atCap);
+      await Future<void>.delayed(Duration.zero);
+
+      final frame = frames
+          .where((f) => f.direction == RealtimeDirection.incoming)
+          .single;
+      expect(frame.text, atCap);
+
+      await conn.close();
+      await incoming.close();
+    });
+  });
+
+  group('WebSocket close code/reason', () {
+    // Fake channel whose stream ends immediately after [events], with the
+    // given close code/reason readable afterwards — mirrors a server that
+    // sends a Close frame and drops the TCP connection.
+    _MockWsChannel closingChannel({int? closeCode, String? closeReason}) {
+      final sink = _MockWsSink();
+      final channel = _MockWsChannel();
+      when(
+        () => channel.stream,
+      ).thenAnswer((_) => const Stream<dynamic>.empty());
+      when(() => channel.sink).thenReturn(sink);
+      when(sink.close).thenAnswer((_) async {});
+      when(() => channel.closeCode).thenReturn(closeCode);
+      when(() => channel.closeReason).thenReturn(closeReason);
+      return channel;
+    }
+
+    Future<List<RealtimeFrame>> framesAfterDone(WebSocketChannel ch) async {
+      final conn = RealtimeService(
+        webSocketFactory: (_, _, _) => ch,
+      ).connectWebSocket('wss://api.dev/socket');
+      final frames = <RealtimeFrame>[];
+      conn.frames.listen(frames.add);
+      await Future<void>.delayed(Duration.zero);
+      await conn.close();
+      return frames;
+    }
+
+    test(
+      'an abnormal close surfaces code + reason on an ERROR frame so a '
+      '1008 auth drop does not render like a clean disconnect',
+      () async {
+        final frames = await framesAfterDone(
+          closingChannel(closeCode: 1008, closeReason: 'auth token expired'),
+        );
+
+        final last = frames.last;
+        expect(last.direction, RealtimeDirection.error);
+        expect(last.text, 'Disconnected (1008): auth token expired');
+      },
+    );
+
+    test(
+      'a normal 1000 close keeps the close direction with the code',
+      () async {
+        final frames = await framesAfterDone(
+          closingChannel(closeCode: 1000, closeReason: 'bye'),
+        );
+
+        final last = frames.last;
+        expect(last.direction, RealtimeDirection.close);
+        expect(last.text, 'Disconnected (1000): bye');
+      },
+    );
+
+    test(
+      'a 1005 no-status close stays a close frame without a reason suffix',
+      () async {
+        final frames = await framesAfterDone(closingChannel(closeCode: 1005));
+
+        final last = frames.last;
+        expect(last.direction, RealtimeDirection.close);
+        expect(last.text, 'Disconnected (1005)');
+      },
+    );
+
+    test(
+      'a null close code (handshake never completed) keeps the bare '
+      'Disconnected close frame',
+      () async {
+        final frames = await framesAfterDone(closingChannel());
+
+        final last = frames.last;
+        expect(last.direction, RealtimeDirection.close);
+        expect(last.text, 'Disconnected');
+      },
+    );
+
+    test(
+      'an abnormal close with an empty reason still carries the code',
+      () async {
+        final frames = await framesAfterDone(
+          closingChannel(closeCode: 1006, closeReason: ''),
+        );
+
+        final last = frames.last;
+        expect(last.direction, RealtimeDirection.error);
+        expect(last.text, 'Disconnected (1006)');
+      },
+    );
+  });
+
+  group('WebSocket network config plumbing', () {
+    _MockWsChannel stubbedChannel() {
+      final sink = _MockWsSink();
+      final channel = _MockWsChannel();
+      when(
+        () => channel.stream,
+      ).thenAnswer((_) => const Stream<dynamic>.empty());
+      when(() => channel.sink).thenReturn(sink);
+      when(sink.close).thenAnswer((_) async {});
+      return channel;
+    }
+
+    test(
+      'connectWebSocket passes the last-applied NetworkConfig to the '
+      'factory so wss:// honors SSL/proxy/mTLS like https://',
+      () async {
+        NetworkConfig? seen;
+        final channel = stubbedChannel();
+        final service = RealtimeService(
+          dio: RealtimeService.buildSseDio(NetworkConfig.defaults),
+          webSocketFactory: (uri, headers, config) {
+            seen = config;
+            return channel;
+          },
+        );
+        const custom = NetworkConfig(
+          verifySsl: false,
+          proxyUrl: 'localhost:8080',
+          clientCertPath: '/certs/client.pem',
+          clientKeyPath: '/certs/client.key',
+        );
+
+        service.applyConfig(custom);
+        final conn = service.connectWebSocket('wss://api.dev/socket');
+
+        expect(seen, same(custom));
+        await conn.close();
+      },
+    );
+
+    test(
+      'a timeout-only applyConfig (adapter early-return path) still reaches '
+      'the next WebSocket connect',
+      () async {
+        NetworkConfig? seen;
+        final channel = stubbedChannel();
+        final service =
+            RealtimeService(
+                dio: RealtimeService.buildSseDio(NetworkConfig.defaults),
+                webSocketFactory: (uri, headers, config) {
+                  seen = config;
+                  return channel;
+                },
+              )
+              // Second call changes only the timeout: same adapter fields, so
+              // applyConfig early-returns before the swap — but the WS connect
+              // config must still pick up the new timeout.
+              ..applyConfig(NetworkConfig.defaults)
+              ..applyConfig(const NetworkConfig(connectTimeoutMs: 1234));
+        final conn = service.connectWebSocket('wss://api.dev/socket');
+
+        expect(seen?.connectTimeoutMs, 1234);
+        await conn.close();
+      },
+    );
+
+    test(
+      'before any applyConfig, connects use the config the injected SSE Dio '
+      'was built with (DI boot path — the settings listener only fires on '
+      'changes)',
+      () async {
+        NetworkConfig? seen;
+        final channel = stubbedChannel();
+        const bootConfig = NetworkConfig(verifySsl: false);
+        final service = RealtimeService(
+          dio: RealtimeService.buildSseDio(bootConfig),
+          webSocketFactory: (uri, headers, config) {
+            seen = config;
+            return channel;
+          },
+        );
+
+        final conn = service.connectWebSocket('wss://api.dev/socket');
+
+        expect(seen, same(bootConfig));
+        await conn.close();
       },
     );
   });

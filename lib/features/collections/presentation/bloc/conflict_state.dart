@@ -14,6 +14,7 @@ class ConflictState extends Equatable {
     this.conflicts = const [],
     this.batch = 0,
     this.errorMessage,
+    this.editsStashed = false,
   });
 
   final ConflictStatus status;
@@ -27,6 +28,13 @@ class ConflictState extends Equatable {
 
   final String? errorMessage;
 
+  /// Only meaningful with [ConflictStatus.done]: the rebase finished but the
+  /// user's uncommitted edits (the pull's autostash) conflicted on re-apply
+  /// and were kept in `stash@{0}` (`RebaseStep.doneEditsStashed`) — the
+  /// dialog tells the user where their edits went instead of a plain
+  /// "Conflicts resolved."
+  final bool editsStashed;
+
   bool get isBusy =>
       status == ConflictStatus.loading || status == ConflictStatus.resolving;
 
@@ -35,6 +43,7 @@ class ConflictState extends Equatable {
     List<FileConflict>? conflicts,
     int? batch,
     String? errorMessage,
+    bool? editsStashed,
   }) {
     final next = status ?? this.status;
     return ConflictState(
@@ -45,9 +54,17 @@ class ConflictState extends Equatable {
       errorMessage: next == ConflictStatus.error
           ? (errorMessage ?? this.errorMessage)
           : null,
+      // Same idea: the flag only survives into a done state.
+      editsStashed: next == ConflictStatus.done && (editsStashed ?? false),
     );
   }
 
   @override
-  List<Object?> get props => [status, conflicts, batch, errorMessage];
+  List<Object?> get props => [
+    status,
+    conflicts,
+    batch,
+    errorMessage,
+    editsStashed,
+  ];
 }

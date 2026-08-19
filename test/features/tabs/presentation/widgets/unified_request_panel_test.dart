@@ -38,6 +38,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_section_index.dart';
+import 'package:getman/features/tabs/presentation/widgets/response_area.dart';
 import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
@@ -68,6 +69,9 @@ class _FakeRules extends Fake implements RequestRulesEntity {}
 class _FakeCollectionsBloc extends Bloc<CollectionsEvent, CollectionsState>
     implements CollectionsBloc {
   _FakeCollectionsBloc() : super(CollectionsState());
+
+  @override
+  Future<void> flushPendingSaves() async {}
 }
 
 class _FakeHistoryBloc extends Bloc<HistoryEvent, HistoryState>
@@ -85,6 +89,9 @@ class _FakeTabsBloc extends Bloc<TabsEvent, TabsState> implements TabsBloc {
 
   @override
   bool get canReopenClosedTab => false;
+
+  @override
+  Future<void> flushPendingSaves() async {}
 }
 
 SettingsBloc _settingsBloc() {
@@ -270,6 +277,92 @@ void main() {
         5,
         reason: 'a real completed send must still auto-jump to RESPONSE',
       );
+    },
+  );
+
+  testWidgets(
+    'send completing while the panel is OFFSTAGE still lands on RESPONSE, '
+    'correct on the first frame back on stage',
+    (tester) async {
+      final tabsBloc = _FakeTabsBloc(
+        TabsState(tabs: [tabWith(isSending: false)]),
+      );
+      addTearDown(tabsBloc.close);
+      final rulesBloc = _rulesBloc(tabId);
+      addTearDown(rulesBloc.close);
+      final bodyController = CodeLineEditingController();
+      addTearDown(bodyController.dispose);
+      final variablesController = CodeLineEditingController();
+      addTearDown(variablesController.dispose);
+      final responseController = CodeLineEditingController();
+      addTearDown(responseController.dispose);
+
+      // Mimics TabContentStack: the panel stays alive offstage with muted
+      // tickers while the user is on another request tab.
+      Widget page({required bool onStage}) => MaterialApp(
+        theme: brutalistTheme(Brightness.light),
+        home: Scaffold(
+          body: MultiBlocProvider(
+            providers: [
+              BlocProvider<TabsBloc>.value(value: tabsBloc),
+              BlocProvider<SettingsBloc>(create: (_) => _settingsBloc()),
+              BlocProvider<EnvironmentsBloc>(
+                create: (_) => _environmentsBloc(),
+              ),
+              BlocProvider<CollectionsBloc>(
+                create: (_) => _FakeCollectionsBloc(),
+              ),
+              BlocProvider<HistoryBloc>(create: (_) => _FakeHistoryBloc()),
+              BlocProvider<RulesBloc>.value(value: rulesBloc),
+            ],
+            child: ChangeNotifierProvider<RequestSectionIndex>(
+              create: (_) => RequestSectionIndex(),
+              child: Offstage(
+                offstage: !onStage,
+                child: TickerMode(
+                  enabled: onStage,
+                  child: UnifiedRequestPanel(
+                    tabId: tabId,
+                    bodyController: bodyController,
+                    variablesController: variablesController,
+                    responseController: responseController,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(page(onStage: true));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 300)),
+      );
+      await tester.pumpAndSettle();
+      expect(tabControllerIndex(tester), 0, reason: 'starts on PARAMS');
+
+      // User switches to another request tab mid-send.
+      await tester.pumpWidget(page(onStage: false));
+      await tester.pump();
+
+      tabsBloc.push(TabsState(tabs: [tabWith(isSending: true)]));
+      await tester.pump();
+      tabsBloc.push(
+        TabsState(tabs: [tabWith(isSending: false, response: respA)]),
+      );
+      await tester.pump();
+
+      // Back on stage: the FIRST frame must already show the RESPONSE tab —
+      // no stalled mid-warp content from the muted-ticker period.
+      await tester.pumpWidget(page(onStage: true));
+      await tester.pump();
+
+      expect(tabControllerIndex(tester), 5);
+      expect(find.byType(ResponseArea).hitTestable(), findsOneWidget);
+
+      // Drain the theme's one-shot status-reaction timers so the test binding
+      // ends with no pending timers (assertions above already ran first-frame).
+      await tester.pumpAndSettle();
     },
   );
 }

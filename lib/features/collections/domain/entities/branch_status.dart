@@ -23,6 +23,7 @@ class BranchStatus extends Equatable {
     this.behind = 0,
     this.hasRemote = false,
     this.stashes = const [],
+    this.rebaseInProgress = false,
   });
 
   /// Nothing to show: not a repo (or git is unavailable).
@@ -36,6 +37,14 @@ class BranchStatus extends Equatable {
   final bool hasRemote;
   final List<StashInfo> stashes;
 
+  /// A rebase is paused mid-conflict (e.g. a pull halted on conflicts).
+  /// Durable — re-read from the repo on every status load — unlike the
+  /// edge-delivered `GitSyncState.conflictToken` bump, which is lost when the
+  /// branch chip is unmounted (or the app restarts) at bump time. While true,
+  /// HEAD is typically detached ([current] is null), so this flag is what
+  /// keeps the chip rendered with a path back into the conflict resolver.
+  final bool rebaseInProgress;
+
   int get stashCount => stashes.length;
 
   @override
@@ -47,5 +56,6 @@ class BranchStatus extends Equatable {
     behind,
     hasRemote,
     stashes,
+    rebaseInProgress,
   ];
 }

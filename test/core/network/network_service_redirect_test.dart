@@ -231,6 +231,38 @@ void main() {
     expect(_headerValue(h.adapter.requests[1], 'authorization'), isNull);
   });
 
+  test('a cross-host redirect strips a user-typed Cookie header too '
+      '(dart:io nonRedirectHeaders parity)', () async {
+    final h = _harness([
+      _Hop(302, location: 'https://tracker.other.dev/x'),
+      _Hop(200, body: 'ok'),
+    ]);
+
+    await h.svc.request(
+      url: 'https://api.dev/data',
+      method: 'GET',
+      headers: {'Cookie': 'session=SECRET'},
+    );
+
+    expect(h.adapter.requests[1].uri.host, 'tracker.other.dev');
+    expect(_headerValue(h.adapter.requests[1], 'cookie'), isNull);
+  });
+
+  test('a same-host redirect keeps a user-typed Cookie header', () async {
+    final h = _harness([
+      _Hop(302, location: 'https://api.dev/x'),
+      _Hop(200, body: 'ok'),
+    ]);
+
+    await h.svc.request(
+      url: 'https://api.dev/data',
+      method: 'GET',
+      headers: {'Cookie': 'session=SECRET'},
+    );
+
+    expect(_headerValue(h.adapter.requests[1], 'cookie'), 'session=SECRET');
+  });
+
   test('a same-host redirect keeps the Authorization header', () async {
     final h = _harness([
       _Hop(302, location: 'https://api.dev/x'),

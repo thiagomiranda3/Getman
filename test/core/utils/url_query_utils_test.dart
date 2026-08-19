@@ -78,6 +78,36 @@ void main() {
       ]);
     });
 
+    test('preserves {{var}} tokens with spaces/@ in the name '
+        '(resolver-grammar parity)', () {
+      final parts = UrlQueryUtils.parse('https://x/a?q={{api key}}');
+      expect(parts.params, [
+        const QueryParamEntity(key: 'q', value: '{{api key}}'),
+      ]);
+      expect(
+        UrlQueryUtils.replaceQuery('https://x/a?q={{api key}}', parts.params),
+        'https://x/a?q={{api key}}',
+        reason: 'a params-row edit must never percent-mangle a wide token',
+      );
+    });
+
+    test('decodes + as space (form-encoding convention) and %2B as a '
+        'literal plus, round-tripping the wire semantics', () {
+      final parts = UrlQueryUtils.parse('https://x/a?q=hello+world&p=a%2Bb');
+      expect(parts.params, [
+        const QueryParamEntity(key: 'q', value: 'hello world'),
+        const QueryParamEntity(key: 'p', value: 'a+b'),
+      ]);
+      // Re-encoding keeps the semantics: space stays a space (%20), a
+      // literal plus stays %2B — never the reverse.
+      expect(
+        UrlQueryUtils.replaceQuery('https://x/a?q=hello+world&p=a%2Bb', [
+          ...parts.params,
+        ]),
+        'https://x/a?q=hello%20world&p=a%2Bb',
+      );
+    });
+
     test('only splits on the first ? and first # after it', () {
       final parts = UrlQueryUtils.parse('https://x/a?a=1&b=?=2#frag#tail');
       expect(parts.base, 'https://x/a');

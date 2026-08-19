@@ -10,10 +10,12 @@ void main() {
     AuthConfig auth, {
     Map<String, String>? headers,
     String Function(String)? resolve,
+    bool Function(String)? hasQueryParam,
   }) => resolveAuthApplication(
     auth: auth,
     currentHeaders: headers ?? <String, String>{},
     resolve: resolve ?? identity,
+    hasQueryParam: hasQueryParam ?? (_) => false,
   );
 
   group('none / inherit', () {
@@ -124,6 +126,55 @@ void main() {
       expect(app.headers, isEmpty);
       expect(app.queryParam?.key, 'token');
       expect(app.queryParam?.value, 'secret');
+    });
+
+    test('query location skips when a same-name param already exists', () {
+      // The query mirror of the header skip-if-set: a hand-written param wins
+      // over the AUTH tab instead of shipping two conflicting credentials.
+      final app = apply(
+        const AuthConfig(
+          type: AuthType.apiKey,
+          apiKeyName: 'token',
+          apiKeyValue: 'secret',
+          apiKeyLocation: ApiKeyLocation.query,
+        ),
+        hasQueryParam: (name) => name == 'token',
+      );
+      expect(app.headers, isEmpty);
+      expect(app.queryParam, isNull);
+    });
+
+    test('query-param existence check is exact-name (case-sensitive)', () {
+      // Query params are case-sensitive, unlike headers: TOKEN != token.
+      final app = apply(
+        const AuthConfig(
+          type: AuthType.apiKey,
+          apiKeyName: 'token',
+          apiKeyValue: 'secret',
+          apiKeyLocation: ApiKeyLocation.query,
+        ),
+        hasQueryParam: (name) => name == 'TOKEN',
+      );
+      expect(app.queryParam?.key, 'token');
+    });
+
+    test('checks the RESOLVED name against existing query params', () {
+      final probed = <String>[];
+      final app = apply(
+        const AuthConfig(
+          type: AuthType.apiKey,
+          apiKeyName: '{{n}}',
+          apiKeyValue: 'v',
+          apiKeyLocation: ApiKeyLocation.query,
+        ),
+        resolve: (s) => s == '{{n}}' ? 'api_key' : s,
+        hasQueryParam: (name) {
+          probed.add(name);
+          return true;
+        },
+      );
+      expect(probed, ['api_key']);
+      expect(app.queryParam, isNull);
     });
 
     test('skips entirely when the name resolves empty', () {

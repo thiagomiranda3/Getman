@@ -6,6 +6,9 @@
 // The C2 toolbar (filter + expand/collapse-all) lives in _buildToolbar;
 // filtering unions filter.ancestorPaths into the effective expansion without
 // mutating the user's own _expanded set.
+// The flatten pass never recurses past kTreeMaxDepth (stack-overflow guard,
+// shared with json_tree_filter.dart's walks): content below the cap renders
+// as a single "[nested too deep — N more levels]" leaf.
 import 'dart:async';
 import 'dart:convert';
 
@@ -27,6 +30,7 @@ class JsonTreeView extends StatefulWidget {
     required this.data,
     this.onExtract,
     this.filterFocusNode,
+    @visibleForTesting this.maxDepth = kTreeMaxDepth,
     super.key,
   });
 
@@ -40,6 +44,12 @@ class JsonTreeView extends StatefulWidget {
   /// the body mode is TREE. Owned (created/disposed) by the caller.
   final FocusNode? filterFocusNode;
 
+  /// Recursion ceiling threaded into every walk (flatten / filter /
+  /// expand-all planning). Production always uses [kTreeMaxDepth]; tests
+  /// override it so the "[nested too deep]" marker is reachable on a
+  /// shallow, cheap fixture.
+  final int maxDepth;
+
   @override
   State<JsonTreeView> createState() => _JsonTreeViewState();
 }
@@ -51,6 +61,7 @@ class JsonTreeNode {
     required this.label,
     required this.value,
     required this.depth,
+    this.isDepthTruncation = false,
   });
 
   final String path;
@@ -58,16 +69,65 @@ class JsonTreeNode {
   final Object? value;
   final int depth;
 
+  /// True for the synthetic "[nested too deep — N more levels]" leaf emitted
+  /// in place of content past the depth cap (see [kTreeMaxDepth]). Its
+  /// [path] is not a JSONPath and it carries no value, so the row renders
+  /// without a preview or an actions menu.
+  final bool isDepthTruncation;
+
   bool get isContainer => value is Map || value is List;
 
   /// Compact preview shown to the right of the key.
   String get preview {
+    if (isDepthTruncation) return '';
     final v = value;
     if (v is Map) return '{ ${v.length} }';
     if (v is List) return '[ ${v.length} ]';
     if (v is String) return '"$v"';
     return v == null ? 'null' : v.toString();
   }
+}
+
+/// Max nesting depth of [root]'s subtree, walked with an explicit stack so
+/// the measurement itself can't overflow — feeds the "N more levels" count
+/// in the depth-truncation marker. Direct children are 1 level below.
+int _levelsBelow(Object? root) {
+  var deepest = 0;
+  final stack = <(Object?, int)>[(root, 0)];
+  while (stack.isNotEmpty) {
+    final (value, depth) = stack.removeLast();
+    final children = value is Map
+        ? value.values
+        : value is List
+        ? value
+        : const <Object?>[];
+    for (final child in children) {
+      if (depth + 1 > deepest) deepest = depth + 1;
+      if (child is Map || child is List) stack.add((child, depth + 1));
+    }
+  }
+  return deepest;
+}
+
+/// The single leaf emitted in place of [parent]'s children when they would
+/// render past the depth cap. The synthetic `#truncated` path suffix keeps
+/// the row id unique per truncated container without colliding with any
+/// JSONPath the builder can produce.
+JsonTreeNode _depthTruncationNode(
+  String parentPath,
+  Object? parent,
+  int depth,
+) {
+  final levels = _levelsBelow(parent);
+  return JsonTreeNode(
+    path: '$parentPath#truncated',
+    label: levels == 1
+        ? '[nested too deep — 1 more level]'
+        : '[nested too deep — $levels more levels]',
+    value: null,
+    depth: depth,
+    isDepthTruncation: true,
+  );
 }
 
 /// Flattens [data] into the visible row list given the set of [expanded] paths.
@@ -78,10 +138,16 @@ class JsonTreeNode {
 /// When [filter] is non-null, only kept rows are emitted: matched nodes, their
 /// ancestors, and descendants of matched nodes (so an expanded matched
 /// container still shows its children).
+///
+/// Recursion never descends past [maxDepth] (default [kTreeMaxDepth], the
+/// stack-overflow guard): an expanded container whose children would render
+/// past the cap gets a single "[nested too deep — N more levels]" leaf
+/// instead.
 List<JsonTreeNode> flattenVisibleJsonTree({
   required Object? data,
   required Set<String> expanded,
   JsonTreeFilterResult? filter,
+  int maxDepth = kTreeMaxDepth,
 }) {
   final out = <JsonTreeNode>[];
 
@@ -100,6 +166,15 @@ List<JsonTreeNode> flattenVisibleJsonTree({
     if (!kept) return;
     out.add(JsonTreeNode(path: path, label: label, value: value, depth: depth));
     if (!expanded.contains(path)) return;
+    final hasChildren = value is Map
+        ? value.isNotEmpty
+        : value is List && value.isNotEmpty;
+    if (hasChildren && depth + 1 >= maxDepth) {
+      // Depth guard (kTreeMaxDepth): don't recurse — stand in for the whole
+      // subtree with one marker leaf.
+      out.add(_depthTruncationNode(path, value, depth + 1));
+      return;
+    }
     final childUnderMatch =
         underMatch || (filter?.matchedPaths.contains(path) ?? false);
     if (value is Map) {
@@ -215,15 +290,31 @@ class _JsonTreeViewState extends State<JsonTreeView> {
       // Re-run the live filter against the new data instance.
       _filter = _filterQuery.text.trim().isEmpty
           ? null
-          : filterJsonTree(data: widget.data, query: _filterQuery.text);
+          : filterJsonTree(
+              data: widget.data,
+              query: _filterQuery.text,
+              maxDepth: widget.maxDepth,
+            );
     }
   }
 
+  /// Last filter text acted on — a TextEditingController also notifies on
+  /// SELECTION-only changes (clicking back into the field to refine the
+  /// query), which must not clear the collapse overrides or re-run the
+  /// filter: only an actual text change starts a new filter session.
+  String? _lastFilterText;
+
   void _onFilterChanged() {
+    if (_filterQuery.text == _lastFilterText) return;
+    _lastFilterText = _filterQuery.text;
     setState(() {
       final next = _filterQuery.text.trim().isEmpty
           ? null
-          : filterJsonTree(data: widget.data, query: _filterQuery.text);
+          : filterJsonTree(
+              data: widget.data,
+              query: _filterQuery.text,
+              maxDepth: widget.maxDepth,
+            );
       // The override layer is scoped to "the currently active filter" — ANY
       // query change (including to a different non-empty query, not just to
       // empty) starts a new filter session, so overrides from the previous
@@ -237,7 +328,7 @@ class _JsonTreeViewState extends State<JsonTreeView> {
   }
 
   void _expandAll() {
-    final plan = planExpandAll(data: widget.data);
+    final plan = planExpandAll(data: widget.data, maxDepth: widget.maxDepth);
     setState(() {
       _expanded
         ..clear()
@@ -333,6 +424,7 @@ class _JsonTreeViewState extends State<JsonTreeView> {
       data: widget.data,
       expanded: effectiveExpanded,
       filter: filter,
+      maxDepth: widget.maxDepth,
     );
 
     return ColoredBox(
@@ -507,45 +599,48 @@ class _TreeRowState extends State<_TreeRow> {
                   ),
                 ),
               ),
-              AnimatedOpacity(
-                opacity: _hovered ? 1 : 0.25,
-                duration: const Duration(milliseconds: 120),
-                child: PopupMenuButton<String>(
-                  key: ValueKey('tree_menu_${node.path}'),
-                  tooltip: 'Node actions',
-                  icon: Icon(
-                    Icons.more_vert,
-                    size: layout.iconSize,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                  padding: EdgeInsets.zero,
-                  onSelected: (action) {
-                    switch (action) {
-                      case 'value':
-                        widget.onCopyValue();
-                      case 'path':
-                        widget.onCopyPath();
-                      case 'extract':
-                        widget.onExtract?.call();
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'value',
-                      child: Text('Copy value'),
+              // The depth-truncation marker is informational only: it has no
+              // value to copy and no JSONPath, so it gets no actions menu.
+              if (!node.isDepthTruncation)
+                AnimatedOpacity(
+                  opacity: _hovered ? 1 : 0.25,
+                  duration: const Duration(milliseconds: 120),
+                  child: PopupMenuButton<String>(
+                    key: ValueKey('tree_menu_${node.path}'),
+                    tooltip: 'Node actions',
+                    icon: Icon(
+                      Icons.more_vert,
+                      size: layout.iconSize,
+                      color: theme.colorScheme.onSurface,
                     ),
-                    const PopupMenuItem(
-                      value: 'path',
-                      child: Text('Copy path'),
-                    ),
-                    if (widget.onExtract != null)
+                    padding: EdgeInsets.zero,
+                    onSelected: (action) {
+                      switch (action) {
+                        case 'value':
+                          widget.onCopyValue();
+                        case 'path':
+                          widget.onCopyPath();
+                        case 'extract':
+                          widget.onExtract?.call();
+                      }
+                    },
+                    itemBuilder: (context) => [
                       const PopupMenuItem(
-                        value: 'extract',
-                        child: Text('Extract to {{var}}'),
+                        value: 'value',
+                        child: Text('Copy value'),
                       ),
-                  ],
+                      const PopupMenuItem(
+                        value: 'path',
+                        child: Text('Copy path'),
+                      ),
+                      if (widget.onExtract != null)
+                        const PopupMenuItem(
+                          value: 'extract',
+                          child: Text('Extract to {{var}}'),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),

@@ -8,6 +8,7 @@ import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 
 /// What kind of value a [FieldConflict] carries. `scalar`/`mapEntry` show the
@@ -103,6 +104,14 @@ class ThreeWayMerge {
       yours?.isFavorite,
       (v) => '${v ?? false}',
     );
+    final description = _pick(
+      conflicts,
+      'description',
+      base?.description,
+      incoming?.description,
+      yours?.description,
+      (v) => v ?? '',
+    );
     final mergedConfig = _mergeConfig(
       conflicts,
       base?.config,
@@ -113,6 +122,10 @@ class ThreeWayMerge {
     final merged = skeleton.copyWith(
       name: name,
       isFavorite: isFavorite,
+      // copyWith's `??` cannot clear a field, so a picked deletion (null) is
+      // normalized to '' — the serializer omits empty descriptions, making
+      // null and '' the same "no description" on the wire.
+      description: description ?? '',
       config: mergedConfig,
     );
     return NodeMergeResult(merged: merged, conflicts: conflicts);
@@ -155,6 +168,14 @@ class ThreeWayMerge {
       yours?.isFavorite,
       (v) => '${v ?? false}',
     );
+    final description = _pick(
+      conflicts,
+      'description',
+      base?.description,
+      incoming?.description,
+      yours?.description,
+      (v) => v ?? '',
+    );
     final variables = _mergeMap(
       conflicts,
       'variable',
@@ -183,6 +204,8 @@ class ThreeWayMerge {
     final merged = skeleton.copyWith(
       name: name,
       isFavorite: isFavorite,
+      // See mergeRequest: '' (not null) so a picked deletion actually clears.
+      description: description ?? '',
       variables: variables,
       secretKeys: secretKeys,
     );
@@ -212,6 +235,17 @@ class ThreeWayMerge {
       base?.url,
       incoming?.url,
       yours?.url,
+      (v) => v ?? '',
+    );
+    // `kind` is persisted as the enum's NAME (the serializer's git-friendly
+    // wire form, omitted when http), so it merges as a scalar over that name
+    // — the same shape as bodyType over its wire string.
+    final kindName = _pick(
+      conflicts,
+      'kind',
+      base?.kind.name,
+      incoming?.kind.name,
+      yours?.kind.name,
       (v) => v ?? '',
     );
     final bodyTypeWire = _pick(
@@ -285,6 +319,11 @@ class ThreeWayMerge {
       body: body,
       auth: auth,
       bodyType: BodyType.fromWire(bodyTypeWire),
+      // Lenient, like the serializer: unknown/blank names read as http (the
+      // same default as an absent `kind` key on disk).
+      kind:
+          RequestKind.values.firstWhereOrNull((k) => k.name == kindName) ??
+          RequestKind.http,
       formFields: formFields,
       bodyFilePath: bodyFilePath,
       graphqlVariables: graphqlVariables,

@@ -320,6 +320,107 @@ void main() {
     },
   );
 
+  test(
+    'flushPending drains a write chained onto the tail DURING its own '
+    'await, not just the tail captured when it started',
+    () async {
+      // The A1 race: user edit arms the debounce → PULL calls flushPending →
+      // W1 starts (slow) → a second edit's debounce fires mid-flush and
+      // chains W2. The old single-await flushPending resolved after W1 only,
+      // certifying the tree while W2 was still queued to write the pre-pull
+      // forest over whatever git checked out.
+      final completerA = Completer<void>();
+      final completerB = Completer<void>();
+      final completers = [completerA, completerB];
+      var started = 0;
+      final done = <int>[];
+      when(() => ds.write(any(), any())).thenAnswer((_) {
+        started++;
+        final id = started;
+        return completers.removeAt(0).future.then((_) => done.add(id));
+      });
+      final service = WorkspaceSyncService(
+        ds,
+        debounce: const Duration(milliseconds: 5),
+      );
+      addTearDown(service.dispose);
+
+      // Arm the debounce, then flush: W1 starts and stays in flight.
+      service.scheduleMirror('/ws', const []);
+      var resolved = false;
+      final flush = service.flushPending();
+      unawaited(flush.then((_) => resolved = true));
+      await pumpEventQueue();
+      expect(started, 1);
+
+      // Second edit lands while flushPending awaits W1; its debounce fires
+      // (W1 is slower than the debounce) and chains W2 onto the tail.
+      service.scheduleMirror('/ws', const []);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(started, 1, reason: 'W2 must be chained behind W1, not started');
+      expect(resolved, isFalse);
+
+      // W1 completes. This is exactly where the buggy flushPending resolved.
+      completerA.complete();
+      await pumpEventQueue();
+      expect(started, 2, reason: 'W2 starts once W1 lands');
+      expect(
+        resolved,
+        isFalse,
+        reason: 'flushPending must also await the write chained mid-flush',
+      );
+
+      completerB.complete();
+      await flush;
+      expect(resolved, isTrue);
+      expect(done, [1, 2], reason: 'both writes landed, in order');
+      verify(() => ds.write('/ws', any())).called(2);
+    },
+  );
+
+  test(
+    'a chained write that reaches its turn while mirroring is suspended is '
+    'dropped — no disk write, and flushPending is not poisoned',
+    () async {
+      final completerA = Completer<void>();
+      var writes = 0;
+      when(() => ds.write(any(), any())).thenAnswer((_) {
+        writes++;
+        return writes == 1 ? completerA.future : Future<void>.value();
+      });
+      final service = WorkspaceSyncService(
+        ds,
+        debounce: const Duration(milliseconds: 5),
+      );
+      addTearDown(service.dispose);
+
+      // W1 starts and stays in flight; W2 chains behind it.
+      service.scheduleMirror('/ws', const []);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(writes, 1);
+      service.scheduleMirror('/ws', const []);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(writes, 1, reason: 'W2 queued behind W1, not started');
+
+      // The git op suspends mirroring while W2 is still queued — the window
+      // the schedule-time check in scheduleMirror cannot see. When W1 lands
+      // and W2's turn comes, its forest predates the git op: it must be
+      // dropped at execution time, never written.
+      service.suspendMirroring();
+      completerA.complete();
+      await pumpEventQueue();
+      expect(writes, 1, reason: 'the suspended W2 must not touch disk');
+      verify(() => ds.write('/ws', any())).called(1);
+
+      // Dropping a suspended write is not a failure: the tree belongs to
+      // git now, so flushPending must still certify it.
+      expect(await service.flushPending(), isTrue);
+      expect(writes, 1);
+
+      service.resumeMirroring();
+    },
+  );
+
   test('overlapping writes are serialized, never run concurrently', () async {
     final completerA = Completer<void>();
     final callOrder = <String>[];
@@ -456,6 +557,68 @@ void main() {
       service.scheduleMirror('/ws', const []);
       await Future<void>.delayed(const Duration(milliseconds: 20));
       verify(() => ds.write('/ws', any())).called(1);
+    });
+  });
+
+  group('a failed reload blocks mirroring for that root', () {
+    WorkspaceSyncService build() {
+      final service = WorkspaceSyncService(
+        ds,
+        debounce: const Duration(milliseconds: 5),
+      );
+      addTearDown(service.dispose);
+      return service;
+    }
+
+    test(
+      'scheduleMirror never writes after a failed read — even once the '
+      'debounce elapses (disk holds state Hive could not load)',
+      () async {
+        when(() => ds.read('/ws')).thenThrow(Exception('malformed req'));
+        final service = build();
+
+        await expectLater(service.read('/ws'), throwsException);
+        expect(service.isReloadBlocked('/ws'), isTrue);
+
+        // Mirroring the stale in-memory forest here would silently revert
+        // the files git just changed on disk.
+        service.scheduleMirror('/ws', const []);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        verifyNever(() => ds.write(any(), any()));
+      },
+    );
+
+    test(
+      'a later successful read clears the block and mirroring resumes',
+      () async {
+        when(() => ds.read('/ws')).thenThrow(Exception('malformed req'));
+        final service = build();
+        await expectLater(service.read('/ws'), throwsException);
+        expect(service.isReloadBlocked('/ws'), isTrue);
+
+        when(() => ds.read('/ws')).thenAnswer((_) async => const []);
+        await service.read('/ws');
+        expect(service.isReloadBlocked('/ws'), isFalse);
+
+        service.scheduleMirror('/ws', const []);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        verify(() => ds.write('/ws', any())).called(1);
+      },
+    );
+
+    test('the block is root-scoped: a different root still mirrors', () async {
+      when(() => ds.read('/ws')).thenThrow(Exception('malformed req'));
+      final service = build();
+      await expectLater(service.read('/ws'), throwsException);
+
+      expect(service.isReloadBlocked('/other'), isFalse);
+      service.scheduleMirror('/other', const []);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      verify(() => ds.write('/other', any())).called(1);
+      verifyNever(() => ds.write('/ws', any()));
     });
   });
 }

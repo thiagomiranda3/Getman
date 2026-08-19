@@ -34,4 +34,31 @@ void main() {
       expect(tabs.byId('ghost'), isNull);
     });
   });
+
+  group('viewedHistoryEntryId', () {
+    test('defaults to null (viewing latest) and participates in props', () {
+      final base = tab();
+      expect(base.viewedHistoryEntryId, isNull);
+      // Same tab differing ONLY by viewedHistoryEntryId must not be equal —
+      // this inequality is what keeps a time-travel emission between
+      // value-equal responses from being suppressed (G2).
+      expect(base, isNot(base.copyWith(viewedHistoryEntryId: 'e1')));
+      expect(
+        base.copyWith(viewedHistoryEntryId: 'e1'),
+        base.copyWith(viewedHistoryEntryId: 'e1'),
+      );
+    });
+
+    test('copyWith sets, keeps, and explicitly clears it', () {
+      final viewing = tab().copyWith(viewedHistoryEntryId: 'e1');
+      expect(viewing.viewedHistoryEntryId, 'e1');
+      // Omitted -> unchanged (the _unset sentinel, same as response).
+      expect(viewing.copyWith(isSending: true).viewedHistoryEntryId, 'e1');
+      // Explicit null -> cleared (back to viewing the latest response).
+      expect(
+        viewing.copyWith(viewedHistoryEntryId: null).viewedHistoryEntryId,
+        isNull,
+      );
+    });
+  });
 }

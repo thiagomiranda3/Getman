@@ -112,6 +112,22 @@ void main() {
       expect(const ReorderTabs(1, 2), isNot(const ReorderTabs(0, 2)));
       expect(const ReorderTabs(1, 2), isNot(const ReorderTabs(1, 3)));
     });
+
+    test('panelId participates in props and defaults to null', () {
+      expect(const ReorderTabs(1, 2).panelId, isNull);
+      expect(
+        const ReorderTabs(1, 2, panelId: 'p1'),
+        const ReorderTabs(1, 2, panelId: 'p1'),
+      );
+      expect(
+        const ReorderTabs(1, 2, panelId: 'p1'),
+        isNot(const ReorderTabs(1, 2, panelId: 'p2')),
+      );
+      expect(
+        const ReorderTabs(1, 2, panelId: 'p1'),
+        isNot(const ReorderTabs(1, 2)),
+      );
+    });
   });
 
   group('UpdateTab', () {

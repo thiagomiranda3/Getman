@@ -3,6 +3,14 @@
 // stored security-scoped bookmark. Lives in the collections feature (it
 // coordinates CollectionsBloc + WorkspaceSyncService); the settings dialog
 // just embeds it. Desktop/mobile only.
+//
+// Gotcha: CHOOSE FOLDER and RELOAD FROM DISK follow the same flush →
+// suspended-read discipline as GitBranchService/BranchSyncListener:
+// flushPending() first (abort on false — disk is stale), then the disk read
+// and any ReplaceCollections dispatch inside withMirroringSuspended, so a
+// debounced/in-flight mirror write can't race the directory walk and the
+// freshly imported forest isn't immediately mirrored back over files the
+// user may have just hand-edited.
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -137,9 +145,33 @@ class WorkspaceSettingsTile extends StatelessWidget {
     final settings = context.read<SettingsBloc>();
     final messenger = ScaffoldMessenger.of(context);
 
+    // Land any pending mirror write first: re-picking the CURRENTLY
+    // connected folder (e.g. to restore a macOS bookmark) while a
+    // debounced/in-flight write is still rewriting it would let the read
+    // below walk a half-written tree and import a mixed old/new forest.
+    // A failed flush only poisons THAT root — mirrors never target any
+    // other folder — so it aborts only when re-picking the same path.
+    // Vetoing a DIFFERENT folder would wedge the user: the flush failing
+    // usually means the old folder is unwritable, which is exactly when
+    // they need to switch away from it.
+    final flushed = await sync.flushPending();
+    final currentPath = settings.state.settings.workspacePath;
+    if (!flushed && picked.path == currentPath) {
+      showAppSnackBarVia(
+        messenger,
+        'Could not write the workspace to disk — workspace not connected. '
+        'Check the workspace folder is writable.',
+      );
+      return;
+    }
+
     List<CollectionNodeEntity> onDisk;
     try {
-      onDisk = await sync.read(picked.path);
+      // Suspended so an edit landing while `read` walks the folder cannot
+      // arm a mirror write that races the directory walk (reachable when
+      // re-picking the currently connected folder — mirrors only ever
+      // target the connected root).
+      onDisk = await sync.withMirroringSuspended(() => sync.read(picked.path));
     } on Object catch (_) {
       // A failed read must never masquerade as an empty workspace — the
       // empty-folder branch would overwrite the folder's existing content
@@ -167,18 +199,31 @@ class WorkspaceSettingsTile extends StatelessWidget {
               'REPLACE your current collections?',
           confirmLabel: 'IMPORT',
           onConfirm: () {
-            // Overlay app-only data (secret values, examples) — a no-op for
-            // a foreign folder, but reconnecting the same folder (e.g. to
-            // restore a macOS bookmark) must not wipe them.
-            collections.add(
-              ReplaceCollections(
-                CollectionsTreeHelper.overlayLocalOnly(
-                  onDisk,
-                  collections.state.collections,
-                ),
-              ),
+            // The import dispatch runs with mirroring suspended, like
+            // BranchSyncListener's post-git reload: CollectionsBloc's state
+            // change would otherwise be mirrored straight back over the
+            // files just imported — an immediate rewrite of content the
+            // user may have hand-edited on disk.
+            unawaited(
+              sync.withMirroringSuspended(() async {
+                // Overlay app-only data (secret values, examples) — a no-op
+                // for a foreign folder, but reconnecting the same folder
+                // (e.g. to restore a macOS bookmark) must not wipe them.
+                collections.add(
+                  ReplaceCollections(
+                    CollectionsTreeHelper.overlayLocalOnly(
+                      onDisk,
+                      collections.state.collections,
+                    ),
+                  ),
+                );
+                connect();
+                // Yield one event-loop turn so the suspension covers the
+                // bloc's microtask-delivered state emission — full
+                // rationale on the same yield in _reload.
+                await Future<void>.delayed(Duration.zero);
+              }),
             );
-            connect();
           },
         ),
       );
@@ -193,29 +238,65 @@ class WorkspaceSettingsTile extends StatelessWidget {
     final sync = context.read<WorkspaceSyncService>();
     final collections = context.read<CollectionsBloc>();
     final messenger = ScaffoldMessenger.of(context);
-    List<CollectionNodeEntity> onDisk;
-    try {
-      onDisk = await sync.read(path);
-    } on Object catch (_) {
-      // A failed read (e.g. one malformed .req.json) must never masquerade
-      // as an empty workspace: ReplaceCollections(const []) would wipe the
-      // in-app tree, and the next mirror would delete the files on disk too.
+    // Land any pending mirror write first, or abort: reading while a
+    // debounced/in-flight write is still rewriting the tree would import a
+    // mixed old/new forest — which the next mirror would then write back
+    // over the user's newest edit.
+    if (!await sync.flushPending()) {
       showAppSnackBarVia(
         messenger,
-        'Could not read the workspace — nothing was reloaded. '
-        'Fix or remove the malformed file and try again.',
+        'Could not write the workspace to disk — nothing was reloaded. '
+        'Check the workspace folder is writable.',
       );
       return;
     }
-    if (!context.mounted) return;
-    collections.add(
-      ReplaceCollections(
-        CollectionsTreeHelper.overlayLocalOnly(
-          onDisk,
-          collections.state.collections,
+    // The disk read + ReplaceCollections dispatch run with mirroring gated
+    // off, same as BranchSyncListener's post-git reload: an edit landing
+    // while `read` walks the workspace would arm a mirror of the pre-reload
+    // forest, and the CollectionsBloc state change below would otherwise be
+    // mirrored straight back over files the user may have just hand-edited
+    // (a reload → mirror → reload loop). A null result means nothing was
+    // replaced (failed read or torn-down tile).
+    final reloaded = await sync.withMirroringSuspended<int?>(() async {
+      final List<CollectionNodeEntity> onDisk;
+      try {
+        onDisk = await sync.read(path);
+      } on Object catch (_) {
+        // A failed read (e.g. one malformed .req.json) must never masquerade
+        // as an empty workspace: ReplaceCollections(const []) would wipe the
+        // in-app tree, and the next mirror would delete the files on disk
+        // too.
+        showAppSnackBarVia(
+          messenger,
+          'Could not read the workspace — nothing was reloaded. '
+          'Fix or remove the malformed file and try again.',
+        );
+        return null;
+      }
+      if (!context.mounted) return null;
+      collections.add(
+        ReplaceCollections(
+          CollectionsTreeHelper.overlayLocalOnly(
+            onDisk,
+            collections.state.collections,
+          ),
         ),
-      ),
-    );
-    showAppSnackBar(context, 'Reloaded ${onDisk.length} item(s) from disk');
+      );
+      // Yield one event-loop turn: the bloc delivers the event, runs the
+      // handler and notifies its state listeners over microtasks, so they
+      // have all run by the time a zero-duration timer fires. This relies
+      // on CollectionsBloc._commitNow emitting SYNCHRONOUSLY on entry
+      // (before its awaited save) — move that emit after an awaited write,
+      // or give ReplaceCollections a debounce/restartable transformer, and
+      // the yield is no longer enough to cover the emission.
+      // (Resuming a touch early would at worst re-write byte-identical
+      // files; holding the gate open on a state that never arrives would
+      // kill mirroring for the session — so this errs on the safe side
+      // deliberately.)
+      await Future<void>.delayed(Duration.zero);
+      return onDisk.length;
+    });
+    if (reloaded == null) return;
+    showAppSnackBarVia(messenger, 'Reloaded $reloaded item(s) from disk');
   }
 }

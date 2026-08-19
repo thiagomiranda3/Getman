@@ -197,6 +197,53 @@ void main() {
     });
   });
 
+  group('key (persistence identity)', () {
+    test(r'a cookie without | or \ keeps the legacy raw-join key '
+        '(persisted Hive keys must keep matching)', () {
+      const c = NetworkCookie(
+        name: 'sid',
+        value: 'abc',
+        domain: 'example.com',
+        path: '/v1',
+      );
+      expect(c.key, 'example.com|/v1|sid');
+    });
+
+    test('two cookies that raw-join to the same string get DISTINCT keys '
+        '(| is legal in cookie names and paths)', () {
+      // Raw '|' joins made both of these 'example.com|/|a|b' — the second
+      // upsert silently overwrote the first.
+      const pipeInName = NetworkCookie(
+        name: 'a|b',
+        value: '1',
+        domain: 'example.com',
+      );
+      const pipeInPath = NetworkCookie(
+        name: 'b',
+        value: '2',
+        domain: 'example.com',
+        path: '/|a',
+      );
+      expect(pipeInName.key, isNot(pipeInPath.key));
+    });
+
+    test(r'the escape char itself is escaped (injective for \p sequences)', () {
+      // Without escaping '\', a literal '\p' in one part would be
+      // indistinguishable from an escaped '|' in another.
+      const literalBackslashP = NetworkCookie(
+        name: r'a\pb',
+        value: '1',
+        domain: 'example.com',
+      );
+      const literalPipe = NetworkCookie(
+        name: 'a|b',
+        value: '2',
+        domain: 'example.com',
+      );
+      expect(literalBackslashP.key, isNot(literalPipe.key));
+    });
+  });
+
   test('isExpired honors expiresEpochMs', () {
     const session = NetworkCookie(name: 'a', value: '1', domain: 'x');
     expect(session.isExpired(99999), isFalse);

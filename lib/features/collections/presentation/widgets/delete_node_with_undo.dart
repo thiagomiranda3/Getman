@@ -3,9 +3,14 @@
 // (node_action_sheet.dart): single request nodes delete INSTANTLY with a 5s
 // UNDO snackbar; folders/collection roots keep the ConfirmDialog (bulk
 // destruction) and gain the same UNDO snackbar after. Captures the live
-// subtree + ancestor chain + sibling index BEFORE dispatching DeleteNode so
-// RestoreNodeSubtree can put everything back — restoring under the nearest
-// surviving ancestor (or root) if the parent vanishes meanwhile.
+// subtree + ancestor chain + sibling index AT DELETE TIME (inside the
+// confirm callback, right before dispatching DeleteNode — A10: the tree can
+// mutate while the confirm dialog is up via a background git-pull reload or
+// Cmd+S saving into the folder, so a dialog-open-time snapshot would make
+// UNDO silently drop those interim changes) so RestoreNodeSubtree can put
+// everything back — restoring under the nearest surviving ancestor (or root)
+// if the parent vanishes meanwhile. If the node itself vanished while the
+// dialog was open, the delete is a no-op with an informational snackbar.
 //
 // Gotcha: only the LATEST snackbar is undoable — a newer delete replaces the
 // previous snackbar (standard messenger behavior; accepted loss per spec).
@@ -33,20 +38,30 @@ void deleteNodeWithUndo(
 }) {
   final bloc = context.read<CollectionsBloc>();
   final messenger = ScaffoldMessenger.of(context);
-  final collections = bloc.state.collections;
-  final ancestorIds = CollectionsTreeHelper.ancestorFolderIds(
-    collections,
-    node.id,
-  );
-  final siblingIndex = CollectionsTreeHelper.siblingIndexOf(
-    collections,
-    node.id,
-  );
-  // Snapshot from LIVE state (not the row's build-time copy) so the restore
-  // carries the freshest children/examples/variables.
-  final snapshot = CollectionsTreeHelper.findNode(collections, node.id) ?? node;
 
   void deleteAndOfferUndo() {
+    // Capture from LIVE bloc state at delete time — NOT at dialog-open time
+    // and NOT the row's build-time copy (A10): for folders the ConfirmDialog
+    // await sits between this function being created and being called, and
+    // the tree can mutate meanwhile. Snapshotting here guarantees UNDO
+    // restores exactly what CONFIRM deleted.
+    final collections = bloc.state.collections;
+    final snapshot = CollectionsTreeHelper.findNode(collections, node.id);
+    if (snapshot == null) {
+      // The node vanished while the confirm dialog was up (e.g. a background
+      // git pull removed it) — nothing to delete, nothing to offer UNDO for.
+      showAppSnackBarVia(messenger, '"${node.name}" no longer exists');
+      onDeleted?.call();
+      return;
+    }
+    final ancestorIds = CollectionsTreeHelper.ancestorFolderIds(
+      collections,
+      node.id,
+    );
+    final siblingIndex = CollectionsTreeHelper.siblingIndexOf(
+      collections,
+      node.id,
+    );
     bloc.add(DeleteNode(node.id));
     showAppSnackBarVia(
       messenger,

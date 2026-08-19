@@ -207,6 +207,12 @@ abstract class GitService {
   /// `git rebase --abort` — restores the pre-rebase tree.
   Future<void> rebaseAbort(String root);
 
+  /// `git reset --hard HEAD` — restores the working tree and index to HEAD.
+  /// Used after a finished rebase whose autostash re-apply conflicted: the
+  /// marker-riddled tree is discarded while the conflicting edits stay parked
+  /// in `stash@{0}` (git keeps the entry on a conflicted pop).
+  Future<void> resetHard(String root);
+
   /// `git fetch` — updates remote-tracking refs without touching the working
   /// tree.
   Future<void> fetch(String root);

@@ -12,7 +12,9 @@
 // regression). Mirrors auris_ambient.dart/glass_decorations.dart's
 // AmbientSignals + single-ticker lifecycle discipline (build once, start/
 // stop, resolve pulse unconditionally in didChangeDependencies so a re-enable
-// round-trip isn't missed).
+// round-trip isn't missed). The starfield CustomPaint sits BEFORE the child
+// in the Stack (painted underneath, like every sibling ambient) — a past
+// regression put it after the child and drew motes over the app panels.
 
 import 'dart:async';
 import 'dart:math' as math;
@@ -275,22 +277,24 @@ class _RpgAnimatedBackgroundState extends State<_RpgAnimatedBackground>
             ),
           ),
         ),
-        RepaintBoundary(child: widget.child),
+        // Starfield UNDER the app content (before the child in the Stack,
+        // matching brutalist/glass/auris): this is a scaffold *background* —
+        // a past regression placed it after the child and painted the motes +
+        // shooting comet over every panel.
         Positioned.fill(
-          child: IgnorePointer(
-            child: RepaintBoundary(
-              child: CustomPaint(
-                painter: _StarfieldPainter(
-                  tListenable: _frameNotifier,
-                  motes: _motes,
-                  isDark: isDark,
-                  signals: signals,
-                  hasPulse: _pulse != null,
-                ),
+          child: RepaintBoundary(
+            child: CustomPaint(
+              painter: _StarfieldPainter(
+                tListenable: _frameNotifier,
+                motes: _motes,
+                isDark: isDark,
+                signals: signals,
+                hasPulse: _pulse != null,
               ),
             ),
           ),
         ),
+        RepaintBoundary(child: widget.child),
       ],
     );
 

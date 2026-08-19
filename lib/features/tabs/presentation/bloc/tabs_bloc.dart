@@ -18,6 +18,12 @@
 // - In-flight sends and updates resolve the tab ACROSS all panels via
 //   _findTab/_replaceTabAcrossPanels — a send started in a background panel
 //   still lands correctly even after the active panel changes.
+// - Persisting a panel AFTER any await must go through _persistLivePanel,
+//   never _persistPanel with a pre-await snapshot: a concurrent handler
+//   (SetActiveIndex/ReorderTabs persist immediately) may have written a newer
+//   version of the panel while the first write was in flight, and the stale
+//   snapshot would clobber it on disk (wrong active tab / lost reorder after
+//   restart).
 // - Keeps a narrowly-scoped `flutter/foundation.dart` import (justified
 //   `// ignore: avoid_flutter_imports`) only for `compute`, since Isolate.run
 //   is unsupported on web.
@@ -120,6 +126,14 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   // rule's "notify via add" guidance doesn't apply to a plain state read.
   // ignore: avoid_public_bloc_methods
   bool get canReopenClosedTab => _closedTabs.isNotEmpty;
+
+  /// Persists any dirty tabs NOW. Called by `ExitFlushGuard` when the app is
+  /// about to exit (or its window hides): `close()` — the only other flush of
+  /// the 10 s debounce — never runs on process exit, so quitting inside the
+  /// debounce window silently lost the last edits and responses.
+  // Persistence flush, not a state-mutation entry point (emits nothing).
+  // ignore: avoid_public_bloc_methods
+  Future<void> flushPendingSaves() => _flushDirtyTabs();
 
   /// Push a just-closed tab (with its stored strip position). Dirty tabs
   /// closed via DISCARD arrive with their dirty content — pushed as-is; that
@@ -255,6 +269,17 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   Future<void> _persistPanel(PanelEntity panel) =>
       _guardWrite(() => _repository.putPanel(panel));
 
+  /// Persist the LIVE version of [snapshot]'s panel, resolved from [state] at
+  /// write time (falling back to [snapshot] if the panel vanished meanwhile).
+  ///
+  /// Required for any panel persist that runs AFTER an await: while the prior
+  /// write was in flight (putTab can be slow — it serializes cached response
+  /// bodies), a concurrent handler such as SetActiveIndex may have emitted AND
+  /// persisted a newer version of the same panel; writing the pre-await
+  /// snapshot afterwards would clobber it on disk.
+  Future<void> _persistLivePanel(PanelEntity snapshot) =>
+      _persistPanel(state.panels.byId(snapshot.id) ?? snapshot);
+
   Future<void> _persistPanelMeta() => _guardWrite(
     () => _repository.savePanelMeta(
       state.panels.map((p) => p.id).toList(),
@@ -370,7 +395,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     );
     emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     await _guardWrite(() => _repository.putTab(newTab));
-    await _persistPanel(updated);
+    await _persistLivePanel(updated);
   }
 
   Future<void> _onRemoveTab(RemoveTab event, Emitter<TabsState> emit) async {
@@ -397,7 +422,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     _dirtyTabIds.remove(event.tabId);
     await _guardWrite(() => _repository.deleteTabs([event.tabId]));
-    await _persistPanel(updated);
+    await _persistLivePanel(updated);
   }
 
   Future<void> _onSetActiveIndex(
@@ -414,13 +439,27 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     await _persistPanel(updated);
   }
 
+  /// Reorders within the panel the drag's indices were captured against.
+  ///
+  /// When the event carries a [ReorderTabs.panelId], the reorder applies to
+  /// THAT panel — resolved by id — even if the user switched the active panel
+  /// mid-drag (Cmd+Shift+], Cmd+Shift+T reopen). That is the safe semantic:
+  /// the indices stay valid for the strip they were captured on, so applying
+  /// them there does exactly what the drop visually promised, whereas
+  /// applying them to the now-active panel would silently reorder the wrong
+  /// panel's tabs (and persist it). A no-op only when the named panel has
+  /// vanished — then the indices point at nothing. Null panelId keeps the
+  /// legacy active-panel targeting for dispatch sites that can't race a
+  /// panel switch.
   Future<void> _onReorderTabs(
     ReorderTabs event,
     Emitter<TabsState> emit,
   ) async {
     if (state.panels.isEmpty) return;
-    final active = _activePanel;
-    final tabs = [...active.tabs];
+    final panelId = event.panelId;
+    final target = panelId == null ? _activePanel : state.panels.byId(panelId);
+    if (target == null) return;
+    final tabs = [...target.tabs];
     // A reorder enqueued behind a concurrent shrink (e.g. CLOSE OTHERS) can
     // carry stale indices; bail rather than RangeError. Both indices use
     // after-removal semantics (onReorderItem already adjusted newIndex), so on
@@ -431,7 +470,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     // ReorderableListView.onReorderItem callback — no manual decrement.
     final item = tabs.removeAt(event.oldIndex);
     tabs.insert(event.newIndex, item);
-    final updated = active.copyWith(tabs: tabs);
+    final updated = target.copyWith(tabs: tabs);
     emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     await _persistPanel(updated);
   }
@@ -479,7 +518,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     _dirtyTabIds.removeAll(removedIds);
     await _guardWrite(() => _repository.deleteTabs(removedIds));
-    await _persistPanel(updated);
+    await _persistLivePanel(updated);
   }
 
   Future<void> _onCloseTabsToTheRight(
@@ -506,7 +545,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     _dirtyTabIds.removeAll(removedIds);
     await _guardWrite(() => _repository.deleteTabs(removedIds));
-    await _persistPanel(updated);
+    await _persistLivePanel(updated);
   }
 
   Future<void> _onCloseTabsToTheLeft(
@@ -533,7 +572,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     _dirtyTabIds.removeAll(removedIds);
     await _guardWrite(() => _repository.deleteTabs(removedIds));
-    await _persistPanel(updated);
+    await _persistLivePanel(updated);
   }
 
   /// "CLOSE SAVED TABS": close every non-dirty tab of the panel, in one pass,
@@ -570,7 +609,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     _dirtyTabIds.removeAll(removedIds);
     await _guardWrite(() => _repository.deleteTabs(removedIds));
-    await _persistPanel(updated);
+    await _persistLivePanel(updated);
   }
 
   Future<void> _onDuplicateTab(
@@ -592,7 +631,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final updated = active.copyWith(tabs: tabs, activeTabId: dup.tabId);
     emit(_derive(_replacePanel(state.panels, updated), state.activePanelId));
     await _guardWrite(() => _repository.putTab(dup));
-    await _persistPanel(updated);
+    await _persistLivePanel(updated);
   }
 
   /// Pop the reopen stack: restore into the original panel if it still
@@ -636,7 +675,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final updated = target.copyWith(tabs: tabs, activeTabId: record.tab.tabId);
     emit(_derive(_replacePanel(state.panels, updated), updated.id));
     await _guardWrite(() => _repository.putTab(record.tab));
-    await _persistPanel(updated);
+    await _persistLivePanel(updated);
     await _persistPanelMeta();
   }
 
@@ -724,11 +763,17 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   /// Sets [response] as the tab's displayed response and prepends it to the
   /// time-travel history (newest-first), trimmed to [limit]. A [limit] of 0
   /// disables history (clears any accumulated entries). When [saveLarge] is
-  /// false, a *superseded* entry whose body exceeds the large-viewer threshold
-  /// is downgraded to the metadata-only placeholder; the newest entry always
-  /// keeps its full body — it is what "Latest" in the timeline restores after
-  /// time-travelling, so a placeholder there would lose the displayed body.
-  /// On-disk capping at 1 MiB happens at the persistence boundary.
+  /// false, a *superseded* entry is downgraded to the metadata-only
+  /// placeholder when it is large — a body over the large-viewer threshold OR
+  /// a media/binary response carrying [HttpResponseEntity.bodyBytes] (those
+  /// have a short placeholder body but hold up to 50 MiB of bytes, which the
+  /// downgrade nulls out so re-sends don't pin one buffer per entry). The
+  /// newest entry always keeps its full body and bytes — it is what "Latest"
+  /// in the timeline restores after time-travelling, so a placeholder there
+  /// would lose the displayed body. On-disk capping at 1 MiB happens at the
+  /// persistence boundary. Recording a new response also resets
+  /// [HttpRequestTabEntity.viewedHistoryEntryId] — the tab is viewing the
+  /// latest response again.
   HttpRequestTabEntity _recordResponse(
     HttpRequestTabEntity live,
     HttpResponseEntity response,
@@ -740,6 +785,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         isSending: false,
         response: response,
         responseHistory: const [],
+        viewedHistoryEntryId: null,
       );
     }
     final entry = ResponseHistoryEntry(
@@ -749,15 +795,19 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     );
     Iterable<ResponseHistoryEntry> older = live.responseHistory;
     if (!saveLarge) {
-      older = older.map(
-        (e) => e.response.body.length > kLargeResponseViewerChars
+      older = older.map((e) {
+        final r = e.response;
+        final isLarge =
+            r.body.length > kLargeResponseViewerChars || r.bodyBytes != null;
+        return isLarge
             ? e.copyWith(
-                response: e.response.copyWithBody(
+                response: r.copyWithBody(
                   kHistoryBodyNotKeptPlaceholder,
+                  keepBytes: false,
                 ),
               )
-            : e,
-      );
+            : e;
+      });
     }
     final history = [entry, ...older];
     return live.copyWith(
@@ -766,11 +816,17 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       responseHistory: history.length > limit
           ? history.sublist(0, limit)
           : history,
+      viewedHistoryEntryId: null,
     );
   }
 
   /// Time-travel: swap the displayed response to the chosen history entry
   /// without mutating the history. No-op if the tab or entry is gone.
+  /// Tracks the viewed entry BY ID (`viewedHistoryEntryId`), not by response
+  /// value — two history entries can hold value-equal responses (same
+  /// status/body/headers/duration, trivial against localhost), and identity
+  /// is what keeps the state emission from being suppressed and the timeline
+  /// checkmark on the picked row.
   void _onViewResponseHistoryEntry(
     ViewResponseHistoryEntry event,
     Emitter<TabsState> emit,
@@ -783,7 +839,12 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     if (entry == null) return;
     emit(
       _derive(
-        _replaceTabAcrossPanels(tab.copyWith(response: entry.response)),
+        _replaceTabAcrossPanels(
+          tab.copyWith(
+            response: entry.response,
+            viewedHistoryEntryId: entry.id,
+          ),
+        ),
         state.activePanelId,
       ),
     );
@@ -999,7 +1060,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     // in both panels (a visible but recoverable duplicate) instead of in
     // neither (orphaned in the tabs box, never rendered again).
     await _persistPanel(updatedTarget);
-    await _persistPanel(detached.source);
+    await _persistLivePanel(detached.source);
   }
 
   Future<void> _onMoveTabToNewPanel(
@@ -1018,7 +1079,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     emit(_derive(panels, state.activePanelId)); // stay on current panel
     // New panel first — same crash-ordering rationale as _onMoveTabToPanel.
     await _persistPanel(newPanel);
-    await _persistPanel(detached.source);
+    await _persistLivePanel(detached.source);
     await _persistPanelMeta();
   }
 }

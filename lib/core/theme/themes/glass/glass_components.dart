@@ -8,6 +8,13 @@
 // (context.appPalette / Theme.of). Colors.white / Colors.black specular
 // highlights are allowed (this file is under lib/core/theme/, exempt from
 // avoid_hardcoded_brand_colors).
+//
+// Frost ownership: the panel CONSUMERS (request_config_section,
+// response_section, unified_request_panel, realtime_panel) wrap the surface
+// slot in context.appDecoration.frost themselves — FrostedTile must NOT call
+// frost again, or every glass panel pays two σ18 BackdropFilter blurs per
+// frame (the double-frost regression). The tile only paints the translucent
+// panelBox fill; the consumer-owned frost supplies the blur.
 
 import 'dart:async';
 
@@ -68,8 +75,10 @@ Widget _surface(
 }
 
 // --- surface: frosted tile -------------------------------------------------
-// Fills its slot. The frost (context.appDecoration.frost) is identity under
-// reduceEffects, so blur auto-degrades without threading the flag here.
+// Fills its slot. Deliberately does NOT call context.appDecoration.frost:
+// the consumers own the blur (see the frost-ownership rule in this file's
+// header) — frosting here again stacked a second σ18 BackdropFilter on every
+// glass panel, doubling the per-frame blur cost.
 
 class FrostedTile extends StatelessWidget {
   const FrostedTile({required this.child, this.title, super.key});
@@ -79,29 +88,25 @@ class FrostedTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(context.appShape.panelRadius);
-    // The frosted box forwards constraints (DecoratedBox sizes to its child;
+    // The panel box forwards constraints (DecoratedBox sizes to its child;
     // the child receives the full slot via the outer Expanded in the titled
     // path, or directly here for the no-title path).
-    final frosted = context.appDecoration.frost(
-      context,
-      borderRadius: radius,
-      child: DecoratedBox(
-        decoration: context.appDecoration.panelBox(
-          context,
-          borderRadius: radius,
-        ),
-        child: child,
+    final panel = DecoratedBox(
+      decoration: context.appDecoration.panelBox(
+        context,
+        borderRadius: radius,
       ),
+      child: child,
     );
 
-    if (title == null) return frosted;
+    if (title == null) return panel;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _FloatingTitleChip(title: title!),
         const SizedBox(height: 6),
-        Expanded(child: frosted),
+        Expanded(child: panel),
       ],
     );
   }

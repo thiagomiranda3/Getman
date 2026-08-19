@@ -564,6 +564,190 @@ void main() {
     });
   });
 
+  group('harvestLocalOnly / reapplyLocalOnly (M6 session store)', () {
+    SavedExampleEntity example(String id) => SavedExampleEntity(
+      id: id,
+      name: 'Example $id',
+      capturedAt: DateTime.fromMillisecondsSinceEpoch(1),
+      config: HttpRequestConfigEntity(id: 'cfg-$id'),
+    );
+
+    test('harvest captures leaf examples and folder secret values, by id', () {
+      final forest = [
+        folder(
+          'f1',
+          'API',
+          children: [
+            leaf('r1', 'R1').copyWith(examples: [example('ex1')]),
+          ],
+        ).copyWith(
+          variables: {'base': 'https://api.dev', 'token': 'sk-123'},
+          secretKeys: {'token'},
+        ),
+      ];
+
+      final store = CollectionsTreeHelper.harvestLocalOnly(forest);
+
+      expect(store.keys, unorderedEquals(['f1', 'r1']));
+      expect(store['r1']!.examples.single.id, 'ex1');
+      expect(store['r1']!.secretValues, isEmpty);
+      expect(
+        store['f1']!.secretValues,
+        {'token': 'sk-123'},
+        reason: 'only SECRET values are app-only; base is mirrored to disk',
+      );
+      expect(store['f1']!.examples, isEmpty);
+    });
+
+    test('harvest omits nodes with nothing app-only (compact store)', () {
+      final forest = [
+        folder(
+          'f1',
+          'Plain',
+          children: [leaf('r1', 'R1')],
+        ).copyWith(
+          // Secret key whose value is already empty: nothing worth keeping.
+          variables: {'token': ''},
+          secretKeys: {'token'},
+        ),
+      ];
+      expect(CollectionsTreeHelper.harvestLocalOnly(forest), isEmpty);
+    });
+
+    test('reapply fills an empty leaf examples list from the store', () {
+      final store = {
+        'r1': (
+          examples: [example('ex1')],
+          secretValues: const <String, String>{},
+        ),
+      };
+      final forest = [
+        folder('f1', 'API', children: [leaf('r1', 'R1')]),
+      ];
+
+      final merged = CollectionsTreeHelper.reapplyLocalOnly(forest, store);
+
+      expect(
+        CollectionsTreeHelper.findNode(merged, 'r1')!.examples.single.id,
+        'ex1',
+        reason: "a branch round trip must restore R's saved examples",
+      );
+    });
+
+    test('reapply never stomps examples already present (belt wins)', () {
+      final store = {
+        'r1': (
+          examples: [example('stale')],
+          secretValues: const <String, String>{},
+        ),
+      };
+      final forest = [
+        leaf('r1', 'R1').copyWith(examples: [example('fresh')]),
+      ];
+
+      final merged = CollectionsTreeHelper.reapplyLocalOnly(forest, store);
+
+      expect(
+        merged.single.examples.single.id,
+        'fresh',
+        reason:
+            "the caller's overlayLocalOnly ran against the live forest and "
+            'is fresher than any harvest — the store only fills gaps',
+      );
+    });
+
+    test('reapply fills masked secret values; non-empty disk values win', () {
+      final store = {
+        'f1': (
+          examples: const <SavedExampleEntity>[],
+          secretValues: {'token': 'sk-123', 'other': 'sk-999'},
+        ),
+      };
+      final forest = [
+        folder('f1', 'API').copyWith(
+          variables: {'token': '', 'other': 'upstream'},
+          secretKeys: {'token', 'other'},
+        ),
+      ];
+
+      final merged = CollectionsTreeHelper.reapplyLocalOnly(forest, store);
+
+      expect(CollectionsTreeHelper.findNode(merged, 'f1')!.variables, {
+        'token': 'sk-123',
+        'other': 'upstream',
+      });
+    });
+
+    test("reapply respects the incoming node's secretKeys set", () {
+      final store = {
+        'f1': (
+          examples: const <SavedExampleEntity>[],
+          secretValues: {'token': 'sk-123'},
+        ),
+      };
+      final forest = [
+        // Upstream un-flagged 'token' as secret — its empty value is now a
+        // deliberate plain value, not a mask to fill.
+        folder('f1', 'API').copyWith(variables: {'token': ''}),
+      ];
+
+      final merged = CollectionsTreeHelper.reapplyLocalOnly(forest, store);
+
+      expect(
+        CollectionsTreeHelper.findNode(merged, 'f1')!.variables['token'],
+        '',
+      );
+    });
+
+    test('reapply with an empty store is an identity pass', () {
+      final forest = [
+        folder('f1', 'API', children: [leaf('r1', 'R1')]),
+      ];
+      expect(
+        CollectionsTreeHelper.reapplyLocalOnly(forest, const {}),
+        same(forest),
+      );
+    });
+
+    test('round trip: harvest then reapply restores nested app-only data', () {
+      final before = [
+        folder(
+          'f1',
+          'API',
+          children: [
+            folder(
+              'f2',
+              'Inner',
+              children: [
+                leaf('r1', 'R1').copyWith(examples: [example('ex1')]),
+              ],
+            ).copyWith(variables: {'key': 'v'}, secretKeys: {'key'}),
+          ],
+        ),
+      ];
+      // The same tree as read back from the git mirror: examples stripped,
+      // secrets masked.
+      final onDisk = [
+        folder(
+          'f1',
+          'API',
+          children: [
+            folder(
+              'f2',
+              'Inner',
+              children: [leaf('r1', 'R1')],
+            ).copyWith(variables: {'key': ''}, secretKeys: {'key'}),
+          ],
+        ),
+      ];
+
+      final store = CollectionsTreeHelper.harvestLocalOnly(before);
+      final merged = CollectionsTreeHelper.reapplyLocalOnly(onDisk, store);
+
+      expect(merged, before);
+    });
+  });
+
   group('insertIntoTree / insertExampleInNode / siblingIndexOf (A1 undo)', () {
     CollectionNodeEntity leaf(String id, String name) => CollectionNodeEntity(
       id: id,

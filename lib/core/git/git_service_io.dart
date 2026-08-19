@@ -364,15 +364,25 @@ class _IoGitService implements GitService {
       '--git-path',
       'rebase-merge',
     ], allowFailure: true);
-    final merge = (r.stdout as String).trim();
-    if (merge.isNotEmpty && Directory('$root/$merge').existsSync()) return true;
+    if (_gitPathExists(root, (r.stdout as String).trim())) return true;
     final r2 = await _run(root, [
       'rev-parse',
       '--git-path',
       'rebase-apply',
     ], allowFailure: true);
-    final apply = (r2.stdout as String).trim();
-    return apply.isNotEmpty && Directory('$root/$apply').existsSync();
+    return _gitPathExists(root, (r2.stdout as String).trim());
+  }
+
+  /// `git rev-parse --git-path` answers relative to the CWD in a normal
+  /// checkout (`.git/rebase-merge`) but ABSOLUTE in a linked `git worktree`
+  /// (`…/main/.git/worktrees/<name>/rebase-merge`) — unconditionally
+  /// prefixing `$root/` there produced a nonexistent path, so a genuinely
+  /// paused rebase read as "not in progress" and a conflicted pull
+  /// auto-aborted instead of opening the resolver.
+  static bool _gitPathExists(String root, String gitPath) {
+    if (gitPath.isEmpty) return false;
+    final dir = Directory(gitPath);
+    return (dir.isAbsolute ? dir : Directory('$root/$gitPath')).existsSync();
   }
 
   @override
@@ -435,6 +445,10 @@ class _IoGitService implements GitService {
 
   @override
   Future<void> rebaseAbort(String root) => _run(root, ['rebase', '--abort']);
+
+  @override
+  Future<void> resetHard(String root) =>
+      _run(root, ['reset', '--hard', 'HEAD']);
 
   @override
   Future<void> fetch(String root) => _run(root, ['fetch']);

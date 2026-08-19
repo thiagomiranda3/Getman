@@ -27,6 +27,7 @@ import 'package:getman/features/settings/domain/usecases/settings_usecases.dart'
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/features/tabs/domain/entities/response_history_entry.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
@@ -65,6 +66,9 @@ class _FakePanel extends Fake implements PanelEntity {}
 class _FakeCollectionsBloc extends Bloc<CollectionsEvent, CollectionsState>
     implements CollectionsBloc {
   _FakeCollectionsBloc() : super(CollectionsState());
+
+  @override
+  Future<void> flushPendingSaves() async {}
 }
 
 class _FakeHistoryBloc extends Bloc<HistoryEvent, HistoryState>
@@ -645,6 +649,90 @@ void main() {
 
     expect(find.text('SIZE: '), findsOneWidget);
   });
+
+  // -------------------------------------------------------------------------
+  // Test 7b (G2): time-travel between VALUE-EQUAL responses must not be
+  // swallowed by ResponseSection's buildWhen — the viewed-entry id is the only
+  // thing that changes, and the timeline badge must still flip to #2.
+  // -------------------------------------------------------------------------
+  testWidgets(
+    'picking a history entry value-equal to the latest still flips the '
+    'HISTORY badge (viewedHistoryEntryId in buildWhen)',
+    (tester) async {
+      const tabId = 'tab7b';
+      const same = HttpResponseEntity(
+        statusCode: 200,
+        body: '{"ok":true}',
+        headers: {},
+        durationMs: 7,
+      );
+      final head = ResponseHistoryEntry(
+        id: 'eq-head',
+        response: same,
+        capturedAt: DateTime(2024, 1, 2).millisecondsSinceEpoch,
+      );
+      final older = ResponseHistoryEntry(
+        id: 'eq-older',
+        response: same,
+        capturedAt: DateTime(2024).millisecondsSinceEpoch,
+      );
+      final tab = HttpRequestTabEntity(
+        tabId: tabId,
+        config: const HttpRequestConfigEntity(id: tabId),
+        response: same,
+        responseHistory: [head, older],
+      );
+      final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+      addTearDown(bloc.close);
+      final controller = CodeLineEditingController();
+      addTearDown(controller.dispose);
+
+      // Metadata row shown (default showMetadata: true) — it hosts the
+      // timeline.
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: brutalistTheme(Brightness.light),
+          home: Scaffold(
+            body: MultiBlocProvider(
+              providers: [
+                BlocProvider.value(value: bloc),
+                BlocProvider<SettingsBloc>(
+                  create: (_) => _settingsBloc(const SettingsEntity()),
+                ),
+                BlocProvider<CollectionsBloc>(
+                  create: (_) => _FakeCollectionsBloc(),
+                ),
+                BlocProvider<HistoryBloc>(create: (_) => _FakeHistoryBloc()),
+              ],
+              child: ResponseSection(
+                tabId: tabId,
+                responseController: controller,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 300)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('HISTORY'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('response_history_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('#2'));
+      await tester.pump(); // dismiss starts
+      await tester.pump(); // first frame after the bloc emission
+
+      // Value-equal responses: without viewedHistoryEntryId in the entity
+      // props AND in ResponseSection.buildWhen this badge never flipped.
+      expect(find.text('HISTORY: #2'), findsOneWidget);
+      await tester.pumpAndSettle();
+
+      // Drain the bloc's 10s debounced-save timer before teardown.
+      await tester.pump(const Duration(seconds: 11));
+    },
+  );
 
   // -------------------------------------------------------------------------
   // Test 8: TESTS tab renders assertion results, a summary, and captures

@@ -28,16 +28,21 @@ class HttpResponseEntity extends Equatable {
   /// older time-travel history entry. Null for textual responses.
   final Uint8List? bodyBytes;
 
-  /// Returns a copy with [body] replaced, keeping status/headers/duration/bytes
-  /// — used when an over-limit text body is swapped for a placeholder before
-  /// persisting. Media bytes ride along (they are dropped at the model layer).
-  HttpResponseEntity copyWithBody(String body) => HttpResponseEntity(
-    statusCode: statusCode,
-    body: body,
-    headers: headers,
-    durationMs: durationMs,
-    bodyBytes: bodyBytes,
-  );
+  /// Returns a copy with [body] replaced, keeping status/headers/duration —
+  /// used when an over-limit text body is swapped for a placeholder before
+  /// persisting. By default media [bodyBytes] ride along (the persistence
+  /// callers rely on that; bytes are dropped at the model layer anyway).
+  /// Pass `keepBytes: false` to null them out — the in-session history
+  /// downgrade uses it so a superseded media entry releases its (up to
+  /// 50 MiB) buffer instead of pinning it in RAM for the whole session.
+  HttpResponseEntity copyWithBody(String body, {bool keepBytes = true}) =>
+      HttpResponseEntity(
+        statusCode: statusCode,
+        body: body,
+        headers: headers,
+        durationMs: durationMs,
+        bodyBytes: keepBytes ? bodyBytes : null,
+      );
 
   // bodyBytes itself is excluded from props — a list compare on multi-MB
   // buffers every rebuild is unacceptable. Its length is a cheap discriminator.

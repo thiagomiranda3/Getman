@@ -55,6 +55,24 @@ void main() {
       expect(palette.statusAccent(404), Colors.redAccent);
     });
 
+    test(
+      'statusColor/statusAccent map code < 100 (transport-failure sentinel 0) '
+      'to error, not warning',
+      () {
+        // 0 is the transport-failure sentinel (NetworkFailure with no
+        // response) — it must band as an ERROR, never the 3xx-style amber.
+        expect(palette.statusColor(0), Colors.red);
+        expect(palette.statusAccent(0), Colors.redAccent);
+        // Anything below the first real HTTP class is equally not-a-status.
+        expect(palette.statusColor(-1), Colors.red);
+        expect(palette.statusColor(99), Colors.red);
+        expect(palette.statusAccent(99), Colors.redAccent);
+        // 1xx informational stays in the warning band.
+        expect(palette.statusColor(100), Colors.orange);
+        expect(palette.statusAccent(100), Colors.orangeAccent);
+      },
+    );
+
     test('statusColor/statusAccent handle band boundaries correctly', () {
       // Just below 2xx → warning
       expect(palette.statusColor(199), Colors.orange);

@@ -19,6 +19,11 @@ abstract class EnvironmentsLocalDataSource {
   Future<void> deleteEnvironment(String id);
 
   /// Replaces the whole list (used for import). Keyed by id.
+  ///
+  /// Non-destructive: puts the new entries, then deletes only the keys that
+  /// are absent from [environments] — never `clear()` — so a concurrent
+  /// [putEnvironment] (e.g. the chaining write-back merging captured
+  /// variables mid-import) is not wiped by the replace.
   Future<void> saveEnvironments(List<EnvironmentModel> environments);
 }
 
@@ -65,8 +70,21 @@ class EnvironmentsLocalDataSourceImpl implements EnvironmentsLocalDataSource {
   Future<void> saveEnvironments(List<EnvironmentModel> environments) async {
     try {
       final box = _box();
-      await box.clear();
-      await box.putAll({for (final e in environments) e.id: e});
+      final next = {for (final e in environments) e.id: e};
+      // Diff-based replace — never `clear()`. A clear+putAll is a destructive
+      // two-phase write: a putEnvironment landing in the await gap (the
+      // chaining write-back dispatches MergeEnvironmentVariables whenever a
+      // response with extraction rules finishes, so it CAN race an import's
+      // save) was erased by the clear/overwritten by the stale putAll, and the
+      // captured variables silently vanished on restart. putAll applies to the
+      // box synchronously at call time, so a concurrent put can only land
+      // after it and wins; the removed-keys snapshot is taken BEFORE putAll so
+      // a key put concurrently is never swept by deleteAll.
+      final removedKeys = box.keys
+          .where((key) => !next.containsKey(key))
+          .toList(growable: false);
+      await box.putAll(next);
+      await box.deleteAll(removedKeys);
     } catch (e) {
       throw PersistenceException('Failed to save environments', cause: e);
     }

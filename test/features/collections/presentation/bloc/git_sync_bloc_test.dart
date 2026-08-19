@@ -16,6 +16,8 @@ void main() {
   const root = '/ws';
   late _MockService service;
   late Completer<PullOutcome> pullGate;
+  late Completer<void> fetchGate;
+  late Completer<BranchStatus> statusGate;
 
   const status = BranchStatus(
     isRepo: true,
@@ -309,6 +311,69 @@ void main() {
       expect(b.state.status, GitSyncStatus.ready);
       expect(b.state.conflictToken, 1);
       expect(b.state.reloadToken, 1, reason: 'the resolve reload must land');
+    },
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'ConflictsResolved landing while a fetch is in flight bumps reloadToken '
+    'but keeps `busy` — a terminal ready here would re-enable the UI while '
+    "the fetch's git subprocess is still running, defeating _dropWhileBusy",
+    build: () {
+      fetchGate = Completer<void>();
+      when(() => service.fetch(root)).thenAnswer((_) => fetchGate.future);
+      return GitSyncBloc(service: service);
+    },
+    act: (b) async {
+      b.add(const FetchRemote(root, silent: true));
+      await Future<void>.delayed(Duration.zero);
+      b.add(const ConflictsResolved(root)); // fetch is mid-flight
+      await Future<void>.delayed(Duration.zero);
+      // The reload signal landed, but the busy guard must still hold: a
+      // `ready` now would let a third op (e.g. a branch switch) run git
+      // concurrently with the in-flight fetch (.git lock contention).
+      expect(b.state.reloadToken, 1);
+      expect(b.state.status, GitSyncStatus.busy);
+      fetchGate.complete();
+      await Future<void>.delayed(Duration.zero);
+    },
+    verify: (b) {
+      expect(b.state.status, GitSyncStatus.ready);
+      expect(b.state.reloadToken, 1);
+    },
+    // The full emission trace proves no intermediate `ready` slipped in
+    // between the resolve and the fetch's own terminal state.
+    expect: () => [
+      const GitSyncState(status: GitSyncStatus.busy),
+      const GitSyncState(status: GitSyncStatus.busy, reloadToken: 1),
+      const GitSyncState(
+        status: GitSyncStatus.ready,
+        branch: status,
+        reloadToken: 1,
+      ),
+    ],
+  );
+
+  blocTest<GitSyncBloc, GitSyncState>(
+    'ConflictsResolved landing while a status load is in flight bumps '
+    'reloadToken but keeps `loading` — same guard as busy',
+    build: () {
+      statusGate = Completer<BranchStatus>();
+      when(() => service.status(root)).thenAnswer((_) => statusGate.future);
+      return GitSyncBloc(service: service);
+    },
+    act: (b) async {
+      b.add(const LoadBranchStatus(root));
+      await Future<void>.delayed(Duration.zero);
+      b.add(const ConflictsResolved(root)); // load is mid-flight
+      await Future<void>.delayed(Duration.zero);
+      expect(b.state.reloadToken, 1);
+      expect(b.state.status, GitSyncStatus.loading);
+      statusGate.complete(status);
+      await Future<void>.delayed(Duration.zero);
+    },
+    verify: (b) {
+      expect(b.state.status, GitSyncStatus.ready);
+      expect(b.state.reloadToken, 1);
     },
   );
 

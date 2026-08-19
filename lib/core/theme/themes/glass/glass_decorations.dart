@@ -494,7 +494,13 @@ class _GlassMeshPainter extends CustomPainter {
       _paint.shader = RadialGradient(
         colors: [
           blobs[i].withValues(alpha: blobAlpha),
-          Colors.transparent,
+          // Same-hue zero-alpha edge, NOT Colors.transparent: fading to
+          // transparent BLACK drags the gradient through a desaturated dark
+          // midpoint that reads as a gray halo around each blob (the
+          // documented transparent-lerp gotcha). The sheen below keeps its
+          // transparent-black edge on purpose — under BlendMode.plus black
+          // is additive-neutral.
+          blobs[i].withValues(alpha: 0),
         ],
       ).createShader(blobRect);
       canvas.drawRect(rect, _paint);

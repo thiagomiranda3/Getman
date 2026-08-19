@@ -74,5 +74,36 @@ void main() {
       expect(r.textBlocks, isEmpty);
       expect(r.rawBlocks.single['type'], 'image');
     });
+
+    test(
+      'synthesizes a pretty-printed text block from structuredContent when '
+      'content yields no blocks (2025-06-18 structured output)',
+      () {
+        final r = McpToolResult.fromJson(const {
+          'structuredContent': {'temperature': 22.5, 'unit': 'C'},
+        });
+        expect(r.textBlocks, hasLength(1));
+        expect(r.textBlocks.single, contains('"temperature": 22.5'));
+        expect(r.textBlocks.single, contains('"unit": "C"'));
+        // The synthesized block rides rawBlocks as a normal text block so
+        // raw-JSON renderers show it too.
+        expect(r.rawBlocks.single['type'], 'text');
+        expect(r.rawBlocks.single['text'], r.textBlocks.single);
+      },
+    );
+
+    test(
+      'does not synthesize from structuredContent when content blocks exist',
+      () {
+        final r = McpToolResult.fromJson(const {
+          'content': [
+            {'type': 'text', 'text': 'plain'},
+          ],
+          'structuredContent': {'x': 1},
+        });
+        expect(r.textBlocks, ['plain']);
+        expect(r.rawBlocks, hasLength(1));
+      },
+    );
   });
 }

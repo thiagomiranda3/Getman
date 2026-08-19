@@ -28,6 +28,15 @@ class RequestKindMethodSelector extends StatelessWidget {
     final theme = Theme.of(context);
     final layout = context.appLayout;
     final smallGap = isNarrow ? 2.0 : (layout.isCompact ? 4.0 : 8.0);
+    // Imported requests can carry methods beyond HttpMethods.all (the Postman
+    // mapper keeps arbitrary methods verbatim; the curl parser passes
+    // HEAD/OPTIONS/PURGE/PROPFIND/... through its clamp). DropdownButton
+    // ASSERTS when its value isn't among the items, so append the current
+    // method for this build only — never mutate HttpMethods.all (canonical
+    // order). The extra entry vanishes once the user picks a listed method.
+    final methods = HttpMethods.all.contains(tab.config.method)
+        ? HttpMethods.all
+        : [...HttpMethods.all, tab.config.method];
 
     return Container(
       padding: EdgeInsets.symmetric(
@@ -94,7 +103,9 @@ class RequestKindMethodSelector extends StatelessWidget {
                   fontSize: layout.fontSizeNormal,
                 ),
                 selectedItemBuilder: (context) {
-                  return HttpMethods.all
+                  // Must mirror `items` 1:1 — DropdownButton pairs the two
+                  // lists by index.
+                  return methods
                       .map(
                         (m) => SizedBox(
                           width: isNarrow ? 64 : (layout.isCompact ? 80 : 100),
@@ -108,7 +119,7 @@ class RequestKindMethodSelector extends StatelessWidget {
                       )
                       .toList();
                 },
-                items: HttpMethods.all
+                items: methods
                     .map(
                       (m) => DropdownMenuItem(
                         value: m,

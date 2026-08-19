@@ -89,8 +89,11 @@ class _UpdateGateState extends State<UpdateGate> {
   /// Guards against updat's downloader (a single `http.get` with no timeout)
   /// stalling mid-transfer and leaving the non-dismissible
   /// [UpdateDownloadDialog] up forever. Started in [_startInAppDownload];
-  /// cancelled on any terminal resolution (`_onStatus`'s error/readyToInstall
-  /// branches) and in [dispose].
+  /// cancelled synchronously by [_onStatus] on any terminal resolution
+  /// (error/readyToInstall) and in [dispose]. On fire it defers its timeout
+  /// verdict by one frame — updat reports completion only from its `build()`,
+  /// so a download that finished while frames were paused (minimized window)
+  /// must get a chance to land before being declared a stall (A6).
   Timer? _downloadWatchdog;
 
   bool get _installsInApp =>
@@ -301,13 +304,27 @@ class _UpdateGateState extends State<UpdateGate> {
       widget.debugDownloadTimeout ?? const Duration(minutes: 10),
       () {
         if (!_inAppDownloadInFlight || !mounted) return;
-        _inAppDownloadInFlight = false;
-        _popDownloadDialogIfOpen();
-        showAppSnackBar(context, 'The update download timed out.');
-        // If updat's downloader resolves after this fires, `_onStatus`'s
-        // readyToInstall/error branches see `_inAppDownloadInFlight ==
-        // false` and no-op, so a late completion is a harmless no-op rather
-        // than reopening the dialog or launching a stale installer.
+        // Don't declare the timeout straight from this wall-clock Timer:
+        // updat reports readyToInstall/error only from its build(), so a
+        // download that completed while frames were paused (window minimized
+        // — GTK stops pumping frames; plausible on Windows too) is still
+        // parked in a dirty element. Request a frame and re-check afterwards:
+        // that frame's build delivers the parked status to `_onStatus`, which
+        // clears `_inAppDownloadInFlight` synchronously (before any post-frame
+        // callback runs), so a completed download is never misread as a
+        // stall. If frames stay paused, the verdict simply waits until the
+        // window is restored — a snackbar would be unseen until then anyway.
+        WidgetsBinding.instance.ensureVisualUpdate();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_inAppDownloadInFlight || !mounted) return;
+          _inAppDownloadInFlight = false;
+          _popDownloadDialogIfOpen();
+          showAppSnackBar(context, 'The update download timed out.');
+          // If updat's downloader resolves after this fires, `_onStatus`'s
+          // readyToInstall/error branches see `_inAppDownloadInFlight ==
+          // false` and no-op, so a late completion is a harmless no-op rather
+          // than reopening the dialog or launching a stale installer.
+        });
       },
     );
     _updatStartUpdate?.call();
@@ -353,9 +370,24 @@ class _UpdateGateState extends State<UpdateGate> {
     UpdateController controller,
     UpdatStatus status,
   ) {
+    final mapped = _mapPhase(status);
+    // Terminal in-app download bookkeeping runs NOW, not post-frame: this
+    // callback (invoked from updat's build) is the only completion signal,
+    // and the fired watchdog's deferred verdict re-checks
+    // `_inAppDownloadInFlight` in this same frame's post-frame batch —
+    // deferring the flip too would let it misread a completed download as a
+    // stall and abandon the installer (A6). Plain field writes and
+    // Timer.cancel are build-safe; everything that notifies or touches
+    // context/Navigator stays post-frame below.
+    final inAppTerminal =
+        _inAppDownloadInFlight &&
+        (mapped == UpdatePhase.readyToInstall || mapped == UpdatePhase.error);
+    if (inAppTerminal) {
+      _downloadWatchdog?.cancel();
+      _inAppDownloadInFlight = false;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final mapped = _mapPhase(status);
       controller.updateFromGate(phase: mapped);
 
       switch (mapped) {
@@ -367,11 +399,9 @@ class _UpdateGateState extends State<UpdateGate> {
             showAppSnackBar(context, "You're on the latest version.");
           }
         case UpdatePhase.error:
-          if (_inAppDownloadInFlight) {
+          if (inAppTerminal) {
             // The in-app download failed (not a version check): unblock the
             // UI and keep the app running.
-            _downloadWatchdog?.cancel();
-            _inAppDownloadInFlight = false;
             _popDownloadDialogIfOpen();
             showAppSnackBar(context, "Couldn't download the update.");
           } else if (controller.manualInFlight) {
@@ -382,9 +412,7 @@ class _UpdateGateState extends State<UpdateGate> {
             showAppSnackBar(context, "Couldn't check for updates.");
           }
         case UpdatePhase.readyToInstall:
-          if (_inAppDownloadInFlight) {
-            _downloadWatchdog?.cancel();
-            _inAppDownloadInFlight = false;
+          if (inAppTerminal) {
             unawaited(_finishInAppUpdate());
           }
         // downloading is surfaced by the blocking dialog _startInAppDownload

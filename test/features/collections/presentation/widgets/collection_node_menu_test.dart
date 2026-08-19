@@ -27,6 +27,11 @@ import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
+import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
+import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockCollectionsRepository extends Mock implements CollectionsRepository {}
@@ -37,6 +42,24 @@ class MockEnvironmentsBloc
 
 class MockSettingsBloc extends MockBloc<SettingsEvent, SettingsState>
     implements SettingsBloc {}
+
+/// Records added events instead of processing them — rename tests assert the
+/// exact UpdateTab events `renameOpenTabsForNode` dispatches.
+class _RecordingTabsBloc extends Bloc<TabsEvent, TabsState>
+    implements TabsBloc {
+  _RecordingTabsBloc(super.initialState);
+
+  final added = <TabsEvent>[];
+
+  @override
+  void add(TabsEvent event) => added.add(event);
+
+  @override
+  bool get canReopenClosedTab => false;
+
+  @override
+  Future<void> flushPendingSaves() async {}
+}
 
 const _folderNode = CollectionNodeEntity(id: 'f1', name: 'My Folder');
 
@@ -74,8 +97,10 @@ void main() {
 
   /// Hosts [child] under all the blocs the menu actions may reach
   /// (CollectionsBloc for events, Environments/Settings for the API-docs
-  /// export dialog).
-  Widget host(CollectionsBloc bloc, Widget child) {
+  /// export dialog, TabsBloc for the rename open-tab refresh).
+  Widget host(CollectionsBloc bloc, Widget child, {TabsBloc? tabs}) {
+    final tabsBloc = tabs ?? _RecordingTabsBloc(const TabsState());
+    if (tabs == null) addTearDown(tabsBloc.close);
     final environments = MockEnvironmentsBloc();
     whenListen(
       environments,
@@ -96,6 +121,7 @@ void main() {
             BlocProvider<CollectionsBloc>.value(value: bloc),
             BlocProvider<EnvironmentsBloc>.value(value: environments),
             BlocProvider<SettingsBloc>.value(value: settings),
+            BlocProvider<TabsBloc>.value(value: tabsBloc),
           ],
           child: child,
         ),
@@ -108,13 +134,16 @@ void main() {
     WidgetTester tester,
     CollectionNodeEntity node, {
     List<CollectionNodeEntity>? seedTree,
+    TabsBloc? tabs,
   }) async {
     final bloc = buildBloc();
     if (seedTree != null) {
       bloc.add(ReplaceCollections(seedTree));
       await bloc.stream.first;
     }
-    await tester.pumpWidget(host(bloc, CollectionNodeMenu(node: node)));
+    await tester.pumpWidget(
+      host(bloc, CollectionNodeMenu(node: node), tabs: tabs),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(ValueKey('node_menu_${node.id}')));
@@ -208,32 +237,61 @@ void main() {
       },
     );
 
-    testWidgets('RENAME confirm dispatches RenameNode and shows a snackbar', (
-      tester,
-    ) async {
-      final bloc = await openMenu(
-        tester,
-        _folderNode,
-        seedTree: [_folderNode],
-      );
-      addTearDown(bloc.close);
+    testWidgets(
+      'RENAME confirm dispatches RenameNode, refreshes the linked open tab '
+      'and shows a snackbar',
+      (tester) async {
+        // An open tab linked to the renamed node snapshots its name — the
+        // rename must carry over via renameOpenTabsForNode.
+        final tabs = _RecordingTabsBloc(
+          const TabsState(
+            panels: [
+              PanelEntity(
+                id: 'p1',
+                name: 'Panel 1',
+                tabs: [
+                  HttpRequestTabEntity(
+                    tabId: 't1',
+                    config: HttpRequestConfigEntity(id: 't1'),
+                    collectionNodeId: 'f1',
+                    collectionName: 'My Folder',
+                  ),
+                ],
+                activeTabId: 't1',
+              ),
+            ],
+            activePanelId: 'p1',
+          ),
+        );
+        addTearDown(tabs.close);
+        final bloc = await openMenu(
+          tester,
+          _folderNode,
+          seedTree: [_folderNode],
+          tabs: tabs,
+        );
+        addTearDown(bloc.close);
 
-      await tester.tap(find.text('RENAME'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('RENAME'));
+        await tester.pumpAndSettle();
 
-      await tester.enterText(
-        find.byKey(const ValueKey('name_prompt_field')),
-        'Renamed Folder',
-      );
-      await tester.tap(find.text('SAVE'));
-      await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('name_prompt_field')),
+          'Renamed Folder',
+        );
+        await tester.tap(find.text('SAVE'));
+        await tester.pumpAndSettle();
 
-      expect(
-        CollectionsTreeHelper.findNode(bloc.state.collections, 'f1')!.name,
-        'Renamed Folder',
-      );
-      expect(find.text('Renamed to "Renamed Folder"'), findsOneWidget);
-    });
+        expect(
+          CollectionsTreeHelper.findNode(bloc.state.collections, 'f1')!.name,
+          'Renamed Folder',
+        );
+        final update = tabs.added.whereType<UpdateTab>().single;
+        expect(update.tab.tabId, 't1');
+        expect(update.tab.collectionName, 'Renamed Folder');
+        expect(find.text('Renamed to "Renamed Folder"'), findsOneWidget);
+      },
+    );
 
     testWidgets(
       'EDIT DESCRIPTION confirm dispatches UpdateNodeDescription (trimmed) '
@@ -448,6 +506,101 @@ void main() {
       );
       expect(find.text('UNDO'), findsOneWidget);
     });
+
+    testWidgets(
+      'A10: folder mutated while the confirm dialog is up — UNDO restores '
+      'the delete-time snapshot, keeping the interim mutation',
+      (tester) async {
+        final bloc = await openMenu(
+          tester,
+          _folderNode,
+          seedTree: [_folderNode],
+        );
+        addTearDown(bloc.close);
+
+        await tester.tap(find.text('DELETE'));
+        await tester.pumpAndSettle();
+        expect(find.text('Delete folder?'), findsOneWidget);
+
+        // Background mutation while the dialog is open (e.g. a git-pull
+        // reload or Cmd+S saving into the folder — shortcuts fire above the
+        // modal): a request lands inside the folder.
+        const interimChild = CollectionNodeEntity(
+          id: 'r-new',
+          name: 'Added While Confirming',
+          isFolder: false,
+          config: HttpRequestConfigEntity(
+            id: 'r-new',
+            url: 'https://interim.dev',
+          ),
+        );
+        bloc.add(
+          ReplaceCollections([
+            _folderNode.copyWith(children: const [interimChild]),
+          ]),
+        );
+        await tester.pump();
+        expect(
+          CollectionsTreeHelper.findNode(bloc.state.collections, 'r-new'),
+          isNotNull,
+          reason: 'the interim mutation must land before the confirm',
+        );
+
+        await tester.tap(find.widgetWithText(TextButton, 'DELETE'));
+        await tester.pumpAndSettle();
+        expect(
+          CollectionsTreeHelper.findNode(bloc.state.collections, 'f1'),
+          isNull,
+        );
+
+        await tester.tap(find.text('UNDO'));
+        await tester.pumpAndSettle();
+
+        final restored = CollectionsTreeHelper.findNode(
+          bloc.state.collections,
+          'f1',
+        );
+        expect(restored, isNotNull);
+        expect(
+          restored!.children,
+          contains(interimChild),
+          reason:
+              'the restore snapshot must be captured at delete time, not at '
+              'dialog-open time — a pre-await snapshot silently drops the '
+              'interim mutation',
+        );
+      },
+    );
+
+    testWidgets(
+      'A10: folder vanished while the confirm dialog is up — confirming is '
+      'a no-op with an informational snackbar and no UNDO',
+      (tester) async {
+        final bloc = await openMenu(
+          tester,
+          _folderNode,
+          seedTree: [_folderNode],
+        );
+        addTearDown(bloc.close);
+
+        await tester.tap(find.text('DELETE'));
+        await tester.pumpAndSettle();
+        expect(find.text('Delete folder?'), findsOneWidget);
+
+        // The folder is removed while the dialog is open (e.g. a git pull
+        // deleted it upstream).
+        bloc.add(const ReplaceCollections([]));
+        await tester.pump();
+
+        await tester.tap(find.widgetWithText(TextButton, 'DELETE'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('"My Folder" no longer exists'), findsOneWidget);
+        expect(find.text('Deleted "My Folder"'), findsNothing);
+        expect(find.text('UNDO'), findsNothing);
+        expect(bloc.state.collections, isEmpty);
+      },
+    );
   });
 
   group('showCollectionNodeMenuAt (right-click entry point)', () {
@@ -538,6 +691,81 @@ void main() {
         isNotNull,
         reason: 'dismissing without a selection must not mutate the tree',
       );
+    });
+  });
+
+  group('renameOpenTabsForNode', () {
+    const linkedTab = HttpRequestTabEntity(
+      tabId: 't1',
+      config: HttpRequestConfigEntity(id: 't1'),
+      collectionNodeId: 'n1',
+      collectionName: 'old',
+    );
+    const unlinkedTab = HttpRequestTabEntity(
+      tabId: 't2',
+      config: HttpRequestConfigEntity(id: 't2'),
+    );
+
+    test(
+      'dispatches exactly one UpdateTab carrying the new name for the '
+      'linked tab and leaves unlinked tabs alone',
+      () {
+        final tabs = _RecordingTabsBloc(
+          const TabsState(
+            panels: [
+              PanelEntity(
+                id: 'p1',
+                name: 'Panel 1',
+                tabs: [linkedTab, unlinkedTab],
+                activeTabId: 't1',
+              ),
+            ],
+            activePanelId: 'p1',
+          ),
+        );
+        addTearDown(tabs.close);
+
+        renameOpenTabsForNode(tabs, 'n1', 'new');
+
+        final update = tabs.added.single as UpdateTab;
+        expect(update.tab.tabId, 't1');
+        expect(update.tab.collectionName, 'new');
+      },
+    );
+
+    test('carries the rename to linked tabs across all panels', () {
+      const linkedInOtherPanel = HttpRequestTabEntity(
+        tabId: 't3',
+        config: HttpRequestConfigEntity(id: 't3'),
+        collectionNodeId: 'n1',
+        collectionName: 'old',
+      );
+      final tabs = _RecordingTabsBloc(
+        const TabsState(
+          panels: [
+            PanelEntity(
+              id: 'p1',
+              name: 'Panel 1',
+              tabs: [linkedTab, unlinkedTab],
+              activeTabId: 't1',
+            ),
+            PanelEntity(
+              id: 'p2',
+              name: 'Panel 2',
+              tabs: [linkedInOtherPanel],
+              activeTabId: 't3',
+            ),
+          ],
+          activePanelId: 'p1',
+        ),
+      );
+      addTearDown(tabs.close);
+
+      renameOpenTabsForNode(tabs, 'n1', 'new');
+
+      final updates = tabs.added.whereType<UpdateTab>().toList();
+      expect(updates.map((e) => e.tab.tabId).toList(), ['t1', 't3']);
+      expect(updates.every((e) => e.tab.collectionName == 'new'), isTrue);
     });
   });
 }

@@ -2,6 +2,8 @@
 // helpers — `tab(...)`, `buildBloc()`, `buildLoadedBloc()` — that the panel
 // *event* tests landing in Tasks 5 and 6 reuse. Keep the helpers stable: later
 // tasks append `blocTest`s that call them, so changing their contract ripples.
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -564,5 +566,60 @@ void main() {
 
       expect(bloc.state.panels.map((p) => p.id).toList(), [ids[1], ids[0]]);
     });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Regression: a panel persist that follows an await must write the LIVE
+  // panel, never the handler's pre-await snapshot (_persistLivePanel).
+  // ---------------------------------------------------------------------------
+
+  group('panel persist race (stale pre-await snapshot)', () {
+    test(
+      'AddTab persists the live panel after a slow putTab — a SetActiveIndex '
+      'landing mid-write wins on disk, not just in the UI',
+      () async {
+        final bloc = await buildLoadedBloc();
+        addTearDown(bloc.close);
+        final seedTabId = bloc.state.tabs.single.tabId;
+
+        // Gate putTab so AddTab parks on its tabs-box await (mimics the slow
+        // serialization of a tab with large cached response bodies).
+        final putTabGate = Completer<void>();
+        when(
+          () => repository.putTab(any()),
+        ).thenAnswer((_) => putTabGate.future);
+
+        // AddTab emits (new tab becomes active) then blocks awaiting putTab.
+        bloc.add(const AddTab());
+        await bloc.stream.firstWhere((s) => s.tabs.length == 2);
+        final addedTabId = bloc.state.tabs.last.tabId;
+        expect(bloc.state.panels.single.activeTabId, addedTabId);
+
+        // The user clicks back to the first tab while putTab is in flight —
+        // SetActiveIndex emits AND persists its panel immediately.
+        bloc.add(const SetActiveIndex(0));
+        await bloc.stream.firstWhere(
+          (s) => s.panels.single.activeTabId == seedTabId,
+        );
+
+        // putTab completes — AddTab resumes and runs its panel persist.
+        putTabGate.complete();
+        await pumpEventQueue();
+
+        // The LAST putPanel must carry the newer activeTabId (the seed tab).
+        // The buggy pre-await snapshot carried the added tab instead, so a
+        // restart would activate the wrong tab.
+        final persisted = verify(
+          () => repository.putPanel(captureAny()),
+        ).captured.cast<PanelEntity>();
+        expect(
+          persisted.last.activeTabId,
+          seedTabId,
+          reason:
+              'AddTab must persist the live panel (with the activeTabId set '
+              'by the later SetActiveIndex), not its pre-await snapshot',
+        );
+      },
+    );
   });
 }

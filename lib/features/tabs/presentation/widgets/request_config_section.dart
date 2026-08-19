@@ -38,21 +38,17 @@ class RequestConfigSection extends StatefulWidget {
 }
 
 class _RequestConfigSectionState extends State<RequestConfigSection>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const int _sectionCount = 5;
 
-  late final TabController _tabController;
+  late TabController _tabController;
   late final RequestSectionIndex _sectionIndex;
 
   @override
   void initState() {
     super.initState();
     _sectionIndex = context.read<RequestSectionIndex>();
-    _tabController = TabController(
-      length: _sectionCount,
-      vsync: this,
-      initialIndex: _sectionIndex.value.clamp(0, _sectionCount - 1),
-    )..addListener(_onTabChanged);
+    _tabController = _createController(_sectionIndex.value);
     _sectionIndex.addListener(_onSectionIndexChanged);
   }
 
@@ -65,18 +61,30 @@ class _RequestConfigSectionState extends State<RequestConfigSection>
     super.dispose();
   }
 
+  TabController _createController(int index) => TabController(
+    length: _sectionCount,
+    vsync: this,
+    initialIndex: index.clamp(0, _sectionCount - 1),
+  )..addListener(_onTabChanged);
+
   void _onTabChanged() {
     // Same-value writes are dropped by ValueNotifier, so the echo from
-    // _onSectionIndexChanged's own jump can't loop.
+    // _onSectionIndexChanged's own sync can't loop.
     _sectionIndex.value = _tabController.index;
   }
 
-  /// Another request tab's strip picked a section — jump (no animation: this
-  /// instance is usually offstage with tickers disabled when it happens).
+  /// Another request tab's strip picked a section — follow by REPLACING the
+  /// controller, never by setting `.index`: this instance is offstage with
+  /// tickers muted when it happens, and a muted TabBarView warp stalls
+  /// mid-flight (for non-adjacent jumps it also leaves the children swapped),
+  /// showing the wrong section's content under the right label. A fresh
+  /// controller makes TabBarView jump synchronously with no animation.
   void _onSectionIndexChanged() {
-    if (_sectionIndex.value != _tabController.index) {
-      _tabController.index = _sectionIndex.value;
-    }
+    if (_sectionIndex.value == _tabController.index) return;
+    final old = _tabController..removeListener(_onTabChanged);
+    _tabController = _createController(_sectionIndex.value);
+    old.dispose();
+    setState(() {});
   }
 
   @override

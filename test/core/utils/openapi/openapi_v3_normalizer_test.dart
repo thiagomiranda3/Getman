@@ -487,4 +487,109 @@ void main() {
       expect(api.operations.single.security, isNull);
     });
   });
+
+  group('type-wrong leaf values (JSON-valid, schema-wrong specs)', () {
+    test('non-string leaves are coerced with toString, not thrown on', () {
+      // {"info":{"title":5}} used to throw TypeError out of the normalizer.
+      final api = normalizeOpenApiV3({
+        'openapi': '3.0.0',
+        'info': {'title': 5},
+        'servers': [
+          {'url': 123, 'description': 4.5},
+        ],
+        'paths': {
+          '/x': {
+            'get': {'summary': 7},
+          },
+        },
+      });
+      expect(api.title, '5');
+      expect(api.servers.single.url, '123');
+      expect(api.servers.single.description, '4.5');
+      expect(api.operations.single.name, '7');
+    });
+
+    test('the exact reported fixture normalizes instead of throwing', () {
+      final api = normalizeOpenApiV3({
+        'openapi': '3.0.0',
+        'info': {'title': 5},
+        'paths': <String, dynamic>{},
+      });
+      expect(api.title, '5');
+      expect(api.operations, isEmpty);
+    });
+
+    test('a non-map securityScheme entry is skipped, not thrown on', () {
+      final api = normalizeOpenApiV3({
+        'info': {'title': 'T'},
+        'components': {
+          'securitySchemes': {'bad': 'not-a-map'},
+        },
+        'security': [
+          {'bad': <dynamic>[]},
+        ],
+        'paths': {
+          '/x': {'get': <String, dynamic>{}},
+        },
+      });
+      expect(api.operations.single.security, isNull);
+    });
+  });
+
+  group('ref fan-out budget', () {
+    test('a billion-laughs schema normalizes quickly and warns on the '
+        'operation that crossed the budget', () {
+      final schemas = <String, dynamic>{};
+      for (var level = 0; level < 10; level++) {
+        schemas['L$level'] = {
+          'type': 'object',
+          'properties': {
+            for (var i = 0; i < 10; i++)
+              'p$i': level == 9
+                  ? {'type': 'string'}
+                  : {r'$ref': '#/components/schemas/L${level + 1}'},
+          },
+        };
+      }
+      final api = normalizeOpenApiV3({
+        'openapi': '3.0.0',
+        'info': {'title': 'T'},
+        'components': {'schemas': schemas},
+        'paths': {
+          '/bomb': {
+            'post': {
+              'requestBody': {
+                'content': {
+                  'application/json': {
+                    'schema': {r'$ref': '#/components/schemas/L0'},
+                  },
+                },
+              },
+            },
+          },
+          '/after': {'get': <String, dynamic>{}},
+        },
+      });
+      final bomb = api.operations.firstWhere((o) => o.path == '/bomb');
+      expect(
+        bomb.warnings,
+        contains(
+          'Spec too complex to fully resolve — some schema examples were '
+          'truncated.',
+        ),
+      );
+      // Only the crossing operation warns; later ops stay clean.
+      final after = api.operations.firstWhere((o) => o.path == '/after');
+      expect(after.warnings, isEmpty);
+    });
+
+    test('a normal spec resolves identically with no truncation warning', () {
+      final api = normalizeOpenApiV3(_spec);
+      for (final op in api.operations) {
+        expect(op.warnings, isEmpty);
+      }
+      final post = api.operations.firstWhere((o) => o.method == 'POST');
+      expect(post.body!.raw, contains('"name"'));
+    });
+  });
 }

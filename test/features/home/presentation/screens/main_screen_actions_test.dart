@@ -27,12 +27,15 @@ import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/navigation/intents.dart';
 import 'package:getman/core/navigation/url_focus_registry.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/core/ui/widgets/app_snack_bar.dart';
+import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
+import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
@@ -42,6 +45,7 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
+import 'package:getman/features/tabs/presentation/widgets/save_all_coordinator.dart';
 import 'package:mocktail/mocktail.dart';
 
 // ── mocks ────────────────────────────────────────────────────────────────────
@@ -129,8 +133,13 @@ Future<void> _pump(
   Widget child = const SizedBox.expand(),
 }) async {
   await tester.pumpWidget(
-    RepositoryProvider<UrlFocusRegistry>.value(
-      value: focusRegistry,
+    MultiRepositoryProvider(
+      providers: [
+        RepositoryProvider<UrlFocusRegistry>.value(value: focusRegistry),
+        RepositoryProvider<TabDirtyChecker>.value(
+          value: const TabDirtyChecker(),
+        ),
+      ],
       child: MaterialApp(
         theme: brutalistTheme(Brightness.light),
         home: MultiBlocProvider(
@@ -142,9 +151,10 @@ Future<void> _pump(
           ],
           child: Builder(
             builder: (ctx) {
-              final tabsState = ctx.watch<TabsBloc>().state;
-              final activeIndex = tabsState.activeIndex;
-              final tabs = tabsState.tabs;
+              // The real MainScreen builder still snapshots tabsState for
+              // LAYOUT (tab strip, content stack), but every Action callback
+              // below live-reads TabsBloc state at press time (K4) — so the
+              // harness no longer captures builder-scope tabs/activeIndex.
               return Actions(
                 actions: <Type, Action<Intent>>{
                   NewTabIntent: CallbackAction<NewTabIntent>(
@@ -155,30 +165,38 @@ Future<void> _pump(
                   ),
                   CloseTabIntent: CallbackAction<CloseTabIntent>(
                     onInvoke: (_) {
-                      if (activeIndex < 0 || activeIndex >= tabs.length) {
+                      // Live-read at press time (K4), mirroring MainScreen —
+                      // the builder snapshot (`tabs`/`activeIndex` above) is
+                      // one frame stale.
+                      final s = ctx.read<TabsBloc>().state;
+                      if (s.activeIndex < 0 || s.activeIndex >= s.tabs.length) {
                         return null;
                       }
                       // In a real MainScreen this calls _confirmAndClose;
                       // here we dispatch RemoveTab directly so the test can
                       // assert the event without a dialog.
                       ctx.read<TabsBloc>().add(
-                        RemoveTab(tabs[activeIndex].tabId),
+                        RemoveTab(s.tabs[s.activeIndex].tabId),
                       );
                       return null;
                     },
                   ),
                   SendRequestIntent: CallbackAction<SendRequestIntent>(
                     onInvoke: (_) {
-                      if (activeIndex >= 0 &&
-                          activeIndex < tabs.length &&
-                          !tabs[activeIndex].isSending) {
+                      // Live-read (K4), mirroring MainScreen (which also
+                      // resolves envVars — omitted here as it needs no
+                      // index/identity logic).
+                      final s = ctx.read<TabsBloc>().state;
+                      if (s.activeIndex >= 0 &&
+                          s.activeIndex < s.tabs.length &&
+                          !s.tabs[s.activeIndex].isSending) {
                         final settings = ctx
                             .read<SettingsBloc>()
                             .state
                             .settings;
                         ctx.read<TabsBloc>().add(
                           SendRequest(
-                            tabId: tabs[activeIndex].tabId,
+                            tabId: s.tabs[s.activeIndex].tabId,
                             responseHistoryLimit: settings.responseHistoryLimit,
                             saveLargeResponsesInHistory:
                                 settings.saveLargeResponsesInHistory,
@@ -188,21 +206,69 @@ Future<void> _pump(
                       return null;
                     },
                   ),
+                  // Verbatim copy of MainScreen._saveActiveTabFromShell (K2):
+                  // the shell-level Cmd/Ctrl+S fallback for focus outside the
+                  // RequestView subtree.
+                  SaveRequestIntent: CallbackAction<SaveRequestIntent>(
+                    onInvoke: (_) {
+                      final s = ctx.read<TabsBloc>().state;
+                      if (s.activeIndex < 0 || s.activeIndex >= s.tabs.length) {
+                        return null;
+                      }
+                      final tab = s.tabs[s.activeIndex];
+                      final collectionsBloc = ctx.read<CollectionsBloc>();
+                      final savedConfigs = collectionsBloc.state.configById;
+                      final isDirty = ctx.read<TabDirtyChecker>()(
+                        tab: tab,
+                        savedConfigs: savedConfigs,
+                      );
+                      if (!isDirty) {
+                        showAppSnackBar(
+                          ctx,
+                          saveAllSnackBarMessage(
+                            savedCount: 0,
+                            skippedCount: 0,
+                          ),
+                        );
+                        return null;
+                      }
+                      final nodeId = tab.collectionNodeId;
+                      if (nodeId == null || !savedConfigs.containsKey(nodeId)) {
+                        showAppSnackBar(
+                          ctx,
+                          'Focus the request to save it to a collection',
+                        );
+                        return null;
+                      }
+                      collectionsBloc.add(
+                        UpdateNodeRequest(nodeId, tab.config.copyWith()),
+                      );
+                      showAppSnackBar(
+                        ctx,
+                        saveAllSnackBarMessage(savedCount: 1, skippedCount: 0),
+                      );
+                      return null;
+                    },
+                  ),
                   NextTabIntent: CallbackAction<NextTabIntent>(
                     onInvoke: (_) {
-                      if (tabs.length < 2) return null;
+                      // Live-read (K4), mirroring MainScreen.
+                      final s = ctx.read<TabsBloc>().state;
+                      if (s.tabs.length < 2) return null;
                       ctx.read<TabsBloc>().add(
-                        SetActiveIndex((activeIndex + 1) % tabs.length),
+                        SetActiveIndex((s.activeIndex + 1) % s.tabs.length),
                       );
                       return null;
                     },
                   ),
                   PrevTabIntent: CallbackAction<PrevTabIntent>(
                     onInvoke: (_) {
-                      if (tabs.length < 2) return null;
+                      // Live-read (K4), mirroring MainScreen.
+                      final s = ctx.read<TabsBloc>().state;
+                      if (s.tabs.length < 2) return null;
                       ctx.read<TabsBloc>().add(
                         SetActiveIndex(
-                          (activeIndex - 1 + tabs.length) % tabs.length,
+                          (s.activeIndex - 1 + s.tabs.length) % s.tabs.length,
                         ),
                       );
                       return null;
@@ -216,11 +282,13 @@ Future<void> _pump(
                   ),
                   FocusUrlIntent: CallbackAction<FocusUrlIntent>(
                     onInvoke: (_) {
-                      if (activeIndex < 0 || activeIndex >= tabs.length) {
+                      // Live-read (K4), mirroring MainScreen.
+                      final s = ctx.read<TabsBloc>().state;
+                      if (s.activeIndex < 0 || s.activeIndex >= s.tabs.length) {
                         return null;
                       }
                       ctx.read<UrlFocusRegistry>().focus(
-                        tabs[activeIndex].tabId,
+                        s.tabs[s.activeIndex].tabId,
                       );
                       return null;
                     },
@@ -374,6 +442,26 @@ void main() {
         await tester.pump();
         verifyNever(() => tabsBloc.add(any(that: isA<RemoveTab>())));
       });
+
+      testWidgets(
+        'closes the NEW active tab after a state change WITHOUT a frame '
+        '(K4: live-read, never the builder snapshot)',
+        (tester) async {
+          await pump(tester); // built while tab 1 was active
+          // Simulate a Ctrl+Tab + Cmd/Ctrl+W chord inside one frame: the
+          // bloc state has moved to tab 2, but NO rebuild has happened, so
+          // a snapshot-capturing callback would still close tab 1 — the tab
+          // the user just LEFT.
+          when(() => tabsBloc.state).thenReturn(_tabsState(activeIndex: 1));
+          Actions.invoke(
+            tester.element(find.byKey(const ValueKey('ms_actions_focus'))),
+            const CloseTabIntent(),
+          );
+          // Deliberately no pump between the state change and the invoke.
+          verify(() => tabsBloc.add(RemoveTab(_kTab2.tabId))).called(1);
+          verifyNever(() => tabsBloc.add(RemoveTab(_kTab.tabId)));
+        },
+      );
     });
 
     group('SendRequestIntent', () {
@@ -423,6 +511,162 @@ void main() {
         await tester.pump();
         verifyNever(() => tabsBloc.add(any(that: isA<SendRequest>())));
       });
+    });
+
+    // K2: the shell-level Cmd/Ctrl+S fallback — reachable when focus sits
+    // OUTSIDE the RequestView subtree (HISTORY search box, collections
+    // filter field), where the chord used to be dead. Semantics mirror
+    // planSaveAllTabs' single-tab path exactly.
+    group('SaveRequestIntent (shell-level fallback)', () {
+      const savedConfig = HttpRequestConfigEntity(id: 'cfg-1');
+      const dirtyConfig = HttpRequestConfigEntity(
+        id: 'cfg-1',
+        url: 'https://dirty.example',
+      );
+
+      /// Puts [tab] alone in the active panel and, when [savedNode] is given,
+      /// exposes it through CollectionsState so configById resolves it.
+      void stubTab(
+        HttpRequestTabEntity tab, {
+        CollectionNodeEntity? savedNode,
+      }) {
+        final panel = PanelEntity(
+          id: 'p1',
+          name: 'Panel 1',
+          tabs: [tab],
+          activeTabId: tab.tabId,
+        );
+        when(() => tabsBloc.state).thenReturn(
+          TabsState(
+            panels: [panel],
+            activePanelId: 'p1',
+            tabs: [tab], // explicit — mock state doesn't derive
+          ),
+        );
+        when(() => collectionsBloc.state).thenReturn(
+          CollectionsState(collections: [?savedNode]),
+        );
+      }
+
+      testWidgets(
+        'dirty LINKED tab: dispatches UpdateNodeRequest and shows '
+        "'Saved 1 request'",
+        (tester) async {
+          stubTab(
+            const HttpRequestTabEntity(
+              tabId: 'ms-tab-1',
+              config: dirtyConfig,
+              collectionNodeId: 'node-1',
+            ),
+            savedNode: const CollectionNodeEntity(
+              id: 'node-1',
+              name: 'REQ',
+              isFolder: false,
+              config: savedConfig,
+            ),
+          );
+          await pump(tester);
+          Actions.invoke(
+            tester.element(find.byKey(const ValueKey('ms_actions_focus'))),
+            const SaveRequestIntent(),
+          );
+          await tester.pump();
+          verify(
+            () => collectionsBloc.add(
+              const UpdateNodeRequest('node-1', dirtyConfig),
+            ),
+          ).called(1);
+          expect(find.text('Saved 1 request'), findsOneWidget);
+          await tester.pumpAndSettle(); // drain the snackbar timer
+        },
+      );
+
+      testWidgets(
+        'dirty UNLINKED tab: no dispatch, informational snackbar (the save '
+        'dialog needs RequestView context)',
+        (tester) async {
+          stubTab(
+            const HttpRequestTabEntity(
+              tabId: 'ms-tab-1',
+              config: dirtyConfig, // differs from the pristine default
+            ),
+          );
+          await pump(tester);
+          Actions.invoke(
+            tester.element(find.byKey(const ValueKey('ms_actions_focus'))),
+            const SaveRequestIntent(),
+          );
+          await tester.pump();
+          verifyNever(
+            () => collectionsBloc.add(any(that: isA<UpdateNodeRequest>())),
+          );
+          expect(
+            find.text('Focus the request to save it to a collection'),
+            findsOneWidget,
+          );
+          await tester.pumpAndSettle();
+        },
+      );
+
+      testWidgets(
+        'STALE link (node deleted while the tab was open) behaves like '
+        'unlinked: no dispatch, informational snackbar',
+        (tester) async {
+          stubTab(
+            const HttpRequestTabEntity(
+              tabId: 'ms-tab-1',
+              config: dirtyConfig,
+              collectionNodeId: 'node-gone',
+            ),
+            // no savedNode — configById has no entry for node-gone
+          );
+          await pump(tester);
+          Actions.invoke(
+            tester.element(find.byKey(const ValueKey('ms_actions_focus'))),
+            const SaveRequestIntent(),
+          );
+          await tester.pump();
+          verifyNever(
+            () => collectionsBloc.add(any(that: isA<UpdateNodeRequest>())),
+          );
+          expect(
+            find.text('Focus the request to save it to a collection'),
+            findsOneWidget,
+          );
+          await tester.pumpAndSettle();
+        },
+      );
+
+      testWidgets(
+        "CLEAN tab: no dispatch, 'Nothing to save' (same dirty gate as "
+        'save-all)',
+        (tester) async {
+          stubTab(
+            const HttpRequestTabEntity(
+              tabId: 'ms-tab-1',
+              config: savedConfig,
+              collectionNodeId: 'node-1',
+            ),
+            savedNode: const CollectionNodeEntity(
+              id: 'node-1',
+              name: 'REQ',
+              isFolder: false,
+              config: savedConfig,
+            ),
+          );
+          await pump(tester);
+          Actions.invoke(
+            tester.element(find.byKey(const ValueKey('ms_actions_focus'))),
+            const SaveRequestIntent(),
+          );
+          await tester.pump();
+          verifyNever(
+            () => collectionsBloc.add(any(that: isA<UpdateNodeRequest>())),
+          );
+          expect(find.text('Nothing to save'), findsOneWidget);
+          await tester.pumpAndSettle();
+        },
+      );
     });
 
     group('NextTabIntent / PrevTabIntent', () {

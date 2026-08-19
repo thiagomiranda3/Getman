@@ -2,7 +2,13 @@
 // send, streaming the response body so it can be capped at
 // kMaxRenderableResponseBytes, classified (textual vs media/binary), and
 // decoded honoring a declared charset — oversize bodies become a "too
-// large" placeholder instead of buffering into memory.
+// large" placeholder instead of buffering into memory. Bodyless responses
+// (HEAD, 1xx/204/304) skip the declared-Content-Length too-large early-out:
+// their Content-Length legally echoes the representation size with zero
+// body bytes. Response Content-Encoding is handled case-insensitively:
+// gzip/deflate bodies the platform didn't decompress are decoded via the
+// content_encoding.dart seam (dart:io-free here); br/zstd/unknown become an
+// "unsupported" placeholder instead of mojibake.
 //
 // Gotchas: redirects are followed with a MANUAL loop, not Dio's built-in
 // follow — each hop is sent with followRedirects:false so the cookie
@@ -23,6 +29,7 @@ import 'package:flutter/foundation.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/failures.dart';
 import 'package:getman/core/network/cancel_handle.dart';
+import 'package:getman/core/network/content_encoding.dart';
 import 'package:getman/core/network/dio_adapter_config.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/network/network_config.dart';
@@ -204,10 +211,21 @@ class NetworkService {
               return lk == 'content-type' || lk == 'content-length';
             });
           }
-          // Never leak credentials across an origin boundary (dart:io parity).
+          // Never leak credentials across an origin boundary (dart:io
+          // parity): its nonRedirectHeaders strips authorization AND the
+          // cookie headers — a hand-typed `Cookie: session=…` row must not
+          // follow a redirect to a different host any more than a bearer
+          // token does. (Jar cookies are safe either way: the interceptor
+          // re-matches them per hop.)
           if (nextUri.host.toLowerCase() != fromUri.host.toLowerCase()) {
+            const nonRedirectHeaders = {
+              'authorization',
+              'www-authenticate',
+              'cookie',
+              'cookie2',
+            };
             currentHeaders.removeWhere(
-              (k, _) => k.toLowerCase() == 'authorization',
+              (k, _) => nonRedirectHeaders.contains(k.toLowerCase()),
             );
           }
 
@@ -220,6 +238,10 @@ class NetworkService {
         return await _buildResponse(
           response,
           currentUrl,
+          // The FINAL hop's method — a 303/POST-301/302 hop may have rewritten
+          // it to GET en route, and the bodyless-response rules below care
+          // about what was actually sent last, not the original verb.
+          currentMethod,
           stopwatch,
           cancelToken,
         );
@@ -235,10 +257,12 @@ class NetworkService {
 
   /// Reads [response]'s body (capping at [_maxResponseBytes]) and classifies it
   /// into the final [HttpResponseEntity]. [url] is the final hop's URL (used in
-  /// the too-large / media placeholders); [stopwatch] spans the whole chain.
+  /// the too-large / media placeholders); [method] is the final hop's method
+  /// (post any redirect rewrite); [stopwatch] spans the whole chain.
   Future<HttpResponseEntity> _buildResponse(
     Response<ResponseBody> response,
     String url,
+    String method,
     Stopwatch stopwatch,
     CancelToken cancelToken,
   ) async {
@@ -247,11 +271,27 @@ class NetworkService {
     );
     final status = response.statusCode ?? 0;
 
+    // A HEAD response, and any 1xx/204/304, carries NO body by definition
+    // (RFC 7230 §3.3.3) — yet its Content-Length may legally echo the
+    // representation's size (HEAD of a 6 GB mirror declares 6 GB with zero
+    // body bytes; a 304 may echo the entity length per RFC 7232). The
+    // declared-length early-out below must not fire for these: it would
+    // render the "too large" placeholder and pointlessly cancel the
+    // connection. Read the (empty) body normally instead. The mid-stream
+    // overflow guard stays active regardless — it measures bytes actually
+    // received, so it never fires on a conforming bodyless response but
+    // still protects memory against a server that sends one anyway.
+    final bodyless =
+        method.toUpperCase() == 'HEAD' ||
+        status == 204 ||
+        status == 304 ||
+        (status >= 100 && status < 200);
+
     // Early-out: declared length already over the cap → don't read at all.
     final declared = int.tryParse(
       response.headers.value('content-length') ?? '',
     );
-    if (declared != null && declared > _maxResponseBytes) {
+    if (!bodyless && declared != null && declared > _maxResponseBytes) {
       cancelToken.cancel();
       stopwatch.stop();
       return HttpResponseEntity(
@@ -286,7 +326,62 @@ class NetworkService {
       );
     }
 
-    final bytes = builder.takeBytes();
+    var bytes = builder.takeBytes();
+
+    // Content-Encoding: dart:io auto-decompresses ONLY an exactly-lowercase
+    // 'gzip' header value. 'GZIP'/'x-gzip'/'deflate' arrive as raw compressed
+    // bytes (which the textual classifier would utf8-decode into mojibake),
+    // and 'br'/'zstd' — negotiated by a pasted Chrome-cURL Accept-Encoding —
+    // have no Dart decoder at all. Empty bodies skip all of this: a HEAD/304
+    // may echo the representation's Content-Encoding with zero body bytes.
+    final encoding = _residualContentEncoding(headersMap);
+    if (bytes.isNotEmpty && encoding != null) {
+      // A gzip-typed PAYLOAD (.tar.gz served as application/gzip with
+      // Content-Encoding: gzip) must not be attempt-decoded a second time:
+      // the transfer layer already removed the transfer encoding, and a
+      // second successful decode would silently hand the user the inner
+      // archive instead of the .gz file they requested.
+      final gzipTypedPayload = (contentTypeOf(headersMap)?.toLowerCase() ?? '')
+          .contains('gzip');
+      if (encoding == 'gzip' || encoding == 'x-gzip' || encoding == 'deflate') {
+        // Attempt-decode: when the platform already decompressed (dart:io on
+        // lowercase 'gzip'), decoding again fails and null keeps bytes as-is.
+        // The web stub always returns null (the browser already decoded).
+        final decoded = gzipTypedPayload
+            ? null
+            : decodeContentEncoding(bytes, encoding);
+        if (decoded != null) {
+          if (decoded.length > _maxResponseBytes) {
+            // Decompressed size busts the render cap even though the wire
+            // size didn't — same too-large treatment as an oversized stream.
+            return HttpResponseEntity(
+              statusCode: status,
+              body: _tooLargePlaceholder(headersMap, url, decoded.length),
+              headers: headersMap,
+              durationMs: stopwatch.elapsedMilliseconds,
+            );
+          }
+          bytes = decoded;
+        }
+      } else if (!platformDecompressesTransparently) {
+        // br / zstd / unknown (or a multi-token chain): surface a clear
+        // placeholder instead of feeding compressed bytes to the textual
+        // decoder — mirrors the too-large placeholder shape (no bodyBytes),
+        // so nothing downstream tries to parse or preview it. On web this
+        // branch is SKIPPED: the browser transparently decompresses every
+        // encoding it negotiated (incl. br/zstd), so the bytes here are
+        // already plain despite the residual header.
+        return HttpResponseEntity(
+          statusCode: status,
+          body:
+              '[content-encoding: $encoding — unsupported; remove the '
+              'Accept-Encoding header to let the server fall back]',
+          headers: headersMap,
+          durationMs: stopwatch.elapsedMilliseconds,
+        );
+      }
+    }
+
     final contentType = contentTypeOf(headersMap);
     final kind = bytes.isEmpty
         ? ResponseMediaKind.textual
@@ -326,19 +421,51 @@ class NetworkService {
     }
   }
 
-  /// Decodes a textual body honoring the declared `charset` (read from the raw
-  /// Content-Type header — [contentTypeOf] strips the parameters). ISO-8859-1
-  /// family charsets decode as latin1; everything else falls back to UTF-8 with
-  /// malformed sequences replaced (the safe default for unlabeled bodies).
-  String _decodeTextual(Uint8List bytes, Map<String, String> headers) {
-    switch (_charsetOf(headers)) {
-      case 'iso-8859-1':
-      case 'latin1':
-      case 'us-ascii':
-        return latin1.decode(bytes, allowInvalid: true);
-      default:
-        return utf8.decode(bytes, allowMalformed: true);
+  /// The lowercased Content-Encoding token still applying to the received
+  /// bytes, or null when none does. `identity` tokens are dropped; a
+  /// multi-token chain (rare, e.g. `gzip, br`) is returned joined so it lands
+  /// in the unsupported-placeholder branch instead of being half-decoded.
+  String? _residualContentEncoding(Map<String, String> headers) {
+    for (final e in headers.entries) {
+      if (e.key.toLowerCase() == 'content-encoding') {
+        // Encoding names are case-insensitive tokens (RFC 9110 §8.4) — some
+        // servers do send 'GZIP', which dart:io's exact-match auto-decompress
+        // ignores; lowercasing here is what routes it to our own decoder.
+        final tokens = e.value
+            .toLowerCase()
+            .split(',')
+            .map((t) => t.trim())
+            .where((t) => t.isNotEmpty && t != 'identity')
+            .toList();
+        if (tokens.isEmpty) return null;
+        return tokens.length == 1 ? tokens.first : tokens.join(', ');
+      }
     }
+    return null;
+  }
+
+  /// Decodes a textual body honoring the declared `charset` (read from the raw
+  /// Content-Type header — [contentTypeOf] strips the parameters). The single-
+  /// byte Latin family decodes as latin1; everything else falls back to UTF-8
+  /// with malformed sequences replaced (the safe default for unlabeled bodies).
+  ///
+  /// windows-1252/cp1252 and every iso-8859-* label route to latin1 even
+  /// though Dart has no exact codec for them: latin1 maps all 256 bytes
+  /// one-to-one, so only the 0x80–0x9F block (curly quotes, €, — in cp1252)
+  /// and the few ISO-8859-15 revisions come out as C1 controls — a strictly
+  /// better approximation than the UTF-8 branch, which mojibakes EVERY
+  /// 0x80–0xFF byte into U+FFFD.
+  String _decodeTextual(Uint8List bytes, Map<String, String> headers) {
+    final charset = _charsetOf(headers);
+    if (charset != null &&
+        (charset == 'windows-1252' ||
+            charset == 'cp1252' ||
+            charset == 'latin1' ||
+            charset == 'us-ascii' ||
+            charset.startsWith('iso-8859-'))) {
+      return latin1.decode(bytes, allowInvalid: true);
+    }
+    return utf8.decode(bytes, allowMalformed: true);
   }
 
   static final RegExp _charsetPattern = RegExp(

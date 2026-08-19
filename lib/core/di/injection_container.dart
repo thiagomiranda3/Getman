@@ -12,6 +12,7 @@
 // between-test isolation; registered adapters intentionally survive (Hive
 // can't unregister them).
 
+import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 import 'package:getman/core/git/gh_service.dart';
 import 'package:getman/core/git/git_service.dart';
@@ -302,8 +303,9 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     // registered below, alongside NetworkService, once the cookie store and
     // initial NetworkConfig it needs (H2) are available.
     ..registerLazySingleton(() => RealtimeBloc(service: sl()))
-    // Features - MCP (Model Context Protocol client over Streamable HTTP)
-    ..registerLazySingleton(McpService.new)
+    // Features - MCP (Model Context Protocol client over Streamable HTTP).
+    // McpService itself is registered below, alongside NetworkService, once
+    // the cookie store and initial NetworkConfig it needs are available.
     ..registerLazySingleton(() => McpBloc(service: sl()))
     // Features - Home
     ..registerLazySingleton(() => const TabDirtyChecker())
@@ -348,9 +350,81 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
         ),
       ),
     )
+    // Same wiring for MCP: SSL verify/proxy/mTLS + cookie jar — a bare Dio
+    // here silently ignored every network setting and stored cookie.
+    ..registerLazySingleton(
+      () => McpService(
+        dio: McpService.buildMcpDio(
+          initialSettings.toNetworkConfig(),
+          CookieInterceptor(cookieStore),
+        ),
+      ),
+    )
     ..registerLazySingleton(AppRouter.new);
 
+  // H4 housekeeping: drop request-rules entries whose owning config no longer
+  // exists anywhere (closed tabs / deleted nodes left them behind forever).
+  // All boxes it reads are open by this point (parallel wait + hydrate above).
+  await _sweepOrphanedRequestRules();
+
   return initialSettings;
+}
+
+/// Boot-time orphan sweep for the `requestRules` box (H4): rules are keyed by
+/// config id (UUIDs, never reused — duplication and history re-mint fresh
+/// ids) and nothing deleted them when their owner disappeared (tab closed,
+/// node deleted, history pruned), so the box grew forever. Runs once per
+/// boot, after every box is open.
+///
+/// The live-owner set is deliberately CONSERVATIVE — the union of every
+/// persisted store that can carry a rule-owning config id:
+///  - **open tabs** (`tabs` box): rules are only ever written keyed by a
+///    tab's config id (RULES-tab edits via `SaveRules`, and TREE-mode
+///    "Extract to {{var}}" via `AddExtractionRule`);
+///  - **collection nodes + their examples** (`collections` box, full tree
+///    walk): saving a tab stores `config.copyWith()` — SAME id — on the node,
+///    and reopening the node reuses that id, so a saved request legitimately
+///    owns its rules after the tab closes. Examples embed configs too;
+///    included defensively even though no current path keys rules by them;
+///  - **history entries** (`history` box): cannot own rules today (recording
+///    mints a fresh config id, and opening from history/command-palette mints
+///    another — `withId(Uuid().v4())`), but inclusion is free and shields a
+///    future id-reusing path from losing its rules.
+///
+/// In-memory-only id holders need no entry: the closed-tab restore stack is
+/// empty at boot, and duplicate-tab re-mints its config id. Failures only
+/// log — housekeeping must never block boot.
+Future<void> _sweepOrphanedRequestRules() async {
+  try {
+    final liveConfigIds = <String>{
+      for (final tab in Hive.box<HttpRequestTabModel>(HiveBoxes.tabs).values)
+        tab.config.id,
+      for (final config in Hive.box<HttpRequestConfig>(
+        HiveBoxes.history,
+      ).values)
+        config.id,
+    };
+    final pending = List.of(
+      Hive.box<CollectionNode>(HiveBoxes.collections).values,
+    );
+    while (pending.isNotEmpty) {
+      final node = pending.removeLast();
+      final configId = node.config?.id;
+      if (configId != null) liveConfigIds.add(configId);
+      for (final example in node.examples) {
+        liveConfigIds.add(example.config.id);
+      }
+      pending.addAll(node.children);
+    }
+    final removed = await sl<RequestRulesLocalDataSource>().sweepOrphans(
+      liveConfigIds,
+    );
+    if (removed > 0) {
+      debugPrint('Swept $removed orphaned request-rules entries');
+    }
+  } on Object catch (e) {
+    debugPrint('Request-rules orphan sweep failed (non-fatal): $e');
+  }
 }
 
 /// Ensures the cookies + request-rules boxes are open, migrates the cookie jar

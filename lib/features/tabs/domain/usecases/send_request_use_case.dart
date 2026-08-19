@@ -81,7 +81,19 @@ class SendRequestUseCase {
               statusCode: response?.statusCode ?? failure?.statusCode ?? 0,
               durationMs: response?.durationMs ?? 0,
             )
-          : config;
+          // Toggle OFF: strip the response columns, don't just skip writing
+          // new ones — a config opened from an older history entry still
+          // carries THAT entry's responseBody/headers/statusCode/durationMs,
+          // and recording it unmodified would leak the old response body into
+          // history (the very data the user turned the toggle off to keep
+          // out) and show a stale status chip. copyWith's `_unset` sentinel
+          // makes explicit nulls clear the fields.
+          : config.copyWith(
+              responseBody: null,
+              responseHeaders: null,
+              statusCode: null,
+              durationMs: null,
+            );
       await addToHistoryUseCase(historyConfig, settings.historyLimit);
     } on Object catch (e, st) {
       // History is best-effort; never fail the request because of persistence —

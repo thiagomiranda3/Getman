@@ -8,7 +8,12 @@ import 'package:mocktail/mocktail.dart';
 class _MockBox extends Mock implements Box<String> {}
 
 void main() {
-  group('replaceAllInBox (real box)', () {
+  setUpAll(() {
+    registerFallbackValue(<String, String>{});
+    registerFallbackValue(<dynamic>[]);
+  });
+
+  group('replaceAllKeyedInBox (real box)', () {
     late Directory tempDir;
     late Box<String> box;
 
@@ -17,8 +22,8 @@ void main() {
         'getman_hive_helpers_test',
       );
       Hive.init(tempDir.path);
-      box = await Hive.openBox<String>('replace_all_test');
-      await box.addAll(['old1', 'old2']);
+      box = await Hive.openBox<String>('replace_all_keyed_test');
+      await box.putAll({'a': 'old-a', 'b': 'old-b'});
     });
 
     tearDown(() async {
@@ -26,39 +31,50 @@ void main() {
       if (tempDir.existsSync()) await tempDir.delete(recursive: true);
     });
 
-    test('replaces the box contents', () async {
-      await replaceAllInBox(box, ['new1', 'new2', 'new3']);
-      expect(box.values.toList(), ['new1', 'new2', 'new3']);
+    test('upserts new entries and deletes stale keys', () async {
+      await replaceAllKeyedInBox(box, {'a': 'new-a', 'c': 'new-c'});
+
+      expect(box.toMap(), {'a': 'new-a', 'c': 'new-c'});
     });
 
-    test(
-      'materializes items before clearing, so values-derived input survives',
-      () async {
-        // A lazy iterable that reads the box would be emptied by an early
-        // clear().
-        await replaceAllInBox(box, box.values.map((v) => v.toUpperCase()));
-        expect(box.values.toList(), ['OLD1', 'OLD2']);
-      },
-    );
+    test('an empty replacement empties the box', () async {
+      await replaceAllKeyedInBox(box, <String, String>{});
+
+      expect(box.isEmpty, isTrue);
+    });
   });
 
-  group('replaceAllInBox (addAll failure)', () {
-    test('restores the previous contents and rethrows', () async {
+  group('replaceAllKeyedInBox (failure ordering)', () {
+    test('a failing putAll leaves the old entries intact: no clear, '
+        'no deleteAll, rethrows', () async {
       final box = _MockBox();
-      var addCalls = 0;
-      when(() => box.values).thenReturn(['old1', 'old2']);
-      when(box.clear).thenAnswer((_) async => 0);
-      when(() => box.addAll(any())).thenAnswer((_) async {
-        addCalls++;
-        if (addCalls == 1) throw StateError('disk full');
-        return <int>[];
-      });
+      when(() => box.keys).thenReturn(['a', 'b']);
+      when(() => box.putAll(any())).thenThrow(StateError('disk full'));
 
-      await expectLater(replaceAllInBox(box, ['new']), throwsStateError);
+      await expectLater(
+        replaceAllKeyedInBox(box, {'c': 'new-c'}),
+        throwsStateError,
+      );
 
-      final captured = verify(() => box.addAll(captureAny())).captured;
-      expect(captured.first, ['new']); // attempted write
-      expect(captured.last, ['old1', 'old2']); // restored snapshot
+      // The old-data-destroying calls must never have run.
+      verifyNever(box.clear);
+      verifyNever(() => box.deleteAll(any()));
+    });
+
+    test('happy path: putAll first, then deleteAll of only the stale keys, '
+        'never clear', () async {
+      final box = _MockBox();
+      when(() => box.keys).thenReturn(['a', 'stale']);
+      when(() => box.putAll(any())).thenAnswer((_) async {});
+      when(() => box.deleteAll(any())).thenAnswer((_) async {});
+
+      await replaceAllKeyedInBox(box, {'a': 'new-a'});
+
+      final put = verify(() => box.putAll(captureAny())).captured.single;
+      expect(put, {'a': 'new-a'});
+      final deleted = verify(() => box.deleteAll(captureAny())).captured.single;
+      expect(deleted, ['stale']);
+      verifyNever(box.clear);
     });
   });
 }

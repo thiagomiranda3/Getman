@@ -28,9 +28,12 @@ const _httpMethods = [
 /// Converts an OpenAPI 3.x spec map into a [NormalizedApi].
 NormalizedApi normalizeOpenApiV3(Map<String, dynamic> spec) {
   final refs = RefResolver(spec);
+  // Leaf fields are producer-controlled: coerce via toString() instead of
+  // `as` casts so a type-wrong-but-JSON-valid spec imports what it can
+  // rather than throwing TypeError (structural `is` checks stay).
   final title =
       (spec['info'] is Map
-          ? (spec['info'] as Map)['title'] as String?
+          ? (spec['info'] as Map)['title']?.toString()
           : null) ??
       'Imported API';
 
@@ -84,8 +87,8 @@ List<NormalizedServer> _parseServers(dynamic rawServers) {
       }
       servers.add(
         NormalizedServer(
-          url: (s['url'] as String?) ?? '',
-          description: s['description'] as String?,
+          url: s['url']?.toString() ?? '',
+          description: s['description']?.toString(),
           variables: vars,
         ),
       );
@@ -105,11 +108,14 @@ NormalizedOperation _operation({
   required String? globalSecurity,
 }) {
   final warnings = <String>[];
+  // Snapshot the resolver's budget state so only the operation that crossed
+  // the node budget carries the "too complex" warning (not every later op).
+  final budgetWasExhausted = refs.nodeBudgetExhausted;
   final tags = op['tags'];
   final tag = (tags is List && tags.isNotEmpty) ? tags.first.toString() : null;
   final name =
-      (op['summary'] as String?) ??
-      (op['operationId'] as String?) ??
+      op['summary']?.toString() ??
+      op['operationId']?.toString() ??
       '$method $path';
 
   final query = <NormalizedParam>[];
@@ -119,8 +125,8 @@ NormalizedOperation _operation({
     op['parameters'],
     refs,
   )) {
-    final location = resolved['in'] as String?;
-    final pName = resolved['name'] as String?;
+    final location = resolved['in']?.toString();
+    final pName = resolved['name']?.toString();
     if (pName == null) continue;
     final value = _paramExample(resolved, refs);
     if (location == 'query') {
@@ -156,6 +162,13 @@ NormalizedOperation _operation({
   final effectiveServers = opServers.isNotEmpty
       ? opServers
       : _parseServers(pathItemServers);
+
+  if (!budgetWasExhausted && refs.nodeBudgetExhausted) {
+    warnings.add(
+      'Spec too complex to fully resolve — some schema examples were '
+      'truncated.',
+    );
+  }
 
   return NormalizedOperation(
     method: method,
@@ -254,17 +267,19 @@ Map<String, NormalizedSecurityScheme> _securitySchemes(
   final raw = components is Map ? components['securitySchemes'] : null;
   if (raw is! Map) return out;
   for (final e in raw.entries) {
-    final scheme = refs.resolve(Map<String, dynamic>.from(e.value as Map));
+    final value = e.value;
+    if (value is! Map) continue; // type-wrong scheme entry: skip, don't throw
+    final scheme = refs.resolve(Map<String, dynamic>.from(value));
     out[e.key.toString()] = _scheme(scheme);
   }
   return out;
 }
 
 NormalizedSecurityScheme _scheme(Map<String, dynamic> scheme) {
-  final type = scheme['type'] as String?;
+  final type = scheme['type']?.toString();
   switch (type) {
     case 'http':
-      final s = (scheme['scheme'] as String?)?.toLowerCase();
+      final s = scheme['scheme']?.toString().toLowerCase();
       if (s == 'bearer') {
         return const NormalizedSecurityScheme(kind: SecuritySchemeKind.bearer);
       }
@@ -275,12 +290,12 @@ NormalizedSecurityScheme _scheme(Map<String, dynamic> scheme) {
         kind: SecuritySchemeKind.unsupported,
       );
     case 'apiKey':
-      final location = scheme['in'] as String?;
+      final location = scheme['in']?.toString();
       return NormalizedSecurityScheme(
         kind: location == 'query'
             ? SecuritySchemeKind.apiKeyQuery
             : SecuritySchemeKind.apiKeyHeader,
-        apiKeyName: scheme['name'] as String?,
+        apiKeyName: scheme['name']?.toString(),
       );
     case 'oauth2':
     case 'openIdConnect':

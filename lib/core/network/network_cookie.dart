@@ -41,7 +41,26 @@ class NetworkCookie extends Equatable {
   final bool hostOnly;
 
   /// Identity for upsert: a server overwriting (domain, path, name) replaces.
-  String get key => '$domain|$path|$name';
+  ///
+  /// Each part is escaped before joining (`\` → `\\`, then `|` → `\p`) so a
+  /// literal `|` — legal in cookie names and paths — can never make two
+  /// distinct cookies collide on the same key (e.g. name `a|b` at path `/`
+  /// vs name `b` at path `/|a` both raw-joined to `…|/|a|b`). The escape is
+  /// injective, so the key uniquely identifies (domain, path, name).
+  ///
+  /// Migration non-issue: for a cookie containing neither `\` nor `|` (the
+  /// overwhelmingly common case) the escaped key is byte-identical to the
+  /// legacy raw join, so keys already persisted in Hive keep matching. A rare
+  /// legacy cookie that DID contain `|` was ambiguous under the old scheme
+  /// anyway; it simply re-persists once under its unambiguous key (its old
+  /// raw-key record lingers until it expires or is cleared).
+  String get key {
+    final d = _escapeKeyPart(domain);
+    return '$d|${_escapeKeyPart(path)}|${_escapeKeyPart(name)}';
+  }
+
+  static String _escapeKeyPart(String part) =>
+      part.replaceAll(r'\', r'\\').replaceAll('|', r'\p');
 
   bool isExpired(int nowEpochMs) =>
       expiresEpochMs != null && expiresEpochMs! <= nowEpochMs;

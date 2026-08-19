@@ -44,6 +44,8 @@ void main() {
   late WorkspaceReviewService service;
   const root = '/ws';
 
+  setUpAll(() => registerFallbackValue(<String>[]));
+
   setUp(() {
     git = _MockGit();
     sync = _MockSync();
@@ -169,6 +171,88 @@ void main() {
       );
     },
   );
+
+  group('commit re-stages entries edited again after staging', () {
+    setUp(() {
+      when(() => git.stage(root, any())).thenAnswer((_) async {});
+      when(
+        () => git.commit(
+          root,
+          any(),
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).thenAnswer((_) async {});
+    });
+
+    test(
+      'a staged entry edited again after staging (MM) is re-staged '
+      'before the commit records the older index blob',
+      () async {
+        when(() => git.status(root)).thenAnswer(
+          (_) async => const [
+            GitStatusEntry(
+              indexStatus: 'M',
+              worktreeStatus: 'M',
+              path: 'a.req.json',
+            ),
+          ],
+        );
+
+        await service.commit(root, 'msg');
+
+        verifyInOrder([
+          () => git.stage(root, ['a.req.json']),
+          () => git.commit(
+            root,
+            'msg',
+            authorName: any(named: 'authorName'),
+            authorEmail: any(named: 'authorEmail'),
+          ),
+        ]);
+      },
+    );
+
+    test('a staged-only entry (no later edit) is not re-staged', () async {
+      when(() => git.status(root)).thenAnswer(
+        (_) async => const [
+          GitStatusEntry(
+            indexStatus: 'M',
+            worktreeStatus: ' ',
+            path: 'a.req.json',
+          ),
+        ],
+      );
+
+      await service.commit(root, 'msg');
+
+      verifyNever(() => git.stage(root, any()));
+      verify(
+        () => git.commit(
+          root,
+          'msg',
+          authorName: any(named: 'authorName'),
+          authorEmail: any(named: 'authorEmail'),
+        ),
+      ).called(1);
+    });
+
+    test('a staged-then-deleted entry (MD) is re-staged', () async {
+      when(() => git.status(root)).thenAnswer(
+        (_) async => const [
+          GitStatusEntry(
+            indexStatus: 'M',
+            worktreeStatus: 'D',
+            path: 'a.req.json',
+          ),
+        ],
+      );
+
+      await service.commit(root, 'msg');
+
+      verify(() => git.stage(root, ['a.req.json'])).called(1);
+    });
+  });
 
   test('the manifest maps to a workspaceOrder entry', () async {
     when(() => git.status(root)).thenAnswer(

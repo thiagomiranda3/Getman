@@ -1,16 +1,20 @@
 // Hive data source for the collections tree (box: 'collections', typeId 3),
 // keyed by root node id so an edit rewrites only the affected root subtree.
 // migrateLegacyKeysIfNeeded re-keys a legacy auto-increment-int-keyed box on
-// the first cold-start read.
+// the first cold-start read. Full replaces go through replaceAllKeyedInBox —
+// never clear()-then-write, which wipes the box on a mid-replace crash (H2b).
 import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
+import 'package:getman/core/storage/hive_helpers.dart';
 import 'package:getman/features/collections/data/models/collection_node_model.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
 abstract class CollectionsLocalDataSource {
   Future<List<CollectionNode>> getCollections();
 
-  /// Full keyed replace: clears the box and writes every root keyed by id.
+  /// Full keyed replace: upserts every root keyed by id, then deletes roots
+  /// no longer present. Never `clear()` — a crash mid-replace must leave the
+  /// previous roots on disk, not an empty box (H2b).
   Future<void> saveCollections(List<CollectionNode> collections);
 
   /// Upserts the given root subtrees by id (leaves other roots untouched).
@@ -41,9 +45,9 @@ class CollectionsLocalDataSourceImpl implements CollectionsLocalDataSource {
   @override
   Future<void> saveCollections(List<CollectionNode> collections) async {
     try {
-      final box = _box();
-      await box.clear();
-      await box.putAll({for (final c in collections) c.id: c});
+      await replaceAllKeyedInBox(_box(), {
+        for (final c in collections) c.id: c,
+      });
     } catch (e) {
       throw PersistenceException('Failed to save collections', cause: e);
     }
@@ -71,11 +75,20 @@ class CollectionsLocalDataSourceImpl implements CollectionsLocalDataSource {
   /// every root by its node id so later id-keyed put/delete overwrite the same
   /// logical root. No-op once the keys are strings. Runs on the cold-start path
   /// before collections are first read.
+  ///
+  /// Uses the keyed non-destructive replace (put by id, then delete the int
+  /// keys) — never clear()-then-write, which wiped the box if the process died
+  /// between the phases (H2b). A crash mid-migration instead leaves roots
+  /// under both keyings; the int keys make this guard re-run on the next boot
+  /// and the by-id map dedups, so it self-heals.
   static Future<void> migrateLegacyKeysIfNeeded() async {
     final box = _box();
     if (box.isEmpty || !box.keys.any((k) => k is int)) return;
-    final roots = box.values.toList(growable: false);
-    await box.clear();
-    await box.putAll({for (final r in roots) r.id: r});
+    // Detach each root via an entity round-trip: a HiveObject still stored
+    // under its legacy int key cannot be put under a second (id) key.
+    final detached = {
+      for (final r in box.values) r.id: CollectionNode.fromEntity(r.toEntity()),
+    };
+    await replaceAllKeyedInBox(box, detached);
   }
 }

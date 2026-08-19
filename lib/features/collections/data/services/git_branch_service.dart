@@ -14,6 +14,7 @@ import 'package:getman/core/git/git_service.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/branch_service.dart';
 import 'package:getman/features/collections/domain/entities/branch_status.dart';
+import 'package:getman/features/collections/domain/logic/workspace_paths.dart';
 
 /// Composes [GitService] + [WorkspaceSyncService] into the branch/sync
 /// operations. Pure of `dart:io` — all git access goes through [GitService].
@@ -53,13 +54,26 @@ class GitBranchService implements BranchService {
       stashes: [
         for (final s in stashes) StashInfo(index: s.index, message: s.message),
       ],
+      // Durable rebase-paused signal: a halted pull leaves HEAD detached
+      // (currentBranch == null), and the edge-delivered conflictToken bump is
+      // lost if the branch chip was unmounted (or the app restarts). Every
+      // status load re-reads this flag so the chip can always offer the
+      // conflict resolver / abort while the rebase is paused.
+      rebaseInProgress: await _git.isRebaseInProgress(root),
     );
   }
 
   @override
   Future<bool> isDirty(String root) async {
     await _flushOrThrow();
-    return (await _git.status(root)).isNotEmpty;
+    // Count only workspace files (the set Review can actually commit).
+    // Anything else — .DS_Store from a Finder visit, a hand-added README —
+    // must not refuse branch switches with "You have uncommitted changes"
+    // that REVIEW CHANGES then reports as empty (an uncommittable dead end).
+    // Untracked unrelated files never block `git switch` anyway, and a
+    // modified tracked one still surfaces via git's own checkout refusal.
+    final status = await _git.status(root);
+    return status.any((s) => isWorkspacePath(s.path));
   }
 
   /// Flushes the pending mirror, then runs [action] with mirroring **gated

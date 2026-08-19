@@ -1,8 +1,10 @@
 // Domain entity for one request tab: request config, the currently displayed
 // response (null = nothing sent, or the last send was cancelled), isSending,
-// and time-travel responseHistory. copyWith uses an internal sentinel so
-// callers can explicitly clear response/collectionNodeId/collectionName back
-// to null (vs. leaving them unchanged).
+// time-travel responseHistory, and viewedHistoryEntryId (which history entry
+// the response was time-travelled to; null = viewing the latest — view state,
+// never persisted). copyWith uses an internal sentinel so callers can
+// explicitly clear response/collectionNodeId/collectionName/
+// viewedHistoryEntryId back to null (vs. leaving them unchanged).
 import 'package:collection/collection.dart';
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/assertion_result.dart';
@@ -40,6 +42,7 @@ class HttpRequestTabEntity extends Equatable {
     this.extractionResults = const [],
     this.assertionResults = const [],
     this.responseHistory = const [],
+    this.viewedHistoryEntryId,
   });
   final HttpRequestConfigEntity config;
 
@@ -62,6 +65,15 @@ class HttpRequestTabEntity extends Equatable {
   /// `responseHistoryLimit`. The head mirrors [response] after a fresh send.
   final List<ResponseHistoryEntry> responseHistory;
 
+  /// Id of the [responseHistory] entry currently displayed via time-travel;
+  /// null = viewing the latest response. Identity (not response value) is
+  /// what the timeline highlights and what keeps a time-travel emission from
+  /// being suppressed when two history entries hold value-equal responses.
+  /// Pure view state — deliberately NOT persisted (the Hive model maps its
+  /// fields explicitly and omits it, so a restored tab opens on the latest
+  /// response).
+  final String? viewedHistoryEntryId;
+
   HttpRequestTabEntity copyWith({
     HttpRequestConfigEntity? config,
     Object? response = _unset,
@@ -72,6 +84,7 @@ class HttpRequestTabEntity extends Equatable {
     List<ExtractionResult>? extractionResults,
     List<AssertionResult>? assertionResults,
     List<ResponseHistoryEntry>? responseHistory,
+    Object? viewedHistoryEntryId = _unset,
   }) {
     return HttpRequestTabEntity(
       config: config ?? this.config,
@@ -89,6 +102,9 @@ class HttpRequestTabEntity extends Equatable {
       extractionResults: extractionResults ?? this.extractionResults,
       assertionResults: assertionResults ?? this.assertionResults,
       responseHistory: responseHistory ?? this.responseHistory,
+      viewedHistoryEntryId: identical(viewedHistoryEntryId, _unset)
+          ? this.viewedHistoryEntryId
+          : viewedHistoryEntryId as String?,
     );
   }
 
@@ -103,5 +119,6 @@ class HttpRequestTabEntity extends Equatable {
     extractionResults,
     assertionResults,
     responseHistory,
+    viewedHistoryEntryId,
   ];
 }

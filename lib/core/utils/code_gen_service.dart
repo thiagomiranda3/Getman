@@ -18,6 +18,7 @@ import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/utils/body_type_utils.dart';
+import 'package:getman/core/utils/url_query_utils.dart';
 
 /// Target language for generated request code.
 enum CodeGenTarget {
@@ -81,11 +82,15 @@ class CodeGenService {
     var url = resolve(config.url);
 
     // Same auth decision as the send path (auth_application.dart); credential
-    // values flow through the same resolver.
+    // values flow through the same resolver. hasQueryParam checks the
+    // effective (resolved) URL's own query so a hand-written same-name param
+    // wins over a query-located api-key — mirroring the send path's skip.
+    final existingParams = UrlQueryUtils.parseQuery(url);
     final auth = resolveAuthApplication(
       auth: config.authConfig,
       currentHeaders: headers,
       resolve: resolve,
+      hasQueryParam: (name) => existingParams.any((p) => p.key == name),
     );
     headers.addAll(auth.headers);
     final apiKeyQuery = auth.queryParam;
@@ -163,8 +168,19 @@ class CodeGenService {
       case BodyType.multipart:
         for (final f in e.formFields) {
           if (f.name.isEmpty) continue;
-          final v = f.isFile ? '@${f.filePath ?? ''}' : f.value;
-          b.write(" \\\n  --form '${_shellSq('${f.name}=$v')}'");
+          if (f.isFile) {
+            b.write(
+              " \\\n  --form '${_shellSq('${f.name}=@${f.filePath ?? ''}')}'",
+            );
+          } else {
+            // --form-string, not --form: curl reinterprets a leading @/< as
+            // a file reference and a `;type=`/`;filename=` suffix as a hint
+            // in --form values, while the real send path posts the literal
+            // text — the exported snippet must match the wire.
+            b.write(
+              " \\\n  --form-string '${_shellSq('${f.name}=${f.value}')}'",
+            );
+          }
         }
       case BodyType.binary:
         b.write(" \\\n  --data-binary '@${_shellSq(e.binaryPath ?? '')}'");

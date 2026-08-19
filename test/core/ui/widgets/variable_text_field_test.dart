@@ -86,6 +86,47 @@ void main() {
   });
 
   testWidgets(
+    'rebuilding with a different controller/focusNode keeps autocomplete '
+    'alive — typing {{ into the swapped-in field opens the overlay '
+    '(regression: AUTH type switch bearer→basic reuses the element)',
+    (tester) async {
+      // The AUTH tab keeps one controller+focusNode pair per field and swaps
+      // which pair the (un-keyed) VariableTextField gets when the auth type
+      // changes. Without VariableAutocomplete.didUpdateWidget the overlay
+      // listeners stay on pair A and the swapped-in field is dead.
+      final controllerA = VariableHighlightController();
+      final focusA = FocusNode();
+      final controllerB = VariableHighlightController();
+      final focusB = FocusNode();
+      addTearDown(() {
+        controllerA.dispose();
+        focusA.dispose();
+        controllerB.dispose();
+        focusB.dispose();
+      });
+
+      Widget build(VariableHighlightController c, FocusNode f) => _host(
+        VariableTextField(
+          variables: ctx,
+          controller: c,
+          focusNode: f,
+          onChanged: (_) {},
+        ),
+      );
+
+      await tester.pumpWidget(build(controllerA, focusA));
+      await tester.pumpWidget(build(controllerB, focusB));
+
+      await tester.tap(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), '{{');
+      await tester.pumpAndSettle();
+
+      expect(find.text('host'), findsOneWidget);
+      expect(find.text('token'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'with no env/collection vars, {{ still offers dynamic variables',
     (tester) async {
       // Regression: when no environment is active (allVariables empty), the

@@ -59,5 +59,5 @@ dart run build_runner build --delete-conflicting-outputs
 | Settings | immediately on every `Update*` |
 | Collections | immediately after every mutation (saves the whole tree) |
 | History | via Hive `Box.watch()`; writes on each `add/delete/clear` |
-| Tabs | debounced 10 s after any change + flush on `close()` |
+| Tabs | debounced 10 s after any change + flush on `close()` AND on app exit/hide (`ExitFlushGuard` → `TabsBloc.flushPendingSaves`; `close()` never runs on process exit, so without the guard Cmd+Q inside the window lost the last edits) |
 | Environments | immediately after every mutation (single keyed put/delete per environment; batch import saves the list) |

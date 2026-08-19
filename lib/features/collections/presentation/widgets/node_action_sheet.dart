@@ -14,11 +14,15 @@ import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/utils/json_file_io.dart';
 import 'package:getman/core/utils/postman/postman_collection_mapper.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
+import 'package:getman/features/collections/presentation/widgets/collection_node_menu.dart'
+    show renameOpenTabsForNode;
 import 'package:getman/features/collections/presentation/widgets/collection_variables_dialog.dart';
 import 'package:getman/features/collections/presentation/widgets/delete_node_with_undo.dart';
 import 'package:getman/features/collections/presentation/widgets/export_api_docs_dialog.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 
 /// Touch-first replacement for the three-dot context menu. Opened via long-
 /// press on a collection node when `BuildContext.isPhone` is true. Exposes
@@ -115,13 +119,19 @@ class _SheetBody extends StatelessWidget {
             label: 'RENAME',
             onTap: () {
               final bloc = context.read<CollectionsBloc>();
+              final tabsBloc = context.read<TabsBloc>();
               Navigator.of(context).pop();
               unawaited(
                 NamePromptDialog.show(
                   context,
                   title: 'RENAME',
                   initialText: node.name,
-                  onConfirm: (name) => bloc.add(RenameNode(node.id, name)),
+                  onConfirm: (name) {
+                    bloc.add(RenameNode(node.id, name));
+                    // Same tab-title carry-over as the desktop context menu
+                    // (see collection_node_menu.renameOpenTabsForNode).
+                    renameOpenTabsForNode(tabsBloc, node.id, name);
+                  },
                 ),
               );
             },
@@ -187,16 +197,21 @@ class _SheetBody extends StatelessWidget {
             icon: Icons.file_download,
             label: 'EXPORT TO POSTMAN',
             onTap: () {
+              // Live re-fetch BEFORE popping: while the search filter is
+              // active this sheet holds a filtered copy (children pruned to
+              // matches) — exporting it silently dropped the rest.
+              final live = _liveNode(context, node);
               Navigator.of(context).pop();
-              unawaited(_exportNode(context, node));
+              unawaited(_exportNode(context, live));
             },
           ),
           _Action(
             icon: Icons.article_outlined,
             label: 'EXPORT AS API DOCS…',
             onTap: () {
+              final live = _liveNode(context, node);
               Navigator.of(context).pop();
-              unawaited(ExportApiDocsDialog.show(context, node));
+              unawaited(ExportApiDocsDialog.show(context, live));
             },
           ),
           _Action(
@@ -381,6 +396,19 @@ class _FolderEntry {
   final CollectionNodeEntity node;
   final int depth;
 }
+
+/// Live re-fetch by id — this sheet may hold a SEARCH-FILTERED copy of the
+/// node (children pruned to matches); anything that serializes children must
+/// use the live tree (same rationale as collection_node_menu's copy).
+CollectionNodeEntity _liveNode(
+  BuildContext context,
+  CollectionNodeEntity node,
+) =>
+    CollectionsTreeHelper.findNode(
+      context.read<CollectionsBloc>().state.collections,
+      node.id,
+    ) ??
+    node;
 
 Future<void> _exportNode(BuildContext context, CollectionNodeEntity node) {
   return saveJsonFileWithFeedback(

@@ -26,17 +26,21 @@ void main() {
     });
 
     test(
-      'replaces existing URL query with legacy params when both present',
+      'MERGES legacy params after the existing URL query when both present '
+      "(regression: replace silently dropped the URL's own ?a=1)",
       () {
-        // Pre-migration data shouldn't have both, but be lenient: legacy map
-        // wins to restore user intent (they had explicit params rows before).
         final model = HttpRequestConfig(
           id: 'id',
-          url: 'https://x.y/path?stale=1',
+          url: 'https://x.y/path?a=1',
           params: {'fresh': '2'},
         );
         final entity = model.toEntity();
-        expect(entity.url, 'https://x.y/path?fresh=2');
+        // The URL's own query survives, legacy map entries append after it.
+        expect(entity.url, 'https://x.y/path?a=1&fresh=2');
+        expect(entity.params, [
+          const QueryParamEntity(key: 'a', value: '1'),
+          const QueryParamEntity(key: 'fresh', value: '2'),
+        ]);
       },
     );
 

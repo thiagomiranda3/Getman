@@ -1,11 +1,12 @@
 // Response time-travel dropdown: lists this tab's responseHistory
-// (newest-first, "Latest" + "#N"), highlighting whichever entry currently
-// backs tab.response. Selecting one dispatches ViewResponseHistoryEntry,
-// which swaps the displayed response without mutating the history itself.
-// Hidden entirely below two history entries.
+// (newest-first, "Latest" + "#N"), highlighting the entry named by the tab's
+// viewedHistoryEntryId (null = the newest). Tracks the viewed entry BY ID,
+// never by response value — two entries can hold value-equal responses.
+// Selecting one dispatches ViewResponseHistoryEntry, which swaps the
+// displayed response without mutating the history itself. Hidden entirely
+// below two history entries.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/utils/byte_format.dart';
 import 'package:getman/features/tabs/domain/entities/response_history_entry.dart';
@@ -19,13 +20,18 @@ class ResponseHistoryTimeline extends StatelessWidget {
   const ResponseHistoryTimeline({
     required this.tabId,
     required this.history,
-    required this.current,
+    required this.viewedHistoryEntryId,
     super.key,
   });
 
   final String tabId;
   final List<ResponseHistoryEntry> history;
-  final HttpResponseEntity? current;
+
+  /// The tab's `viewedHistoryEntryId`: the id of the history entry currently
+  /// displayed, or null when viewing the latest response. Identity, not
+  /// response value — value equality mis-highlights when two entries hold
+  /// equal responses (same status/body/headers/duration).
+  final String? viewedHistoryEntryId;
 
   static String _clock(int epochMillis) {
     final d = DateTime.fromMillisecondsSinceEpoch(epochMillis);
@@ -39,14 +45,14 @@ class ResponseHistoryTimeline extends StatelessWidget {
     final theme = Theme.of(context);
     final layout = context.appLayout;
 
-    // The displayed entry is the one whose response matches `current`;
-    // default to the head (newest) when `current` is null. A genuine miss
-    // (-1) is kept as-is — clamping it to 0 would falsely mark "Latest" as
-    // selected and drop the HISTORY badge for a response that isn't actually
-    // the newest entry.
-    final currentIndex = current == null
+    // The displayed entry is resolved BY ID; a null viewedHistoryEntryId
+    // means the tab is viewing the latest response (the head). A genuine
+    // miss (-1, e.g. a stale id) is kept as-is — clamping it to 0 would
+    // falsely mark "Latest" as selected and drop the HISTORY badge for a
+    // response that isn't actually the newest entry.
+    final currentIndex = viewedHistoryEntryId == null
         ? 0
-        : history.indexWhere((e) => e.response == current);
+        : history.indexWhere((e) => e.id == viewedHistoryEntryId);
     final viewingOld = currentIndex > 0;
 
     return PopupMenuButton<String>(

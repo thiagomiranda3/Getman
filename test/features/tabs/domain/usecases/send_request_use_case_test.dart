@@ -142,6 +142,105 @@ void main() {
     },
   );
 
+  group('stale response columns (privacy)', () {
+    // A config opened from an older history entry still carries THAT entry's
+    // response columns. With the toggle OFF they must be STRIPPED, not
+    // copied through — otherwise the new history row leaks the old response
+    // body and shows a stale status chip as this send's result.
+    const staleConfig = HttpRequestConfigEntity(
+      id: 'c1',
+      method: 'POST',
+      url: 'https://{{host}}/login',
+      body: '{"user":"{{user}}"}',
+      responseBody: '{"secret":"OLD-RESPONSE"}',
+      responseHeaders: {'x-stale': 'yes'},
+      statusCode: 500,
+      durationMs: 999,
+    );
+
+    test(
+      'toggle OFF clears stale columns from the recorded config (success)',
+      () async {
+        stubSendSuccess();
+
+        await useCase(config: staleConfig, envVars: envVars);
+
+        final recorded =
+            verify(
+                  () => addToHistory.call(captureAny(), any()),
+                ).captured.single
+                as HttpRequestConfigEntity;
+        expect(
+          recorded.responseBody,
+          isNull,
+          reason:
+              'the user turned the toggle off precisely to keep response '
+              'data out of history',
+        );
+        expect(recorded.responseHeaders, isNull);
+        expect(recorded.statusCode, isNull);
+        expect(recorded.durationMs, isNull);
+      },
+    );
+
+    test(
+      'toggle OFF clears stale columns from the recorded config (failure)',
+      () async {
+        when(
+          () => repository.sendRequest(
+            any(),
+            envVars: any(named: 'envVars'),
+            cancelHandle: any(named: 'cancelHandle'),
+          ),
+        ).thenThrow(
+          const NetworkFailure(
+            'boom',
+            type: NetworkFailureType.connectionError,
+          ),
+        );
+
+        await expectLater(
+          () => useCase(config: staleConfig, envVars: envVars),
+          throwsA(isA<NetworkFailure>()),
+        );
+
+        final recorded =
+            verify(
+                  () => addToHistory.call(captureAny(), any()),
+                ).captured.single
+                as HttpRequestConfigEntity;
+        expect(recorded.responseBody, isNull);
+        expect(recorded.responseHeaders, isNull);
+        expect(recorded.statusCode, isNull);
+        expect(recorded.durationMs, isNull);
+      },
+    );
+
+    test(
+      "toggle ON replaces stale columns with this send's response",
+      () async {
+        stubSendSuccess();
+        when(() => getSettings.call()).thenAnswer(
+          (_) async => const SettingsEntity(saveResponseInHistory: true),
+        );
+
+        await useCase(config: staleConfig, envVars: envVars);
+
+        final recorded =
+            verify(
+                  () => addToHistory.call(captureAny(), any()),
+                ).captured.single
+                as HttpRequestConfigEntity;
+        expect(recorded.responseBody, '{"token":"x"}');
+        expect(recorded.responseHeaders, {
+          'content-type': 'application/json',
+        });
+        expect(recorded.statusCode, 201);
+        expect(recorded.durationMs, 12);
+      },
+    );
+  });
+
   test('records failed requests and rethrows', () async {
     when(
       () => repository.sendRequest(

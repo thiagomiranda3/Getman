@@ -5,9 +5,24 @@
 // returns every container id, falling back to depth kTreeExpandAllDepthCap
 // on trees over kTreeExpandAllMaxNodes so EXPAND ALL can never freeze the UI.
 // Node ids are JSONPath strings in the JsonPathBuilder grammar — the same
-// ids JsonTreeView keys its expansion set with.
+// ids JsonTreeView keys its expansion set with. Every recursive walk here
+// (and flattenVisibleJsonTree's) stops at kTreeMaxDepth so a pathological
+// deeply-nested body can never overflow the stack.
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/utils/json_path_builder.dart';
+
+/// Hard recursion ceiling shared by every walk over decoded JSON — the
+/// flatten pass (`flattenVisibleJsonTree`), the filter walk, and
+/// [planExpandAll]'s count/collect. The TREE gate admits bodies up to
+/// `kLargeResponseViewerChars` (512 KiB), and a pathological `[[[[…]]]]`
+/// body in that budget nests ~200k levels deep — `jsonDecode` survives
+/// that, but an unguarded recursive walk overflows the stack. 512 levels
+/// is generous for real JSON (typical APIs nest well under 20) while
+/// staying far below crash depth. Content past the cap renders as a single
+/// "[nested too deep — N more levels]" leaf (flatten), stops being matched
+/// (filter — flagged via [JsonTreeFilterResult.truncated]), and stops being
+/// counted/collected (expand-all planning).
+const int kTreeMaxDepth = 512;
 
 /// Auto-expansion cap: a filter reveals at most this many nodes (matches +
 /// their ancestors); past it the result is flagged [JsonTreeFilterResult
@@ -42,14 +57,18 @@ class JsonTreeFilterResult extends Equatable {
   /// Paths of revealed matching nodes (capped by the reveal limit).
   final Set<String> matchedPaths;
 
-  /// Ancestor container paths of revealed matches — auto-expand these.
+  /// Every chain entry of a revealed match — auto-expand these. Includes
+  /// containers that are themselves matches (they overlap [matchedPaths]):
+  /// a matched container with a matching descendant must still expand, or
+  /// the descendant match is counted but invisible.
   final Set<String> ancestorPaths;
 
   /// Total matches in the document, including ones beyond the reveal cap.
   final int matchCount;
 
   /// True when the reveal cap was hit (some matches are not in
-  /// [matchedPaths]) — surface "Refine filter to see more".
+  /// [matchedPaths]) or content past [kTreeMaxDepth] was skipped without
+  /// being matched — surface "Refine filter to see more".
   final bool truncated;
 
   @override
@@ -65,16 +84,28 @@ class JsonTreeFilterResult extends Equatable {
 /// against key names and primitive value strings. Matching nodes are revealed
 /// together with their ancestor chain, up to [maxRevealed] total revealed
 /// nodes; [JsonTreeFilterResult.matchCount] always counts every match.
+///
+/// The walk never descends past [maxDepth] (default [kTreeMaxDepth], the
+/// stack-overflow guard); skipped non-empty subtrees flag
+/// [JsonTreeFilterResult.truncated].
 JsonTreeFilterResult filterJsonTree({
   required Object? data,
   required String query,
   int maxRevealed = kTreeFilterMaxRevealedNodes,
+  int maxDepth = kTreeMaxDepth,
 }) {
   final q = query.trim().toLowerCase();
   if (q.isEmpty) return JsonTreeFilterResult.empty;
 
   final matched = <String>{};
   final ancestors = <String>{};
+  // Budget = revealed ROWS (matched ∪ ancestors). Tracked as a separate
+  // union set because `ancestors` deliberately overlaps `matched`: a matched
+  // container that is also the ancestor of a deeper match must appear in
+  // BOTH — excluding it from `ancestors` (the auto-expand set) left it
+  // collapsed, hiding its matching descendants while the match counter still
+  // announced them ("2 MATCHES" with one invisible).
+  final revealed = <String>{};
   final chain = <String>[];
   var matchCount = 0;
   var truncated = false;
@@ -88,25 +119,35 @@ JsonTreeFilterResult filterJsonTree({
 
   void record(String path) {
     matchCount++;
-    // A chain entry already revealed as a *match* (a matched container that
-    // is also the ancestor of a deeper match) must not be re-budgeted as an
-    // ancestor — otherwise the same node id is counted twice toward the cap
-    // and the walk truncates before the reveal set actually fills up.
-    final newAncestors = chain
-        .where((a) => !ancestors.contains(a) && !matched.contains(a))
-        .length;
-    if (matched.length + ancestors.length + 1 + newAncestors > maxRevealed) {
+    final newReveals =
+        (revealed.contains(path) ? 0 : 1) +
+        chain.where((a) => !revealed.contains(a)).length;
+    if (revealed.length + newReveals > maxRevealed) {
       truncated = true;
       return;
     }
     matched.add(path);
+    revealed.add(path);
     for (final a in chain) {
-      if (!matched.contains(a)) ancestors.add(a);
+      ancestors.add(a);
+      revealed.add(a);
     }
   }
 
-  void walk(Object? value, String path, String label) {
+  void walk(Object? value, String path, String label, int depth) {
     if (isMatch(label, value)) record(path);
+    final hasChildren = value is Map
+        ? value.isNotEmpty
+        : value is List && value.isNotEmpty;
+    if (!hasChildren) return;
+    if (depth + 1 >= maxDepth) {
+      // Depth guard (kTreeMaxDepth): children past the cap are never
+      // rendered by flattenVisibleJsonTree, so stop matching here — but
+      // flag the skip so the UI shows "Refine filter to see more" instead
+      // of silently pretending the subtree is empty.
+      truncated = true;
+      return;
+    }
     if (value is Map) {
       chain.add(path);
       for (final e in value.entries) {
@@ -114,13 +155,14 @@ JsonTreeFilterResult filterJsonTree({
           e.value,
           JsonPathBuilder.appendKey(path, e.key.toString()),
           e.key.toString(),
+          depth + 1,
         );
       }
       chain.removeLast();
     } else if (value is List) {
       chain.add(path);
       for (var i = 0; i < value.length; i++) {
-        walk(value[i], JsonPathBuilder.appendIndex(path, i), '[$i]');
+        walk(value[i], JsonPathBuilder.appendIndex(path, i), '[$i]', depth + 1);
       }
       chain.removeLast();
     }
@@ -132,6 +174,7 @@ JsonTreeFilterResult filterJsonTree({
         e.value,
         JsonPathBuilder.appendKey(JsonPathBuilder.root, e.key.toString()),
         e.key.toString(),
+        0,
       );
     }
   } else if (data is List) {
@@ -140,6 +183,7 @@ JsonTreeFilterResult filterJsonTree({
         data[i],
         JsonPathBuilder.appendIndex(JsonPathBuilder.root, i),
         '[$i]',
+        0,
       );
     }
   } else if (isMatch(JsonPathBuilder.root, data)) {
@@ -177,25 +221,39 @@ class JsonTreeExpandAllPlan extends Equatable {
 /// Plans EXPAND ALL over decoded JSON [data]: all container paths, unless the
 /// tree has more than [maxNodes] total nodes — then only containers at depth
 /// < [depthCap] (top-level rows are depth 0, matching flattenVisibleJsonTree).
+///
+/// Neither the count nor the collect pass descends past [maxDepth] (default
+/// [kTreeMaxDepth], the stack-overflow guard): nodes below the cap can never
+/// render, so they are neither counted toward [maxNodes] nor expandable.
 JsonTreeExpandAllPlan planExpandAll({
   required Object? data,
   int maxNodes = kTreeExpandAllMaxNodes,
   int depthCap = kTreeExpandAllDepthCap,
+  int maxDepth = kTreeMaxDepth,
 }) {
   var total = 0;
-  void count(Object? v) {
+  void count(Object? v, int depth) {
     total++;
+    if (depth + 1 >= maxDepth) return; // depth guard (kTreeMaxDepth)
     if (v is Map) {
-      v.values.forEach(count);
+      for (final child in v.values) {
+        count(child, depth + 1);
+      }
     } else if (v is List) {
-      v.forEach(count);
+      for (final child in v) {
+        count(child, depth + 1);
+      }
     }
   }
 
   if (data is Map) {
-    data.values.forEach(count);
+    for (final child in data.values) {
+      count(child, 0);
+    }
   } else if (data is List) {
-    data.forEach(count);
+    for (final child in data) {
+      count(child, 0);
+    }
   } else {
     total = 1;
   }
@@ -205,6 +263,7 @@ JsonTreeExpandAllPlan planExpandAll({
 
   void collect(Object? value, String path, int depth) {
     if (value is! Map && value is! List) return;
+    if (depth >= maxDepth) return; // depth guard (kTreeMaxDepth)
     if (limited && depth >= depthCap) return;
     out.add(path);
     if (value is Map) {

@@ -26,7 +26,9 @@ class AuthApplication {
 
   /// An api-key credential destined for the query string, or null. The key and
   /// value are resolved but NOT URL-encoded — a caller targeting a URL string
-  /// must encode them (the Dio query map encodes on its own).
+  /// must encode them (the Dio query map encodes on its own). Already respects
+  /// "an explicit param wins": null when [resolveAuthApplication]'s
+  /// `hasQueryParam` reports the name as already present.
   final MapEntry<String, String>? queryParam;
 
   static const AuthApplication none = AuthApplication();
@@ -36,10 +38,17 @@ class AuthApplication {
 /// [currentHeaders]. Credential values pass through [resolve] first — the send
 /// path injects an environment resolver; code-gen passes the identity so
 /// `{{vars}}` stay templated.
+///
+/// [hasQueryParam] is the query-string mirror of the header skip-if-set check:
+/// it must report whether the request already carries a query param with the
+/// given (resolved) name, so an api-key with `addTo: query` never appends a
+/// second, conflicting credential next to a hand-written one. Query-param
+/// names are case-sensitive (unlike headers) — report an exact-name match.
 AuthApplication resolveAuthApplication({
   required AuthConfig auth,
   required Map<String, String> currentHeaders,
   required String Function(String value) resolve,
+  required bool Function(String name) hasQueryParam,
 }) {
   switch (auth.type) {
     case AuthType.none:
@@ -73,6 +82,10 @@ AuthApplication resolveAuthApplication({
         }
         return AuthApplication(headers: {name: value});
       }
+      // Query mirror of the header skip-if-set: a hand-written same-name
+      // param wins over the AUTH tab (appending would ship two conflicting
+      // credentials: `?api_key=OVERRIDE&api_key=<authValue>`).
+      if (hasQueryParam(name)) return AuthApplication.none;
       return AuthApplication(queryParam: MapEntry(name, value));
   }
 }

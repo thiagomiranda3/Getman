@@ -52,6 +52,7 @@ UI/business-logic separation; every state/event is `Equatable`.
 | Settings, history, auto-update | [docs/architecture/settings-history-updates.md](docs/architecture/settings-history-updates.md) |
 | Git sync/branches/PRs/conflicts | [docs/architecture/git-sync.md](docs/architecture/git-sync.md) |
 | MCP feature | [docs/architecture/mcp.md](docs/architecture/mcp.md) |
+| Writing or reviewing ANY test | [docs/architecture/testing.md](docs/architecture/testing.md) |
 | Open work / backlog | [docs/BACKLOG.md](docs/BACKLOG.md) |
 
 The user-facing feature wiki is <https://github.com/thiagomiranda3/Getman/wiki>

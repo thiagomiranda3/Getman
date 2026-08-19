@@ -1,10 +1,18 @@
 // McpBloc state: per-tab MCP session map. See McpTabSession class doc below
-// for what one tab's session carries.
+// for what one tab's session carries. copyWith uses an internal sentinel
+// (like request_tab_entity.dart) so callers can explicitly clear
+// lastResult/errorMessage back to null vs. leaving them unchanged — the old
+// always-replace semantics silently wiped the displayed result on every
+// McpToolSelected.
 
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/mcp/domain/entities/mcp_session.dart';
 import 'package:getman/features/mcp/domain/entities/mcp_tool.dart';
 import 'package:getman/features/mcp/domain/entities/mcp_tool_result.dart';
+
+// Sentinel used by copyWith to distinguish "not provided" from "explicitly
+// null".
+const Object _unset = Object();
 
 enum McpConnectionStatus { disconnected, connecting, connected, error }
 
@@ -31,23 +39,30 @@ class McpTabSession extends Equatable {
   final String? errorMessage;
   final List<String> log;
 
+  /// [lastResult] and [errorMessage] use the `_unset` sentinel: omit to keep
+  /// the current value, pass `null` to clear explicitly. All other fields are
+  /// plain keep-if-null.
   McpTabSession copyWith({
     McpConnectionStatus? status,
     McpSession? session,
     List<McpTool>? tools,
     String? selectedTool,
-    McpToolResult? lastResult,
+    Object? lastResult = _unset,
     bool? calling,
-    String? errorMessage,
+    Object? errorMessage = _unset,
     List<String>? log,
   }) => McpTabSession(
     status: status ?? this.status,
     session: session ?? this.session,
     tools: tools ?? this.tools,
     selectedTool: selectedTool ?? this.selectedTool,
-    lastResult: lastResult,
+    lastResult: identical(lastResult, _unset)
+        ? this.lastResult
+        : lastResult as McpToolResult?,
     calling: calling ?? this.calling,
-    errorMessage: errorMessage,
+    errorMessage: identical(errorMessage, _unset)
+        ? this.errorMessage
+        : errorMessage as String?,
     log: log ?? this.log,
   );
 
@@ -73,6 +88,12 @@ class McpState extends Equatable {
 
   McpState withSession(String tabId, McpTabSession session) =>
       McpState(sessions: {...sessions, tabId: session});
+
+  /// Drops [tabId]'s session entirely (tab closed — nothing left to show).
+  McpState without(String tabId) {
+    final next = Map<String, McpTabSession>.of(sessions)..remove(tabId);
+    return McpState(sessions: next);
+  }
 
   @override
   List<Object?> get props => [sessions];

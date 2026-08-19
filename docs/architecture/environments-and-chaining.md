@@ -10,7 +10,9 @@ The currently-active environment id is **not** owned by `EnvironmentsBloc`; it l
 
 ### Variable syntax
 
-`{{name}}` — the resolver in `lib/core/utils/environment_resolver.dart` accepts any non-empty, non-brace name (trimmed): `\$?[^{}]+?` with optional whitespace inside the braces (`{{ name }}`, `{{api key}}`, `{{token@prod}}` are all valid — the env editor, Postman import, and autocomplete all allow such names, so the grammar must resolve whatever they produce). Unknown variable names are **left verbatim**, not blanked — silent empty substitution is worse than a visibly broken URL.
+`{{name}}` — the resolver in `lib/core/utils/environment_resolver.dart` accepts any non-empty, non-brace name (trimmed): `\$?[^{}]+?` with optional whitespace inside the braces (`{{ name }}`, `{{api key}}`, `{{token@prod}}` are all valid — the env editor, Postman import, and autocomplete all allow such names, so the grammar must resolve whatever they produce). `UrlQueryUtils._varToken` mirrors this grammar exactly — a narrower class there percent-mangles wide tokens on every params-row edit. Unknown variable names are **left verbatim**, not blanked — silent empty substitution is worse than a visibly broken URL.
+
+Resolution is **recursive to a fixpoint** (Postman-compatible, depth-capped at 10 to survive reference cycles): a substituted value may itself contain `{{var}}` — `baseUrl = https://{{host}}/api` is a common imported-environment shape. A nested UNKNOWN name still ships verbatim.
 
 ### Dynamic variables
 
@@ -18,7 +20,7 @@ A leading `$` marks a built-in resolved at send time without an environment — 
 
 ### Substitution scope
 
-`TabsRepositoryImpl.sendRequest` resolves against URL, query-param values, header values, and body (not header/param *keys*) before dispatching via `networkService.request`. **History records the templated (unresolved) config** — the user should be able to re-send a history entry under a different environment, matching Postman/Insomnia. Never resolve env vars in `SendRequestUseCase._record`.
+`TabsRepositoryImpl.sendRequest` resolves against URL, query-param keys AND values, header values, and body (header *keys* only stay unresolved — the warning chip flags those) before dispatching via `networkService.request`. Param keys resolve so send matches code-gen (which resolves the whole URL) and the urlencoded/multipart form-field names. **History records the templated (unresolved) config** — the user should be able to re-send a history entry under a different environment, matching Postman/Insomnia. Never resolve env vars in `SendRequestUseCase._record`.
 
 ### Resolution plumbing
 
@@ -30,7 +32,7 @@ The `SendRequest` event carries `tabId` plus `Map<String, String> envVars`. Disp
 
 ### Unresolved-variable warning chip (E3)
 
-`UnresolvedVarsChip` (left of SEND in `UrlBar`) is purely advisory — it never blocks sending. `UnresolvedVariableCollector.collect` scans the request (URL, headers, parked params, raw/graphql body, form fields for urlencoded/multipart, auth) for `{{var}}` tokens that resolve to nothing against the same `LayeredVariableContext` (env layered over inherited collection variables, via `TabVariableContextBuilder`) every other variable-aware field uses — no separate resolution path. The scan is memoized in the widget's `State` on the `(config, LayeredVariableContext)` pair so a keystroke that changes neither input doesn't re-run the regex. Clicking the chip lists up to `UnresolvedVarsChip.maxListedNames` (10) names plus an "Open environment editor…" action that reopens `EnvironmentsDialog`.
+`UnresolvedVarsChip` (left of SEND in `UrlBar`) is purely advisory — it never blocks sending. `UnresolvedVariableCollector.collect` is **wire-accurate**: it scans only what send transmits (URL, ENABLED header values, raw/graphql body, form fields for urlencoded/multipart, auth — parked params and disabled header rows never ship, so they're skipped), and any `{{var}}` in an enabled header KEY is flagged even when defined (send never resolves header keys, so it ships as a literal header name). Tokens that resolve to nothing are checked against the same `LayeredVariableContext` (env layered over inherited collection variables, via `TabVariableContextBuilder`) every other variable-aware field uses — no separate resolution path. The scan is memoized in the widget's `State` on the `(config, LayeredVariableContext)` pair so a keystroke that changes neither input doesn't re-run the regex. Clicking the chip lists up to `UnresolvedVarsChip.maxListedNames` (10) names plus an "Open environment editor…" action that reopens `EnvironmentsDialog`.
 
 ### Secret variables
 

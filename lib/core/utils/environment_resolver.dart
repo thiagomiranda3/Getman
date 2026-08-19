@@ -84,15 +84,31 @@ class EnvironmentResolver {
     }
   }
 
+  /// Cap on nested-substitution passes in [resolve]: enough for any sane
+  /// var-in-var chain while keeping a reference cycle ({{a}} → {{b}} → {{a}})
+  /// from looping forever.
+  static const int _maxResolveDepth = 10;
+
   static String resolve(String input, Map<String, String> variables) {
     // No early-out on empty variables: dynamic vars resolve without an env.
     if (input.isEmpty) return input;
-    return input.replaceAllMapped(_pattern, (match) {
-      final name = _name(match);
-      final value = variables[name];
-      if (value != null) return value;
-      return _resolveDynamic(name) ?? match.group(0)!;
-    });
+    // Iterate to a fixpoint (Postman-compatible): a substituted value may
+    // itself contain {{var}} (`baseUrl = https://{{host}}/api` is a common
+    // imported-environment shape) — a single pass shipped the inner token
+    // literally while the UI showed the outer one as resolved.
+    var current = input;
+    for (var depth = 0; depth < _maxResolveDepth; depth++) {
+      var substituted = false;
+      current = current.replaceAllMapped(_pattern, (match) {
+        final name = _name(match);
+        final value = variables[name] ?? _resolveDynamic(name);
+        if (value == null) return match.group(0)!; // unknown → verbatim
+        substituted = true;
+        return value;
+      });
+      if (!substituted) break;
+    }
+    return current;
   }
 
   static Map<String, String> resolveMap(

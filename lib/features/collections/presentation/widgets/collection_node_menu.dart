@@ -16,11 +16,14 @@ import 'package:getman/core/ui/widgets/name_prompt_dialog.dart';
 import 'package:getman/core/utils/json_file_io.dart';
 import 'package:getman/core/utils/postman/postman_collection_mapper.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/widgets/collection_variables_dialog.dart';
 import 'package:getman/features/collections/presentation/widgets/delete_node_with_undo.dart';
 import 'package:getman/features/collections/presentation/widgets/export_api_docs_dialog.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 
 /// Shows the node's actions menu at [globalPosition] — the right-click path.
 /// Same items and actions as the row's trailing [CollectionNodeMenu] button.
@@ -200,14 +203,29 @@ void _handleSelection(
     case 'add_subfolder':
       _showAddSubfolderDialog(context, node);
     case 'export':
-      unawaited(_exportNode(context, node));
+      unawaited(_exportNode(context, _liveNode(context, node)));
     case 'export_docs':
-      unawaited(ExportApiDocsDialog.show(context, node));
+      unawaited(ExportApiDocsDialog.show(context, _liveNode(context, node)));
   }
 }
 
+/// Rows/menus receive SEARCH-FILTERED node copies (children pruned to the
+/// matches) while the filter is active. Exports serialize children, so they
+/// must re-fetch the live node by id — exporting the filtered copy silently
+/// dropped every non-matching request from the artifact.
+CollectionNodeEntity _liveNode(
+  BuildContext context,
+  CollectionNodeEntity node,
+) =>
+    CollectionsTreeHelper.findNode(
+      context.read<CollectionsBloc>().state.collections,
+      node.id,
+    ) ??
+    node;
+
 void _showRenameDialog(BuildContext context, CollectionNodeEntity node) {
   final bloc = context.read<CollectionsBloc>();
+  final tabsBloc = context.read<TabsBloc>();
   final messenger = ScaffoldMessenger.of(context);
   unawaited(
     NamePromptDialog.show(
@@ -216,10 +234,26 @@ void _showRenameDialog(BuildContext context, CollectionNodeEntity node) {
       initialText: node.name,
       onConfirm: (name) {
         bloc.add(RenameNode(node.id, name));
+        renameOpenTabsForNode(tabsBloc, node.id, name);
         showAppSnackBarVia(messenger, 'Renamed to "$name"');
       },
     ),
   );
+}
+
+/// Open tabs SNAPSHOT their linked request's name (`tab.collectionName`
+/// feeds `displayTitle`, persisted with the tab) — nothing else refreshes it
+/// on a tree rename, so the strip/tooltip/open-tabs dropdown showed the old
+/// name forever (it even survived restarts). Carry the rename to every
+/// linked tab, across all panels.
+void renameOpenTabsForNode(TabsBloc tabsBloc, String nodeId, String name) {
+  for (final panel in tabsBloc.state.panels) {
+    for (final tab in panel.tabs) {
+      if (tab.collectionNodeId == nodeId) {
+        tabsBloc.add(UpdateTab(tab.copyWith(collectionName: name)));
+      }
+    }
+  }
 }
 
 void _showDescriptionDialog(BuildContext context, CollectionNodeEntity node) {

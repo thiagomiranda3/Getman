@@ -139,6 +139,38 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
   }
 
   @override
+  void didUpdateWidget(VariableAutocomplete oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The parent can rebuild this (un-keyed) element with a DIFFERENT
+    // controller/focusNode instance — e.g. the AUTH tab swapping bearer→basic
+    // reuses the element with another field's controller, and FormDataEditor
+    // external resets (REVERT CHANGES, curl -F paste) hand rows brand-new
+    // controllers. Without re-subscribing here the listeners stay on the old
+    // instances: autocomplete goes dead and dispose() would unhook the wrong
+    // object. removeListener on an already-disposed ChangeNotifier is a
+    // supported no-op, which covers FormDataEditor disposing the old row
+    // controllers before this rebuild lands.
+    final controllerSwapped = !identical(
+      oldWidget.controller,
+      widget.controller,
+    );
+    final focusNodeSwapped = !identical(oldWidget.focusNode, widget.focusNode);
+    if (controllerSwapped) {
+      oldWidget.controller.removeListener(_onControllerChanged);
+      widget.controller.addListener(_onControllerChanged);
+      _lastText = widget.controller.text;
+      _dismissed = false;
+    }
+    if (focusNodeSwapped) {
+      oldWidget.focusNode.removeListener(_onFocusChanged);
+      widget.focusNode.addListener(_onFocusChanged);
+    }
+    // An open menu belongs to the old field's text/caret state — close it
+    // rather than let it accept into the new controller.
+    if (controllerSwapped || focusNodeSwapped) _close();
+  }
+
+  @override
   void dispose() {
     widget.controller.removeListener(_onControllerChanged);
     widget.focusNode.removeListener(_onFocusChanged);
@@ -209,6 +241,7 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
 
   void _removeOverlay() {
     _entry?.remove();
+    _entry?.dispose();
     _entry = null;
     _activeQuery = null;
     _suggestions = const [];

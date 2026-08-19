@@ -18,6 +18,9 @@ class _FakeTabsBloc extends Bloc<TabsEvent, TabsState> implements TabsBloc {
 
   @override
   bool get canReopenClosedTab => false;
+
+  @override
+  Future<void> flushPendingSaves() async {}
 }
 
 const _kTabId = 'tab-copy-all';

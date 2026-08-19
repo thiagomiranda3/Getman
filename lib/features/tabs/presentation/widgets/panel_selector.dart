@@ -399,15 +399,33 @@ class _PanelMenuCard extends StatelessWidget {
                 buildWhen: (p, n) =>
                     p.panels != n.panels || p.activePanelId != n.activePanelId,
                 builder: (context, state) {
-                  final panels = state.panels;
-                  final canClose = panels.length > 1;
+                  // In move mode, exclude the panel that owns the dropped tab:
+                  // the bloc rejects same-panel moves (_onMoveTabToPanel), so
+                  // the owner row would be a silently-eaten no-op. Mirrors the
+                  // other two move UIs (request_tab_chip's MOVE TO PANEL
+                  // submenu, tab_switcher_sheet), which both exclude the owner.
+                  final tabId = droppedTabId;
+                  final panels = tabId == null
+                      ? state.panels
+                      : state.panels
+                            .where((p) => !p.tabs.any((t) => t.tabId == tabId))
+                            .toList();
+                  final canClose = state.panels.length > 1;
                   return ReorderableListView.builder(
                     shrinkWrap: true,
                     buildDefaultDragHandles: false,
                     itemCount: panels.length,
-                    onReorderItem: (oldIndex, newIndex) => context
-                        .read<TabsBloc>()
-                        .add(ReorderPanels(oldIndex, newIndex)),
+                    // Inert in move mode: with the owner row filtered out the
+                    // list's indices no longer map onto the bloc's full panel
+                    // list, so a reorder from here would move the wrong panel.
+                    // The drag handles are hidden too (see _PanelRow) — this
+                    // guard is belt-and-braces.
+                    onReorderItem: (oldIndex, newIndex) {
+                      if (tabId != null) return;
+                      context.read<TabsBloc>().add(
+                        ReorderPanels(oldIndex, newIndex),
+                      );
+                    },
                     proxyDecorator: (child, index, animation) => Material(
                       color: theme.scaffoldBackgroundColor,
                       elevation: 4,
@@ -572,17 +590,23 @@ class _PanelRow extends StatelessWidget {
                 padding: EdgeInsets.all(layout.badgePaddingVertical),
                 onPressed: () => _close(context),
               ),
-            ReorderableDragStartListener(
-              index: index,
-              child: Padding(
-                padding: EdgeInsets.only(left: layout.tabSpacing),
-                child: Icon(
-                  Icons.drag_handle,
-                  size: layout.smallIconSize,
-                  color: theme.dividerColor,
+            // Move mode hides the reorder handle: the owner row is filtered
+            // out of the list, so its indices no longer match the bloc's full
+            // panel list and a reorder would move the wrong panel. A
+            // drop-opened menu is a target picker anyway (neither sibling
+            // move UI offers reorder).
+            if (droppedTabId == null)
+              ReorderableDragStartListener(
+                index: index,
+                child: Padding(
+                  padding: EdgeInsets.only(left: layout.tabSpacing),
+                  child: Icon(
+                    Icons.drag_handle,
+                    size: layout.smallIconSize,
+                    color: theme.dividerColor,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),

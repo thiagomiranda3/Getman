@@ -40,6 +40,25 @@
 - **Effort**: L. **Verify**: unit-test the token value object + a mocked token
   fetch; widget-test the AUTH fields.
 
+### H5 — Folder-level auth (make INHERIT FROM PARENT real)
+- **Files**: `lib/features/collections/domain/entities/collection_node_entity.dart`
+  (no auth field today), `lib/core/domain/auth_application.dart`,
+  `lib/features/tabs/data/request_serializer.dart`, dispatch sites
+  (`url_bar.dart`, `main_screen.dart` SendRequestIntent), Postman mapper
+  (folder-level `auth` blocks are currently dropped on import), workspace
+  serializer + git-mirror parity.
+- **Problem**: `AuthType.inherit` exists and is Postman-compatible on
+  import/export, but folders can't hold auth, so it resolves to "no auth".
+  The AUTH tab hint was corrected (2026-08-18) to say so — this item is what
+  makes the option do what its name promises.
+- **Fix**: add an optional `AuthConfig` to folders (+ editor UI on folder
+  nodes), an ancestor walk at dispatch time (same shape as `collectVariables`,
+  nearest ancestor wins), import Postman folder `auth`, mirror to
+  `.folder.json`, then restore the "Inherits auth from the parent collection"
+  hint.
+- **Effort**: L. **Verify**: unit-test the ancestor walk + Postman folder-auth
+  import round-trip; widget-test the AUTH tab hint against a folder with auth.
+
 ---
 
 ## 📦 Request & Body Types

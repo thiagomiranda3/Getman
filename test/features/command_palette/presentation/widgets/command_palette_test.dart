@@ -255,6 +255,88 @@ void main() {
     },
   );
 
+  testWidgets(
+    'opening a history entry mints a FRESH config id; two opens yield two '
+    'different ids',
+    (tester) async {
+      // Chaining rules are keyed by config id (TabsBloc._onDuplicateTab mints
+      // withId(uuid) for the same reason). copyWith PINS the id, so two tabs
+      // opened from the same history entry would silently alias each other's
+      // rules — the opened tab must carry a fresh id, never the entry's.
+      when(() => history.state).thenReturn(
+        const HistoryState(
+          history: [
+            HttpRequestConfigEntity(
+              id: 'h-row',
+              method: 'POST',
+              url: 'https://api.example.com/orders',
+            ),
+          ],
+        ),
+      );
+      await pump(tester);
+
+      // History rows sit at the tail of the lazy results list — filter down
+      // to the entry so its row is actually built.
+      await tester.enterText(find.byType(TextField), 'orders');
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+
+      // The palette isn't hosted in a dialog here, so _invoke's maybePop is a
+      // no-op and the row stays tappable for a second open.
+      await tester.tap(find.text('https://api.example.com/orders'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('https://api.example.com/orders'));
+      await tester.pumpAndSettle();
+
+      final captured = verify(
+        () => tabs.add(captureAny(that: isA<AddTab>())),
+      ).captured.cast<AddTab>();
+      expect(captured, hasLength(2));
+      final firstId = captured[0].config?.id;
+      final secondId = captured[1].config?.id;
+      expect(firstId, isNotNull);
+      expect(firstId, isNot('h-row'));
+      expect(secondId, isNot('h-row'));
+      expect(firstId, isNot(secondId));
+      // Only the id is re-minted — the payload is carried over verbatim.
+      expect(captured[0].config?.url, 'https://api.example.com/orders');
+      expect(captured[0].config?.method, 'POST');
+    },
+  );
+
+  testWidgets('history entry matches by status code', (tester) async {
+    // The HISTORY tab's own search filters by status code; the palette must
+    // too (matchExtra folds in config.statusCode). Neither row's URL/method
+    // contains a '404' subsequence, so only the status code can match it.
+    when(() => history.state).thenReturn(
+      const HistoryState(
+        history: [
+          HttpRequestConfigEntity(
+            id: 'h404',
+            url: 'https://api.example.com/missing',
+            statusCode: 404,
+          ),
+          HttpRequestConfigEntity(
+            id: 'h200',
+            url: 'https://api.example.com/present',
+            statusCode: 200,
+          ),
+        ],
+      ),
+    );
+    await pump(tester);
+
+    await tester.enterText(find.byType(TextField), '404');
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pumpAndSettle();
+
+    // The status code widened only the hidden match text — the visible label
+    // is still the URL.
+    expect(find.text('https://api.example.com/missing'), findsOneWidget);
+    expect(find.text('https://api.example.com/present'), findsNothing);
+  });
+
   testWidgets('empty history adds no History row', (tester) async {
     // history.state already stubbed empty in setUp.
     await pump(tester);

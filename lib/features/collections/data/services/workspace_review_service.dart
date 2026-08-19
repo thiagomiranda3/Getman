@@ -87,6 +87,22 @@ class WorkspaceReviewService implements ReviewService {
     String? authorEmail,
   }) async {
     await _flushOrThrow();
+    // Re-stage staged entries edited again after staging (status `MM`, or
+    // staged-then-deleted `MD`). The dialog previews the WORKTREE content
+    // (_entryFor diffs HEAD vs working tree) and shows those entries as
+    // checked, so committing the older index blob would record content that
+    // differs from what was just reviewed — the fix would linger unstaged
+    // while the user believes it was committed. The flush above can itself
+    // rewrite a staged file, creating exactly this shape.
+    final status = await _git.status(root);
+    final editedAfterStaging = [
+      for (final s in status)
+        if (s.isStaged && (s.worktreeStatus == 'M' || s.worktreeStatus == 'D'))
+          s.path,
+    ];
+    if (editedAfterStaging.isNotEmpty) {
+      await _git.stage(root, editedAfterStaging);
+    }
     await _git.commit(
       root,
       message,
@@ -140,7 +156,10 @@ class WorkspaceReviewService implements ReviewService {
         changeType: changeType,
         displayName: (after ?? before)?.name ?? 'Request',
         staged: s.isStaged,
-        diff: RequestConfigDiff.diff(before?.config, after?.config),
+        // RequestNodeDiff, not RequestConfigDiff: a request's description
+        // lives on the NODE, and the config-only diff made a
+        // description-only change review as an empty diff.
+        diff: RequestNodeDiff.diff(before, after),
       );
     }
     return null; // non-workspace file — ignore

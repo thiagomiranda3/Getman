@@ -154,15 +154,25 @@ class TabsRepositoryImpl implements TabsRepository {
     Map<String, String> envVars = const {},
     NetworkCancelHandle? cancelHandle,
   }) async {
-    final parts = UrlQueryUtils.parse(config.url);
+    // Wire-level trim only — the stored config text stays untouched. A pasted
+    // trailing space would ship as %20 (silent 404) and a LEADING space makes
+    // Uri.parse throw an opaque FormatException inside Dio.
+    final parts = UrlQueryUtils.parse(config.url.trim());
     final resolvedBase = EnvironmentResolver.resolve(parts.base, envVars);
 
     // Duplicate keys ride through as list values — Dio (with ListFormat.multi)
-    // serializes `[1, 2]` as `?key=1&key=2`.
+    // serializes `[1, 2]` as `?key=1&key=2`. Param KEYS resolve too, matching
+    // code-gen (which resolves the whole URL) and the urlencoded/multipart
+    // form-field names — otherwise `{{k}}=1` ships as %7B%7Bk%7D%7D=1 even
+    // when `k` is defined. Header keys stay unresolved by design (the
+    // unresolved-vars chip flags those; see environments-and-chaining.md).
     final queryMap = <String, List<String>>{};
     for (final p in parts.params) {
       queryMap
-          .putIfAbsent(p.key, () => <String>[])
+          .putIfAbsent(
+            EnvironmentResolver.resolve(p.key, envVars),
+            () => <String>[],
+          )
           .add(EnvironmentResolver.resolve(p.value, envVars));
     }
 

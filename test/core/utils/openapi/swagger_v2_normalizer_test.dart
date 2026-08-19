@@ -144,4 +144,98 @@ void main() {
     final del = api.operations.firstWhere((o) => o.method == 'DELETE');
     expect(del.queryParams.single.name, 'tenant');
   });
+
+  group('type-wrong leaf values (JSON-valid, schema-wrong specs)', () {
+    test('non-string leaves are coerced with toString, not thrown on', () {
+      // {"info":{"title":5}} used to throw TypeError out of the normalizer.
+      final api = normalizeSwaggerV2({
+        'swagger': '2.0',
+        'info': {'title': 5},
+        'host': 123,
+        'basePath': 9,
+        'schemes': ['https'],
+        'paths': {
+          '/x': {
+            'get': {'summary': 7},
+          },
+        },
+      });
+      expect(api.title, '5');
+      expect(api.servers.single.url, 'https://1239');
+      expect(api.operations.single.name, '7');
+    });
+
+    test('a non-string securityDefinition name field is coerced', () {
+      final api = normalizeSwaggerV2({
+        'swagger': '2.0',
+        'info': {'title': 'T'},
+        'securityDefinitions': {
+          'k': {'type': 'apiKey', 'in': 'header', 'name': 42},
+        },
+        'security': [
+          {'k': <dynamic>[]},
+        ],
+        'paths': {
+          '/x': {'get': <String, dynamic>{}},
+        },
+      });
+      expect(api.operations.single.security?.apiKeyName, '42');
+    });
+  });
+
+  group('ref fan-out budget', () {
+    test('a billion-laughs definitions tree normalizes quickly and warns on '
+        'the operation that crossed the budget', () {
+      final definitions = <String, dynamic>{};
+      for (var level = 0; level < 10; level++) {
+        definitions['L$level'] = {
+          'type': 'object',
+          'properties': {
+            for (var i = 0; i < 10; i++)
+              'p$i': level == 9
+                  ? {'type': 'string'}
+                  : {r'$ref': '#/definitions/L${level + 1}'},
+          },
+        };
+      }
+      final api = normalizeSwaggerV2({
+        'swagger': '2.0',
+        'info': {'title': 'T'},
+        'definitions': definitions,
+        'paths': {
+          '/bomb': {
+            'post': {
+              'parameters': [
+                {
+                  'name': 'body',
+                  'in': 'body',
+                  'schema': {r'$ref': '#/definitions/L0'},
+                },
+              ],
+            },
+          },
+          '/after': {'get': <String, dynamic>{}},
+        },
+      });
+      final bomb = api.operations.firstWhere((o) => o.path == '/bomb');
+      expect(
+        bomb.warnings,
+        contains(
+          'Spec too complex to fully resolve — some schema examples were '
+          'truncated.',
+        ),
+      );
+      final after = api.operations.firstWhere((o) => o.path == '/after');
+      expect(after.warnings, isEmpty);
+    });
+
+    test('a normal spec resolves identically with no truncation warning', () {
+      final api = normalizeSwaggerV2(_spec);
+      for (final op in api.operations) {
+        expect(op.warnings, isEmpty);
+      }
+      final post = api.operations.firstWhere((o) => o.method == 'POST');
+      expect(post.body!.raw, contains('"name"'));
+    });
+  });
 }

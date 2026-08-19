@@ -29,11 +29,17 @@ class _FakeTabsBloc extends Bloc<TabsEvent, TabsState> implements TabsBloc {
 
   @override
   bool get canReopenClosedTab => false;
+
+  @override
+  Future<void> flushPendingSaves() async {}
 }
 
 class _FakeCollectionsBloc extends Bloc<CollectionsEvent, CollectionsState>
     implements CollectionsBloc {
   _FakeCollectionsBloc(super.initialState);
+
+  @override
+  Future<void> flushPendingSaves() async {}
 }
 
 class _FakeHistoryBloc extends Bloc<HistoryEvent, HistoryState>

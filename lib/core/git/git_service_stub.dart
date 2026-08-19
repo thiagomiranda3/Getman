@@ -92,5 +92,7 @@ class _StubGitService implements GitService {
   @override
   Future<void> rebaseAbort(String root) async {}
   @override
+  Future<void> resetHard(String root) async {}
+  @override
   Future<void> fetch(String root) async {}
 }

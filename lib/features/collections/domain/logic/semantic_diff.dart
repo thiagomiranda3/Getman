@@ -1,7 +1,8 @@
 // Semantic (field-level) diffing for the review tab: FieldChange/SemanticDiff
-// plus RequestConfigDiff/FolderNodeDiff, which diff the workspace-serialized
-// fields of a request or folder node (never the whole JSON blob). Auth
-// changes are reported as changed without surfacing the (secret) values.
+// plus RequestConfigDiff/RequestNodeDiff/FolderNodeDiff, which diff the
+// workspace-serialized fields of a request or folder node (never the whole
+// JSON blob). Auth changes are reported as changed without surfacing the
+// (secret) values.
 import 'package:collection/collection.dart';
 import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
@@ -80,9 +81,10 @@ void _mapPerKey(
 }
 
 /// Diffs the workspace-serialized fields of a request config (see
-/// WorkspaceCollectionSerializer._configToJson). `kind` and response fields are
-/// not persisted, so they are never diffed. Auth is reported as changed without
-/// its (secret) values.
+/// WorkspaceCollectionSerializer._configToJson). Response fields are not
+/// persisted, so they are never diffed; `kind` IS persisted (as the enum's
+/// name, omitted when http) and diffs as a scalar over that name. Auth is
+/// reported as changed without its (secret) values.
 class RequestConfigDiff {
   const RequestConfigDiff._();
 
@@ -93,6 +95,7 @@ class RequestConfigDiff {
     final out = <FieldChange>[];
     _scalar(out, 'method', before?.method, after?.method);
     _scalar(out, 'url', before?.url, after?.url);
+    _scalar(out, 'kind', before?.kind.name, after?.kind.name);
     _scalar(out, 'body type', before?.bodyType.name, after?.bodyType.name);
     _scalar(out, 'body', before?.body, after?.body);
     _scalar(
@@ -142,8 +145,28 @@ class RequestConfigDiff {
   }
 }
 
+/// Diffs the workspace-serialized fields of a request NODE: the node-level
+/// fields the serializer round-trips outside the `request` map (today:
+/// description) plus the config via [RequestConfigDiff]. Use this over a
+/// `*.req.json` pair so a description-only edit does not show an empty diff.
+class RequestNodeDiff {
+  const RequestNodeDiff._();
+
+  static SemanticDiff diff(
+    CollectionNodeEntity? before,
+    CollectionNodeEntity? after,
+  ) {
+    final out = <FieldChange>[];
+    // Node-level fields first, mirroring the serialized field order
+    // (description precedes the `request` map in the .req.json file).
+    _scalar(out, 'description', before?.description, after?.description);
+    out.addAll(RequestConfigDiff.diff(before?.config, after?.config).changes);
+    return SemanticDiff(out);
+  }
+}
+
 /// Diffs the workspace-serialized fields of a folder node (name, favorite,
-/// variables, child order). Description is not persisted, so it is not diffed.
+/// description, variables, child order).
 class FolderNodeDiff {
   const FolderNodeDiff._();
 
@@ -159,6 +182,7 @@ class FolderNodeDiff {
       before == null ? null : '${before.isFavorite}',
       after == null ? null : '${after.isFavorite}',
     );
+    _scalar(out, 'description', before?.description, after?.description);
     _mapPerKey(
       out,
       'variable',

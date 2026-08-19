@@ -199,7 +199,17 @@ class _AuthTabViewState extends State<AuthTabView> {
       case AuthType.none:
         return [_hint(context, 'This request is sent without authentication.')];
       case AuthType.inherit:
-        return [_hint(context, 'Inherits auth from the parent collection.')];
+        // Folder-level auth doesn't exist yet, so there is nothing to
+        // inherit — saying "inherits from the parent" here caused silent
+        // 401s. Keep the option (Postman-compat on import/export) but tell
+        // the truth about what it does today.
+        return [
+          _hint(
+            context,
+            'Collections cannot hold auth yet, so this request is sent '
+            'without authentication. Pick an auth type here to authenticate.',
+          ),
+        ];
       case AuthType.bearer:
         return [
           _field(

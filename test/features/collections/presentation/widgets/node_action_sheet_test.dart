@@ -26,6 +26,9 @@ import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockCollectionsRepository extends Mock implements CollectionsRepository {}
@@ -36,6 +39,8 @@ class MockEnvironmentsBloc
 
 class MockSettingsBloc extends MockBloc<SettingsEvent, SettingsState>
     implements SettingsBloc {}
+
+class MockTabsBloc extends MockBloc<TabsEvent, TabsState> implements TabsBloc {}
 
 const _folderNode = CollectionNodeEntity(id: 'f1', name: 'My Folder');
 
@@ -84,12 +89,22 @@ Future<CollectionsBloc> openSheet(
     const Stream<SettingsState>.empty(),
     initialState: const SettingsState(settings: SettingsEntity()),
   );
+  // The RENAME action carries the new name to open linked tabs
+  // (renameOpenTabsForNode reads TabsBloc), so the sheet's route needs it in
+  // scope — above the MaterialApp like the other blocs, mirroring main.dart.
+  final tabs = MockTabsBloc();
+  whenListen(
+    tabs,
+    const Stream<TabsState>.empty(),
+    initialState: const TabsState(),
+  );
 
   await tester.pumpWidget(
     MultiBlocProvider(
       providers: [
         BlocProvider<EnvironmentsBloc>.value(value: environments),
         BlocProvider<SettingsBloc>.value(value: settings),
+        BlocProvider<TabsBloc>.value(value: tabs),
       ],
       child: MaterialApp(
         theme: brutalistTheme(Brightness.light),

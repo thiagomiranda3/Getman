@@ -102,6 +102,41 @@ void main() {
       expect(envs[1].variables, {'y': '2'});
     });
 
+    test('coerces a numeric environment name instead of throwing (F2)', () {
+      final source = jsonEncode({
+        'name': 99,
+        'values': [
+          {'key': 'x', 'value': '1'},
+        ],
+      });
+      final envs = PostmanEnvironmentMapper.fromJson(source);
+      expect(
+        envs.single.name,
+        '99',
+        reason: 'a numeric name must not abort the whole file import',
+      );
+      expect(envs.single.variables, {'x': '1'});
+    });
+
+    test('reads string "false" enabled flags as disabled (F3)', () {
+      final source = jsonEncode({
+        'name': 'Prod',
+        'values': [
+          {'key': 'off', 'value': 'x', 'enabled': 'false'},
+          {'key': 'on', 'value': 'y', 'enabled': 'true'},
+          {'key': 'plain', 'value': 'z'},
+        ],
+      });
+      final env = PostmanEnvironmentMapper.fromJson(source).single;
+      expect(
+        env.variables,
+        {'on': 'y', 'plain': 'z'},
+        reason:
+            'a row disabled with the string "false" must not import as an '
+            'enabled variable',
+      );
+    });
+
     test('throws FormatException on malformed input', () {
       expect(
         () => PostmanEnvironmentMapper.fromJson('nope'),

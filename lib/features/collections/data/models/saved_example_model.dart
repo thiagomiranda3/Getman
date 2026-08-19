@@ -55,7 +55,10 @@ class SavedExampleModel extends HiveObject {
   SavedExampleEntity toEntity() => SavedExampleEntity(
     id: id,
     name: name,
-    capturedAt: DateTime.fromMillisecondsSinceEpoch(capturedAtMs, isUtc: true),
+    // LOCAL reconstruction: the stamp was captured with DateTime.now() and
+    // is displayed via .hour/.minute — an isUtc: true here shifted the
+    // "captured HH:MM" label by the UTC offset after every app restart.
+    capturedAt: DateTime.fromMillisecondsSinceEpoch(capturedAtMs),
     config: config.toEntity(),
   );
 }

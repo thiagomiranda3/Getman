@@ -74,6 +74,45 @@ void main() {
     },
   );
 
+  test(
+    'a paused rebase inside a LINKED git worktree is detected '
+    '(--git-path answers with an absolute path there)',
+    () async {
+      if (!await gitPresent()) return;
+      // Same shape as setUpConflictedRebase, except `feature` is checked out
+      // in a linked worktree — where `rev-parse --git-path rebase-merge`
+      // answers with an ABSOLUTE path into <main>/.git/worktrees/<name>/,
+      // which must not be prefixed with the root again.
+      final root = tmp.path;
+      await run(root, ['init', '-b', 'main']);
+      await run(root, ['config', 'user.email', 't@t.co']);
+      await run(root, ['config', 'user.name', 't']);
+      final f = File('$root/a.req.json')..writeAsStringSync('{"v":0}\n');
+      await run(root, ['add', '.']);
+      await run(root, ['commit', '-m', 'base']);
+      f.writeAsStringSync('{"v":1}\n');
+      await run(root, ['commit', '-am', 'upstream']);
+      await run(root, ['branch', 'feature', 'HEAD~1']);
+      final wt = Directory('${tmp.path}_wt');
+      addTearDown(() async {
+        if (wt.existsSync()) await wt.delete(recursive: true);
+      });
+      await run(root, ['worktree', 'add', wt.path, 'feature']);
+      File('${wt.path}/a.req.json').writeAsStringSync('{"v":2}\n');
+      await run(wt.path, ['commit', '-am', 'yours']);
+      // Rebase feature onto main inside the worktree -> conflict, paused.
+      final r = await Process.run('git', [
+        'rebase',
+        'main',
+      ], workingDirectory: wt.path);
+      expect(r.exitCode, isNot(0));
+
+      expect(await git.isRebaseInProgress(wt.path), isTrue);
+      // The pause lives in the linked worktree only, not the main checkout.
+      expect(await git.isRebaseInProgress(root), isFalse);
+    },
+  );
+
   test('rebaseAbort restores the pre-rebase tree', () async {
     if (!await gitPresent()) return;
     final root = await setUpConflictedRebase();

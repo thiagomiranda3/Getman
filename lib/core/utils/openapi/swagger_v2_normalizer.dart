@@ -29,9 +29,12 @@ const _httpMethods = [
 /// Converts a Swagger 2.0 spec map into a [NormalizedApi].
 NormalizedApi normalizeSwaggerV2(Map<String, dynamic> spec) {
   final refs = RefResolver(spec);
+  // Leaf fields are producer-controlled: coerce via toString() instead of
+  // `as` casts so a type-wrong-but-JSON-valid spec imports what it can
+  // rather than throwing TypeError (structural `is` checks stay).
   final title =
       (spec['info'] is Map
-          ? (spec['info'] as Map)['title'] as String?
+          ? (spec['info'] as Map)['title']?.toString()
           : null) ??
       'Imported API';
 
@@ -39,8 +42,8 @@ NormalizedApi normalizeSwaggerV2(Map<String, dynamic> spec) {
       (spec['schemes'] is List && (spec['schemes'] as List).isNotEmpty)
       ? (spec['schemes'] as List).first.toString()
       : 'https';
-  final host = (spec['host'] as String?) ?? '';
-  final basePath = (spec['basePath'] as String?) ?? '';
+  final host = spec['host']?.toString() ?? '';
+  final basePath = spec['basePath']?.toString() ?? '';
   final servers = host.isEmpty
       ? <NormalizedServer>[]
       : [NormalizedServer(url: '$scheme://$host$basePath')];
@@ -84,11 +87,15 @@ NormalizedOperation _operation({
   required Map<String, NormalizedSecurityScheme> schemes,
   required String? globalSecurity,
 }) {
+  final warnings = <String>[];
+  // Snapshot the resolver's budget state so only the operation that crossed
+  // the node budget carries the "too complex" warning (not every later op).
+  final budgetWasExhausted = refs.nodeBudgetExhausted;
   final tags = op['tags'];
   final tag = (tags is List && tags.isNotEmpty) ? tags.first.toString() : null;
   final name =
-      (op['summary'] as String?) ??
-      (op['operationId'] as String?) ??
+      op['summary']?.toString() ??
+      op['operationId']?.toString() ??
       '$method $path';
 
   final query = <NormalizedParam>[];
@@ -101,8 +108,8 @@ NormalizedOperation _operation({
     op['parameters'],
     refs,
   )) {
-    final location = param['in'] as String?;
-    final pName = param['name'] as String?;
+    final location = param['in']?.toString();
+    final pName = param['name']?.toString();
     switch (location) {
       case 'query':
         if (pName != null) {
@@ -164,6 +171,13 @@ NormalizedOperation _operation({
     security = schemes[globalSecurity];
   }
 
+  if (!budgetWasExhausted && refs.nodeBudgetExhausted) {
+    warnings.add(
+      'Spec too complex to fully resolve — some schema examples were '
+      'truncated.',
+    );
+  }
+
   return NormalizedOperation(
     method: method,
     path: path,
@@ -173,6 +187,7 @@ NormalizedOperation _operation({
     headerParams: headers,
     body: body,
     security: security,
+    warnings: warnings,
   );
 }
 
@@ -185,7 +200,7 @@ Map<String, NormalizedSecurityScheme> _securityDefinitions(
   for (final e in raw.entries) {
     final def = e.value;
     if (def is! Map) continue;
-    final type = def['type'] as String?;
+    final type = def['type']?.toString();
     switch (type) {
       case 'basic':
         out[e.key.toString()] = const NormalizedSecurityScheme(
@@ -196,7 +211,7 @@ Map<String, NormalizedSecurityScheme> _securityDefinitions(
           kind: def['in'] == 'query'
               ? SecuritySchemeKind.apiKeyQuery
               : SecuritySchemeKind.apiKeyHeader,
-          apiKeyName: def['name'] as String?,
+          apiKeyName: def['name']?.toString(),
         );
       case 'oauth2':
         out[e.key.toString()] = const NormalizedSecurityScheme(

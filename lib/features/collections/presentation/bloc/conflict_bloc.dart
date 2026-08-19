@@ -70,8 +70,13 @@ class ConflictBloc extends Bloc<ConflictEvent, ConflictState> {
         authorName: event.authorName,
         authorEmail: event.authorEmail,
       );
-      if (step == RebaseStep.done) {
-        emit(state.copyWith(status: ConflictStatus.done));
+      if (step != RebaseStep.moreConflicts) {
+        emit(
+          state.copyWith(
+            status: ConflictStatus.done,
+            editsStashed: step == RebaseStep.doneEditsStashed,
+          ),
+        );
         return;
       }
       final conflicts = await _service.currentConflicts(event.root);
