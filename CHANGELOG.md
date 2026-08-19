@@ -5,6 +5,89 @@ All notable changes to **Getman** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.1] - 2026-08-19
+
+A stability release. A whole-codebase bug hunt — a subsystem audit followed by
+an adversarial review campaign and a final verification wave — fixed roughly a
+hundred verified bugs. No new features; everything below is existing behavior
+that now works the way it always should have. The test suite grew from ~2,900
+to 3,593 unit tests alongside the 143-flow macOS integration suite.
+
+### Fixed
+
+- **Request tabs**
+  - Switching between request tabs could show the **wrong section content**
+    (PARAMS / AUTH / HEADERS / BODY / RULES) even though the correct section
+    tab stayed highlighted.
+  - **Cmd/Ctrl+Enter sent a stale snapshot** of the tab — edits made just
+    before the shortcut could be silently left out of the request.
+  - **Enter on the numeric keypad** now triggers everything the main Enter
+    key does, including URL-bar Enter-to-send.
+
+- **Never lose work**
+  - **Quitting inside a save-debounce window lost the last edits** and the
+    just-received response. Pending tab, collection, **and workspace-mirror**
+    writes are all flushed on exit now — previously a quit right after a tree
+    edit could even get that edit deleted by the next launch's disk import.
+  - Closing a tab while its WebSocket/SSE/MCP connection was still being
+    established **leaked the connection**, which kept streaming into a ghost
+    session until app exit.
+
+- **Git workspace collaboration** — a cluster of data-loss fixes:
+  - Launching Getman after teammates' changes arrived via `git pull` **no
+    longer deletes their new files** from the workspace: disk is imported
+    before the first mirror write of a session.
+  - On case-insensitive filesystems (macOS/Windows), a case-only rename no
+    longer makes the mirror **delete the very file that received the
+    write**; saved root ordering also survives case drift now.
+  - A workspace read failure (a malformed file, a missing root folder) no
+    longer masquerades as an *empty* workspace — that used to wipe the
+    in-app tree and then delete the files on disk too.
+  - A `git pull` halted on conflicts is now impossible to lose track of: a
+    durable **REBASE PAUSED** chip keeps RESOLVE CONFLICTS… and ABORT REBASE
+    reachable even after an app restart, a conflicted autostash re-apply no
+    longer exits "successfully" with conflict markers in your files, and
+    conflict resolution no longer silently reverts a request's description
+    or protocol kind.
+  - Git failure messages now actually reach the screen in production
+    (several were silently written to a debug log instead), and choosing a
+    NEW workspace folder is no longer blocked when the OLD one has become
+    unwritable.
+
+- **Networking correctness**
+  - **Cookies no longer leak across hosts** when a redirect hops domains.
+  - Downloads *typed* as gzip (e.g. `.tar.gz`) are no longer decompressed a
+    second time and corrupted; on the web build, Brotli/zstd responses the
+    browser already decoded are no longer replaced with an "unsupported
+    encoding" placeholder.
+  - WebSocket close codes, SSE `\r` line endings and oversized streams, MCP
+    request/response id matching, per-request timeouts, and network-settings
+    parity (proxy/TLS) for MCP connects are all handled correctly now.
+
+- **Importers hardened against hostile input** — cURL import understands
+  short-flag bundles (`-Is`, `-sXPOST`), `--json`, `--next` chains, and
+  ~110 flags it previously tripped on; Postman collections with
+  string-shorthand or loosely-typed fields import instead of erroring; bulk
+  key-value edit round-trips values containing newlines and backslashes via
+  escape sequences.
+
+- **Response viewing** — the JSON TREE filter no longer hides matches nested
+  under a matched container, the existing >3 MB pretty-print cap is now
+  disclosed in the viewer instead of silently showing raw text, plus a batch
+  of editor caret, selection, and index-drift fixes.
+
+- **App-wide sweep** — concurrency races in seven BLoCs, environment/
+  variable resolution in code generation and export, stale titles after
+  renames, filtered-tree exports serializing only the visible subtree,
+  theme and widget-lifecycle glitches, and dozens of similar edge cases.
+
+### Internal
+
+- `docs/architecture/testing.md` gained mandatory first-frame,
+  boundary-class, and offstage-lifecycle test conventions born from the
+  hunt, and the adversarial-review findings each landed with red→green
+  regression tests.
+
 ## [1.10.0] - 2026-07-27
 
 ### Added
