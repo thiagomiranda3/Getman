@@ -38,6 +38,8 @@ import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/request_kind.dart';
+import 'package:getman/core/utils/body_type_utils.dart';
+import 'package:getman/core/utils/header_utils.dart';
 import 'package:getman/core/utils/param_row_composer.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
@@ -424,7 +426,12 @@ class PostmanCollectionMapper {
       id: _uuid.v4(),
       method: method,
       url: mergedUrl,
-      headers: headers.headers,
+      headers: _withImpliedContentType(
+        headers.headers,
+        body.bodyType,
+        body.body,
+        request['body'],
+      ),
       disabledHeaderKeys: headers.disabledKeys,
       disabledParams: structuredQuery?.parked ?? const [],
       auth: _parseAuth(request['auth']),
@@ -435,6 +442,50 @@ class PostmanCollectionMapper {
       graphqlVariables: body.graphqlVariables,
       kind: _parseKind(request['_getman_kind']),
     );
+  }
+
+  /// Postman exports omit its auto-generated headers, so a raw JSON request
+  /// arrives with no Content-Type row — and Getman's code-gen would then ship
+  /// a header-less curl that Bruno/Postman import as text. Materialize the
+  /// row Postman itself sends: the raw `options.raw.language` hint (json/xml/
+  /// html/javascript/text) wins; a hint-less raw body that parses as JSON is
+  /// json, anything else text/plain; structured bodies get their body-type
+  /// default. Never touches an existing row (even a disabled one) and adds
+  /// nothing for a bodyless request or an empty raw body.
+  static Map<String, String> _withImpliedContentType(
+    Map<String, String> headers,
+    BodyType bodyType,
+    String rawBody,
+    dynamic body,
+  ) {
+    if (HeaderUtils.hasHeader(headers, BodyTypeUtils.contentTypeHeader)) {
+      return headers;
+    }
+    if (bodyType != BodyType.raw) {
+      return BodyTypeUtils.withDefaultContentType(headers, bodyType);
+    }
+    if (rawBody.isEmpty) return headers;
+    final options = body is Map ? body['options'] : null;
+    final raw = options is Map ? options['raw'] : null;
+    final language = raw is Map ? raw['language'] : null;
+    final mime = switch (language?.toString().toLowerCase()) {
+      'json' => 'application/json',
+      'xml' => 'application/xml',
+      'html' => 'text/html',
+      'javascript' => 'application/javascript',
+      'text' => 'text/plain',
+      _ => _looksLikeJson(rawBody) ? 'application/json' : 'text/plain',
+    };
+    return {BodyTypeUtils.contentTypeHeader: mime, ...headers};
+  }
+
+  static bool _looksLikeJson(String text) {
+    try {
+      jsonDecode(text);
+      return true;
+    } on FormatException {
+      return false;
+    }
   }
 
   /// Parses the `_getman_kind` vendor key back into a [RequestKind].

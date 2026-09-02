@@ -40,7 +40,7 @@ widgets + screens). Shared cross-feature code lives under `lib/core/`. See
 | `lib/core/error` | Failure / Exception hierarchy. | `failures.dart`, `exceptions.dart`, `guard.dart` |
 | `lib/core/git` | Abstract `git`/`gh` CLI gateways (+ io/stub impls). | `git_service.dart`, `git_service_io.dart`, `gh_service.dart`, `gh_output_parser.dart` |
 | `lib/core/navigation` | Router + keyboard intents + shortcut labels. | `app_router.dart`, `intents.dart`, `url_focus_registry.dart`, `shortcut_catalog.dart`, `app_messenger.dart` (root ScaffoldMessenger key for coordinators above MaterialApp) |
-| `lib/core/network` | Dio client, cookies, realtime, MCP transport. | `network_service.dart`, `realtime_service.dart`, `mcp_service.dart`, `cookie_interceptor.dart`, `web_socket_connector.dart` (io/stub: WS handshake headers on desktop) |
+| `lib/core/network` | Dio client, cookies, realtime, MCP transport. | `network_service.dart`, `realtime_service.dart`, `mcp_service.dart`, `cookie_interceptor.dart`, `web_socket_connector.dart` (io/stub: WS handshake headers on desktop), `auto_generated_headers.dart` (what the client adds at send), `default_user_agent.dart` (io/stub) |
 | `lib/core/storage` | Hive box-name constants + helpers. | `hive_boxes.dart`, `hive_helpers.dart` |
 | `lib/core/theme` | Theme registry + responsive tiers. | `theme_registry.dart`, `theme_ids.dart`, `responsive.dart`, `app_theme.dart` |
 | `lib/core/theme/extensions` | The 8 `ThemeExtension`s + `context.app*` accessors. | `app_palette.dart`, `app_components.dart`, `app_theme_access.dart`, `app_layout.dart` |
@@ -182,7 +182,7 @@ widgets + screens). Shared cross-feature code lives under `lib/core/`. See
 | `lib/features/tabs/domain/usecases` | `send_request_use_case.dart` (couples send + history write). |
 | `lib/features/tabs/presentation/bloc` | `tabs_bloc.dart` (panel-aware), `tabs_event.dart`, `tabs_state.dart`, `request_manager.dart`. |
 | `lib/features/tabs/presentation/screens` | `request_view.dart` (per-tab request/response screen; owns code controllers + split). |
-| `lib/features/tabs/presentation/widgets` | Editor tabs + URL bar + panels: `url_bar.dart`, `params_tab_view.dart`, `headers_tab_view.dart`, `body_tab_view.dart`, `auth_tab_view.dart`, `panel_selector.dart`, `json_code_editor.dart`, `response_section.dart`. |
+| `lib/features/tabs/presentation/widgets` | Editor tabs + URL bar + panels: `url_bar.dart`, `params_tab_view.dart`, `headers_tab_view.dart`, `auto_generated_headers_section.dart`, `body_tab_view.dart`, `auth_tab_view.dart`, `panel_selector.dart`, `json_code_editor.dart`, `response_section.dart`. |
 | `lib/features/tabs/presentation/widgets/response` | Response pane tab bodies: `response_body_view.dart`, `response_headers_view.dart`, `response_cookies_view.dart`, `response_tests_view.dart`, `json_tree_view.dart`, `response_history_timeline.dart`. |
 | `lib/features/tabs/presentation/widgets/response/viewers` | Media/binary response viewers: `response_media_panel.dart`, `image_response_view.dart`, `pdf_response_view.dart`, `media_response_view.dart`, `csv_response_view.dart`, `html_response_view.dart`, `binary_response_view.dart`. |
 
@@ -227,6 +227,8 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | Compare / diff responses | `lib/core/utils/response_diff_builder.dart`, `lib/core/ui/widgets/response_diff_view.dart`, `lib/core/utils/line_diff.dart` |
 | Confirm dialog | `lib/core/ui/widgets/confirm_dialog.dart` |
 | Conflict resolution (git rebase) | `lib/features/collections/domain/logic/three_way_merge.dart`, `lib/features/collections/presentation/widgets/conflict_resolution_dialog.dart` |
+| Content-Type per body type (HEADERS row sync, import defaults, wire rule) | `lib/core/utils/body_type_utils.dart`, `lib/core/domain/entities/request_config_entity.dart` (`withBodyType`) |
+| Auto-generated headers (Host / Content-Length / User-Agent / Accept-Encoding / AUTH) | `lib/core/network/auto_generated_headers.dart`, `lib/core/network/default_user_agent.dart`, `lib/features/tabs/presentation/widgets/auto_generated_headers_section.dart` |
 | Cookie parsing (Set-Cookie) | `lib/core/utils/cookie_parser.dart`, `lib/core/network/network_cookie.dart` |
 | Cookies (jar + interceptor) | `lib/core/network/cookie_interceptor.dart`, `lib/core/network/in_memory_cookie_store.dart`, `lib/features/cookies/data/hive_cookie_persistence.dart`, `lib/features/cookies/presentation/widgets/cookie_manager_dialog.dart` |
 | cURL parse / paste | `lib/core/utils/curl_utils.dart`, `lib/features/tabs/presentation/widgets/url_bar.dart` |

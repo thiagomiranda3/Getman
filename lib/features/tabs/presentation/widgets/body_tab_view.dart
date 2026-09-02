@@ -1,7 +1,10 @@
 // BODY tab of the request editor: body-type selector (none/raw/urlencoded/
 // multipart/binary/graphql) and the per-type editors — raw JSON editor,
 // dual-pane GraphQL QUERY+VARIABLES editor, binary file picker. Composed by
-// RequestConfigSection and UnifiedRequestPanel.
+// RequestConfigSection and UnifiedRequestPanel. The selector dispatches
+// `config.withBodyType(type)`, never a bare `copyWith(bodyType:)`, so the
+// HEADERS tab's Content-Type row follows the body type (see
+// BodyTypeUtils.syncContentType).
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -117,9 +120,11 @@ class _BodyTypeSelector extends StatelessWidget {
                   final bloc = context.read<TabsBloc>();
                   final tab = bloc.state.tabs.byId(tabId);
                   if (tab == null || tab.config.bodyType == type) return;
+                  // withBodyType keeps the HEADERS tab's Content-Type row in
+                  // step with the new type (user-chosen values untouched).
                   bloc.add(
                     UpdateTab(
-                      tab.copyWith(config: tab.config.copyWith(bodyType: type)),
+                      tab.copyWith(config: tab.config.withBodyType(type)),
                     ),
                   );
                 },

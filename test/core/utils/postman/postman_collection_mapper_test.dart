@@ -737,4 +737,151 @@ void main() {
   // descriptions, form/multipart/graphql bodies, RequestKind and collection
   // variables) lives in postman_collection_mapper_roundtrip_test.dart
   // (main() here is at the function_lines_of_code metric gate).
+
+  group('import materializes the Content-Type row Postman leaves implicit', () {
+    HttpRequestConfigEntity import(
+      Map<String, dynamic> body, {
+      List<Map<String, dynamic>> header = const [],
+    }) {
+      final source = jsonEncode({
+        'info': {'name': 'ct', 'schema': 'v2.1.0'},
+        'item': [
+          {
+            'name': 'req',
+            'request': {
+              'method': 'POST',
+              'url': {'raw': 'https://x.y/a'},
+              'header': header,
+              'body': body,
+            },
+          },
+        ],
+      });
+      return PostmanCollectionMapper.fromJson(source).children.first.config!;
+    }
+
+    test('raw + language json → application/json', () {
+      final c = import({
+        'mode': 'raw',
+        'raw': '{"a":1}',
+        'options': {
+          'raw': {'language': 'json'},
+        },
+      });
+      expect(c.headers['Content-Type'], 'application/json');
+      expect(c.headers.keys.first, 'Content-Type');
+    });
+
+    test('raw + language xml/html/javascript/text map to their mime', () {
+      expect(
+        import({
+          'mode': 'raw',
+          'raw': '<a/>',
+          'options': {
+            'raw': {'language': 'xml'},
+          },
+        }).headers['Content-Type'],
+        'application/xml',
+      );
+      expect(
+        import({
+          'mode': 'raw',
+          'raw': '<p/>',
+          'options': {
+            'raw': {'language': 'html'},
+          },
+        }).headers['Content-Type'],
+        'text/html',
+      );
+      expect(
+        import({
+          'mode': 'raw',
+          'raw': 'x()',
+          'options': {
+            'raw': {'language': 'javascript'},
+          },
+        }).headers['Content-Type'],
+        'application/javascript',
+      );
+      expect(
+        import({
+          'mode': 'raw',
+          'raw': 'hello',
+          'options': {
+            'raw': {'language': 'text'},
+          },
+        }).headers['Content-Type'],
+        'text/plain',
+      );
+    });
+
+    test('raw without a language hint: JSON-looking → json, else text', () {
+      expect(
+        import({'mode': 'raw', 'raw': ' {"a": [1]} '}).headers['Content-Type'],
+        'application/json',
+      );
+      expect(
+        import({'mode': 'raw', 'raw': 'plain words'}).headers['Content-Type'],
+        'text/plain',
+      );
+    });
+
+    test('empty raw body adds nothing', () {
+      expect(
+        import({'mode': 'raw', 'raw': ''}).headers.containsKey('Content-Type'),
+        isFalse,
+      );
+    });
+
+    test('urlencoded / formdata / file / graphql get their defaults', () {
+      expect(
+        import({
+          'mode': 'urlencoded',
+          'urlencoded': <Object>[],
+        }).headers['Content-Type'],
+        'application/x-www-form-urlencoded',
+      );
+      expect(
+        import({
+          'mode': 'formdata',
+          'formdata': <Object>[],
+        }).headers['Content-Type'],
+        'multipart/form-data',
+      );
+      expect(
+        import({
+          'mode': 'file',
+          'file': {'src': '/tmp/x.bin'},
+        }).headers['Content-Type'],
+        'application/octet-stream',
+      );
+      expect(
+        import({
+          'mode': 'graphql',
+          'graphql': {'query': '{ me }', 'variables': ''},
+        }).headers['Content-Type'],
+        'application/json',
+      );
+    });
+
+    test(
+      'an explicit Content-Type header (even disabled) is never touched',
+      () {
+        final c = import(
+          {
+            'mode': 'raw',
+            'raw': '{"a":1}',
+            'options': {
+              'raw': {'language': 'json'},
+            },
+          },
+          header: [
+            {'key': 'Content-Type', 'value': 'text/csv', 'disabled': true},
+          ],
+        );
+        expect(c.headers, {'Content-Type': 'text/csv'});
+        expect(c.disabledHeaderKeys, {'Content-Type'});
+      },
+    );
+  });
 }

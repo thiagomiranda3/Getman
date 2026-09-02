@@ -28,6 +28,7 @@ import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/network/request_kind.dart';
+import 'package:getman/core/utils/body_type_utils.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
 
 // Sentinel used by copyWith to distinguish "not provided" from "explicitly
@@ -177,6 +178,23 @@ class HttpRequestConfigEntity extends Equatable {
       sentAt: identical(sentAt, _unset) ? this.sentAt : sentAt as DateTime?,
       disabledParams: disabledParams ?? this.disabledParams,
       disabledHeaderKeys: disabledHeaderKeys ?? this.disabledHeaderKeys,
+    );
+  }
+
+  /// The body-type selector's switch: changes [bodyType] AND keeps the
+  /// HEADERS tab's Content-Type row in step via
+  /// [BodyTypeUtils.syncContentType] (absent/auto → the new type's default,
+  /// user-chosen → untouched, none → auto row removed). A row that disappears
+  /// is pruned from [disabledHeaderKeys]; a rewritten row keeps its flag.
+  HttpRequestConfigEntity withBodyType(BodyType type) {
+    final synced = BodyTypeUtils.syncContentType(headers, type);
+    return copyWith(
+      bodyType: type,
+      headers: synced,
+      disabledHeaderKeys: {
+        for (final key in disabledHeaderKeys)
+          if (synced.containsKey(key)) key,
+      },
     );
   }
 

@@ -827,4 +827,30 @@ curl --location 'http://test.com/dynamics/websocket-metric' \
       expect(reparsed.body, config.body);
     });
   });
+
+  group('import materializes the Content-Type row curl leaves implicit', () {
+    test('JSON -d body gets application/json', () {
+      final c = CurlUtils.parse('curl https://api.dev -d \'{"k":1}\'', id: 'a');
+      expect(c!.headers['Content-Type'], 'application/json');
+    });
+    test('k=v -d body gets x-www-form-urlencoded', () {
+      final c = CurlUtils.parse("curl https://api.dev -d 'a=1&b=2'", id: 'a');
+      expect(c!.headers['Content-Type'], 'application/x-www-form-urlencoded');
+    });
+    test('-F body gets multipart/form-data', () {
+      final c = CurlUtils.parse("curl https://api.dev -F 'a=b'", id: 'a');
+      expect(c!.headers['Content-Type'], 'multipart/form-data');
+    });
+    test('an explicit -H Content-Type wins', () {
+      final c = CurlUtils.parse(
+        "curl https://api.dev -H 'Content-Type: text/plain' -d 'x'",
+        id: 'a',
+      );
+      expect(c!.headers['Content-Type'], 'text/plain');
+    });
+    test('a bodyless GET adds nothing', () {
+      final c = CurlUtils.parse('curl https://api.dev', id: 'a');
+      expect(c!.headers.containsKey('Content-Type'), isFalse);
+    });
+  });
 }
