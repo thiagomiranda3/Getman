@@ -18,6 +18,7 @@ import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/utils/body_type_utils.dart';
+import 'package:getman/core/utils/header_utils.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
 
 /// Target language for generated request code.
@@ -101,8 +102,21 @@ class CodeGenService {
       url += '$sep$name=$value';
     }
 
-    // Mirror the send pipeline's content-type handling for structured bodies.
-    BodyTypeUtils.applyContentType(headers, config.bodyType);
+    // Mirror the send pipeline's content-type handling. An EMPTY raw body
+    // sends no data, so Dio implies no Content-Type for it — skip the raw rule
+    // then. multipart: the wire carries `multipart/form-data; boundary=…`
+    // (Dio), so the effective map carries the boundary-less type; emitters
+    // whose form encoder would be broken by an explicit header drop it.
+    if (config.bodyType != BodyType.raw || config.body.isNotEmpty) {
+      BodyTypeUtils.applyContentType(headers, config.bodyType);
+    }
+    if (config.bodyType == BodyType.multipart) {
+      HeaderUtils.setHeader(
+        headers,
+        BodyTypeUtils.contentTypeHeader,
+        BodyTypeUtils.defaultContentType(BodyType.multipart)!,
+      );
+    }
 
     // Resolve form-field names + values (binary file paths stay local).
     final formFields = [
@@ -193,9 +207,10 @@ class CodeGenService {
   static String _fetch(_Effective e) {
     final b = StringBuffer();
     final opts = StringBuffer()..write("  method: '${e.method}',\n");
-    if (e.headers.isNotEmpty) {
+    final headers = e.headersForFormEncoder();
+    if (headers.isNotEmpty) {
       opts.write('  headers: {\n');
-      _writeHeaders(opts, e.headers, '    ');
+      _writeHeaders(opts, headers, '    ');
       opts.write('  },\n');
     }
     switch (e.bodyType) {
@@ -211,7 +226,10 @@ class CodeGenService {
           '  body: new URLSearchParams(${_jsObject(e.formFields)}),\n',
         );
       case BodyType.multipart:
-        b.write('const form = new FormData();\n');
+        b.write(
+          '// Content-Type (with the multipart boundary) is set by fetch.\n'
+          'const form = new FormData();\n',
+        );
         for (final f in e.formFields) {
           if (f.name.isEmpty) continue;
           if (f.isFile) {
@@ -241,7 +259,7 @@ class CodeGenService {
     final b = StringBuffer('import requests\n\n')
       ..write("url = '${_sq(e.url)}'\n")
       ..write('headers = {\n');
-    _writeHeaders(b, e.headers, '    ');
+    _writeHeaders(b, e.headersForFormEncoder(), '    ');
     b.write('}\n');
 
     final extra = <String>['headers=headers'];
@@ -258,7 +276,10 @@ class CodeGenService {
         b.write('data = ${_pyObject(e.formFields)}\n');
         extra.add('data=data');
       case BodyType.multipart:
-        b.write('files = {\n');
+        b.write(
+          '# Content-Type (with the multipart boundary) is set by requests.\n'
+          'files = {\n',
+        );
         for (final f in e.formFields) {
           if (f.name.isEmpty) continue;
           if (f.isFile) {
@@ -384,7 +405,8 @@ class CodeGenService {
         reqBodyArg = 'payload';
       case BodyType.multipart:
         comments.write(
-          '\t// Build a multipart/form-data body with mime/multipart.Writer (omitted).\n',
+          '\t// Build a multipart/form-data body with mime/multipart.Writer '
+          '(omitted)\n\t// and set Content-Type from writer.FormDataContentType().\n',
         );
       case BodyType.binary:
         comments.write(
@@ -411,7 +433,7 @@ class CodeGenService {
       ..write('\tclient := &http.Client{}\n')
       ..write('\treq, err := http.NewRequest(method, url, $reqBodyArg)\n')
       ..write('\tif err != nil {\n\t\tpanic(err)\n\t}\n');
-    e.headers.forEach((k, v) {
+    e.headersForFormEncoder().forEach((k, v) {
       b.write('\treq.Header.Add(${_dqString(k)}, ${_dqString(v)})\n');
     });
     b
@@ -611,4 +633,16 @@ class _Effective {
   final String rawBody;
   final List<MultipartFieldEntity> formFields;
   final String? binaryPath;
+
+  /// [headers] minus Content-Type when the body is multipart — for targets
+  /// (fetch, requests, net/http) whose form encoder sets the header WITH the
+  /// boundary itself; an explicit boundary-less header would override it and
+  /// break the upload. curl appends the boundary to an explicit header and
+  /// axios spreads form.getHeaders() after ours, so those keep the row.
+  Map<String, String> headersForFormEncoder() => bodyType != BodyType.multipart
+      ? headers
+      : {
+          for (final e in headers.entries)
+            if (e.key.toLowerCase() != 'content-type') e.key: e.value,
+        };
 }

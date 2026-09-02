@@ -8,6 +8,7 @@
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/utils/body_type_utils.dart';
 import 'package:getman/core/utils/openapi/auth_mapper.dart';
 import 'package:getman/core/utils/openapi/normalized_api.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
@@ -87,13 +88,16 @@ HttpRequestConfigEntity _config(NormalizedOperation op, NormalizedAuth auth) {
     headers['Content-Type'] = body.contentType!;
   }
 
+  final bodyType = body?.bodyType ?? BodyType.none;
   return HttpRequestConfigEntity(
     id: _uuid.v4(),
     method: op.method,
     url: url,
-    headers: headers,
+    // Form/raw bodies with no declared content type still get the row the
+    // body type implies, matching a hand-built request's HEADERS tab.
+    headers: BodyTypeUtils.withDefaultContentType(headers, bodyType),
     body: body?.raw ?? '',
-    bodyType: body?.bodyType ?? BodyType.none,
+    bodyType: bodyType,
     formFields: body?.formFields ?? const [],
     auth: auth.config.toMap(),
   );

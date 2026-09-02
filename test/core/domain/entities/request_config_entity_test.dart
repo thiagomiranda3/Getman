@@ -264,4 +264,79 @@ void main() {
       expect(a == b, isFalse);
     });
   });
+
+  group('HttpRequestConfigEntity.withBodyType', () {
+    test('switching to multipart rewrites the default Content-Type row', () {
+      const config = HttpRequestConfigEntity(id: 'x');
+      final next = config.withBodyType(BodyType.multipart);
+      expect(next.bodyType, BodyType.multipart);
+      expect(next.headers['Content-Type'], 'multipart/form-data');
+      expect(next.headers['Accept'], '*/*');
+      expect(next.headers.keys.toList(), ['Content-Type', 'Accept']);
+    });
+
+    test('switching back to raw restores application/json', () {
+      const config = HttpRequestConfigEntity(id: 'x');
+      final next = config
+          .withBodyType(BodyType.binary)
+          .withBodyType(BodyType.raw);
+      expect(next.headers['Content-Type'], 'application/json');
+    });
+
+    test('a user-chosen Content-Type survives every switch', () {
+      const config = HttpRequestConfigEntity(
+        id: 'x',
+        headers: {'Content-Type': 'text/xml'},
+      );
+      final next = config.withBodyType(BodyType.multipart);
+      expect(next.headers, {'Content-Type': 'text/xml'});
+    });
+
+    test('none removes the auto row and prunes its disabled flag', () {
+      const config = HttpRequestConfigEntity(
+        id: 'x',
+        disabledHeaderKeys: {'Content-Type'},
+      );
+      final next = config.withBodyType(BodyType.none);
+      expect(next.headers, {'Accept': '*/*'});
+      expect(next.disabledHeaderKeys, isEmpty);
+    });
+
+    test('a disabled auto row stays disabled when its value is rewritten', () {
+      const config = HttpRequestConfigEntity(
+        id: 'x',
+        disabledHeaderKeys: {'Content-Type'},
+      );
+      final next = config.withBodyType(BodyType.urlencoded);
+      expect(
+        next.headers['Content-Type'],
+        'application/x-www-form-urlencoded',
+      );
+      expect(next.disabledHeaderKeys, {'Content-Type'});
+    });
+
+    test('adds the row when a legacy/imported config has none', () {
+      const config = HttpRequestConfigEntity(
+        id: 'x',
+        headers: {'X-Trace': 'on'},
+      );
+      final next = config.withBodyType(BodyType.graphql);
+      expect(next.headers.keys.toList(), ['Content-Type', 'X-Trace']);
+      expect(next.headers['Content-Type'], 'application/json');
+    });
+
+    test('keeps every other field', () {
+      const config = HttpRequestConfigEntity(
+        id: 'x',
+        method: 'PUT',
+        url: 'https://a.b?c=1',
+        body: '{"k":1}',
+      );
+      final next = config.withBodyType(BodyType.binary);
+      expect(next.id, 'x');
+      expect(next.method, 'PUT');
+      expect(next.url, 'https://a.b?c=1');
+      expect(next.body, '{"k":1}');
+    });
+  });
 }

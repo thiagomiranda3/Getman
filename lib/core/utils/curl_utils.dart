@@ -29,6 +29,7 @@ import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/http_methods.dart';
+import 'package:getman/core/utils/body_type_utils.dart';
 import 'package:getman/core/utils/code_gen_service.dart';
 
 class CurlUtils {
@@ -527,7 +528,9 @@ class CurlUtils {
       id: id,
       method: method,
       url: url,
-      headers: state.headers,
+      // A pasted `-d '{…}'` rarely carries -H Content-Type; materialize the
+      // row the body type implies so the HEADERS tab and code-gen show it.
+      headers: BodyTypeUtils.withDefaultContentType(state.headers, bodyType),
       body: resolvedBody,
       auth: state.auth,
       bodyType: bodyType,

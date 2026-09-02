@@ -5,6 +5,35 @@ All notable changes to **Getman** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Content-Type follows the body type.** The HEADERS tab's `Content-Type`
+  row is rewritten when you switch RAW / FORM / MULTIPART / BINARY / GRAPHQL
+  (`application/json`, `application/x-www-form-urlencoded`,
+  `multipart/form-data`, `application/octet-stream`); NONE removes it. A
+  value you typed yourself is never touched.
+- **Auto-generated headers** in the HEADERS tab (Postman-style): a read-only
+  list of what the HTTP client adds at send time — `Host`, `Content-Length`,
+  `User-Agent`, `Accept-Encoding`, the AUTH tab's header, and the implied
+  `Content-Type` when no row sets one — each with an **ADD** button to turn
+  it into an editable row.
+- Postman, cURL and OpenAPI imports now materialize the `Content-Type` row
+  their sources leave implicit (Postman's `options.raw.language` hint is
+  honoured: json / xml / html / javascript / text).
+
+### Fixed
+
+- **Generated code shipped without `Content-Type`** for raw and multipart
+  bodies whenever the request had no explicit row (typical for imported
+  Postman collections), so curl defaulted to form-urlencoded and Bruno /
+  Postman imported the body as plain text. Every target now mirrors what
+  Getman actually sends: raw carries `application/json` unless you set one;
+  multipart carries `multipart/form-data` for cURL (curl appends the
+  boundary) and axios, and is left to the form encoder for fetch, requests
+  and net/http.
+
 ## [1.10.1] - 2026-08-19
 
 A stability release. A whole-codebase bug hunt — a subsystem audit followed by

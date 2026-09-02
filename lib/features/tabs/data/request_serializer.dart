@@ -61,7 +61,9 @@ class RequestSerializer {
   /// - binary → `application/octet-stream` unless a non-default type is set;
   /// - graphql → `application/json` unless a non-default type is set (the
   ///   envelope ships as a pre-encoded JSON string either way);
-  /// - raw → untouched (the user owns the Content-Type);
+  /// - raw → `application/json` unless the user set one (Dio's implied
+  ///   default for a String body, made explicit); an empty raw body is
+  ///   untouched (nothing is sent);
   /// - none → null body, untouched headers.
   ///
   /// Returns the value to hand to Dio as `data` (String / Map / FormData /
@@ -80,7 +82,12 @@ class RequestSerializer {
       case BodyType.none:
         return null;
       case BodyType.raw:
-        return config.body.isEmpty ? null : r(config.body);
+        if (config.body.isEmpty) return null;
+        // Dio would imply application/json for a header-less String body
+        // anyway (ImplyContentTypeInterceptor); set it here so the wire, the
+        // HEADERS tab and code-gen agree on one explicit value.
+        BodyTypeUtils.applyContentType(headers, BodyType.raw);
+        return r(config.body);
       case BodyType.urlencoded:
         BodyTypeUtils.applyContentType(headers, BodyType.urlencoded);
         // Accumulate list values so repeated field names survive: Dio's

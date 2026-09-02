@@ -248,7 +248,24 @@ void main() {
     expect(cfg.headers['Content-Type'], 'application/json');
   });
 
-  test('form body carries its fields and sets no Content-Type header', () {
+  test('raw body with no declared content type defaults to JSON', () {
+    const api = NormalizedApi(
+      title: 'T',
+      operations: [
+        NormalizedOperation(
+          method: 'POST',
+          path: '/items',
+          name: 'Create',
+          body: NormalizedBody(bodyType: BodyType.raw, raw: '{}'),
+        ),
+      ],
+    );
+    final result = buildImport(api);
+    final cfg = result.root.children.single.children.single.config!;
+    expect(cfg.headers['Content-Type'], 'application/json');
+  });
+
+  test('form body carries its fields and the multipart Content-Type row', () {
     const api = NormalizedApi(
       title: 'T',
       operations: [
@@ -271,9 +288,9 @@ void main() {
     expect(cfg.bodyType, BodyType.multipart);
     expect(cfg.formFields.map((f) => f.name), ['avatar', 'notes']);
     expect(
-      cfg.headers.containsKey('Content-Type'),
-      isFalse,
-      reason: 'multipart content-type (with boundary) is set at send time',
+      cfg.headers['Content-Type'],
+      'multipart/form-data',
+      reason: 'the HEADERS tab shows the row; the boundary is added at send',
     );
   });
 }

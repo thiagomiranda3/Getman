@@ -481,4 +481,45 @@ void main() {
       });
     });
   });
+
+  group(
+    'RequestSerializer.buildBody raw Content-Type (Dio implied default)',
+    () {
+      test(
+        'raw with no Content-Type gets application/json explicitly',
+        () async {
+          final headers = <String, String>{'Accept': '*/*'};
+          await RequestSerializer.buildBody(
+            config: const HttpRequestConfigEntity(id: 'c', body: '{"k":1}'),
+            headers: headers,
+            envVars: const {},
+          );
+          expect(headers['Content-Type'], 'application/json');
+        },
+      );
+
+      test(
+        'an EMPTY raw body leaves headers untouched (nothing is sent)',
+        () async {
+          final headers = <String, String>{'Accept': '*/*'};
+          await RequestSerializer.buildBody(
+            config: const HttpRequestConfigEntity(id: 'c'),
+            headers: headers,
+            envVars: const {},
+          );
+          expect(headers, {'Accept': '*/*'});
+        },
+      );
+
+      test('raw keeps a user-chosen Content-Type', () async {
+        final headers = <String, String>{'content-type': 'text/xml'};
+        await RequestSerializer.buildBody(
+          config: const HttpRequestConfigEntity(id: 'c', body: '<a/>'),
+          headers: headers,
+          envVars: const {},
+        );
+        expect(headers, {'content-type': 'text/xml'});
+      });
+    },
+  );
 }

@@ -666,4 +666,34 @@ void main() {
           'editing controller',
     );
   });
+
+  testWidgets('switching body type keeps the Content-Type header row in step', (
+    tester,
+  ) async {
+    final bloc = await _loadedBloc(
+      repository,
+      sendRequestUseCase,
+      tab(BodyType.raw),
+    );
+    addTearDown(bloc.close);
+    final controller = await _pump(tester, bloc, 't');
+    addTearDown(controller.dispose);
+
+    Map<String, String> headers() => bloc.state.tabs.byId('t')!.config.headers;
+
+    await tester.tap(find.text('MULTIPART'));
+    await tester.pumpAndSettle();
+    expect(headers()['Content-Type'], 'multipart/form-data');
+
+    await tester.tap(find.text('BINARY'));
+    await tester.pumpAndSettle();
+    expect(headers()['Content-Type'], 'application/octet-stream');
+
+    await tester.tap(find.text('RAW'));
+    await tester.pumpAndSettle();
+    expect(headers()['Content-Type'], 'application/json');
+    // Row position + the untouched Accept row survive every switch.
+    expect(headers().keys.toList(), ['Content-Type', 'Accept']);
+    await tester.pump(const Duration(seconds: 11)); // flush debounced save
+  });
 }

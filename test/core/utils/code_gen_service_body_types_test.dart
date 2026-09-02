@@ -168,7 +168,8 @@ void main() {
         out,
         contains(
           '// Build a multipart/form-data body with mime/multipart.Writer '
-          '(omitted).',
+          '(omitted)\n\t// and set Content-Type from '
+          'writer.FormDataContentType().',
         ),
       );
       expect(out, contains('http.NewRequest(method, url, nil)'));
@@ -271,5 +272,82 @@ void main() {
     final decoded = jsonDecode(dataMatch!.group(1)!) as Map<String, dynamic>;
     expect(decoded['query'], 'query { me }');
     expect(decoded['variables'], {'x': 1});
+  });
+
+  group('Content-Type mirrors the wire (raw implied default, multipart)', () {
+    const rawNoHeader = HttpRequestConfigEntity(
+      id: 'r',
+      method: 'POST',
+      url: 'https://api.dev/items',
+      headers: {'Accept': '*/*'},
+      body: '{"k":1}',
+    );
+
+    test('curl: raw body with no Content-Type row gets application/json', () {
+      final out = CodeGenService.generate(rawNoHeader, CodeGenTarget.curl);
+      expect(out, contains("--header 'Content-Type: application/json'"));
+    });
+
+    test('curl: an EMPTY raw body adds no Content-Type (nothing is sent)', () {
+      final out = CodeGenService.generate(
+        rawNoHeader.copyWith(body: ''),
+        CodeGenTarget.curl,
+      );
+      expect(out, isNot(contains('Content-Type')));
+    });
+
+    test('curl: a user-chosen raw Content-Type is kept verbatim', () {
+      final out = CodeGenService.generate(
+        rawNoHeader.copyWith(headers: {'Content-Type': 'text/xml'}),
+        CodeGenTarget.curl,
+      );
+      expect(out, contains("--header 'Content-Type: text/xml'"));
+      expect(out, isNot(contains('application/json')));
+    });
+
+    test('every target emits the implied application/json for raw', () {
+      for (final target in CodeGenTarget.values) {
+        final out = CodeGenService.generate(rawNoHeader, target);
+        expect(
+          out,
+          contains('application/json'),
+          reason: '${target.name} should carry the implied Content-Type',
+        );
+      }
+    });
+
+    test('curl: multipart carries a boundary-less multipart/form-data', () {
+      // curl appends `; boundary=…` to an explicit multipart/form-data header
+      // (verified against curl 8.7), and importers (Bruno/Postman) read the
+      // body mode from it.
+      final out = CodeGenService.generate(multipart, CodeGenTarget.curl);
+      expect(out, contains("--header 'Content-Type: multipart/form-data'"));
+      expect(out, isNot(contains('application/json')));
+    });
+
+    test('axios: multipart header row is overridden by form.getHeaders()', () {
+      final out = CodeGenService.generate(multipart, CodeGenTarget.nodeAxios);
+      expect(out, contains("'Content-Type': 'multipart/form-data'"));
+      expect(out, contains('...form.getHeaders()'));
+    });
+
+    test('fetch/python/go: multipart omits the boundary-less header', () {
+      // Their form encoders set Content-Type WITH the boundary; an explicit
+      // boundary-less header would override it and break the upload.
+      final fetch = CodeGenService.generate(multipart, CodeGenTarget.jsFetch);
+      expect(fetch, isNot(contains("'Content-Type'")));
+      final py = CodeGenService.generate(
+        multipart,
+        CodeGenTarget.pythonRequests,
+      );
+      expect(py, isNot(contains("'Content-Type'")));
+      final go = CodeGenService.generate(multipart, CodeGenTarget.goNetHttp);
+      expect(go, isNot(contains('req.Header.Add("Content-Type"')));
+    });
+
+    test('java: multipart still leaves Content-Type to MultipartBody', () {
+      final out = CodeGenService.generate(multipart, CodeGenTarget.javaOkHttp);
+      expect(out, isNot(contains('.addHeader("Content-Type"')));
+    });
   });
 }
