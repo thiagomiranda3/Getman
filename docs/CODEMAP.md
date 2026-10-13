@@ -256,7 +256,7 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | HTTP send / network client | `lib/core/network/network_service.dart` |
 | JSONPath | `lib/core/utils/json_path.dart`, `lib/core/utils/json_path_builder.dart` |
 | Keyboard shortcuts | `lib/main.dart`, `lib/core/navigation/intents.dart`, `lib/core/navigation/shortcut_catalog.dart` (single-source labels/hints), `lib/core/ui/widgets/shortcut_reference_table.dart`, `lib/features/home/presentation/widgets/shortcuts_help_dialog.dart`, `lib/features/settings/presentation/widgets/settings_shortcuts_tab.dart` |
-| Large responses | `lib/core/domain/persistence_limits.dart`, `lib/features/tabs/presentation/widgets/response/response_large_body_view.dart` |
+| Large responses | `lib/core/utils/large_response_text.dart`, `lib/features/tabs/presentation/widgets/response/large_response_text_view.dart`, `lib/core/domain/persistence_limits.dart`, `lib/features/tabs/presentation/widgets/response/response_large_body_view.dart` |
 | MCP (Model Context Protocol) | `lib/core/network/mcp_service.dart`, `lib/features/mcp/presentation/bloc/mcp_bloc.dart` |
 | Media / binary response viewers | `lib/features/tabs/presentation/widgets/response/viewers/response_media_panel.dart` |
 | Method colors / badge | `lib/core/theme/extensions/app_palette.dart`, `lib/core/ui/widgets/method_badge.dart` |

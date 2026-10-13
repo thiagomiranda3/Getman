@@ -91,6 +91,8 @@ class PlainTextFindWindow extends Equatable {
 /// `offsets[currentMatch]` (a match of [matchLength] characters), clamped to
 /// the haystack bounds. All matches that intersect the window are rebased
 /// into window-relative [PlainTextFindWindow.highlights].
+/// [offsets] must be ascending, as returned by [findMatchOffsets]. Only the
+/// intersecting matches are visited after a logarithmic search for the first.
 PlainTextFindWindow buildPlainTextFindWindow({
   required String haystack,
   required List<int> offsets,
@@ -138,9 +140,21 @@ PlainTextFindWindow buildPlainTextFindWindow({
   final text = haystack.substring(start, end);
   final highlights = <TextRange>[];
   var active = 0;
-  for (var i = 0; i < offsets.length; i++) {
+  // Find the first match whose end is strictly past the window start. A
+  // match beginning before the window can still contribute a clipped range.
+  var low = 0;
+  var high = offsets.length;
+  while (low < high) {
+    final middle = low + (high - low) ~/ 2;
+    if (offsets[middle] + matchLength <= start) {
+      low = middle + 1;
+    } else {
+      high = middle;
+    }
+  }
+  for (var i = low; i < offsets.length; i++) {
     final o = offsets[i];
-    if (o + matchLength <= start || o >= end) continue;
+    if (o >= end) break;
     if (i == currentMatch) active = highlights.length;
     highlights.add(
       TextRange(

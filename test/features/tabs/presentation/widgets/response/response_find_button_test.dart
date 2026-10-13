@@ -23,6 +23,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/code_find_panel.dart';
+import 'package:getman/features/tabs/presentation/widgets/response/large_response_text_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_body_view.dart';
 import 'package:re_editor/re_editor.dart';
 
@@ -113,6 +114,23 @@ Future<void> _pump(WidgetTester tester, {required String body}) async {
   await tester.runAsync(
     () => Future<void>.delayed(const Duration(milliseconds: 100)),
   );
+  await _settleResponseWork(tester);
+}
+
+// Isolate messages need real event-loop turns; fake-time pumpAndSettle alone
+// cannot complete formatting followed by the viewer's background chunk index.
+Future<void> _settleResponseWork(WidgetTester tester) async {
+  await tester.pump();
+  for (var i = 0; i < 200; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 25)),
+    );
+    await tester.pump();
+    if (find.byType(CircularProgressIndicator).evaluate().isEmpty &&
+        find.text('FORMATTING…').evaluate().isEmpty) {
+      break;
+    }
+  }
   await tester.pumpAndSettle();
 }
 
@@ -132,7 +150,7 @@ void main() {
     );
 
     await tester.tap(find.byKey(const ValueKey('response_find_button')));
-    await tester.pumpAndSettle();
+    await _settleResponseWork(tester);
 
     expect(
       find.descendant(
@@ -148,10 +166,10 @@ void main() {
   ) async {
     await _pump(tester, body: '{"a":1,"b":2}');
     await tester.tap(find.byKey(const ValueKey('body_toggle_TREE')));
-    await tester.pumpAndSettle();
+    await _settleResponseWork(tester);
 
     await tester.tap(find.byKey(const ValueKey('response_find_button')));
-    await tester.pumpAndSettle();
+    await _settleResponseWork(tester);
 
     final field = tester.widget<TextField>(
       find.byKey(const ValueKey('tree_filter_field')),
@@ -167,17 +185,17 @@ void main() {
       await _pump(tester, body: big);
 
       // Large plain-text path: SelectableText, no find bar yet.
-      expect(find.byType(SelectableText), findsOneWidget);
+      expect(find.byType(LargeResponseTextView), findsOneWidget);
       expect(find.byKey(const ValueKey('large_find_field')), findsNothing);
 
       await tester.tap(find.byKey(const ValueKey('response_find_button')));
-      await tester.pumpAndSettle();
+      await _settleResponseWork(tester);
       expect(find.byKey(const ValueKey('large_find_field')), findsOneWidget);
 
       await tester.tap(find.byKey(const ValueKey('large_find_close')));
-      await tester.pumpAndSettle();
+      await _settleResponseWork(tester);
       expect(find.byKey(const ValueKey('large_find_field')), findsNothing);
-      expect(find.byType(SelectableText), findsOneWidget);
+      expect(find.byType(LargeResponseTextView), findsOneWidget);
     },
   );
 }

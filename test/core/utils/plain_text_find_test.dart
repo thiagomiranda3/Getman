@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/utils/plain_text_find.dart';
@@ -29,6 +31,67 @@ void main() {
   });
 
   group('buildPlainTextFindWindow', () {
+    test('navigation reads only a bounded portion of millions of matches', () {
+      const length = 5 * 1024 * 1024;
+      final haystack = 'a' * length;
+      for (final currentMatch in [0, length ~/ 2, length - 1]) {
+        final offsets = _CountingOffsets(length);
+        final window = buildPlainTextFindWindow(
+          haystack: haystack,
+          offsets: offsets,
+          currentMatch: currentMatch,
+          matchLength: 1,
+        );
+        expect(window.text, 'a' * kPlainTextFindWindowChars);
+        expect(window.highlights.length, kPlainTextFindWindowChars);
+        expect(
+          window.windowStart + window.highlights[window.activeHighlight].start,
+          currentMatch,
+        );
+        expect(
+          offsets.reads,
+          lessThan(kPlainTextFindWindowChars * 2),
+          reason: 'navigation must not scan millions of offscreen matches',
+        );
+      }
+    });
+
+    test('includes matches crossing either edge of the window', () {
+      final window = buildPlainTextFindWindow(
+        haystack: 'abcabcabcabcabc',
+        offsets: const [0, 3, 6, 9, 12],
+        currentMatch: 2,
+        matchLength: 3,
+        windowChars: 7,
+      );
+      expect(window.windowStart, 4);
+      expect(window.text, 'bcabcab');
+      expect(window.highlights, const [
+        TextRange(start: 0, end: 2),
+        TextRange(start: 2, end: 5),
+        TextRange(start: 5, end: 7),
+      ]);
+      expect(window.activeHighlight, 1);
+    });
+
+    test('excludes matches that only touch a window boundary', () {
+      final window = buildPlainTextFindWindow(
+        haystack: 'abcabcabcabcabc',
+        offsets: const [0, 3, 6, 9, 12],
+        currentMatch: 2,
+        matchLength: 3,
+        windowChars: 9,
+      );
+      expect(window.windowStart, 3);
+      expect(window.text, 'abcabcabc');
+      expect(window.highlights, const [
+        TextRange(start: 0, end: 3),
+        TextRange(start: 3, end: 6),
+        TextRange(start: 6, end: 9),
+      ]);
+      expect(window.activeHighlight, 1);
+    });
+
     test('small haystack: whole text, no clipping, relative highlights', () {
       final w = buildPlainTextFindWindow(
         haystack: 'one two one',
@@ -153,6 +216,24 @@ void main() {
   });
 
   group('UTF-16 surrogate boundary safety', () {
+    test('highlights include matches added by surrogate boundary nudges', () {
+      final window = buildPlainTextFindWindow(
+        haystack: '😀😀😀😀😀',
+        offsets: const [0, 2, 4, 6, 8],
+        currentMatch: 2,
+        matchLength: 2,
+        windowChars: 4,
+      );
+      expect(window.windowStart, 2);
+      expect(window.text, '😀😀😀');
+      expect(window.highlights, const [
+        TextRange(start: 0, end: 2),
+        TextRange(start: 2, end: 4),
+        TextRange(start: 4, end: 6),
+      ]);
+      expect(window.activeHighlight, 1);
+    });
+
     test(
       'window start landing on LOW surrogate is nudged off boundary',
       () {
@@ -238,4 +319,28 @@ void main() {
       },
     );
   });
+}
+
+/// Dense match offsets with counted reads, avoiding wall-clock timing flakes.
+class _CountingOffsets extends ListBase<int> {
+  _CountingOffsets(this.length);
+
+  @override
+  final int length;
+
+  int reads = 0;
+
+  @override
+  set length(int value) => throw UnsupportedError('read-only offsets');
+
+  @override
+  int operator [](int index) {
+    RangeError.checkValidIndex(index, this);
+    reads++;
+    return index;
+  }
+
+  @override
+  void operator []=(int index, int value) =>
+      throw UnsupportedError('read-only offsets');
 }

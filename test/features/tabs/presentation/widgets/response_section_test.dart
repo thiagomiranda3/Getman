@@ -34,6 +34,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/json_tree_view.dart';
+import 'package:getman/features/tabs/presentation/widgets/response/large_response_text_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response_section.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:re_editor/re_editor.dart';
@@ -166,7 +167,7 @@ Future<void> _pump(
   await tester.runAsync(
     () => Future<void>.delayed(const Duration(milliseconds: 300)),
   );
-  await tester.pumpAndSettle();
+  await _settleResponseWork(tester);
 }
 
 /// Builds a [TabsState] with a single tab whose [isSending] and [response]
@@ -274,6 +275,23 @@ Future<TabsBloc> _loadedBloc(
 // Main
 // ---------------------------------------------------------------------------
 
+// Isolate messages need real event-loop turns; fake-time pumpAndSettle alone
+// cannot complete formatting followed by the viewer's background chunk index.
+Future<void> _settleResponseWork(WidgetTester tester) async {
+  await tester.pump();
+  for (var i = 0; i < 200; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 25)),
+    );
+    await tester.pump();
+    if (find.byType(CircularProgressIndicator).evaluate().isEmpty &&
+        find.text('FORMATTING…').evaluate().isEmpty) {
+      break;
+    }
+  }
+  await tester.pumpAndSettle();
+}
+
 void main() {
   late MockTabsRepository repository;
   late MockSendRequestUseCase sendRequestUseCase;
@@ -306,10 +324,10 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
-  // Test 1: Large body → banner + SelectableText, no CodeEditor
+  // Test 1: Large body → banner + virtualized text, no CodeEditor
   // -------------------------------------------------------------------------
   testWidgets(
-    'response over threshold shows banner and SelectableText, not CodeEditor',
+    'response over threshold shows banner and virtualized text, not CodeEditor',
     (tester) async {
       const tabId = 'tab1';
       final body = _body(kLargeResponseViewerChars + 1);
@@ -326,8 +344,8 @@ void main() {
       expect(find.textContaining('LARGE RESPONSE'), findsOneWidget);
       expect(find.textContaining('HIGHLIGHTING DISABLED'), findsOneWidget);
 
-      // Plain SelectableText must be present.
-      expect(find.byType(SelectableText), findsOneWidget);
+      // Virtualized plain text must be present.
+      expect(find.byType(LargeResponseTextView), findsOneWidget);
 
       // The re_editor CodeEditor must NOT be present.
       expect(find.byType(CodeEditor), findsNothing);
@@ -354,11 +372,11 @@ void main() {
       await _pump(tester, bloc: bloc, tabId: tabId, controller: controller);
 
       // Before SHOW FULL: truncated text is rendered.
-      final selectableTextBefore = tester.widget<SelectableText>(
-        find.byType(SelectableText),
+      final selectableTextBefore = tester.widget<LargeResponseTextView>(
+        find.byType(LargeResponseTextView),
       );
       expect(
-        selectableTextBefore.data!.length,
+        selectableTextBefore.text.length,
         lessThanOrEqualTo(kLargeResponsePreviewChars),
       );
 
@@ -367,13 +385,13 @@ void main() {
 
       // Tap SHOW FULL.
       await tester.tap(find.text('SHOW FULL'));
-      await tester.pumpAndSettle();
+      await _settleResponseWork(tester);
 
       // After SHOW FULL: full body length is rendered.
-      final selectableTextAfter = tester.widget<SelectableText>(
-        find.byType(SelectableText),
+      final selectableTextAfter = tester.widget<LargeResponseTextView>(
+        find.byType(LargeResponseTextView),
       );
-      expect(selectableTextAfter.data!.length, equals(body.length));
+      expect(selectableTextAfter.text.length, equals(body.length));
 
       // SHOW FULL button gone after full body is shown.
       expect(find.text('SHOW FULL'), findsNothing);
@@ -398,7 +416,7 @@ void main() {
       await _pump(tester, bloc: bloc, tabId: tabId, controller: controller);
 
       // Sanity: we start in large mode.
-      expect(find.byType(SelectableText), findsOneWidget);
+      expect(find.byType(LargeResponseTextView), findsOneWidget);
       expect(find.byType(CodeEditor), findsNothing);
 
       // Tap PRETTIFY ANYWAY.
@@ -408,13 +426,13 @@ void main() {
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 300)),
       );
-      await tester.pumpAndSettle();
+      await _settleResponseWork(tester);
 
       // After opt-in: CodeEditor should be visible.
       expect(find.byType(CodeEditor), findsOneWidget);
 
-      // SelectableText should be gone.
-      expect(find.byType(SelectableText), findsNothing);
+      // The virtualized plain-text viewer should be gone.
+      expect(find.byType(LargeResponseTextView), findsNothing);
     },
   );
 
@@ -443,9 +461,9 @@ void main() {
         settings: const SettingsEntity(alwaysPrettifyLargeResponses: true),
       );
 
-      // Editor is shown (auto opt-in), not the plain-text SelectableText.
+      // Editor is shown (auto opt-in), not the virtualized plain-text viewer.
       expect(find.byType(CodeEditor), findsOneWidget);
-      expect(find.byType(SelectableText), findsNothing);
+      expect(find.byType(LargeResponseTextView), findsNothing);
       // The banner still reports the size, now flagged as highlighting enabled.
       expect(find.textContaining('HIGHLIGHTING ENABLED'), findsOneWidget);
       // No opt-in button needed anymore.
@@ -473,9 +491,9 @@ void main() {
       // CodeEditor must be present.
       expect(find.byType(CodeEditor), findsOneWidget);
 
-      // No banner, no SelectableText.
+      // No banner, no large-response viewer.
       expect(find.textContaining('LARGE RESPONSE'), findsNothing);
-      expect(find.byType(SelectableText), findsNothing);
+      expect(find.byType(LargeResponseTextView), findsNothing);
     },
   );
 
@@ -499,7 +517,7 @@ void main() {
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 100)),
     );
-    await tester.pumpAndSettle();
+    await _settleResponseWork(tester);
 
     // Still an editor after switching to raw.
     expect(find.byType(CodeEditor), findsOneWidget);
@@ -518,11 +536,11 @@ void main() {
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 100)),
     );
-    await tester.pumpAndSettle();
+    await _settleResponseWork(tester);
 
     expect(find.text('TREE'), findsOneWidget);
     await tester.tap(find.text('TREE'));
-    await tester.pumpAndSettle();
+    await _settleResponseWork(tester);
 
     expect(find.byType(JsonTreeView), findsOneWidget);
     expect(find.text('ok'), findsOneWidget);
@@ -603,7 +621,7 @@ void main() {
     await _pump(tester, bloc: bloc, tabId: tabId, controller: controller);
 
     await tester.tap(find.text('COOKIES'));
-    await tester.pumpAndSettle();
+    await _settleResponseWork(tester);
 
     expect(find.text('sid'), findsOneWidget);
   });
@@ -645,7 +663,7 @@ void main() {
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 300)),
     );
-    await tester.pumpAndSettle();
+    await _settleResponseWork(tester);
 
     expect(find.text('SIZE: '), findsOneWidget);
   });
@@ -715,11 +733,11 @@ void main() {
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 300)),
       );
-      await tester.pumpAndSettle();
+      await _settleResponseWork(tester);
       expect(find.text('HISTORY'), findsOneWidget);
 
       await tester.tap(find.byKey(const ValueKey('response_history_button')));
-      await tester.pumpAndSettle();
+      await _settleResponseWork(tester);
       await tester.tap(find.textContaining('#2'));
       await tester.pump(); // dismiss starts
       await tester.pump(); // first frame after the bloc emission
@@ -727,7 +745,7 @@ void main() {
       // Value-equal responses: without viewedHistoryEntryId in the entity
       // props AND in ResponseSection.buildWhen this badge never flipped.
       expect(find.text('HISTORY: #2'), findsOneWidget);
-      await tester.pumpAndSettle();
+      await _settleResponseWork(tester);
 
       // Drain the bloc's 10s debounced-save timer before teardown.
       await tester.pump(const Duration(seconds: 11));
@@ -766,7 +784,7 @@ void main() {
     await _pump(tester, bloc: bloc, tabId: tabId, controller: controller);
 
     await tester.tap(find.text('TESTS'));
-    await tester.pumpAndSettle();
+    await _settleResponseWork(tester);
 
     expect(find.text('1 / 2 PASSED'), findsOneWidget);
     expect(find.textContaining('PASS · status = 200'), findsOneWidget);

@@ -64,15 +64,35 @@ The metadata-row timeline is `ResponseHistoryTimeline` (hidden under 2 entries);
 
 ## Response pane
 
-The response pane is a shell (`response_section.dart` → `ResponseSection`) over per-tab views under `tabs/presentation/widgets/response/` (`ResponseBodyView` + private `_BodyModeToggle`, `ResponseHeadersView`, `ResponseCookiesView`, `ResponseTestsView`, `ResponseMetadataItem`, `ResponseHistoryTimeline`). `ResponseBodyView` carries Copy + Save-to-file (`saveJsonFileWithFeedback`, json/txt) over `_copyableText()` (the verbatim body incl. the large-body cache).
+The response pane is a shell (`response_section.dart` → `ResponseSection`) over per-tab views under `tabs/presentation/widgets/response/` (`ResponseBodyView` + private `_BodyModeToggle`, `ResponseHeadersView`, `ResponseCookiesView`, `ResponseTestsView`, `ResponseMetadataItem`, `ResponseHistoryTimeline`). `ResponseBodyView` carries Copy + Save-to-file (`saveJsonFileWithFeedback`, json/txt) over `_copyableText()` (the full displayed body: raw before prettify, formatted afterward, including the large-body cache).
 
 ### Response body modes
 
 `_BodyModeToggle` is a 3-segment PRETTY/RAW/TREE switch (keys `body_toggle_*`). TREE renders `JsonTreeView` (collapsible, virtualized) and is only enabled when the body decodes to a JSON object/array under `kLargeResponseViewerChars` (the decode is cached in `_decoded` so the tree keeps its expansion state across rebuilds). Each tree node offers Copy value, Copy path (a JSONPath built by `core/utils/json_path_builder.dart` in the exact grammar `JsonPath` accepts), and **Extract to `{{var}}`** → `ResponseBodyView._extractToVariable` dispatches `AddExtractionRule(configId, rule)` to the global `RulesBloc` (loads+appends+saves), closing the loop with the chaining engine.
 
+### Large response rendering
+
+Bodies over `kLargeResponseViewerChars` start in a virtualized plain-text preview
+(`kLargeResponsePreviewChars`). `LargeResponseTextView` uses `ListView.builder`
+with at most 4096 UTF-16 units per text layout, including unbroken JSON strings.
+`large_response_text.dart` computes chunk boundaries off the UI isolate, preserving
+newlines, CRLF and surrogate pairs. Selection copies preserve chunk boundaries;
+select-all copies the entire displayed document, including unmounted chunks.
+Toolbar Copy/Save always uses the full body, even during the shortened preview.
+
+PRETTIFY ANYWAY and `alwaysPrettifyLargeResponses` format through
+`JsonUtils.prettify` off-isolate. FORMATTING… disables duplicate requests; async
+results are guarded against response replacement/disposal. `kMaxHighlightChars`
+limits **editor input**, including expansion after formatting, not formatting
+itself: larger output stays in the virtualized viewer with a FORMATTED banner.
+Do not clear the outgoing re_editor controller during teardown: its listener can
+schedule a cursor-blink callback after disposal. Find searches the full raw or
+formatted body; its window builder binary-searches sorted match offsets and
+visits only matches intersecting the bounded window.
+
 ### Find-everywhere, word wrap, media actions, bug reports (C1–C5)
 
-- **Find everywhere**: `ResponseBodyControls` — the shared find/copy/copy-as-bug-report/save-to-file/compare/save-as-example action row used by both the small and large body views — only renders FIND when the caller passes `onFind`, because dispatch is per-mode. PRETTY/RAW text bodies under `kLargeResponseViewerChars` route FIND to the editor's `CodeFindPanel`; TREE mode focuses the toolbar's filter field, backed by `json_tree_filter.dart`'s pure `filterJsonTree` (auto-expands matches + ancestors, capped at `kTreeFilterMaxRevealedNodes` revealed nodes) and `planExpandAll` (falls back to a depth cap on trees over `kTreeExpandAllMaxNodes` so EXPAND ALL can never freeze the UI); large plain-text bodies get `LargeBodyFindView` — match offsets are scanned off the UI isolate (`compute` over `plain_text_find.dart`'s helpers) and only a `kPlainTextFindWindowChars` window around the current match renders highlight spans, so cost stays independent of body size. HEADERS/COOKIES tables get their own `ResponseRowFilterBar` (a magnifier that expands into a filter `TextField`), since `ResponseBodyControls` only renders on the BODY tab. Highlight colors are `AppPalette.findMatchHighlight` / `findMatchActiveHighlight` (all 7 themes — never hardcoded).
+- **Find everywhere**: `ResponseBodyControls` — the shared find/copy/copy-as-bug-report/save-to-file/compare/save-as-example action row used by both the small and large body views — only renders FIND when the caller passes `onFind`, because dispatch is per-mode. PRETTY/RAW text bodies under `kLargeResponseViewerChars` route FIND to the editor's `CodeFindPanel`; TREE mode focuses the toolbar's filter field, backed by `json_tree_filter.dart`'s pure `filterJsonTree` (auto-expands matches + ancestors, capped at `kTreeFilterMaxRevealedNodes` revealed nodes) and `planExpandAll` (falls back to a depth cap on trees over `kTreeExpandAllMaxNodes` so EXPAND ALL can never freeze the UI); large plain-text bodies get `LargeBodyFindView` — match offsets are scanned off the UI isolate (`compute` over `plain_text_find.dart`'s helpers) and only a `kPlainTextFindWindowChars` window around the current match renders highlight spans, so per-navigation rendering is bounded; the initial scan still scales with body size. HEADERS/COOKIES tables get their own `ResponseRowFilterBar` (a magnifier that expands into a filter `TextField`), since `ResponseBodyControls` only renders on the BODY tab. Highlight colors are `AppPalette.findMatchHighlight` / `findMatchActiveHighlight` (all 7 themes — never hardcoded).
 - **Word wrap**: a text-modes-only toggle in `response_body_view.dart` (PRETTY/RAW); TREE and the media viewers are unaffected.
 - **Media action cluster (C4)**: `ResponseMediaPanel` (image/video/audio/pdf/csv/html/binary) carries the same `ResponseBodyControls` cluster as text bodies — SAVE TO FILE (raw bytes), SAVE AS EXAMPLE, COMPARE, and COPY (gated to csv/html, the only text-representable media kinds).
 - **COPY AS BUG REPORT (C5)**: `BugReportComposer.compose` (pure, `core/utils/bug_report_composer.dart`) builds a markdown bundle — the resolved request as a curl block (via `CodeGenService`), response status/duration/size, headers, and body (truncated at `BugReportComposer.kBugReportBodyMaxChars`, 50 KB). `{{var}}` values are resolved before formatting, but any variable whose key is flagged secret — in env **or** collection-scoped `secretKeys` (env overlays collection, same layering as send) — resolves to `BugReportComposer.kSecretMask` (`•••`) **before** substitution, so a secret never reaches the bundle regardless of where it's interpolated (URL/headers/auth/body). The button in `response_body_controls.dart` gathers the live variable chain and calls `compose()`, then copies the markdown to the clipboard.

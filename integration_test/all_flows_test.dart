@@ -21,6 +21,7 @@ import 'flows/history_deep_test.dart' as history_deep;
 import 'flows/history_management_test.dart' as history_management;
 import 'flows/history_test.dart' as history;
 import 'flows/json_fold_test.dart' as json_fold;
+import 'flows/large_json_response_test.dart' as large_json_response;
 import 'flows/mcp_test.dart' as mcp;
 import 'flows/open_tabs_dropdown_test.dart' as open_tabs_dropdown;
 import 'flows/panels_test.dart' as panels;
@@ -68,6 +69,7 @@ void main() {
   smoke.main();
   request_send.main();
   json_fold.main();
+  large_json_response.main();
   variable_substitution.main();
 
   // Feature flows.

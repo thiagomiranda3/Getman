@@ -23,6 +23,8 @@ class ResponseLargeBodyView extends StatelessWidget {
     required this.onPrettifyAndOptIn,
     required this.onShowFull,
     required this.controls,
+    this.formatted = false,
+    this.formatting = false,
     super.key,
   });
 
@@ -34,6 +36,12 @@ class ResponseLargeBodyView extends StatelessWidget {
 
   /// Whether the user has opted into syntax-highlighting (editor mode).
   final bool highlightingOptedIn;
+
+  /// Pretty text rendered without the highlighted editor.
+  final bool formatted;
+
+  /// Disables duplicate format requests while background work is running.
+  final bool formatting;
 
   /// Called when "PRETTIFY ANYWAY" is pressed.
   final VoidCallback onPrettifyAndOptIn;
@@ -71,6 +79,8 @@ class ResponseLargeBodyView extends StatelessWidget {
             Text(
               highlightingOptedIn
                   ? 'LARGE RESPONSE ($sizeLabel) — HIGHLIGHTING ENABLED'
+                  : formatted
+                  ? 'LARGE RESPONSE ($sizeLabel) — FORMATTED'
                   : 'LARGE RESPONSE ($sizeLabel) — HIGHLIGHTING DISABLED',
               style: TextStyle(
                 fontSize: layout.fontSizeSmall,
@@ -78,11 +88,11 @@ class ResponseLargeBodyView extends StatelessWidget {
                 color: theme.colorScheme.onSurface,
               ),
             ),
-            if (!highlightingOptedIn) ...[
+            if (!highlightingOptedIn && !formatted) ...[
               TextButton(
-                onPressed: onPrettifyAndOptIn,
+                onPressed: formatting ? null : onPrettifyAndOptIn,
                 child: Text(
-                  'PRETTIFY ANYWAY',
+                  formatting ? 'FORMATTING…' : 'PRETTIFY ANYWAY',
                   style: TextStyle(
                     fontSize: layout.fontSizeSmall,
                     fontWeight: typography.titleWeight,

@@ -26,6 +26,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/code_find_panel.dart';
 import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart';
+import 'package:getman/features/tabs/presentation/widgets/response/large_response_text_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_body_view.dart';
 import 'package:re_editor/re_editor.dart';
 
@@ -135,7 +136,7 @@ Future<void> _settle(WidgetTester tester) async {
   await tester.runAsync(
     () => Future<void>.delayed(const Duration(milliseconds: 120)),
   );
-  await tester.pumpAndSettle();
+  await _settleResponseWork(tester);
 }
 
 List<String> _mockClipboard(WidgetTester tester) {
@@ -156,6 +157,23 @@ List<String> _mockClipboard(WidgetTester tester) {
     ),
   );
   return clips;
+}
+
+// Isolate messages need real event-loop turns; fake-time pumpAndSettle alone
+// cannot complete formatting followed by the viewer's background chunk index.
+Future<void> _settleResponseWork(WidgetTester tester) async {
+  await tester.pump();
+  for (var i = 0; i < 200; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 25)),
+    );
+    await tester.pump();
+    if (find.byType(CircularProgressIndicator).evaluate().isEmpty &&
+        find.text('FORMATTING…').evaluate().isEmpty) {
+      break;
+    }
+  }
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -292,7 +310,7 @@ void main() {
       );
 
       await tester.tap(find.byKey(const ValueKey('body_toggle_TREE')));
-      await tester.pumpAndSettle();
+      await _settleResponseWork(tester);
       expect(find.text('first'), findsOneWidget);
 
       blocs.tabs.push(TabsState(tabs: [_tabWith('{"second":2}')]));
@@ -324,7 +342,7 @@ void main() {
             ],
           ),
         );
-        await tester.pumpAndSettle();
+        await _settleResponseWork(tester);
 
         expect(
           find.byKey(const ValueKey('media_preview_placeholder')),
@@ -344,7 +362,7 @@ void main() {
         final big = 'x' * (kLargeResponseViewerChars + 10);
         final blocs = await _pump(tester, body: big, controller: controller);
 
-        expect(find.byType(SelectableText), findsOneWidget);
+        expect(find.byType(LargeResponseTextView), findsOneWidget);
         expect(find.byType(JsonCodeEditor), findsNothing);
 
         blocs.settings.push(
@@ -352,16 +370,85 @@ void main() {
             settings: SettingsEntity(alwaysPrettifyLargeResponses: true),
           ),
         );
-        await tester.pumpAndSettle();
+        await _settleResponseWork(tester);
         expect(find.byType(JsonCodeEditor), findsOneWidget);
-        expect(find.byType(SelectableText), findsNothing);
+        expect(find.byType(LargeResponseTextView), findsNothing);
 
         blocs.settings.push(
           const SettingsState(settings: SettingsEntity()),
         );
-        await tester.pumpAndSettle();
-        expect(find.byType(SelectableText), findsOneWidget);
+        await _settleResponseWork(tester);
+        expect(find.byType(LargeResponseTextView), findsOneWidget);
         expect(find.byType(JsonCodeEditor), findsNothing);
+      },
+    );
+  });
+
+  group('11.3 MB response regression', () {
+    testWidgets('prettify formats the full JSON without loading the editor', (
+      tester,
+    ) async {
+      final controller = CodeLineEditingController();
+      addTearDown(controller.dispose);
+      final clips = _mockClipboard(tester);
+      final body = '{"description":"${'x' * 11300000}","total":42}';
+      await _pump(tester, body: body, controller: controller);
+      await tester.tap(find.text('PRETTIFY ANYWAY'));
+      await tester.pump();
+      // Real isolate completion, bounded wait; no frame-time assertion in CI.
+      for (var i = 0; i < 200; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 25)),
+        );
+        await tester.pump();
+        if (find.text('PRETTIFY ANYWAY').evaluate().isEmpty &&
+            find.text('FORMATTING…').evaluate().isEmpty) {
+          break;
+        }
+      }
+      await tester.tap(find.byTooltip('Copy response'));
+      await tester.pump();
+      expect(
+        clips.single.substring(0, 24),
+        startsWith('{\n    "description":'),
+      );
+      expect(
+        clips.single.substring(clips.single.length - 20),
+        endsWith('"total": 42\n}'),
+      );
+      expect(controller.text, isEmpty);
+      expect(find.byType(JsonCodeEditor), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets(
+      'plain preview never lays out the entire preview as one paragraph',
+      (
+        tester,
+      ) async {
+        final controller = CodeLineEditingController();
+        addTearDown(controller.dispose);
+        await _pump(
+          tester,
+          body: '{"description":"${'x' * 11300000}"}',
+          controller: controller,
+        );
+        final chunks = find.descendant(
+          of: find.byType(LargeResponseTextView),
+          matching: find.byType(Text),
+        );
+        final paragraphs = tester.widgetList<Text>(chunks).toList();
+        expect(paragraphs, isNotEmpty);
+        expect(
+          paragraphs.every((text) => text.data!.length <= 4096),
+          isTrue,
+          reason: 'A single 256 KiB paragraph blocks layout and search opening',
+        );
+        expect(
+          paragraphs.fold<int>(0, (sum, text) => sum + text.data!.length),
+          lessThan(20000),
+        );
       },
     );
   });
@@ -391,66 +478,75 @@ void main() {
       final big = 'x' * (kLargeResponseViewerChars + 5);
       await _pump(tester, body: big, controller: controller);
 
-      String shownText() =>
-          tester.widget<SelectableText>(find.byType(SelectableText)).data!;
+      String shownText() => tester
+          .widget<LargeResponseTextView>(find.byType(LargeResponseTextView))
+          .text;
       expect(shownText().length, kLargeResponsePreviewChars);
 
       await tester.tap(find.text('SHOW FULL'));
-      await tester.pumpAndSettle();
+      await _settleResponseWork(tester);
 
       expect(shownText().length, big.length);
       expect(find.text('SHOW FULL'), findsNothing);
     });
 
-    testWidgets(
-      'PRETTIFY ANYWAY on an over-3-MB body refuses with a snackbar',
-      (tester) async {
-        final controller = CodeLineEditingController();
-        addTearDown(controller.dispose);
-        final huge = 'x' * (kMaxHighlightChars + 10);
-        await _pump(tester, body: huge, controller: controller);
-
-        await tester.tap(find.text('PRETTIFY ANYWAY'));
+    testWidgets('alwaysPrettify formats JSON above the highlighting cap', (
+      tester,
+    ) async {
+      final controller = CodeLineEditingController();
+      addTearDown(controller.dispose);
+      final huge = '{"value":"${'x' * (kMaxHighlightChars + 10)}"}';
+      await _pump(
+        tester,
+        body: huge,
+        controller: controller,
+        settings: const SettingsEntity(alwaysPrettifyLargeResponses: true),
+      );
+      for (
+        var i = 0;
+        i < 200 && find.text('FORMATTING…').evaluate().isNotEmpty;
+        i++
+      ) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 25)),
+        );
         await tester.pump();
+      }
+      final view = tester.widget<LargeResponseTextView>(
+        find.byType(LargeResponseTextView),
+      );
+      expect(view.text.substring(0, 20), startsWith('{\n    "value":'));
+      expect(controller.text, isEmpty);
+      expect(find.byType(JsonCodeEditor), findsNothing);
+      expect(find.text('PRETTIFY ANYWAY'), findsNothing);
+    });
 
-        expect(
-          find.text(
-            'Body too large to highlight (over 3 MB) — showing plain text',
-          ),
-          findsOneWidget,
+    testWidgets('formatted output above the cap never enters the editor', (
+      tester,
+    ) async {
+      final controller = CodeLineEditingController();
+      addTearDown(controller.dispose);
+      // Input <3 MiB, formatted output >3 MiB: the guard must use output size.
+      final body = '[${List.filled(500000, '0').join(',')}]';
+      await _pump(tester, body: body, controller: controller);
+      await tester.tap(find.text('PRETTIFY ANYWAY'));
+      for (var i = 0; i < 200; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 25)),
         );
-        expect(find.byType(SelectableText), findsOneWidget);
-        expect(find.byType(JsonCodeEditor), findsNothing);
-        await tester.pump(const Duration(seconds: 3));
-      },
-    );
-
-    testWidgets(
-      'alwaysPrettifyLargeResponses over the 3 MB cap discloses why the '
-      'body stays plain text',
-      (tester) async {
-        final controller = CodeLineEditingController();
-        addTearDown(controller.dispose);
-        final huge = 'x' * (kMaxHighlightChars + 10);
-        await _pump(
-          tester,
-          body: huge,
-          controller: controller,
-          settings: const SettingsEntity(alwaysPrettifyLargeResponses: true),
-        );
-
-        // The freeze-guard keeps the body plain text (deliberate)…
-        expect(find.byType(SelectableText), findsOneWidget);
-        expect(find.byType(JsonCodeEditor), findsNothing);
-        // …but the setting being silently ignored must be disclosed.
-        expect(
-          find.text(
-            'Too large to prettify (over 3 MB) — shown as plain text',
-          ),
-          findsOneWidget,
-        );
-      },
-    );
+        await tester.pump();
+        if (find.text('FORMATTING…').evaluate().isEmpty) break;
+      }
+      expect(find.byType(JsonCodeEditor), findsNothing);
+      expect(controller.text, isEmpty);
+      expect(
+        tester
+            .widget<LargeResponseTextView>(find.byType(LargeResponseTextView))
+            .text
+            .length,
+        greaterThan(kMaxHighlightChars),
+      );
+    });
 
     testWidgets(
       'no prettify-cap note when the setting is off',
@@ -497,7 +593,7 @@ void main() {
       await _pump(tester, body: '{"a":1}', controller: controllerB);
 
       await tester.tap(find.byKey(const ValueKey('response_find_button')));
-      await tester.pumpAndSettle();
+      await _settleResponseWork(tester);
 
       expect(
         find.descendant(

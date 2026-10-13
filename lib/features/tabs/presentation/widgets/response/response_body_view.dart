@@ -7,6 +7,8 @@
 // fall back to a plain-text large-body view unless
 // alwaysPrettifyLargeResponses opts in (or the user taps PRETTIFY ANYWAY);
 // the kResponseBodyTooLargePlaceholder sentinel always stays plain text.
+// Large plain/pretty bodies use bounded, virtualized chunks; formatting is
+// available above the editor highlight cap and Copy/Find use the displayed text.
 // Extract-to-{{var}} from a tree node dispatches AddExtractionRule to the
 // global RulesBloc, closing the loop with the chaining feature.
 //
@@ -42,6 +44,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
 import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/json_tree_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/large_body_find_view.dart';
+import 'package:getman/features/tabs/presentation/widgets/response/large_response_text_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_body_controls.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_large_body_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/viewers/response_media_panel.dart';
@@ -133,6 +136,8 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
 
   // Large-mode state: non-null when the current body exceeds the threshold.
   String? _largeBody;
+  String? _formattedLargeBody;
+  bool _formatting = false;
   bool _showFullPreview = false;
   bool _highlightingOptedIn = false;
 
@@ -193,39 +198,26 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
     final syncId = ++_pendingSyncId;
 
     if (rawBody != null && rawBody.length > kLargeResponseViewerChars) {
-      // Opt-in setting: prettify + highlight large bodies automatically (the
-      // user accepts the render cost). The over-1-MB placeholder is a known
-      // non-JSON sentinel, so it always stays in plain-text mode.
-      final autoPrettify =
-          context
-              .read<SettingsBloc>()
-              .state
-              .settings
-              .alwaysPrettifyLargeResponses &&
-          !isResponseBodyPlaceholder(rawBody) &&
-          canHighlightBody(rawBody.length);
-      if (autoPrettify) {
-        final prettified = await JsonUtils.prettify(rawBody);
-        if (!mounted || syncId != _pendingSyncId) return;
-        widget.responseController.text = prettified;
-        setState(() {
-          _largeBody = rawBody;
-          _showFullPreview = false;
-          _highlightingOptedIn = true;
-          _findActive = false;
-          _clearTreeState();
-        });
-        return;
-      }
-      // Large path — skip prettify and editor; go to plain-text mode.
-      if (!mounted || syncId != _pendingSyncId) return;
+      // Even the first frame uses bounded text layout for a large response.
+      // Do not mutate the outgoing editor's controller during its teardown:
+      // re_editor schedules a cursor blink on controller notifications.
       setState(() {
         _largeBody = rawBody;
+        _formattedLargeBody = null;
+        _formatting = false;
         _showFullPreview = false;
         _highlightingOptedIn = false;
         _findActive = false;
         _clearTreeState();
       });
+      if (context
+              .read<SettingsBloc>()
+              .state
+              .settings
+              .alwaysPrettifyLargeResponses &&
+          !isResponseBodyPlaceholder(rawBody)) {
+        await _formatLargeBody(rawBody, syncId);
+      }
       return;
     }
 
@@ -238,6 +230,20 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
         : await JsonUtils.prettify(rawBody);
     // Only apply if no newer sync was started and we're still mounted.
     if (!mounted || syncId != _pendingSyncId) return;
+    // Formatting can expand a compact response beyond the editor's budget.
+    // Apply the cap to the OUTPUT too, not only to the incoming body.
+    if (!canHighlightBody(text.length)) {
+      setState(() {
+        _largeBody = rawBody;
+        _formattedLargeBody = text;
+        _formatting = false;
+        _showFullPreview = true;
+        _highlightingOptedIn = false;
+        _findActive = false;
+        _clearTreeState();
+      });
+      return;
+    }
     widget.responseController.text = text;
     // Tree decode is now LAZY (see _decodeForTree): enable TREE optimistically
     // from a cheap shape probe; the real (possibly off-isolate) decode happens
@@ -246,6 +252,8 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
     final treeMaybe = _looksLikeJson(rawBody) && !isPlaceholder;
     setState(() {
       _largeBody = null;
+      _formattedLargeBody = null;
+      _formatting = false;
       _showFullPreview = false;
       _highlightingOptedIn = false;
       _findActive = false;
@@ -384,19 +392,23 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
 
   Future<void> _prettifyAndOptIn() async {
     final body = _largeBody;
-    if (body == null) return;
-    if (!canHighlightBody(body.length)) {
-      showAppSnackBar(
-        context,
-        'Body too large to highlight (over 3 MB) — showing plain text',
-      );
-      return;
-    }
-    final syncId = ++_pendingSyncId;
+    if (body == null || _formatting) return;
+    await _formatLargeBody(body, ++_pendingSyncId);
+  }
+
+  Future<void> _formatLargeBody(String body, int syncId) async {
+    setState(() => _formatting = true);
     final prettified = await JsonUtils.prettify(body);
     if (!mounted || syncId != _pendingSyncId) return;
-    widget.responseController.text = prettified;
-    setState(() => _highlightingOptedIn = true);
+    final useEditor = canHighlightBody(prettified.length);
+    if (useEditor) widget.responseController.text = prettified;
+    setState(() {
+      _formatting = false;
+      _highlightingOptedIn = useEditor;
+      _formattedLargeBody = useEditor ? null : prettified;
+      _showFullPreview = true;
+      _findActive = false;
+    });
   }
 
   /// C1 dispatch: routes the toolbar find button to the affordance matching
@@ -451,10 +463,10 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
     );
   }
 
-  /// The text a Copy action should put on the clipboard: the verbatim large
-  /// body when highlighting is off, otherwise whatever the editor shows.
+  /// Full displayed text for Copy/Save: raw before prettify, formatted after,
+  /// independent of the shortened preview and syntax-highlighting mode.
   String _copyableText() => _largeBody != null && !_highlightingOptedIn
-      ? _largeBody!
+      ? (_formattedLargeBody ?? _largeBody!)
       : widget.responseController.text;
 
   /// Sub-threshold view: a Pretty/Raw/Tree toggle (+ copy) above the body.
@@ -520,7 +532,7 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
   }
 
   Widget _buildLargeMode() {
-    final body = _largeBody!;
+    final body = _formattedLargeBody ?? _largeBody!;
     final displayText = _showFullPreview
         ? body
         : body.substring(0, body.length.clamp(0, kLargeResponsePreviewChars));
@@ -528,61 +540,21 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Banner row (extracted to ResponseLargeBodyView) + the prettify-cap
-        // disclosure note. Both live inside children[0] so the Expanded body
-        // below keeps its children[1] position (see next comment).
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ResponseLargeBodyView(
-              body: body,
-              showFullPreview: _showFullPreview,
-              highlightingOptedIn: _highlightingOptedIn,
-              onPrettifyAndOptIn: _prettifyAndOptIn,
-              onShowFull: () => setState(() => _showFullPreview = true),
-              controls: ResponseBodyControls(
-                tabId: widget.tabId,
-                getCopyableText: _copyableText,
-                onFind: _onFindPressed,
-                // Only the opted-in editor wraps; the plain SelectableText
-                // view always soft-wraps, so the toggle is hidden there.
-                wordWrap: _highlightingOptedIn ? _effectiveWordWrap : null,
-                onToggleWordWrap: _highlightingOptedIn ? _toggleWordWrap : null,
-              ),
-            ),
-            // Disclosure for ALWAYS PRETTIFY LARGE RESPONSES over the 3 MiB
-            // kMaxHighlightChars freeze-guard: the setting is deliberately
-            // ignored there (loading a multi-MB string into re_editor
-            // rebuilds its line model synchronously and hangs the app), but
-            // silently showing plain text reads as a bug — say why.
-            BlocSelector<SettingsBloc, SettingsState, bool>(
-              selector: (state) => state.settings.alwaysPrettifyLargeResponses,
-              builder: (context, prettifySettingOn) {
-                if (!prettifySettingOn ||
-                    _highlightingOptedIn ||
-                    canHighlightBody(body.length)) {
-                  return const SizedBox.shrink();
-                }
-                final layout = context.appLayout;
-                return Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: layout.pagePadding,
-                    vertical: layout.pagePadding / 4,
-                  ),
-                  child: Text(
-                    'Too large to prettify (over 3 MB) — shown as plain text',
-                    key: const ValueKey('prettify_cap_note'),
-                    style: TextStyle(
-                      fontSize: layout.fontSizeSmall,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
+        ResponseLargeBodyView(
+          body: body,
+          showFullPreview: _showFullPreview,
+          highlightingOptedIn: _highlightingOptedIn,
+          formatted: _formattedLargeBody != null,
+          formatting: _formatting,
+          onPrettifyAndOptIn: _prettifyAndOptIn,
+          onShowFull: () => setState(() => _showFullPreview = true),
+          controls: ResponseBodyControls(
+            tabId: widget.tabId,
+            getCopyableText: _copyableText,
+            onFind: _onFindPressed,
+            wordWrap: _highlightingOptedIn ? _effectiveWordWrap : null,
+            onToggleWordWrap: _highlightingOptedIn ? _toggleWordWrap : null,
+          ),
         ),
         // Body — editor when opted-in, plain text otherwise. Kept here so the
         // editor widget occupies the same Column.children[1] position in both
@@ -604,26 +576,8 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
 
   /// The normal large-mode plain-text view (preview or SHOW FULL). Also the
   /// windowed find's fallback while the query is empty/matchless.
-  Widget _buildPlainTextView(String displayText) {
-    final palette = context.appPalette;
-    final typography = context.appTypography;
-    final layout = context.appLayout;
-    final theme = Theme.of(context);
-    return ColoredBox(
-      color: palette.codeBackground,
-      child: SingleChildScrollView(
-        padding: EdgeInsets.all(layout.pagePadding),
-        child: SelectableText(
-          displayText,
-          style: TextStyle(
-            fontFamily: typography.codeFontFamily,
-            fontSize: layout.fontSizeCode,
-            color: theme.colorScheme.onSurface,
-          ),
-        ),
-      ),
-    );
-  }
+  Widget _buildPlainTextView(String displayText) =>
+      LargeResponseTextView(text: displayText);
 }
 
 class _BodyModeToggle extends StatelessWidget {
