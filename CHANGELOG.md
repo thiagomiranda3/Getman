@@ -5,6 +5,53 @@ All notable changes to **Getman** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-10-29
+
+Body editing gains learned JSON field completion, easier variable insertion,
+and live syntax feedback. This release also improves large-response handling
+and fixes request cancellation, redirects, and concurrent history updates.
+
+### Added
+
+- **Persistent JSON field autocomplete** in JSON RAW bodies and GraphQL
+  **VARIABLES (JSON)**. Getman learns property names from nested objects and
+  arrays, stores local usage counts, and ranks matching suggestions by
+  frequency. Only names and counts are learned, never field values.
+- **Complete body** with **Cmd+Space** on macOS or **Ctrl+Space** on
+  Windows/Linux. Suggestions also appear while typing; use arrow keys to
+  navigate, Enter or Tab to accept, and Esc to dismiss.
+- **Body variable completion** for `{{variables}}`, including environment,
+  collection, and dynamic variables, with secret previews masked. Completion
+  preserves existing quotes, paired braces, and surrounding JSON or GraphQL.
+- **Live JSON syntax feedback** with a clickable error message showing line
+  and column. Complete variable placeholders are accepted as template values;
+  syntax warnings remain advisory and do not block sending.
+
+### Changed
+
+- Large JSON responses use a virtualized text preview, with formatting and
+  search work moved off the UI thread where supported. Copy and save retain
+  the complete response even when the preview is shortened.
+- Response comparison performs formatting and exact line diff work in a
+  background worker, with bounded memory and complexity. Responses beyond
+  the inline limit still show their status and header comparison.
+- CSV previews parse in chunks, retain the header and first 500 body rows,
+  and count all logical rows. Rebuilds reuse the parse, and replacing a
+  response immediately hides stale rows.
+- Native gzip/deflate response decoding runs in a worker and stops when
+  decompressed output exceeds the response buffer limit.
+
+### Fixed
+
+- Redirects now strip explicit credential headers whenever the scheme,
+  hostname, or effective port changes, including HTTPS-to-HTTP redirects.
+- Cancelled, superseded, or closed-tab executions cannot publish late rule
+  results or variable captures. Cancellation during decompression also
+  prevents history recording and rule evaluation.
+- Identical captures from successive sends are each written back once.
+- Concurrent history additions, deletes, clears, and undo operations are
+  serialized, preserving deduplication and recovering after failed writes.
+
 ## [1.10.2] - 2026-09-02
 
 A bugfix release for request headers and code generation. The `Content-Type`
@@ -557,6 +604,7 @@ workflow. Runs on macOS, Windows, and Linux.
   machine.
 - Ships for **macOS**, **Windows**, and **Linux** desktop.
 
+[1.11.0]: https://github.com/thiagomiranda3/Getman/releases/tag/v1.11.0
 [1.8.0]: https://github.com/thiagomiranda3/Getman/releases/tag/v1.8.0
 [1.7.0]: https://github.com/thiagomiranda3/Getman/releases/tag/v1.7.0
 [1.0.0]: https://github.com/thiagomiranda3/Getman/releases/tag/1.0.0
