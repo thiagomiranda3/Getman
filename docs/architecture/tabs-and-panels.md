@@ -67,7 +67,7 @@ The metadata-row timeline is `ResponseHistoryTimeline` (hidden under 2 entries);
 editors keep their existing behavior. `body_completion.dart` computes the caret
 context and complete replacement range. Typing a property name in a JSON object
 opens a caret-anchored menu of learned names; typing `{{` offers variables.
-**Cmd+Space on macOS / Ctrl+Space elsewhere** explicitly opens completion.
+**Option+Space on macOS / Ctrl+Space elsewhere** explicitly opens completion.
 Up/Down changes the selected row, Enter or Tab accepts it, and Escape dismisses
 it. Acceptance replaces the full token, including a suffix after the caret,
 and preserves existing quotes, colons, and paired variable delimiters.

@@ -106,7 +106,7 @@ void main() {
 
   Future<void> manual(WidgetTester tester) async {
     final modifier = defaultTargetPlatform == TargetPlatform.macOS
-        ? LogicalKeyboardKey.metaLeft
+        ? LogicalKeyboardKey.altLeft
         : LogicalKeyboardKey.controlLeft;
     await tester.sendKeyDownEvent(modifier);
     await tester.sendKeyEvent(LogicalKeyboardKey.space);

@@ -1,5 +1,5 @@
 // `{{variable}}` autocomplete overlay wrapping a TextField: typing `{{` (or
-// Cmd/Ctrl+Space) opens a keyboard-navigable suggestion menu built from
+// Option+Space on macOS / Ctrl+Space elsewhere) opens a suggestion menu from
 // suggestionsFor; accepting inserts the closing `}}` and reports the new
 // text via onAccepted, since a programmatic controller write never fires
 // TextField.onChanged the way a real keystroke does. Optional
@@ -8,6 +8,7 @@
 // ENTIRE field text (variable mode always wins inside a {{ token).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/utils/variable_autocomplete_query.dart';
 import 'package:getman/core/utils/variable_resolution_helper.dart';
@@ -65,7 +66,7 @@ class _GatedAction extends Action<Intent> {
 }
 
 /// Wraps a [TextField] ([child]) with a `{{variable}}` autocomplete menu.
-/// Typing `{{` (or Cmd/Ctrl+Space) opens a keyboard-navigable overlay built
+/// Typing `{{` (or Option+Space on macOS / Ctrl+Space elsewhere) opens an overlay
 /// from [suggestionsFor]; accepting inserts `name}}`.
 ///
 /// When [urlSuggestionsFor] is also wired, the same overlay gains a second,
@@ -347,18 +348,22 @@ class _VariableAutocompleteState extends State<VariableAutocomplete> {
     return CompositedTransformTarget(
       link: _link,
       child: Shortcuts(
-        shortcuts: const <ShortcutActivator, Intent>{
-          SingleActivator(LogicalKeyboardKey.arrowDown):
-              _NextSuggestionIntent(),
-          SingleActivator(LogicalKeyboardKey.arrowUp): _PrevSuggestionIntent(),
-          SingleActivator(LogicalKeyboardKey.enter): _EnterAcceptIntent(),
-          SingleActivator(LogicalKeyboardKey.tab): _AcceptSuggestionIntent(),
-          SingleActivator(LogicalKeyboardKey.escape):
-              _DismissSuggestionIntent(),
-          SingleActivator(LogicalKeyboardKey.space, control: true):
-              _OpenSuggestionIntent(),
-          SingleActivator(LogicalKeyboardKey.space, meta: true):
-              _OpenSuggestionIntent(),
+        shortcuts: <ShortcutActivator, Intent>{
+          const SingleActivator(LogicalKeyboardKey.arrowDown):
+              const _NextSuggestionIntent(),
+          const SingleActivator(LogicalKeyboardKey.arrowUp):
+              const _PrevSuggestionIntent(),
+          const SingleActivator(LogicalKeyboardKey.enter):
+              const _EnterAcceptIntent(),
+          const SingleActivator(LogicalKeyboardKey.tab):
+              const _AcceptSuggestionIntent(),
+          const SingleActivator(LogicalKeyboardKey.escape):
+              const _DismissSuggestionIntent(),
+          SingleActivator(
+            LogicalKeyboardKey.space,
+            alt: useMetaShortcuts,
+            control: !useMetaShortcuts,
+          ): const _OpenSuggestionIntent(),
         },
         child: Actions(
           actions: <Type, Action<Intent>>{

@@ -1,4 +1,5 @@
 // test/core/ui/widgets/variable_autocomplete_test.dart
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -119,16 +120,27 @@ void main() {
     expect(controller.text, '{{userId}}');
   });
 
-  testWidgets('Ctrl+Space opens the menu on an empty field', (tester) async {
-    await pump(tester);
-    focusNode.requestFocus();
-    await tester.pump();
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
-    await tester.sendKeyEvent(LogicalKeyboardKey.space);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
-    await tester.pumpAndSettle();
-    expect(find.text('baseUrl'), findsOneWidget);
-  });
+  testWidgets(
+    'Option+Space on macOS and Ctrl+Space elsewhere opens completion',
+    (tester) async {
+      await pump(tester);
+      focusNode.requestFocus();
+      await tester.pump();
+      final modifier = defaultTargetPlatform == TargetPlatform.macOS
+          ? LogicalKeyboardKey.altLeft
+          : LogicalKeyboardKey.controlLeft;
+      await tester.sendKeyDownEvent(modifier);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.sendKeyUpEvent(modifier);
+      await tester.pump();
+      expect(find.text('baseUrl').hitTestable(), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(controller.text, '{{baseUrl}}');
+      await tester.pumpAndSettle();
+    },
+    variant: TargetPlatformVariant.desktop(),
+  );
 
   testWidgets(
     'Ctrl+Space notifies onAccepted with the inserted {{}} token — '

@@ -1,5 +1,6 @@
 // Request-only editor assistance: learned fields and caret-anchored variable
-// suggestions. Cmd/Ctrl+Space opens completion; replacing a full token keeps
+// suggestions. Option+Space on macOS / Ctrl+Space elsewhere opens completion;
+// replacing a full token keeps
 // suffixes/paired delimiters intact. Restored bodies seed the learning baseline.
 import 'dart:async';
 import 'dart:math' as math;
@@ -258,12 +259,13 @@ class _BodyCodeEditorState extends State<BodyCodeEditor> {
       return KeyEventResult.ignored;
     }
     final keyboard = HardwareKeyboard.instance;
-    final primary = useMetaShortcuts
-        ? keyboard.isMetaPressed
-        : keyboard.isControlPressed;
+    final completionModifier = useMetaShortcuts
+        ? keyboard.isAltPressed && !keyboard.isControlPressed
+        : keyboard.isControlPressed && !keyboard.isAltPressed;
     if (event.logicalKey == LogicalKeyboardKey.space &&
-        primary &&
-        !keyboard.isAltPressed) {
+        completionModifier &&
+        !keyboard.isMetaPressed &&
+        !keyboard.isShiftPressed) {
       _showOnRefresh = true;
       _explicit = true;
       _refresh();

@@ -29,7 +29,7 @@ The `SendRequest` event carries `tabId` plus `Map<String, String> envVars`. Disp
 ### Request-body template assistance
 
 `BodyCodeEditor` offers the same layered variable names and dynamic variables
-at the caret when typing `{{`, or explicitly with Cmd+Space on macOS /
+at the caret when typing `{{`, or explicitly with Option+Space on macOS /
 Ctrl+Space elsewhere. `TabVariableContextBuilder` supplies collection ancestry
 and the active environment; environment values override inherited collection
 values. Completion inserts the `{{name}}` token, leaving resolution to send
