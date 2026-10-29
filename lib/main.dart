@@ -54,6 +54,7 @@ import 'package:getman/features/settings/domain/usecases/settings_usecases.dart'
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/settings/presentation/widgets/network_settings_listener.dart';
+import 'package:getman/features/tabs/presentation/bloc/body_field_dictionary_cubit.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_section_index.dart';
@@ -235,6 +236,7 @@ class MyApp extends StatelessWidget {
                 di.sl<CollectionsBloc>()..add(const LoadCollections()),
           ),
           BlocProvider(create: (_) => di.sl<TabsBloc>()..add(const LoadTabs())),
+          BlocProvider(create: (_) => di.sl<BodyFieldDictionaryCubit>()),
           BlocProvider(
             create: (_) =>
                 di.sl<EnvironmentsBloc>()..add(const LoadEnvironments()),

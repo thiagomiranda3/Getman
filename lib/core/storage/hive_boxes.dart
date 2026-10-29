@@ -22,4 +22,7 @@ class HiveBoxes {
   /// only `{id, name, orderedTabIds, activeTabId}`. Order + active panel live
   /// in [tabsMeta] under `panelOrder` / `activePanelId`.
   static const String panels = 'panels';
+
+  /// Global JSON property-name usage counts (primitive int values, no adapter).
+  static const String bodyFieldDictionary = 'body_field_dictionary';
 }

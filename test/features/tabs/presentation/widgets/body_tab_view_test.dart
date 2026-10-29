@@ -240,6 +240,102 @@ void main() {
     expect(find.byType(FormDataEditor), findsNothing);
   });
 
+  testWidgets('raw JSON syntax advisory follows enabled Content-Type', (
+    tester,
+  ) async {
+    final bloc = await _loadedBloc(
+      repository,
+      sendRequestUseCase,
+      tab(BodyType.raw),
+    );
+    addTearDown(bloc.close);
+    final controller = await _pump(tester, bloc, 't');
+    addTearDown(controller.dispose);
+    final advisory = find.byKey(const ValueKey('body-json-validation-error'));
+    controller.text = '{"broken": ]}';
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(advisory.hitTestable(), findsOneWidget);
+
+    Future<void> changeHeaders(
+      Map<String, String> headers, {
+      Set<String> disabled = const {},
+    }) async {
+      final current = bloc.state.tabs.byId('t')!;
+      final changed = current.copyWith(
+        config: current.config.copyWith(
+          headers: headers,
+          disabledHeaderKeys: disabled,
+        ),
+      );
+      final emitted = bloc.stream.firstWhere(
+        (state) => state.tabs.byId('t')!.config == changed.config,
+      );
+      bloc.add(UpdateTab(changed));
+      await emitted;
+      await tester.pump();
+    }
+
+    await changeHeaders({'content-type': 'text/plain'});
+    expect(advisory, findsNothing);
+    // A disabled explicit header restores the wire's implied JSON default.
+    await changeHeaders(
+      {'content-type': 'text/plain'},
+      disabled: {'content-type'},
+    );
+    expect(advisory.hitTestable(), findsOneWidget);
+    await changeHeaders({
+      'CONTENT-TYPE': 'Application/Problem+JSON; charset=utf-8',
+    });
+    expect(advisory.hitTestable(), findsOneWidget);
+    await changeHeaders({'Content-Type': 'application/xml'});
+    expect(advisory, findsNothing);
+    await changeHeaders({});
+    expect(advisory.hitTestable(), findsOneWidget);
+    await tester.pump(const Duration(seconds: 11));
+  });
+
+  testWidgets('GraphQL validates VARIABLES while QUERY keeps completion', (
+    tester,
+  ) async {
+    final bloc = await _loadedBloc(
+      repository,
+      sendRequestUseCase,
+      tab(BodyType.graphql),
+    );
+    addTearDown(bloc.close);
+    final queryController = await _pump(tester, bloc, 't');
+    addTearDown(queryController.dispose);
+    final editors = tester.widgetList<CodeEditor>(find.byType(CodeEditor));
+    final variablesController = editors.last.controller!;
+    final advisory = find.byKey(const ValueKey('body-json-validation-error'));
+    queryController.text = 'query { viewer { id } }';
+    variablesController.text = '{"id": ]}';
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(advisory.hitTestable(), findsOneWidget);
+    variablesController.text = '{"id": {{userId}}}';
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(advisory, findsNothing);
+    // Dynamic variables are available without any saved environment or
+    // dictionary provider; query completion must use the same live context.
+    editors.first.focusNode!.requestFocus();
+    await tester.pump();
+    queryController
+      ..text = '{{'
+      ..selection = const CodeLineSelection.collapsed(
+        index: 0,
+        offset: 2,
+      );
+    await tester.pump();
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+    expect(find.text(r'$guid').hitTestable(), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(advisory, findsNothing);
+  });
+
   testWidgets('tapping FORM switches the body type and shows FormDataEditor', (
     tester,
   ) async {

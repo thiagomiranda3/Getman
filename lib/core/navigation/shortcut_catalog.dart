@@ -2,7 +2,8 @@
 // displays a shortcut (settings SHORTCUTS tab, the ⌘/ cheat-sheet overlay,
 // tooltip hints) reads shortcutCatalog()/shortcutHint() so they can never
 // drift. The BINDINGS themselves live in main.dart's buildAppShortcuts —
-// adding a shortcut means adding it in both places. Also home to
+// body completion is local to BodyCodeEditor; other shortcuts go in both.
+// Also home to
 // useMetaShortcuts, the single macOS-vs-everything-else predicate every
 // platform-aware surface reads.
 
@@ -27,6 +28,7 @@ enum AppShortcutAction {
   saveAll,
   send,
   beautifyJson,
+  completeBody,
   commandPalette,
   envSwitcher,
   focusUrl,
@@ -106,6 +108,14 @@ List<ShortcutCatalogEntry> shortcutCatalog({required bool useMeta}) {
       description: 'Format & indent the JSON body',
       keys: hint([mod, 'B']),
       keyCaps: [mod, 'B'],
+      section: 'REQUEST',
+    ),
+    ShortcutCatalogEntry(
+      action: AppShortcutAction.completeBody,
+      title: 'Complete body',
+      description: 'Suggest JSON fields or variables at the body cursor',
+      keys: hint([mod, 'Space']),
+      keyCaps: [mod, 'Space'],
       section: 'REQUEST',
     ),
     ShortcutCatalogEntry(

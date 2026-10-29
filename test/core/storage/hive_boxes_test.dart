@@ -14,6 +14,7 @@ void main() {
     expect(HiveBoxes.cookies, 'cookies');
     expect(HiveBoxes.requestRules, 'request_rules');
     expect(HiveBoxes.panels, 'panels');
+    expect(HiveBoxes.bodyFieldDictionary, 'body_field_dictionary');
   });
 
   test('box names never collide', () {
@@ -27,6 +28,7 @@ void main() {
       HiveBoxes.cookies,
       HiveBoxes.requestRules,
       HiveBoxes.panels,
+      HiveBoxes.bodyFieldDictionary,
     ];
     expect(names.toSet().length, names.length);
   });

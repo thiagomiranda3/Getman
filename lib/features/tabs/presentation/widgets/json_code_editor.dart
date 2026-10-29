@@ -187,11 +187,15 @@ class JsonCodeEditor extends StatelessWidget {
     this.wordWrap = true,
     this.autofocus = true,
     this.findController,
+    this.focusNode,
+    this.indicatorBuilder,
   });
   final CodeLineEditingController controller;
   final bool readOnly;
   final bool wordWrap;
   final bool autofocus;
+  final FocusNode? focusNode;
+  final CodeIndicatorBuilder? indicatorBuilder;
 
   /// Externally-owned find controller. Pass one when the host widget needs to
   /// observe find-mode state (e.g. the body editor's Beautify overlay moves
@@ -222,6 +226,7 @@ class JsonCodeEditor extends StatelessWidget {
         readOnly: readOnly,
         wordWrap: wordWrap,
         autofocus: autofocus,
+        focusNode: focusNode,
         // Let the app's global Cmd/Ctrl+S (save), Cmd/Ctrl+(Numpad)Enter
         // (send), Cmd/Ctrl+L (focus URL), and Cmd/Ctrl+/ (cheat sheet)
         // shortcuts fire even while this editor has focus
@@ -247,26 +252,28 @@ class JsonCodeEditor extends StatelessWidget {
             alpha: readOnly ? 0.2 : 0.1,
           ),
         ),
-        indicatorBuilder: (context, controller, chunkController, notifier) {
-          // Line numbers + JSON fold markers. re_editor's
-          // DefaultCodeChunkAnalyzer (on by default) detects {}/[] regions; the
-          // chunk indicator paints the collapse/expand chevrons in the gutter
-          // and toggles them on tap.
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DefaultCodeLineNumber(
-                controller: controller,
-                notifier: notifier,
-              ),
-              DefaultCodeChunkIndicator(
-                width: context.appLayout.foldGutterWidth,
-                controller: chunkController,
-                notifier: notifier,
-              ),
-            ],
-          );
-        },
+        indicatorBuilder:
+            indicatorBuilder ??
+            (context, controller, chunkController, notifier) {
+              // Line numbers + JSON fold markers. re_editor's
+              // DefaultCodeChunkAnalyzer (on by default) detects {}/[] regions; the
+              // chunk indicator paints the collapse/expand chevrons in the gutter
+              // and toggles them on tap.
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DefaultCodeLineNumber(
+                    controller: controller,
+                    notifier: notifier,
+                  ),
+                  DefaultCodeChunkIndicator(
+                    width: context.appLayout.foldGutterWidth,
+                    controller: chunkController,
+                    notifier: notifier,
+                  ),
+                ],
+              );
+            },
       ),
     );
   }

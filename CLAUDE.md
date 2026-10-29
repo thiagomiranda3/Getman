@@ -38,6 +38,11 @@ UI/business-logic separation; every state/event is `Equatable`.
 "where is X?" index (directory map + concept lookup + cross-cutting flows). Every
 `lib/` file also opens with a `//` header; read it for file-level detail.
 
+**Shared agent context:** `AGENTS.md` is a symlink to this file. On the local
+workstation, [`.agents/README.md`](.agents/README.md) indexes linked Claude skills,
+plugin documentation, and the Getman memory directory. Consult relevant memory
+notes as historical context and verify them against the current code.
+
 **Read-before-editing routing table** — before touching an area, read its doc:
 
 | Touching… | Read first |

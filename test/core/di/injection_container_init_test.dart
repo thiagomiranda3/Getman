@@ -45,8 +45,11 @@ import 'package:getman/features/settings/domain/repositories/settings_repository
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/tabs/data/models/request_tab_model.dart';
+import 'package:getman/features/tabs/domain/entities/body_field_entry.dart';
+import 'package:getman/features/tabs/domain/repositories/body_field_dictionary_repository.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
+import 'package:getman/features/tabs/presentation/bloc/body_field_dictionary_cubit.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_section_index.dart';
 import 'package:getman/features/updates/domain/repositories/update_repository.dart';
@@ -70,6 +73,26 @@ void main() {
     await di.reset();
     if (tempDir.existsSync()) await tempDir.delete(recursive: true);
   });
+
+  test(
+    'dictionary wiring persists learned names through a full reboot',
+    () async {
+      await di.init(storageDirectoryOverride: tempDir.path);
+      final dictionary = di.sl<BodyFieldDictionaryCubit>();
+      await dictionary.recordUsage({'email': 2});
+      expect(di.sl<BodyFieldDictionaryRepository>().entries, const [
+        BodyFieldEntry(name: 'email', usageCount: 2),
+      ]);
+      await dictionary.close();
+      await di.reset();
+      await di.init(storageDirectoryOverride: tempDir.path);
+      final reopened = di.sl<BodyFieldDictionaryCubit>();
+      expect(reopened.state.entries, const [
+        BodyFieldEntry(name: 'email', usageCount: 2),
+      ]);
+      await reopened.close();
+    },
+  );
 
   test(
     'init boots the full graph and every root registration resolves',

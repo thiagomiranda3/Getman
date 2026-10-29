@@ -8,7 +8,7 @@
 2. `di.init()` — opens Hive, registers adapters, opens **all** boxes in parallel (`Future.wait`), reads current settings synchronously, registers all use cases, repositories, data sources, BLoCs, `NetworkService`, `AppRouter`, `TabDirtyChecker`. The `cookies` + `requestRules` boxes are opened on this cold-start path and the cookie jar is hydrated via `openAndHydrateDeferredBoxes` **before** `NetworkService` is usable — an earlier post-frame `warmUpDeferredBoxes` raced early sends (dropped cookies / skipped rules), so don't re-defer these without a readiness gate.
 3. Returns `SettingsEntity` to pass as `initialSettings` into `SettingsBloc`.
 4. `MultiRepositoryProvider` exposes cross-feature services to the widget tree: `TabDirtyChecker`, `NetworkService`, `CookieStore`, `WorkspaceSyncService`, and `UrlFocusRegistry` (the last lets the Cmd/Ctrl+L action focus the active tab's URL field — each `UrlBar` registers its `FocusNode` keyed by tab id).
-5. `MultiBlocProvider` creates `SettingsBloc`, `HistoryBloc`, `CollectionsBloc`, `TabsBloc`, `EnvironmentsBloc` (plus the git blocs and `McpBloc`). Collections/Tabs/Environments dispatch their `Load*` event eagerly; `HistoryBloc` has no load event — it starts with `isLoading: true` and populates from its `watchHistory()` subscription (the stream yields the current list on subscribe). The root `BlocBuilder<SettingsBloc>` has a `buildWhen` gated to `themeId`/`isDarkMode`/`isCompactMode` — anything else would rebuild the whole `MaterialApp` per settings keystroke.
+5. `MultiBlocProvider` creates `SettingsBloc`, `HistoryBloc`, `CollectionsBloc`, `TabsBloc`, `BodyFieldDictionaryCubit`, `EnvironmentsBloc` (plus the git blocs and `McpBloc`). Collections/Tabs/Environments dispatch their `Load*` event eagerly; `HistoryBloc` has no load event — it starts with `isLoading: true` and populates from its `watchHistory()` subscription (the stream yields the current list on subscribe). The root `BlocBuilder<SettingsBloc>` has a `buildWhen` gated to `themeId`/`isDarkMode`/`isCompactMode` — anything else would rebuild the whole `MaterialApp` per settings keystroke.
 
 ## Dependency injection
 
@@ -19,7 +19,7 @@ The hand-written `Hive.registerAdapter(...)` calls also live in `injection_conta
 ## Provider inventory
 
 - **`MultiRepositoryProvider`** (cross-feature services): `TabDirtyChecker`, `NetworkService`, `CookieStore`, `WorkspaceSyncService`, `UrlFocusRegistry`.
-- **`MultiBlocProvider`** (feature blocs): `SettingsBloc`, `HistoryBloc`, `CollectionsBloc`, `TabsBloc`, `EnvironmentsBloc`, the git blocs (`GitSyncBloc`, `ReviewBloc`, `PullRequestsBloc`, `ConflictBloc`), `RulesBloc`, `RealtimeBloc`, `McpBloc`.
+- **`MultiBlocProvider`** (feature blocs): `SettingsBloc`, `HistoryBloc`, `CollectionsBloc`, `TabsBloc`, `BodyFieldDictionaryCubit`, `EnvironmentsBloc`, the git blocs (`GitSyncBloc`, `ReviewBloc`, `PullRequestsBloc`, `ConflictBloc`), `RulesBloc`, `RealtimeBloc`, `McpBloc`.
 - **`ChangeNotifierProvider`** above `MaterialApp`: `UpdateController` (drives the auto-update dialog).
 
 ## Global keyboard shortcuts
@@ -44,6 +44,16 @@ Put intents where `context.read<TabsBloc>()` is reachable — and dialog-opening
 ### Editor shortcut pass-through
 
 `re_editor` would otherwise **consume** three chords while a code editor holds focus. `AppCodeShortcutsActivatorsBuilder` (`json_code_editor.dart`, `@visibleForTesting`) strips them so the app's global shortcuts fire instead: it drops the `save` activator entirely (so **Cmd/Ctrl+S** → `SaveRequestIntent`), removes the **Cmd/Ctrl+Enter** chord from `newLine` (so `SendRequestIntent` fires) while keeping plain / Shift / numpad Enter for real newlines, and drops the **Cmd/Ctrl+/** chord from `singleLineComment` (so `ShowShortcutsIntent` fires for the cheat sheet).
+
+### Local request-body completion shortcut
+
+`BodyCodeEditor` handles **Cmd+Space on macOS / Ctrl+Space elsewhere** locally
+through its focused editor node; this is not a root `appShortcuts` action.
+Enter/Tab accept the selected completion and Escape closes its menu. The local
+handler is inactive when the editor is offstage or lacks focus, so the chord
+does not open suggestions in another tab or a modal dialog. The shared
+`BodyFieldDictionaryCubit` provider carries learned names between request
+editors; it hydrates synchronously from the already-open primitive Hive box.
 
 ## Snackbar action API
 

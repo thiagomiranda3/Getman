@@ -26,6 +26,26 @@ A leading `$` marks a built-in resolved at send time without an environment — 
 
 The `SendRequest` event carries `tabId` plus `Map<String, String> envVars`. Dispatchers that need real substitution — the SEND button in `UrlBar`, the `SendRequestIntent` shortcut in `MainScreen` — compute it via `ActiveEnvironmentHelper.variablesFor(environments, activeEnvironmentId)` read from `EnvironmentsBloc` + `SettingsBloc`. Omitting `envVars` sends `{{var}}` placeholders to the network verbatim.
 
+### Request-body template assistance
+
+`BodyCodeEditor` offers the same layered variable names and dynamic variables
+at the caret when typing `{{`, or explicitly with Cmd+Space on macOS /
+Ctrl+Space elsewhere. `TabVariableContextBuilder` supplies collection ancestry
+and the active environment; environment values override inherited collection
+values. Completion inserts the `{{name}}` token, leaving resolution to send
+time. Secret previews are masked. Learning JSON field names stores only those
+names and counts, never variable values or request body values.
+
+JSON body diagnostics validate **template syntax**, independently of variable
+lookup. Both `{"name":"{{user}}"}` and `{"count":{{count}}}` are accepted as
+templates even when the variables are currently undefined. The validator masks
+complete unquoted placeholders with a padded JSON `null` sentinel, preserving
+UTF-16 source offsets for error navigation; quoted strings retain ordinary JSON
+escape validation. An unquoted placeholder cannot stand in for a property name
+or arbitrary JSON punctuation. The advisory does not resolve values, test their
+types, or guarantee valid JSON after substitution. Undefined variables remain
+the unresolved-variable chip's concern, and neither advisory blocks sending.
+
 ### URL highlighting
 
 `VariableHighlightController` (in `lib/core/ui/widgets/`, a `TextEditingController` subclass) overrides `buildTextSpan` to color each `{{var}}` token. Colors are theme-dependent so the constructor takes none — the owning widget pushes variable + color updates via `updateVariables` / `updateColors` in `didChangeDependencies`; both methods `notifyListeners()` only when the underlying value actually changed (via `MapEquality` / `==`) so we don't thrash rebuilds. Until colors arrive, tokens render unhighlighted. Palette: `AppPalette.variableResolved` / `variableUnresolved` (never hardcode green/red literals).

@@ -85,9 +85,12 @@ import 'package:getman/features/tabs/data/models/panel_model.dart';
 import 'package:getman/features/tabs/data/models/parked_param_model.dart';
 import 'package:getman/features/tabs/data/models/request_tab_model.dart';
 import 'package:getman/features/tabs/data/models/stored_response_model.dart';
+import 'package:getman/features/tabs/data/repositories/body_field_dictionary_repository_impl.dart';
 import 'package:getman/features/tabs/data/repositories/tabs_repository_impl.dart';
+import 'package:getman/features/tabs/domain/repositories/body_field_dictionary_repository.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
+import 'package:getman/features/tabs/presentation/bloc/body_field_dictionary_cubit.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_section_index.dart';
 import 'package:getman/features/updates/data/datasources/github_release_data_source.dart';
@@ -154,6 +157,7 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     Hive.openBox<StoredCookieModel>(HiveBoxes.cookies),
     Hive.openBox<RequestRulesModel>(HiveBoxes.requestRules),
     Hive.openBox<PanelModel>(HiveBoxes.panels),
+    Hive.openBox<int>(HiveBoxes.bodyFieldDictionary),
   ]);
   final settingsBox = boxes[0] as Box<SettingsModel>;
   final environmentsBox = boxes[1] as Box<EnvironmentModel>;
@@ -278,6 +282,10 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
       EnvironmentsLocalDataSourceImpl.new,
     )
     // Features - Tabs
+    ..registerLazySingleton<BodyFieldDictionaryRepository>(
+      () => BodyFieldDictionaryRepositoryImpl(boxes[9] as Box<int>),
+    )
+    ..registerFactory(() => BodyFieldDictionaryCubit(sl()))
     ..registerLazySingleton(
       () => TabsBloc(
         repository: sl(),

@@ -61,6 +61,52 @@ The metadata-row timeline is `ResponseHistoryTimeline` (hidden under 2 entries);
 
 `JsonCodeEditor` (`json_code_editor.dart`) must never set `CodeEditorStyle.codeTheme` — re_editor's built-in highlighter runs in an `isolate_manager` worker whose colored results never reach the paint path in this app, so setting `codeTheme` silently reverts everything to a single color. Highlighting instead comes from a synchronous per-line `jsonHighlightSpanBuilder` wired via the controller's `spanBuilder`. Always build controllers fed to `JsonCodeEditor` with `createJsonCodeController()` — it backs both the request body and response body editors in `request_view.dart`.
 
+### Request-body autocomplete and syntax diagnostics
+
+`BodyCodeEditor` adds request-only assistance around `JsonCodeEditor`; response
+editors keep their existing behavior. `body_completion.dart` computes the caret
+context and complete replacement range. Typing a property name in a JSON object
+opens a caret-anchored menu of learned names; typing `{{` offers variables.
+**Cmd+Space on macOS / Ctrl+Space elsewhere** explicitly opens completion.
+Up/Down changes the selected row, Enter or Tab accepts it, and Escape dismisses
+it. Acceptance replaces the full token, including a suffix after the caret,
+and preserves existing quotes, colons, and paired variable delimiters.
+
+Field matches prefer prefix matches, then usage frequency, then lexical name;
+the menu displays at most 50 suggestions. Variable suggestions use the current
+`LayeredVariableContext` and existing variable classifiers, including dynamic
+variables; secret previews are masked. The learned dictionary contains only
+JSON property names and counts, never body values. GraphQL query text uses
+variable assistance without JSON field learning.
+
+`BodyFieldDictionaryCubit` is shared across editors through the root provider.
+Initial controller contents establish a baseline, so loading/restoring a body
+does not itself increase usage. After a text change, a 200 ms debounce compares
+new key counts with each name's highest occurrence count observed in this
+editor session, seeded from that baseline, and records only positive increases.
+Counts never decrease during that session: temporarily malformed JSON, undo,
+and later repair cannot inflate usage for occurrences already seen. Pending
+additions are flushed when the editor closes. Selection-only notifications do
+not learn names. `json_field_extractor.dart`
+scans nested objects/arrays iteratively, accepts a complete quoted key followed
+by a colon even while its value is unfinished, and decodes escaped keys.
+Complete unquoted `{{variables}}` are consumed as opaque values, so later
+property names can still be learned without resolving the template.
+Learning and completion stop above 1 Mi UTF-16 units per body; dictionary
+storage retains at most 2,000 names of at most 255 UTF-8 bytes each (details in
+[persistence-hive.md](persistence-hive.md)).
+
+`BodyJsonValidation` adds a clickable **JSON syntax:** advisory showing the
+first error's message, line, and column. Clicking it moves the caret to that
+location, expanding a folded line if needed. It validates after a 250 ms text
+change debounce; selection-only changes do not reparse. Larger bodies are
+validated through `compute`, and revision checks discard stale results after
+edits, controller replacement, or disposal. Validation checks template syntax:
+complete `{{variables}}` can appear inside strings or as unquoted values without
+being resolved. It never blocks editing or sending and does not guarantee that
+variable substitution will produce valid JSON; see
+[environments-and-chaining.md](environments-and-chaining.md).
+
 ## Request/response split
 
 `request_view.dart` builds the draggable request/response split via `Splitter` (`core/ui/widgets/splitter.dart`). Drag pattern: a local `ValueNotifier<double?> _localSplitRatio` tracks the ratio while dragging; `onEnd` commits it to `SettingsBloc` (`UpdateSplitRatio`) and resets `_localSplitRatio` back to `null` so the BLoC's `settings.splitRatio` drives the widget again. `main_screen.dart`'s side-menu splitter (`_localSideMenuWidth`) follows the identical local-during-drag / commit-in-`onEnd` / reset-to-`null` pattern — any new splitter must follow it exactly.

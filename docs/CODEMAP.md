@@ -176,13 +176,14 @@ widgets + screens). Shared cross-feature code lives under `lib/core/`. See
 | `lib/features/tabs/data` | `request_serializer.dart` (wire-level auth + body serialization). |
 | `lib/features/tabs/data/datasources` | `tabs_local_data_source.dart` (tabs + panels + meta boxes). |
 | `lib/features/tabs/data/models` | `request_tab_model.dart` (typeId 2), `panel_model.dart` (12), `stored_response_model.dart` (11), `multipart_field_model.dart` (5). |
-| `lib/features/tabs/data/repositories` | `tabs_repository_impl.dart` (persistence + send; env substitution). |
-| `lib/features/tabs/domain/entities` | `request_tab_entity.dart`, `panel_entity.dart`, `response_history_entry.dart`. |
-| `lib/features/tabs/domain/repositories` | `tabs_repository.dart` (abstract). |
+| `lib/features/tabs/data/repositories` | `tabs_repository_impl.dart` (persistence + send; env substitution), `body_field_dictionary_repository_impl.dart` (local learned JSON names/counts). |
+| `lib/features/tabs/domain/entities` | `request_tab_entity.dart`, `panel_entity.dart`, `response_history_entry.dart`, `body_field_entry.dart`. |
+| `lib/features/tabs/domain/logic` | `body_completion.dart` (caret context/replacement ranges), `json_field_extractor.dart` (incomplete JSON key counts), `body_field_dictionary_limits.dart` (name eligibility), `json_body_validation.dart` (template syntax diagnostics). |
+| `lib/features/tabs/domain/repositories` | `tabs_repository.dart`, `body_field_dictionary_repository.dart` (abstract). |
 | `lib/features/tabs/domain/usecases` | `send_request_use_case.dart` (couples send + history write). |
-| `lib/features/tabs/presentation/bloc` | `tabs_bloc.dart` (panel-aware), `tabs_event.dart`, `tabs_state.dart`, `request_manager.dart`. |
+| `lib/features/tabs/presentation/bloc` | `tabs_bloc.dart` (panel-aware), `tabs_event.dart`, `tabs_state.dart`, `request_manager.dart`, `body_field_dictionary_cubit.dart` (shared learned names). |
 | `lib/features/tabs/presentation/screens` | `request_view.dart` (per-tab request/response screen; owns code controllers + split). |
-| `lib/features/tabs/presentation/widgets` | Editor tabs + URL bar + panels: `url_bar.dart`, `params_tab_view.dart`, `headers_tab_view.dart`, `auto_generated_headers_section.dart`, `body_tab_view.dart`, `auth_tab_view.dart`, `panel_selector.dart`, `json_code_editor.dart`, `response_section.dart`. |
+| `lib/features/tabs/presentation/widgets` | Editor tabs + URL bar + panels: `url_bar.dart`, `params_tab_view.dart`, `headers_tab_view.dart`, `auto_generated_headers_section.dart`, `body_tab_view.dart`, `body_code_editor.dart` (caret autocomplete), `body_json_validation.dart` (syntax advisory), `auth_tab_view.dart`, `panel_selector.dart`, `json_code_editor.dart`, `response_section.dart`. |
 | `lib/features/tabs/presentation/widgets/response` | Response pane tab bodies: `response_body_view.dart`, `response_headers_view.dart`, `response_cookies_view.dart`, `response_tests_view.dart`, `json_tree_view.dart`, `response_history_timeline.dart`. |
 | `lib/features/tabs/presentation/widgets/response/viewers` | Media/binary response viewers: `response_media_panel.dart`, `image_response_view.dart`, `pdf_response_view.dart`, `media_response_view.dart`, `csv_response_view.dart`, `html_response_view.dart`, `binary_response_view.dart`. |
 
@@ -210,7 +211,8 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | Assertions (no-code) | `lib/features/chaining/domain/logic/assertion_engine.dart`, `lib/features/chaining/presentation/widgets/assertion_rule_row.dart` |
 | Auth (bearer/basic/api-key) | `lib/core/domain/entities/auth_config.dart`, `lib/core/domain/auth_application.dart`, `lib/features/tabs/presentation/widgets/auth_tab_view.dart` |
 | Auto-update | `lib/features/updates/presentation/update_gate.dart`, `lib/features/updates/presentation/update_decision.dart` |
-| Autocomplete (`{{var}}`) | `lib/core/ui/widgets/variable_autocomplete.dart`, `lib/core/utils/variable_suggestions.dart` |
+| Autocomplete (`{{var}}`) | `lib/core/ui/widgets/variable_autocomplete.dart`, `lib/core/utils/variable_suggestions.dart`, `lib/features/tabs/presentation/widgets/body_code_editor.dart` (request-body caret menu) |
+| Autocomplete (learned JSON property names) | `lib/features/tabs/presentation/widgets/body_code_editor.dart`, `lib/features/tabs/domain/logic/body_completion.dart`, `lib/features/tabs/presentation/bloc/body_field_dictionary_cubit.dart`, `lib/features/tabs/data/repositories/body_field_dictionary_repository_impl.dart` |
 | Beautify / prettify JSON | `lib/core/utils/json_utils.dart` |
 | Body types (raw/urlencoded/multipart/binary/graphql) | `lib/core/domain/entities/body_type.dart`, `lib/features/tabs/presentation/widgets/body_tab_view.dart` |
 | Boot / dependency injection | `lib/main.dart`, `lib/core/di/injection_container.dart` |
@@ -255,6 +257,7 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | HTTP methods list | `lib/core/network/http_methods.dart` |
 | HTTP send / network client | `lib/core/network/network_service.dart` |
 | JSONPath | `lib/core/utils/json_path.dart`, `lib/core/utils/json_path_builder.dart` |
+| JSON body syntax validation | `lib/features/tabs/domain/logic/json_body_validation.dart`, `lib/features/tabs/presentation/widgets/body_json_validation.dart` (debounced advisory + jump to error) |
 | Keyboard shortcuts | `lib/main.dart`, `lib/core/navigation/intents.dart`, `lib/core/navigation/shortcut_catalog.dart` (single-source labels/hints), `lib/core/ui/widgets/shortcut_reference_table.dart`, `lib/features/home/presentation/widgets/shortcuts_help_dialog.dart`, `lib/features/settings/presentation/widgets/settings_shortcuts_tab.dart` |
 | Large responses | `lib/core/utils/large_response_text.dart`, `lib/features/tabs/presentation/widgets/response/large_response_text_view.dart`, `lib/core/domain/persistence_limits.dart`, `lib/features/tabs/presentation/widgets/response/response_large_body_view.dart` |
 | MCP (Model Context Protocol) | `lib/core/network/mcp_service.dart`, `lib/features/mcp/presentation/bloc/mcp_bloc.dart` |

@@ -25,6 +25,23 @@ Persistence is `hive_ce` + `hive_ce_flutter` (the community Hive fork — binary
 
 **Never renumber an existing `typeId`.** Add new models with a fresh ID (**next free: 14**).
 
+## JSON field dictionary (primitive box)
+
+`body_field_dictionary` (`HiveBoxes.bodyFieldDictionary`) stores global, local
+JSON property-name usage counts as `Box<int>`: name → cumulative count. It has
+no model, adapter, or typeId and is opened alongside the other boxes during
+`di.init`. `BodyFieldDictionaryRepositoryImpl` exposes immutable snapshots
+ranked by descending usage count, then lexical name for ties.
+
+Only property names are persisted, never request values or complete bodies.
+The repository retains the 2,000 highest-ranked names, rejects empty names and
+names exceeding 255 UTF-8 bytes, and caps counts at 1,000,000,000. The byte limit
+is required by Hive's string-key encoding; a code-unit-only limit can corrupt
+Unicode keys on reopening. Writes serialize across editors, snapshot caller
+increments, and recover the queue after failures. Failed writes leave the last
+successful in-memory snapshot available; the Cubit logs the failure without
+interrupting editing.
+
 ## SettingsModel fields (typeId 0)
 
 `SettingsModel` is a single record (box `settings`, key `'current'`, loaded synchronously in `main()`). Its `@HiveField` map:
@@ -61,3 +78,4 @@ dart run build_runner build --delete-conflicting-outputs
 | History | via Hive `Box.watch()`; writes on each `add/delete/clear` |
 | Tabs | debounced 10 s after any change + flush on `close()` AND on app exit/hide (`ExitFlushGuard` → `TabsBloc.flushPendingSaves`; `close()` never runs on process exit, so without the guard Cmd+Q inside the window lost the last edits) |
 | Environments | immediately after every mutation (single keyed put/delete per environment; batch import saves the list) |
+| JSON field dictionary | positive key-count additions after the body editor’s 200 ms debounce; repository writes immediately and serializes increments across editors (independent of the tabs’ 10 s save) |

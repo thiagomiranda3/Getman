@@ -4,11 +4,14 @@
 // RequestConfigSection and UnifiedRequestPanel. The selector dispatches
 // `config.withBodyType(type)`, never a bare `copyWith(bodyType:)`, so the
 // HEADERS tab's Content-Type row follows the body type (see
-// BodyTypeUtils.syncContentType).
+// BodyTypeUtils.syncContentType). JSON raw bodies and GraphQL variables use
+// advisory syntax validation and learned-field completion; all request body
+// text editors retain live variable completion, including the GraphQL query.
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
+import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/navigation/shortcut_catalog.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/app_snack_bar.dart';
@@ -16,14 +19,15 @@ import 'package:getman/core/ui/widgets/tab_variable_context_builder.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/core/utils/path_utils.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/features/tabs/presentation/bloc/body_field_dictionary_cubit.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
+import 'package:getman/features/tabs/presentation/widgets/body_code_editor.dart';
+import 'package:getman/features/tabs/presentation/widgets/body_json_validation.dart';
 import 'package:getman/features/tabs/presentation/widgets/code_find_panel.dart'
     show kFindPanelHeight;
 import 'package:getman/features/tabs/presentation/widgets/form_data_editor.dart';
-import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart';
-import 'package:getman/features/tabs/presentation/widgets/variable_code_autocomplete.dart';
 import 'package:re_editor/re_editor.dart';
 
 /// Body editor: a body-type selector over conditional sub-editors. RAW keeps
@@ -46,7 +50,9 @@ class BodyTabView extends StatelessWidget {
     return BlocBuilder<TabsBloc, TabsState>(
       buildWhen: (prev, next) =>
           prev.tabs.byId(tabId)?.config.bodyType !=
-          next.tabs.byId(tabId)?.config.bodyType,
+              next.tabs.byId(tabId)?.config.bodyType ||
+          _usesJsonBody(prev.tabs.byId(tabId)?.config) !=
+              _usesJsonBody(next.tabs.byId(tabId)?.config),
       builder: (context, state) {
         final tab = state.tabs.byId(tabId);
         if (tab == null) return const SizedBox.shrink();
@@ -55,19 +61,44 @@ class BodyTabView extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _BodyTypeSelector(tabId: tabId, active: bodyType),
-            Expanded(child: _editorFor(context, bodyType)),
+            Expanded(
+              child: _editorFor(
+                context,
+                bodyType,
+                validateJson: _usesJsonBody(tab.config),
+              ),
+            ),
           ],
         );
       },
     );
   }
 
-  Widget _editorFor(BuildContext context, BodyType type) {
+  static bool _usesJsonBody(HttpRequestConfigEntity? config) {
+    if (config == null) return false;
+    for (final header in config.enabledHeaders.entries) {
+      if (header.key.toLowerCase() != 'content-type') continue;
+      final mime = header.value.split(';').first.trim().toLowerCase();
+      return mime == 'application/json' || mime.endsWith('+json');
+    }
+    // Matches the raw body's implied application/json wire default.
+    return true;
+  }
+
+  Widget _editorFor(
+    BuildContext context,
+    BodyType type, {
+    required bool validateJson,
+  }) {
     switch (type) {
       case BodyType.none:
         return const _EmptyBodyHint();
       case BodyType.raw:
-        return _RawBodyEditor(tabId: tabId, controller: controller);
+        return _RawBodyEditor(
+          tabId: tabId,
+          controller: controller,
+          validateJson: validateJson,
+        );
       case BodyType.urlencoded:
         return FormDataEditor(tabId: tabId, allowFiles: false);
       case BodyType.multipart:
@@ -187,9 +218,14 @@ class _BodyTypeChip extends StatelessWidget {
 }
 
 class _RawBodyEditor extends StatefulWidget {
-  const _RawBodyEditor({required this.tabId, required this.controller});
+  const _RawBodyEditor({
+    required this.tabId,
+    required this.controller,
+    required this.validateJson,
+  });
   final String tabId;
   final CodeLineEditingController controller;
+  final bool validateJson;
 
   @override
   State<_RawBodyEditor> createState() => _RawBodyEditorState();
@@ -237,10 +273,14 @@ class _RawBodyEditorState extends State<_RawBodyEditor> {
         // The Beautify overlay stays outside the autocomplete wrap.
         TabVariableContextBuilder(
           tabId: widget.tabId,
-          builder: (context, varContext) => wrapBodyWithVariableAutocomplete(
-            contextProvider: () => varContext,
-            child: JsonCodeEditor(
+          builder: (context, varContext) => BodyJsonValidation(
+            controller: widget.controller,
+            enabled: widget.validateJson,
+            child: BodyCodeEditor(
               controller: widget.controller,
+              variableContext: varContext,
+              dictionary: context.read<BodyFieldDictionaryCubit?>(),
+              fieldsEnabled: widget.validateJson,
               findController: _findController,
             ),
           ),
@@ -310,7 +350,14 @@ class _GraphqlBodyEditor extends StatelessWidget {
           flex: 3,
           child: _GraphqlPane(
             label: 'QUERY',
-            child: JsonCodeEditor(controller: queryController),
+            child: TabVariableContextBuilder(
+              tabId: tabId,
+              builder: (context, varContext) => BodyCodeEditor(
+                controller: queryController,
+                variableContext: varContext,
+                fieldsEnabled: false,
+              ),
+            ),
           ),
         ),
         Expanded(
@@ -320,6 +367,7 @@ class _GraphqlBodyEditor extends StatelessWidget {
             child: _RawBodyEditor(
               tabId: tabId,
               controller: variablesController,
+              validateJson: true,
             ),
           ),
         ),
