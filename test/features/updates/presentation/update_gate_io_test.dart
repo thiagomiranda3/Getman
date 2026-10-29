@@ -9,12 +9,14 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/updates/domain/entities/release_info.dart';
 import 'package:getman/features/updates/domain/repositories/update_repository.dart';
 import 'package:getman/features/updates/presentation/update_controller.dart';
@@ -41,6 +43,8 @@ class _ReleaseRepo implements UpdateRepository {
 }
 
 class _MockSave extends Mock implements SaveSettingsUseCase {}
+
+class _MockTabs extends Mock implements TabsBloc {}
 
 void main() {
   setUpAll(() {
@@ -151,6 +155,154 @@ void main() {
       expect(controller.manualInFlight, isFalse);
     },
   );
+
+  group('browser update handoff', () {
+    const channel = MethodChannel('plugins.flutter.io/url_launcher');
+    const assetUrl = 'https://example.com/getman.dmg';
+    late _MockTabs tabs;
+    late UpdateController controller;
+    late SettingsBloc settings;
+    late List<String> calls;
+
+    setUp(() {
+      calls = [];
+      tabs = _MockTabs();
+      when(() => tabs.stream).thenAnswer((_) => const Stream.empty());
+      when(() => tabs.close()).thenAnswer((_) async => calls.add('flush'));
+      settings = buildSettingsBloc();
+    });
+
+    tearDown(() async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+      controller.dispose();
+      await settings.close();
+    });
+
+    Future<void> mount(
+      WidgetTester tester,
+      Future<bool> Function() launch, {
+      String? url = assetUrl,
+    }) async {
+      controller = UpdateController(
+        _ReleaseRepo(
+          ReleaseInfo(version: '99.0.0', changelog: null, assetUrl: url),
+        ),
+      );
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        (call) async {
+          expect(call.method, 'launch');
+          final args = call.arguments as Map;
+          expect(
+            args['url'],
+            url ?? 'https://github.com/thiagomiranda3/Getman/releases/latest',
+          );
+          expect(args['useSafariVC'], isFalse);
+          expect(args['useWebView'], isFalse);
+          calls.add('launch');
+          return launch();
+        },
+      );
+      await tester.pumpWidget(
+        MultiBlocProvider(
+          providers: [
+            BlocProvider<TabsBloc>.value(value: tabs),
+            BlocProvider<SettingsBloc>.value(value: settings),
+          ],
+          child: ChangeNotifierProvider<UpdateController>.value(
+            value: controller,
+            child: MaterialApp(
+              theme: brutalistTheme(Brightness.light),
+              home: Scaffold(
+                body: UpdateGate(
+                  debugInstallsInApp: false,
+                  debugQuit: () => calls.add('quit'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('update_now_button')));
+      await tester.pump();
+    }
+
+    testWidgets('waits for browser acceptance and tab saves before quitting', (
+      tester,
+    ) async {
+      final launched = Completer<bool>();
+      final saved = Completer<void>();
+      when(() => tabs.close()).thenAnswer((_) {
+        calls.add('flush');
+        return saved.future;
+      });
+      await mount(tester, () => launched.future);
+      expect(calls, ['launch']);
+      launched.complete(true);
+      await tester.pump();
+      expect(calls, ['launch', 'flush']);
+      saved.complete();
+      await tester.pump();
+      expect(calls, ['launch', 'flush', 'quit']);
+      await tester.pumpAndSettle();
+    });
+
+    for (final throws in [false, true]) {
+      testWidgets('failed browser launch (throws: $throws) keeps tabs usable '
+          'and allows retry', (tester) async {
+        var attempts = 0;
+        await mount(tester, () async {
+          if (++attempts > 1) return true;
+          if (throws) throw PlatformException(code: 'launch_failed');
+          return false;
+        });
+        expect(calls, ['launch']);
+        expect(
+          find.textContaining("Couldn't open your browser"),
+          findsOneWidget,
+        );
+        await controller.startUpdate!();
+        expect(calls, ['launch', 'launch', 'flush', 'quit']);
+        await tester.pumpAndSettle();
+      });
+    }
+
+    testWidgets('opening the release page without an asset keeps app open', (
+      tester,
+    ) async {
+      // A release page is not a download handoff; see auto-update architecture.
+      await mount(tester, () async => true, url: null);
+      expect(calls, ['launch']);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('duplicate update commands open one download and quit once', (
+      tester,
+    ) async {
+      final launched = Completer<bool>();
+      await mount(tester, () => launched.future);
+      unawaited(controller.startUpdate!());
+      await tester.pump();
+      expect(calls, ['launch']);
+      launched.complete(true);
+      await tester.pump();
+      expect(calls, ['launch', 'flush', 'quit']);
+      await controller.startUpdate!();
+      expect(calls, ['launch', 'flush', 'quit']);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('disposed gate ignores a late browser handoff', (tester) async {
+      final launched = Completer<bool>();
+      await mount(tester, () => launched.future);
+      await tester.pumpWidget(const SizedBox.shrink());
+      launched.complete(true);
+      await tester.pump();
+      expect(calls, ['launch']);
+    });
+  });
 
   group('finishInAppUpdate', () {
     test('launches, then flushes tabs, then quits — in that order', () async {

@@ -41,7 +41,13 @@ the io gate at startup):
   an in-app download by the sandboxed, unsigned app carries a strict
   `com.apple.quarantine` flag that Gatekeeper reports as "damaged", and the
   sandbox can't clear it (the v1.4.1 fix; do not re-enable without
-  signing/notarization).
+  signing/notarization). After `launchUrl` confirms the OS accepted the asset
+  URL, Getman flushes tabs via `TabsBloc.close()` and exits. The browser exposes
+  no signal for actual download progress; OS handoff is the shutdown trigger.
+  Duplicate update commands are ignored during handoff/shutdown. A failed
+  launch leaves tabs usable and permits retry. Opening the fallback release
+  page when no asset is available keeps the app open. A disposed gate ignores
+  a late handoff result. Both update flows share best-effort tab flush/quit.
 - **Windows/Linux** (`installsInApp == true`): a `ConfirmDialog`
   ("CLOSE AND UPDATE?") warns that Getman will close; on confirm, `updat`
   downloads the installer to the user's Downloads folder behind the blocking

@@ -2,7 +2,8 @@
 // package_info_plus; one of the io-gated (*_io.dart) importers of dart:io and
 // path_provider (the web-safety gate — see update_gate.dart's conditional
 // export to update_gate_stub.dart on web).
-// Two flows: macOS hands the download to the browser (a file downloaded by
+// Two flows: macOS hands the download to the browser, flushes tabs and quits
+// after the OS accepts the asset URL (a file downloaded by
 // this sandboxed, unsigned app carries a strict com.apple.quarantine flag
 // that Gatekeeper reports as "damaged", and the sandbox forbids clearing it);
 // Windows/Linux download in-app via updat to the Downloads folder, then
@@ -33,7 +34,8 @@ import 'package:url_launcher/url_launcher.dart';
 /// [UpdateDialog] / snackbars per the prompt decision.
 ///
 /// macOS: the download is handed to the user's browser (see
-/// `_openDownloadInBrowser`) — never performed in-process. Windows/Linux:
+/// `_openDownloadInBrowser`), then tabs are flushed and the app quits. The
+/// browser exposes no download-progress signal. Windows/Linux:
 /// updat downloads the installer (blocking [UpdateDownloadDialog], guarded by
 /// a download-stall watchdog), then [finishInAppUpdate] launches it, flushes
 /// tabs, and quits.
@@ -78,6 +80,9 @@ class _UpdateGateState extends State<UpdateGate> {
   /// in-app flow (a failed version *check* also emits `error` — this flag
   /// tells the two apart).
   bool _inAppDownloadInFlight = false;
+
+  /// Prevents repeated browser handoffs while opening the URL or quitting.
+  bool _browserDownloadInFlight = false;
 
   /// Whether the blocking [UpdateDownloadDialog] is on screen, so the error
   /// path pops exactly it and nothing else.
@@ -237,7 +242,10 @@ class _UpdateGateState extends State<UpdateGate> {
   /// fails with EPERM). A browser download instead carries a benign quarantine
   /// that opens normally, so we route the user there.
   Future<void> _openDownloadInBrowser(UpdateController controller) async {
-    final url = controller.cachedRelease?.assetUrl ?? _releasesUrl;
+    if (_browserDownloadInFlight || !mounted) return;
+    _browserDownloadInFlight = true;
+    final assetUrl = controller.cachedRelease?.assetUrl;
+    final url = assetUrl ?? _releasesUrl;
     final uri = Uri.tryParse(url);
     var ok = false;
     if (uri != null) {
@@ -248,10 +256,26 @@ class _UpdateGateState extends State<UpdateGate> {
       }
     }
     if (!mounted) return;
+    if (ok && assetUrl != null) {
+      // launchUrl confirms the OS handoff, not the browser's network transfer.
+      // Keep the app alive when merely opening the fallback release page.
+      TabsBloc? tabs;
+      try {
+        tabs = context.read<TabsBloc>();
+      } on ProviderNotFoundException {
+        tabs = null; // Tests may mount the gate without a TabsBloc.
+      }
+      await _flushTabsAndQuit(
+        flushTabs: () async => tabs?.close(),
+        quit: widget.debugQuit ?? _exitApp,
+      );
+      return;
+    }
+    _browserDownloadInFlight = false;
     showAppSnackBar(
       context,
       ok
-          ? 'Opening the download in your browser…'
+          ? 'Opening the release page in your browser…'
           : "Couldn't open your browser. Download from $_releasesUrl",
     );
   }
@@ -492,6 +516,15 @@ Future<UpdateFinishResult> finishInAppUpdate({
   } on Object {
     return UpdateFinishResult.launchFailed;
   }
+  await _flushTabsAndQuit(flushTabs: flushTabs, quit: quit);
+  return UpdateFinishResult.quitting;
+}
+
+/// Shared shutdown after a successful browser handoff or installer launch.
+Future<void> _flushTabsAndQuit({
+  required Future<void> Function() flushTabs,
+  required void Function() quit,
+}) async {
   try {
     await flushTabs();
   } on Object catch (e) {
@@ -499,7 +532,6 @@ Future<UpdateFinishResult> finishInAppUpdate({
     debugPrint('Tab flush before update install failed: $e');
   }
   quit();
-  return UpdateFinishResult.quitting;
 }
 
 /// Launches the downloaded installer. Windows: start the Inno Setup `.exe`

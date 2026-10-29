@@ -114,8 +114,8 @@ List<ShortcutCatalogEntry> shortcutCatalog({required bool useMeta}) {
       action: AppShortcutAction.completeBody,
       title: 'Complete body',
       description: 'Suggest JSON fields or variables at the body cursor',
-      keys: hint([mod, 'Space']),
-      keyCaps: [mod, 'Space'],
+      keys: hint([if (useMeta) alt else ctrl, 'Space']),
+      keyCaps: [if (useMeta) alt else ctrl, 'Space'],
       section: 'REQUEST',
     ),
     ShortcutCatalogEntry(

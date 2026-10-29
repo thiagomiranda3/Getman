@@ -20,7 +20,8 @@ import 'package:provider/provider.dart';
 /// [UpdateController.installsInApp] is true (Windows/Linux) UPDATE NOW first
 /// confirms via [ConfirmDialog] that Getman may close, then starts the in-app
 /// download (see `update_gate_io.dart`); otherwise it opens the release
-/// download in the user's browser and closes the dialog.
+/// download in the user's browser, then saves tabs and quits after a successful
+/// handoff. A failed browser launch keeps Getman open.
 ///
 /// Normally opened via [UpdateDialog.show], which injects [UpdateController]
 /// via [ChangeNotifierProvider] and [SettingsBloc] via [BlocProvider]. The
@@ -187,7 +188,8 @@ class _DialogBody extends StatelessWidget {
               ? 'UPDATE NOW downloads the installer to your Downloads folder '
                     'and closes Getman so the installer can run. Getman is '
                     'not code-signed, so your OS may warn before running it.'
-              : 'UPDATE NOW opens the download in your browser. Getman is '
+              : 'UPDATE NOW opens the download in your browser, saves your '
+                    'tabs, and closes Getman. Getman is '
                     'not code-signed, so your OS may warn on first launch — '
                     'allow it via right-click → Open (macOS) or More info → '
                     'Run anyway (Windows).',

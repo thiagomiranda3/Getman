@@ -47,7 +47,7 @@ Put intents where `context.read<TabsBloc>()` is reachable — and dialog-opening
 
 ### Local request-body completion shortcut
 
-`BodyCodeEditor` handles **Cmd+Space on macOS / Ctrl+Space elsewhere** locally
+`BodyCodeEditor` handles **Option+Space on macOS / Ctrl+Space elsewhere** locally
 through its focused editor node; this is not a root `appShortcuts` action.
 Enter/Tab accept the selected completion and Escape closes its menu. The local
 handler is inactive when the editor is offstage or lacks focus, so the chord

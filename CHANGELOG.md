@@ -5,6 +5,20 @@ All notable changes to **Getman** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.1] - 2026-10-29
+
+### Fixed
+
+- **Autocomplete on macOS now uses Option+Space**, avoiding the Spotlight
+  conflict with Cmd+Space. This applies to **Complete body** and variable
+  completion in the URL and other fields. Windows/Linux keep **Ctrl+Space**.
+  The in-app shortcut reference and documentation reflect the new binding.
+- **UPDATE NOW on macOS closes Getman after opening the installer download
+  in the default browser.** Getman waits for the operating system to accept
+  the link, saves open tabs, then quits. A failed browser launch or a fallback
+  to the release page keeps the app open. Repeated update commands cannot
+  open duplicate downloads while the handoff or shutdown is in progress.
+
 ## [1.11.0] - 2026-10-29
 
 Body editing gains learned JSON field completion, easier variable insertion,
@@ -604,6 +618,7 @@ workflow. Runs on macOS, Windows, and Linux.
   machine.
 - Ships for **macOS**, **Windows**, and **Linux** desktop.
 
+[1.11.1]: https://github.com/thiagomiranda3/Getman/releases/tag/v1.11.1
 [1.11.0]: https://github.com/thiagomiranda3/Getman/releases/tag/v1.11.0
 [1.8.0]: https://github.com/thiagomiranda3/Getman/releases/tag/v1.8.0
 [1.7.0]: https://github.com/thiagomiranda3/Getman/releases/tag/v1.7.0
