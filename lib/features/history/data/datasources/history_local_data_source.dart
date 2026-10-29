@@ -7,7 +7,8 @@
 // (rebuilt if the box length drifts) so dedup lookup is O(1) instead of a
 // full box scan. Trim uses a `while` loop so lowering the history limit
 // actually shrinks the box. watch() exposes Box.watch(); the repository
-// reverses insertion order so callers get newest-first.
+// reverses insertion order so callers get newest-first. All mutations share
+// one failure-resilient queue: dedup/delete/add/trim and undo cannot interleave.
 
 import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
@@ -42,6 +43,23 @@ abstract class HistoryLocalDataSource {
 class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
   Box<HttpRequestConfig> _box() =>
       Hive.box<HttpRequestConfig>(HiveBoxes.history);
+
+  Future<void> _writeTail = Future<void>.value();
+
+  /// Serialize whole read/modify/write operations, not individual Hive calls.
+  /// The returned future still reports a failure to its caller; the queue
+  /// recovers and invalidates its index so subsequent writes remain usable.
+  Future<void> _serializeWrite(Future<void> Function() write) {
+    final result = _writeTail.then((_) => write());
+    _writeTail = result.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stackTrace) {
+        _signatureIndex = null;
+        _indexedKeyCount = 0;
+      },
+    );
+    return result;
+  }
 
   // Signature index: HttpRequestConfig.hashCode (the full request signature —
   // method/url/body plus bodyType/graphqlVariables/bodyFilePath/formFields) →
@@ -89,6 +107,7 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
   @override
   Future<List<HttpRequestConfig>> getHistory() async {
     try {
+      await _writeTail;
       return _box().values.toList();
     } catch (e) {
       throw PersistenceException('Failed to read history', cause: e);
@@ -96,7 +115,10 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
   }
 
   @override
-  Future<void> addToHistory(HttpRequestConfig config, int limit) async {
+  Future<void> addToHistory(
+    HttpRequestConfig config,
+    int limit,
+  ) => _serializeWrite(() async {
     try {
       final box = _box();
       _ensureIndex(box);
@@ -141,10 +163,10 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
     } catch (e) {
       throw PersistenceException('Failed to add to history', cause: e);
     }
-  }
+  });
 
   @override
-  Future<void> deleteFromHistory(String id) async {
+  Future<void> deleteFromHistory(String id) => _serializeWrite(() async {
     try {
       final box = _box();
       for (final entry in box.toMap().entries) {
@@ -162,10 +184,10 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
     } catch (e) {
       throw PersistenceException('Failed to delete history entry', cause: e);
     }
-  }
+  });
 
   @override
-  Future<void> clearHistory() async {
+  Future<void> clearHistory() => _serializeWrite(() async {
     try {
       await _box().clear();
       // Drop the index wholesale; it rebuilds lazily on the next add.
@@ -174,33 +196,34 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
     } catch (e) {
       throw PersistenceException('Failed to clear history', cause: e);
     }
-  }
+  });
 
   @override
-  Future<void> restoreToHistory(List<HttpRequestConfig> configs) async {
-    try {
-      final box = _box();
-      _ensureIndex(box);
-      for (final config in configs) {
-        // Signature-duplicate guard (same hash-then-equality pattern as
-        // addToHistory's dedup): if the user re-sent the request after
-        // deleting it, UNDO must not create a second copy.
-        final candidates = _signatureIndex![config.hashCode] ?? const [];
-        final duplicate = candidates.any((key) {
-          final existing = box.get(key);
-          return existing != null && existing == config;
-        });
-        if (duplicate) continue;
-        final key = await box.add(config);
-        _indexAddKey(config.hashCode, key);
-      }
-    } catch (e) {
-      throw PersistenceException(
-        'Failed to restore history entries',
-        cause: e,
-      );
-    }
-  }
+  Future<void> restoreToHistory(List<HttpRequestConfig> configs) =>
+      _serializeWrite(() async {
+        try {
+          final box = _box();
+          _ensureIndex(box);
+          for (final config in configs) {
+            // Signature-duplicate guard (same hash-then-equality pattern as
+            // addToHistory's dedup): if the user re-sent the request after
+            // deleting it, UNDO must not create a second copy.
+            final candidates = _signatureIndex![config.hashCode] ?? const [];
+            final duplicate = candidates.any((key) {
+              final existing = box.get(key);
+              return existing != null && existing == config;
+            });
+            if (duplicate) continue;
+            final key = await box.add(config);
+            _indexAddKey(config.hashCode, key);
+          }
+        } catch (e) {
+          throw PersistenceException(
+            'Failed to restore history entries',
+            cause: e,
+          );
+        }
+      });
 
   @override
   Stream<void> watch() => _box().watch().map((_) {});

@@ -85,6 +85,68 @@ String? _headerValue(RequestOptions options, String name) {
 }
 
 void main() {
+  const credentialHeaders = {
+    'aUtHoRiZaTiOn': 'Bearer secret',
+    'WWW-Authenticate': 'secret challenge',
+    'Cookie': 'session=secret',
+    'Cookie2': 'legacy=secret',
+  };
+  for (final destination in [
+    'http://api.dev/x',
+    'http://api.dev:443/x',
+    'https://api.dev:8443/x',
+    'https://other.dev/x',
+  ]) {
+    test('redirect to $destination strips every credential header', () async {
+      final h = _harness([
+        _Hop(302, location: destination),
+        _Hop(200, body: 'ok'),
+      ]);
+      await h.svc.request(
+        url: 'https://api.dev/login',
+        method: 'GET',
+        headers: {...credentialHeaders, 'X-Trace': 'keep'},
+      );
+
+      for (final entry in credentialHeaders.entries) {
+        expect(
+          _headerValue(h.adapter.requests[0], entry.key.toLowerCase()),
+          entry.value,
+        );
+        expect(
+          _headerValue(h.adapter.requests[1], entry.key.toLowerCase()),
+          isNull,
+          reason: entry.key,
+        );
+      }
+      expect(_headerValue(h.adapter.requests[1], 'x-trace'), 'keep');
+    });
+  }
+
+  for (final origins in [
+    ('https://api.dev/login', 'https://API.dev:443/x'),
+    ('http://api.dev:80/login', 'http://api.dev/x'),
+    ('https://api.dev:8443/login', '/x'),
+  ]) {
+    test('same origin preserves credentials: $origins', () async {
+      final h = _harness([
+        _Hop(302, location: origins.$2),
+        _Hop(200, body: 'ok'),
+      ]);
+      await h.svc.request(
+        url: origins.$1,
+        method: 'GET',
+        headers: credentialHeaders,
+      );
+      for (final entry in credentialHeaders.entries) {
+        expect(
+          _headerValue(h.adapter.requests[1], entry.key.toLowerCase()),
+          entry.value,
+        );
+      }
+    });
+  }
+
   test(
     '302 captures Set-Cookie and sends it on the redirected hop (same host)',
     () async {

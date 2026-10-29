@@ -85,6 +85,38 @@ void main() {
     );
   }
 
+  testWidgets('writes an equal capture again after a new send', (tester) async {
+    when(() => settingsBloc.state).thenReturn(
+      const SettingsState(settings: SettingsEntity(activeEnvironmentId: 'e1')),
+    );
+    when(() => envBloc.state).thenReturn(
+      EnvironmentsState(
+        environments: [
+          EnvironmentEntity(
+            id: 'e1',
+            name: 'Dev',
+            variables: const {'tok': 'changed'},
+          ),
+        ],
+      ),
+    );
+    await pump(tester);
+    const capture = [
+      ExtractionResult(variable: 'tok', value: 'abc', matched: true),
+    ];
+    tabsStream.add(TabsState(tabs: [tabWith(capture)]));
+    await tester.pump();
+    verify(() => envBloc.add(any())).called(1);
+    // SendRequest clears results at the beginning of every execution.
+    tabsStream.add(
+      TabsState(tabs: [tabWith(const []).copyWith(isSending: true)]),
+    );
+    await tester.pump();
+    tabsStream.add(TabsState(tabs: [tabWith(capture)]));
+    await tester.pump();
+    verify(() => envBloc.add(any())).called(1);
+    await tester.pumpWidget(const SizedBox());
+  });
   testWidgets('writes captured values into the active environment', (
     tester,
   ) async {

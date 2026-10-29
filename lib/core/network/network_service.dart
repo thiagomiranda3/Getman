@@ -16,8 +16,8 @@
 // re-matched on the next hop; dart:io's auto-follow would discard it). 303
 // and POST-triggered 301/302 become bodyless GETs; 307/308 (and non-POST
 // 301/302) keep method+body; `Authorization` is stripped whenever a
-// redirect crosses hosts. applyConfig only rebuilds the HTTP adapter when
-// NetworkConfig.sameAdapterConfig says an adapter-relevant field changed
+// redirect changes scheme, host, or effective port. applyConfig rebuilds the
+// HTTP adapter only when NetworkConfig.sameAdapterConfig says a field changed
 // (SSL/proxy/cert), closing the replaced adapter — timeout/redirect-count
 // edits just mutate BaseOptions in place.
 
@@ -45,9 +45,11 @@ class NetworkService {
   NetworkService({
     required this._dio,
     this._maxResponseBytes = kMaxRenderableResponseBytes,
+    this._contentDecoder = decodeContentEncoding,
   });
   final Dio _dio;
   final int _maxResponseBytes;
+  final ContentEncodingDecoder _contentDecoder;
 
   /// The adapter-relevant config of the last [applyConfig] that rebuilt the
   /// adapter. Null until the first swap so an initial [applyConfig] always
@@ -211,13 +213,16 @@ class NetworkService {
               return lk == 'content-type' || lk == 'content-length';
             });
           }
-          // Never leak credentials across an origin boundary (dart:io
-          // parity): its nonRedirectHeaders strips authorization AND the
+          // Never leak credentials across an origin boundary: strip the
+          // dart:io nonRedirectHeaders set, including authorization AND the
           // cookie headers — a hand-typed `Cookie: session=…` row must not
-          // follow a redirect to a different host any more than a bearer
+          // follow a redirect to a different origin any more than a bearer
           // token does. (Jar cookies are safe either way: the interceptor
           // re-matches them per hop.)
-          if (nextUri.host.toLowerCase() != fromUri.host.toLowerCase()) {
+          // Uri.port resolves omitted default ports (HTTP 80 / HTTPS 443).
+          if (nextUri.scheme != fromUri.scheme ||
+              nextUri.host.toLowerCase() != fromUri.host.toLowerCase() ||
+              nextUri.port != fromUri.port) {
             const nonRedirectHeaders = {
               'authorization',
               'www-authenticate',
@@ -345,23 +350,33 @@ class NetworkService {
           .contains('gzip');
       if (encoding == 'gzip' || encoding == 'x-gzip' || encoding == 'deflate') {
         // Attempt-decode: when the platform already decompressed (dart:io on
-        // lowercase 'gzip'), decoding again fails and null keeps bytes as-is.
-        // The web stub always returns null (the browser already decoded).
-        final decoded = gzipTypedPayload
-            ? null
-            : decodeContentEncoding(bytes, encoding);
-        if (decoded != null) {
-          if (decoded.length > _maxResponseBytes) {
-            // Decompressed size busts the render cap even though the wire
-            // size didn't — same too-large treatment as an oversized stream.
+        // lowercase 'gzip'), null decoded bytes keep the input as-is.
+        // The web stub also keeps the input (the browser already decoded).
+        if (!gzipTypedPayload) {
+          final decoded = await _contentDecoder(
+            bytes,
+            encoding,
+            maxOutputBytes: _maxResponseBytes,
+          );
+          // Cancellation can arrive while the worker decodes, after Dio has
+          // finished streaming. Never turn that cancelled send into a result.
+          if (cancelToken.isCancelled) throw cancelToken.cancelError!;
+          if (decoded.exceededLimit) {
+            // The bounded decoder stopped at the cap; the full expanded
+            // size is deliberately unknown. Show a lower bound, not a total.
             return HttpResponseEntity(
               statusCode: status,
-              body: _tooLargePlaceholder(headersMap, url, decoded.length),
+              body: _tooLargePlaceholder(
+                headersMap,
+                url,
+                _maxResponseBytes,
+                sizeIsLowerBound: true,
+              ),
               headers: headersMap,
               durationMs: stopwatch.elapsedMilliseconds,
             );
           }
-          bytes = decoded;
+          bytes = decoded.bytes ?? bytes;
         }
       } else if (!platformDecompressesTransparently) {
         // br / zstd / unknown (or a multi-token chain): surface a clear
@@ -493,10 +508,11 @@ class NetworkService {
   String _tooLargePlaceholder(
     Map<String, String> headers,
     String url,
-    int size,
-  ) {
+    int size, {
+    bool sizeIsLowerBound = false,
+  }) {
     final ct = contentTypeOf(headers) ?? 'binary';
-    final sz = formatBytes(size);
+    final sz = '${sizeIsLowerBound ? '>' : ''}${formatBytes(size)}';
     return '[$ct · $sz — too large to buffer; open externally]';
   }
 

@@ -20,6 +20,53 @@ HttpResponseEntity _resp({
 
 void main() {
   group('ResponseDiffBuilder.build', () {
+    test(
+      'many changed short lines fall back without quadratic allocation',
+      () async {
+        // Budget is documented in tabs-and-panels.md; characters alone do not
+        // bound the LCS matrix.
+        final model = await ResponseDiffBuilder.build(
+          _resp(body: List.generate(4000, (i) => 'a$i').join('\n')),
+          _resp(body: List.generate(4000, (i) => 'b$i').join('\n')),
+        );
+        expect(model.tooLarge, isTrue);
+        expect(model.bodyLines, isEmpty);
+      },
+    );
+
+    test('minified JSON is budgeted after expansion into many lines', () async {
+      final model = await ResponseDiffBuilder.build(
+        _resp(body: '[${List.filled(2000, '0').join(',')}]'),
+        _resp(body: '[${List.filled(2000, '1').join(',')}]'),
+      );
+      expect(model.tooLarge, isTrue);
+    });
+
+    test('identical many-line bodies need no diff matrix', () async {
+      final body = List.filled(100000, 'a').join('\n');
+      final model = await ResponseDiffBuilder.build(
+        _resp(body: body),
+        _resp(body: body),
+      );
+      expect(model.bodiesIdentical, isTrue);
+      expect(model.tooLarge, isFalse);
+    });
+
+    test(
+      'deep minified JSON is rejected before quadratic formatting expansion',
+      () async {
+        // Formatting budget is documented in tabs-and-panels.md.
+        final prefix = '[' * 10000;
+        final suffix = ']' * 10000;
+        final model = await ResponseDiffBuilder.build(
+          _resp(body: '${prefix}0$suffix'),
+          _resp(body: '${prefix}1$suffix'),
+        );
+        expect(model.tooLarge, isTrue);
+        expect(model.bodyLines, isEmpty);
+      },
+    );
+
     test('copies both status codes through', () async {
       final model = await ResponseDiffBuilder.build(
         _resp(),

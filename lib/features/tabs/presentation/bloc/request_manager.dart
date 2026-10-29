@@ -13,7 +13,14 @@ class RequestManager {
     return handle;
   }
 
-  void finish(String tabId) => _handles.remove(tabId);
+  /// A send owns the tab until its post-response rules finish too. A newer
+  /// send replaces the handle, invalidating any older async completion.
+  bool isCurrent(String tabId, NetworkCancelHandle handle) =>
+      identical(_handles[tabId], handle);
+
+  void finish(String tabId, {NetworkCancelHandle? handle}) {
+    if (handle == null || isCurrent(tabId, handle)) _handles.remove(tabId);
+  }
 
   void cancel(String tabId, {String reason = 'User cancelled request'}) {
     final handle = _handles[tabId];

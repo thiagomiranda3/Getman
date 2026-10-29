@@ -157,7 +157,7 @@ class ResponseDiffView extends StatelessWidget {
     if (model.tooLarge) {
       return _note(
         context,
-        'Responses too large to diff inline (over 512 KB). '
+        'Responses exceed the inline diff size or complexity limit. '
         'The status and header summary above still apply.',
       );
     }

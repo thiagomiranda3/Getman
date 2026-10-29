@@ -270,6 +270,7 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | Proxy | `lib/core/network/dio_adapter_config_io.dart`, `lib/core/network/network_config.dart` |
 | Redirects (manual loop) | `lib/core/network/network_service.dart` |
 | Request config entity | `lib/core/domain/entities/request_config_entity.dart` |
+| CSV response preview | `lib/core/utils/csv_preview.dart` (streamed parsing with a bounded retained preview), `lib/features/tabs/presentation/widgets/response/viewers/csv_response_view.dart` (cached background load). |
 | Response time-travel | `lib/features/tabs/domain/entities/response_history_entry.dart`, `lib/features/tabs/presentation/widgets/response/response_history_timeline.dart` |
 | Responsive layout tiers | `lib/core/theme/responsive.dart` |
 | Revert changes (dirty tab) | `lib/features/tabs/presentation/widgets/revert_tab_button.dart`, `lib/features/tabs/presentation/bloc/tabs_event.dart` (`RevertTab`) |

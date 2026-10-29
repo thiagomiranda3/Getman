@@ -45,6 +45,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/failures.dart';
+import 'package:getman/core/network/cancel_handle.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/utils/perf_trace.dart';
 import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';
@@ -710,7 +711,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         envVars: event.envVars,
         cancelHandle: handle,
       );
-      _requests.finish(tabId);
+      if (emit.isDone || !_requests.isCurrent(tabId, handle)) return;
       _applyToTab(
         emit,
         tabId,
@@ -722,9 +723,9 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         ),
       );
       _markResponseDirty(tabId);
-      await _applyRules(emit, tabId, config, response);
+      await _applyRules(emit, tabId, config, response, handle);
     } on NetworkFailure catch (f) {
-      _requests.finish(tabId);
+      if (emit.isDone || !_requests.isCurrent(tabId, handle)) return;
 
       if (f.type == NetworkFailureType.cancelled) {
         _applyToTab(emit, tabId, (live) => live.copyWith(isSending: false));
@@ -750,13 +751,17 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       _markResponseDirty(tabId);
       // Assertions are meaningful on error responses too
       // (e.g. "status in 2xx").
-      await _applyRules(emit, tabId, config, errorResponse);
+      await _applyRules(emit, tabId, config, errorResponse, handle);
     } on Object catch (e) {
       // Anything unexpected must still release the tab — otherwise it is
       // stuck on "SENDING" with no way to retry or cancel.
-      _requests.finish(tabId);
+      if (emit.isDone || !_requests.isCurrent(tabId, handle)) return;
       log('SendRequest failed unexpectedly: $e', name: 'TabsBloc');
       _applyToTab(emit, tabId, (live) => live.copyWith(isSending: false));
+    } finally {
+      // A newer send can start while the previous run evaluates rules.
+      // Never remove that newer run's cancel handle from an older handler.
+      _requests.finish(tabId, handle: handle);
     }
   }
 
@@ -883,6 +888,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     String tabId,
     HttpRequestConfigEntity config,
     HttpResponseEntity response,
+    NetworkCancelHandle handle,
   ) async {
     final useCase = _getRequestRulesUseCase;
     if (useCase == null) return;
@@ -893,18 +899,28 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       log('Loading rules failed: $f', name: 'TabsBloc');
       return;
     }
-    if (rules.isEmpty) return;
+    if (rules.isEmpty ||
+        emit.isDone ||
+        handle.isCancelled ||
+        !_requests.isCurrent(tabId, handle)) {
+      return;
+    }
     final input = RulesRunInput(
       extractionRules: rules.extractionRules,
       assertions: rules.assertions,
       response: response,
     );
     // Decode + evaluate once; off the UI isolate for large bodies.
-    // `_applyToTab` re-resolves the tab after the await, so a closed/replaced
-    // tab is a no-op.
+    // Check execution identity and cancellation after both async boundaries:
+    // cancelled, replaced, or closed-tab executions cannot publish captures.
     final output = response.body.length <= _ruleComputeThresholdBytes
         ? traceSync('rules.run', () => runRules(input))
         : await traceAsync('rules.run.isolate', () => compute(runRules, input));
+    if (emit.isDone ||
+        handle.isCancelled ||
+        !_requests.isCurrent(tabId, handle)) {
+      return;
+    }
     _applyToTab(
       emit,
       tabId,

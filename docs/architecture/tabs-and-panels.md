@@ -16,6 +16,11 @@ The tabs feature is the most complex in the app. Its BLoC is panel-aware; its sc
 
 `RemoveTab`, `CancelRequest`, `CloseOtherTabs`, `CloseTabsToTheRight`, `DuplicateTab`, and `SendRequest` all carry `String tabId`, not `int index`. Handlers resolve the current position via `indexWhere`/`byId` and bail on miss. Only `SetActiveIndex` and `ReorderTabs` are position-based (position *is* the operation) — and `SetActiveIndex` rejects out-of-range indices so widgets may index `tabs[activeIndex]` safely. **Do not reintroduce index-based identity events** — they race against concurrent emissions. This applies to event payloads too: identity-addressed events carry `tabId`. Always look tabs up with `state.tabs.firstWhereOrNull((t) => t.tabId == id)`; never index by position across state emissions.
 
+The request handle stays registered through rule evaluation and extraction.
+A newer send or cancellation invalidates the execution identity; late responses,
+rule results, and variable captures are discarded. Repeated capture values are
+reset for each execution so a later identical value still produces a write.
+
 ### Responses are a value object
 
 `HttpRequestTabEntity.response` is an `HttpResponseEntity?` (`null` = nothing sent yet / last send cancelled). The Hive model (`HttpRequestTabModel`, typeId 2) still stores the four flat columns — `statusCode == null` is the discriminator on read. Don't re-flatten the entity.
@@ -89,6 +94,29 @@ Do not clear the outgoing re_editor controller during teardown: its listener can
 schedule a cursor-blink callback after disposal. Find searches the full raw or
 formatted body; its window builder binary-searches sorted match offsets and
 visits only matches intersecting the bounded window.
+
+### Bounded response comparison and CSV previews
+
+Response comparison passes only body strings to a `compute` worker: formatting
+preflight, line splitting and exact LCS computation stay off the desktop UI
+isolate. Raw-identical bodies skip formatting/LCS. `LineDiff` strips a common
+prefix (identical line lists are linear), then permits at most 1,000,000 uint32
+matrix cells (about 4 MB); larger changed ranges raise `LineDiffBudgetExceeded`.
+Small comparisons retain their exact LCS tie-breaking and replacement order.
+`ResponseDiffModel.tooLarge` covers raw/pretty bodies over 512 Ki UTF-16 units,
+conservative JSON indentation expansion over that budget, and excess LCS work.
+The view says “Responses exceed the inline diff size or complexity limit.”
+Status and header summaries remain available. Flutter web's `compute` runs on
+the main event loop, so these explicit work bounds remain necessary there.
+
+`CsvResponseView` caches one `loadCsvPreview` future per byte-buffer identity.
+`csv_preview.dart` runs UTF-8 decoding (malformed bytes tolerated) and the pinned
+comma CSV decoder in 16 KiB chunks in a worker. It retains the header and first
+500 body rows while counting every logical row, including quoted newlines;
+extra memory beyond the input/preview is one row plus a chunk, not the complete
+decoded string/table. First frame says “Loading CSV…”. Rebuilds reuse the parse;
+response replacement hides stale rows immediately, including while offstage,
+and FutureBuilder ignores late results after replacement/disposal.
 
 ### Find-everywhere, word wrap, media actions, bug reports (C1–C5)
 

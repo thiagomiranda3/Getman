@@ -55,3 +55,11 @@ Flow:
 4. `EnvironmentsBloc.MergeEnvironmentVariables` persists the captures.
 
 The response TREE mode's **Extract to `{{var}}`** action closes the loop from the other direction: it dispatches `AddExtractionRule(configId, rule)` to the global `RulesBloc`.
+
+Each send keeps its cancellation handle as an execution identity until rule
+processing finishes. A newer send or tab close invalidates older asynchronous
+results; cancellation also suppresses pending rule results, including rules
+still loading or evaluating in an isolate. The write-back
+listener observes the cleared results at the start of each execution, so equal
+captures from successive sends are each merged once. Selecting another tab or
+panel without a new send does not repeat a merge.

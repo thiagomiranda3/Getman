@@ -61,6 +61,15 @@ void main() {
       expect(h3.isCancelled, isTrue);
     });
 
+    test('finishing an old run preserves cancellation of the new run', () {
+      final previous = manager.start('tab-1');
+      final current = manager.start('tab-1');
+      manager
+        ..finish('tab-1', handle: previous)
+        ..cancel('tab-1');
+      expect(current.isCancelled, isTrue);
+      expect(previous.isCancelled, isFalse);
+    });
     test('cancelAll is a no-op when no handles are registered', () {
       expect(() => manager.cancelAll(), returnsNormally);
     });

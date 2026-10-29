@@ -1,7 +1,8 @@
-// A dependency-free LCS-based unified line diff, used by the response
-// Compare view. The DP table is sized by line count (not characters), so it
-// stays cheap for response bodies; within a changed hunk, removed lines
-// precede added lines (unified-diff convention).
+// Exact LCS unified line diff with a fixed work/memory budget. Common prefixes
+// (including identical inputs) bypass the matrix; changed ranges exceeding
+// one million cells throw LineDiffBudgetExceeded before allocating.
+
+import 'dart:typed_data';
 
 import 'package:equatable/equatable.dart';
 
@@ -21,35 +22,60 @@ class DiffLine extends Equatable {
   List<Object?> get props => [kind, text];
 }
 
-/// A small, dependency-free LCS line diff. The table is over line *lists*
-/// (line counts, not characters, drive its size), which is ample for response
-/// bodies and keeps the logic pure and testable.
+/// Signals that an exact diff would exceed the bounded LCS work budget.
+class LineDiffBudgetExceeded implements Exception {
+  const LineDiffBudgetExceeded();
+}
+
+/// An exact LCS line diff with at most one million uint32 matrix cells.
 class LineDiff {
   const LineDiff._();
 
-  /// LCS-based unified line diff. [left] lines absent from the LCS are
-  /// [DiffLineKind.removed]; [right] lines absent from the LCS are
+  /// LCS-based unified line diff. [leftInput] lines absent from the LCS are
+  /// [DiffLineKind.removed]; [rightInput] lines absent from the LCS are
   /// [DiffLineKind.added]; LCS lines are [DiffLineKind.equal]. Within a changed
   /// hunk, all removed lines precede added lines (unified-diff convention).
-  static List<DiffLine> diff(List<String> left, List<String> right) {
+  static List<DiffLine> diff(List<String> leftInput, List<String> rightInput) {
+    var prefix = 0;
+    while (prefix < leftInput.length &&
+        prefix < rightInput.length &&
+        leftInput[prefix] == rightInput[prefix]) {
+      prefix++;
+    }
+    final out = <DiffLine>[
+      for (var i = 0; i < prefix; i++)
+        DiffLine(DiffLineKind.equal, leftInput[i]),
+    ];
+    final left = leftInput.sublist(prefix);
+    final right = rightInput.sublist(prefix);
     final n = left.length;
     final m = right.length;
 
-    // LCS length DP table. lcs[i][j] = LCS length of left[i..] and right[j..].
-    final lcs = List.generate(n + 1, (_) => List<int>.filled(m + 1, 0));
+    if (n == 0 || m == 0) {
+      return out
+        ..addAll(left.map((s) => DiffLine(DiffLineKind.removed, s)))
+        ..addAll(right.map((s) => DiffLine(DiffLineKind.added, s)));
+    }
+    const maxCells = 1000000;
+    if ((n + 1) * (m + 1) > maxCells) {
+      throw const LineDiffBudgetExceeded();
+    }
+
+    // Flattened LCS table: one allocation, including highly asymmetric input.
+    final width = m + 1;
+    final lcs = Uint32List((n + 1) * width);
     for (var i = n - 1; i >= 0; i--) {
       for (var j = m - 1; j >= 0; j--) {
         if (left[i] == right[j]) {
-          lcs[i][j] = lcs[i + 1][j + 1] + 1;
+          lcs[i * width + j] = lcs[(i + 1) * width + j + 1] + 1;
         } else {
-          lcs[i][j] = lcs[i + 1][j] >= lcs[i][j + 1]
-              ? lcs[i + 1][j]
-              : lcs[i][j + 1];
+          final down = lcs[(i + 1) * width + j];
+          final across = lcs[i * width + j + 1];
+          lcs[i * width + j] = down >= across ? down : across;
         }
       }
     }
 
-    final out = <DiffLine>[];
     var i = 0;
     var j = 0;
     while (i < n && j < m) {
@@ -57,7 +83,7 @@ class LineDiff {
         out.add(DiffLine(DiffLineKind.equal, left[i]));
         i++;
         j++;
-      } else if (lcs[i + 1][j] >= lcs[i][j + 1]) {
+      } else if (lcs[(i + 1) * width + j] >= lcs[i * width + j + 1]) {
         // Dropping left[i] keeps the LCS at least as long -> it was removed.
         out.add(DiffLine(DiffLineKind.removed, left[i]));
         i++;

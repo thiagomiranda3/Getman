@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/features/history/data/datasources/history_local_data_source.dart';
 import 'package:getman/features/history/data/models/request_config_model.dart';
@@ -40,6 +41,54 @@ void main() {
     headers: headers ?? {},
   );
 
+  test('concurrent sends keep history signatures unique', () async {
+    await dataSource.addToHistory(makeConfig(), 10);
+    await Future.wait([
+      dataSource.addToHistory(makeConfig(), 10),
+      dataSource.addToHistory(makeConfig(), 10),
+    ]);
+    expect(await dataSource.getHistory(), hasLength(1));
+  });
+
+  test('clear stays ordered between concurrent sends', () async {
+    await dataSource.addToHistory(makeConfig(), 10);
+    await Future.wait([
+      dataSource.addToHistory(makeConfig(), 10),
+      dataSource.clearHistory(),
+      dataSource.addToHistory(makeConfig(url: 'https://new.example'), 10),
+    ]);
+    expect((await dataSource.getHistory()).map((e) => e.url), [
+      'https://new.example',
+    ]);
+  });
+
+  test('undo and a simultaneous send cannot duplicate a signature', () async {
+    await Future.wait([
+      dataSource.restoreToHistory([makeConfig()]),
+      dataSource.addToHistory(makeConfig(), 10),
+    ]);
+    expect(await dataSource.getHistory(), hasLength(1));
+  });
+
+  test('queued writes recover after a failed operation', () async {
+    await box.close();
+    await expectLater(
+      dataSource.addToHistory(makeConfig(), 10),
+      throwsA(isA<PersistenceException>()),
+    );
+    box = await Hive.openBox<HttpRequestConfig>(HiveBoxes.history);
+    await dataSource.addToHistory(makeConfig(), 10);
+    expect(await dataSource.getHistory(), hasLength(1));
+  });
+
+  test('delete after an in-flight undo removes the restored record', () async {
+    final restored = makeConfig()..id = 'restored';
+    await Future.wait([
+      dataSource.restoreToHistory([restored]),
+      dataSource.deleteFromHistory('restored'),
+    ]);
+    expect(await dataSource.getHistory(), isEmpty);
+  });
   group('addToHistory – dedup', () {
     test(
       'same method+url+body is deduplicated: only one entry remains, '

@@ -3,6 +3,21 @@ import 'package:getman/core/utils/line_diff.dart';
 
 void main() {
   group('LineDiff.diff', () {
+    test('identical 100000-line inputs bypass the matrix', () {
+      final left = List.generate(100000, (i) => '$i');
+      final out = LineDiff.diff(left, List.of(left));
+      expect(out.length, left.length);
+      expect(out.map((line) => line.kind), everyElement(DiffLineKind.equal));
+    });
+
+    test('unmatched large ranges reject work before allocating a matrix', () {
+      // Deliberate complexity cap; see tabs-and-panels.md.
+      expect(
+        () => LineDiff.diff(List.filled(10000, 'a'), List.filled(10000, 'b')),
+        throwsA(isA<LineDiffBudgetExceeded>()),
+      );
+    });
+
     test('identical inputs are all equal', () {
       final out = LineDiff.diff(['a', 'b', 'c'], ['a', 'b', 'c']);
       expect(out.map((l) => l.kind), everyElement(DiffLineKind.equal));

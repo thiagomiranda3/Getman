@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:getman/core/error/failures.dart';
 import 'package:getman/core/network/content_encoding.dart';
 import 'package:getman/core/network/network_service.dart';
 
@@ -39,12 +40,17 @@ _Harness _harnessReturning(
   Map<String, List<String>> headers, {
   int status = 200,
   int maxResponseBytes = 50 * 1024 * 1024,
+  ContentEncodingDecoder contentDecoder = decodeContentEncoding,
 }) {
   final adapter = _FakeAdapter(bytes: bytes, headers: headers, status: status);
   final dio = Dio(BaseOptions(validateStatus: (_) => true))
     ..httpClientAdapter = adapter;
   return (
-    svc: NetworkService(dio: dio, maxResponseBytes: maxResponseBytes),
+    svc: NetworkService(
+      dio: dio,
+      maxResponseBytes: maxResponseBytes,
+      contentDecoder: contentDecoder,
+    ),
     adapter: adapter,
   );
 }
@@ -203,6 +209,116 @@ void main() {
   });
 
   group('response Content-Encoding handling (F2)', () {
+    for (final exceededLimit in [false, true]) {
+      test(
+        'cancellation during decode discards overflow=$exceededLimit',
+        () async {
+          final started = Completer<void>();
+          final decoded = Completer<({Uint8List? bytes, bool exceededLimit})>();
+          final handle = NetworkCancelHandle();
+          final h = _harnessReturning(
+            gzip.encode(utf8.encode('response')),
+            {
+              'content-type': ['text/plain'],
+              'content-encoding': ['gzip'],
+            },
+            contentDecoder: (bytes, encoding, {required maxOutputBytes}) {
+              started.complete();
+              return decoded.future;
+            },
+          );
+          final request = h.svc.request(
+            url: 'https://x/y',
+            method: 'GET',
+            cancelHandle: handle,
+          );
+          final cancelled = expectLater(
+            request,
+            throwsA(
+              isA<NetworkFailure>().having(
+                (failure) => failure.type,
+                'type',
+                NetworkFailureType.cancelled,
+              ),
+            ),
+          );
+          await started.future;
+          handle.cancel();
+          decoded.complete((
+            bytes: exceededLimit
+                ? null
+                : Uint8List.fromList(utf8.encode('response')),
+            exceededLimit: exceededLimit,
+          ));
+          await cancelled;
+        },
+      );
+    }
+
+    for (final codec in [
+      (encoding: 'gzip', encoder: gzip.encoder),
+      (encoding: 'x-gzip', encoder: gzip.encoder),
+      (encoding: 'deflate', encoder: zlib.encoder),
+      (encoding: 'deflate', encoder: ZLibEncoder(raw: true)),
+    ]) {
+      for (final size in [8192, 8193]) {
+        test(
+          '${codec.encoding} raw=${codec.encoder.raw} decoded cap $size',
+          () async {
+            final svc = serviceReturning(
+              codec.encoder.convert(List<int>.filled(size, 0x61)),
+              {
+                'content-type': ['text/plain'],
+                'content-encoding': [codec.encoding],
+              },
+              maxResponseBytes: 8192,
+            );
+            final r = await svc.request(url: 'https://x/y', method: 'GET');
+            expect(r.body, size == 8192 ? 'a' * 8192 : contains('too large'));
+            expect(r.bodyBytes, isNull);
+          },
+        );
+      }
+    }
+
+    for (final codec in [
+      (encoding: 'gzip', encoder: gzip.encoder),
+      (encoding: 'deflate', encoder: zlib.encoder),
+    ]) {
+      test(
+        '${codec.encoding} stops expansion before a corrupt trailer',
+        () async {
+          final compressed = codec.encoder.convert(
+            List<int>.filled(1024 * 1024, 0x61),
+          );
+          compressed[compressed.length - 1] ^= 0xff;
+          expect(compressed.length, lessThan(8192));
+          final svc = serviceReturning(
+            compressed,
+            {
+              'content-type': ['text/plain'],
+              'content-encoding': [codec.encoding],
+            },
+            maxResponseBytes: 8192,
+          );
+          final r = await svc.request(url: 'https://x/y', method: 'GET');
+          expect(r.body, contains('too large'));
+          expect(r.bodyBytes, isNull);
+        },
+      );
+    }
+
+    for (final encoding in ['gzip', 'x-gzip', 'deflate']) {
+      test('malformed $encoding preserves original text', () async {
+        final svc = serviceReturning(utf8.encode('invalid compressed data'), {
+          'content-type': ['text/plain'],
+          'content-encoding': [encoding],
+        });
+        final r = await svc.request(url: 'https://x/file', method: 'GET');
+        expect(r.body, 'invalid compressed data');
+      });
+    }
+
     test('deflate (zlib-wrapped) body decodes to text', () async {
       final svc = serviceReturning(zlib.encode(utf8.encode('{"ok":true}')), {
         'content-type': ['application/json'],

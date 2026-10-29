@@ -10,10 +10,38 @@ Networking is `dio` (cancel tokens wrapped by `NetworkCancelHandle`). The live c
 
 - A login 302's `Set-Cookie` is captured and re-matched on the next hop.
 - 303 / POST-301/302 become bodyless GETs; 307/308 keep method + body.
-- Credential headers are stripped when a redirect crosses hosts — the full
+- Credential headers are stripped when a redirect changes scheme, host, or
+  effective port — the full
   dart:io `nonRedirectHeaders` set (`authorization`, `www-authenticate`,
   `cookie`, `cookie2`), so a hand-typed `Cookie:` row never follows a
-  redirect to a different host. Jar cookies re-match per hop regardless.
+  redirect to a different origin (including HTTPS → HTTP and same-host port
+  changes). Explicit default ports are equivalent to omitted ports. Jar
+  cookies re-match per hop using normal domain/path/Secure rules regardless.
+
+## Bounded response decompression
+
+`NetworkService` caps both received bytes and decompressed bytes at
+`kMaxRenderableResponseBytes`. Native residual gzip/x-gzip/deflate decoding
+uses `content_encoding_io.dart`: a worker isolate runs the SDK's chunked zlib
+decoder with an output sink that rejects the first block exceeding the cap.
+It retains at most the cap in output, plus the codec's current block and
+internal buffers; it never materializes the full oversized expansion. The
+wire input is still bounded and buffered before decoding.
+
+Overflow is distinct from invalid compressed data: it returns no partial
+payload and never triggers the raw-deflate fallback. The UI uses the existing
+`too large to buffer; open externally` placeholder with a `>` size lower bound,
+because the full expanded size is intentionally never computed. Deflate tries
+zlib-wrapped data before raw deflate on format errors. Malformed and already
+decoded input retains its original bytes. Gzip-typed payloads still skip
+attempt-decoding so downloaded `.gz` archives stay intact.
+
+The conditional web stub performs no decompression: browsers already decode
+the response, and the network stream cap applies to those decoded bytes.
+
+Cancellation is checked again when background decompression finishes, before
+returning either a decoded body or an overflow placeholder. A cancelled send
+therefore skips history recording and rule evaluation.
 
 ## Implicit request headers (what the client adds on top of the HEADERS tab)
 

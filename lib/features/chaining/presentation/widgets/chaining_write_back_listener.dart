@@ -3,8 +3,8 @@
 // EnvironmentsBloc (bloc-to-bloc coupling deliberately avoided).
 //
 // Gotchas: tracks captures across every tab/panel (a send can finish while
-// the user is elsewhere) and marks a capture written only after it
-// persists -- a capture made with no active environment stays pending and
+// the user is elsewhere) and marks a capture written after dispatching its
+// merge -- a capture made with no active environment stays pending and
 // is flushed the moment one is selected, via a separate SettingsBloc
 // listener.
 
@@ -32,7 +32,7 @@ const _resultsEquality = ListEquality<ExtractionResult>();
 /// Tracks captures across **every** tab, not just the active one (a request can
 /// finish while the user is on a different tab). A per-tabId snapshot of
 /// already-written results guarantees each capture is written exactly once.
-/// Crucially, results are marked written **only after** they are persisted — a
+/// Crucially, results are marked written only after dispatching their merge — a
 /// capture made while no environment is active stays pending and is flushed the
 /// moment an environment is selected (which emits on SettingsBloc, not
 /// TabsBloc, so it is listened for separately).
@@ -76,8 +76,11 @@ class _ChainingWriteBackListenerState extends State<ChainingWriteBackListener> {
       state.panels.isEmpty ? state.tabs : state.panels.expand((p) => p.tabs);
 
   bool _hasPending(TabsState next) {
+    final liveIds = <String>{};
     for (final tab in _allTabs(next)) {
-      if (tab.extractionResults.isEmpty) continue;
+      liveIds.add(tab.tabId);
+      // SendRequest clears results for each execution. Observe that empty
+      // transition too, so an equal capture in the NEXT run is written again.
       if (!_resultsEquality.equals(
         _written[tab.tabId],
         tab.extractionResults,
@@ -85,7 +88,7 @@ class _ChainingWriteBackListenerState extends State<ChainingWriteBackListener> {
         return true;
       }
     }
-    return false;
+    return _written.keys.any((id) => !liveIds.contains(id));
   }
 
   void _flush(BuildContext context, TabsState state) {
@@ -150,7 +153,7 @@ class _ChainingWriteBackListenerState extends State<ChainingWriteBackListener> {
     );
     pending.forEach(
       (id, results) => _written[id] = results,
-    ); // mark only after persist
+    ); // mark after dispatch; persistence is owned by EnvironmentsBloc
     _lastNoEnvNotice = null;
     showAppSnackBar(
       context,

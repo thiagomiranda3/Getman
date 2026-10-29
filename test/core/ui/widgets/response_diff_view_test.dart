@@ -70,7 +70,7 @@ void main() {
         tooLarge: true,
       ),
     );
-    expect(find.textContaining('too large'), findsOneWidget);
+    expect(find.textContaining('size or complexity limit'), findsOneWidget);
   });
 
   testWidgets('added/removed lines render with gutter glyphs', (tester) async {

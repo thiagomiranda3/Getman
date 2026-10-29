@@ -6,6 +6,7 @@
 // responseFromConfig.
 
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/network/http_response.dart';
@@ -48,7 +49,7 @@ class ResponseDiffModel extends Equatable {
   final int leftStatus;
   final int rightStatus;
 
-  /// Unified line diff of the pretty-printed bodies. Empty when [tooLarge].
+  /// Unified pretty-body diff; empty for raw-identical bodies or [tooLarge].
   final List<DiffLine> bodyLines;
 
   /// Only the header keys that differ (added / removed / changed).
@@ -57,7 +58,7 @@ class ResponseDiffModel extends Equatable {
   /// True when no add/remove lines exist (bodies render identically).
   final bool bodiesIdentical;
 
-  /// True when a body exceeded [kLargeResponseViewerChars]; no prettify/LCS ran.
+  /// True when input, formatting expansion, or exact diff work exceeds budget.
   final bool tooLarge;
 
   @override
@@ -73,7 +74,7 @@ class ResponseDiffModel extends Equatable {
 
 /// Maps two [HttpResponseEntity] into a [ResponseDiffModel]. `left` is the
 /// current tab's response, `right` the chosen target. Async because it awaits
-/// [JsonUtils.prettify] (which may hop an isolate).
+/// a worker for formatting preflight, prettify, splitting, and bounded LCS.
 class ResponseDiffBuilder {
   const ResponseDiffBuilder._();
 
@@ -96,10 +97,9 @@ class ResponseDiffBuilder {
       );
     }
 
-    final prettyLeft = await JsonUtils.prettify(left.body);
-    final prettyRight = await JsonUtils.prettify(right.body);
-    final lines = LineDiff.diffText(prettyLeft, prettyRight);
-    final identical = lines.every((l) => l.kind == DiffLineKind.equal);
+    final bodyDiff = await compute(_buildBodyDiff, (left.body, right.body));
+    final lines = bodyDiff.lines;
+    final identical = bodyDiff.identical;
 
     return ResponseDiffModel(
       leftStatus: left.statusCode,
@@ -107,7 +107,7 @@ class ResponseDiffBuilder {
       bodyLines: lines,
       headerDeltas: headerDeltas,
       bodiesIdentical: identical,
-      tooLarge: false,
+      tooLarge: bodyDiff.tooLarge,
     );
   }
 
@@ -139,6 +139,72 @@ class ResponseDiffBuilder {
     deltas.sort((a, b) => a.key.toLowerCase().compareTo(b.key.toLowerCase()));
     return deltas;
   }
+}
+
+// Only strings enter the worker: do not copy response media byte buffers.
+Future<({List<DiffLine> lines, bool identical, bool tooLarge})> _buildBodyDiff(
+  (String, String) bodies,
+) async {
+  final (left, right) = bodies;
+  // No formatting or matrix is needed when the raw bodies already match.
+  if (left == right) {
+    return (lines: const <DiffLine>[], identical: true, tooLarge: false);
+  }
+  if (!_fitsFormattingBudget(left) || !_fitsFormattingBudget(right)) {
+    return (lines: const <DiffLine>[], identical: false, tooLarge: true);
+  }
+  final prettyLeft = await JsonUtils.prettify(left);
+  final prettyRight = await JsonUtils.prettify(right);
+  if (prettyLeft.length > kLargeResponseViewerChars ||
+      prettyRight.length > kLargeResponseViewerChars) {
+    return (lines: const <DiffLine>[], identical: false, tooLarge: true);
+  }
+  try {
+    final lines = LineDiff.diffText(prettyLeft, prettyRight);
+    return (
+      lines: lines,
+      identical: lines.every((line) => line.kind == DiffLineKind.equal),
+      tooLarge: false,
+    );
+  } on LineDiffBudgetExceeded {
+    return (lines: const <DiffLine>[], identical: false, tooLarge: true);
+  }
+}
+
+// Conservative preflight prevents deeply nested minified JSON from expanding
+// quadratically inside the formatter before the post-format size guard runs.
+bool _fitsFormattingBudget(String body) {
+  final trimmed = body.trimLeft();
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return true;
+  var depth = 0;
+  var quoted = false;
+  var estimate = body.length;
+  for (var i = 0; i < body.length; i++) {
+    final c = body.codeUnitAt(i);
+    if (quoted) {
+      if (c == 92) {
+        i++;
+      } else if (c == 34) {
+        quoted = false;
+      }
+      continue;
+    }
+    if (c == 34) {
+      quoted = true;
+    } else if (c == 123 || c == 91) {
+      depth++;
+      estimate += 1 + depth * 4;
+    } else if (c == 125 || c == 93) {
+      if (depth > 0) depth--;
+      estimate += 1 + depth * 4;
+    } else if (c == 44) {
+      estimate += 1 + depth * 4;
+    } else if (c == 58) {
+      estimate++;
+    }
+    if (estimate > kLargeResponseViewerChars) return false;
+  }
+  return true;
 }
 
 /// Reconstructs an [HttpResponseEntity] from a config that carries response
