@@ -9,7 +9,7 @@
     "nativeToolchainC": "0.19.2",
     "sources": {
       "LICENSE": "96f73f9d2a16c21a36b418f06073be26e7d6d5e7c1bc99756b21a4f2c74ef171",
-      "bridge.c": "1501326c0da37379dcf5fdfdfe90b49c5e525383b695712b8a9b660db18c94c0",
+      "bridge.c": "366be04de4864ba7bf6ad29ef3d10b8a4b561f9b99e78355fa9358e55be1b516",
       "builtin-array-fromasync.h": "d47456ec04d98843d35412049377f03bde47c8bd029869f76e0f4c64bbbca6ad",
       "builtin-iterator-zip-keyed.h": "0f9ad43935a5dd00798b07ce654fcc340d3b989416aff70b65097b5181e9a77d",
       "builtin-iterator-zip.h": "46c358b4303a6a69050a812877b244d5d45b0c3a670ca5c3894c1e5995d2860c",
@@ -26,7 +26,7 @@
       "quickjs-atom.h": "66be65be6f96379d85b55769d7a1fcf98c956ccbae166d8ffb8eee3293965af6",
       "quickjs-c-atomics.h": "29883c742a5c512278fce54d19b1b9af949006e1d7dfc9ffa2e0946b184d8c5c",
       "quickjs-opcode.h": "2d8fd6e896bf030e3dfb70dfaae23d3c1fb1193d23154ad605b445e8203077f1",
-      "quickjs.c": "0dc62d8f9a2ed0e6f19fba948a1c54ee09c8d5c74545a814918716da89ccc35f",
+      "quickjs.c": "e179653b506bbbb2afe9460e89d63ef931941e99a2be5d1f8dc4c4dfbd793dc7",
       "quickjs.h": "729312017860128a3f3520586ca4d78031f21bf618bf68b0c1220f39423c0613"
     }
   },

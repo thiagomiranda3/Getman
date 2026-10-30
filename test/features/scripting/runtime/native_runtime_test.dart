@@ -114,6 +114,39 @@ void main() {
       ScriptErrorKind.cancelled,
     );
   });
+  test(
+    'heap quota during sparse Array construction releases ownership',
+    () async {
+      final runtime = createScriptRuntime();
+      addTearDown(runtime.close);
+      // Sparse arrays exhaust object/shape allocations rather than the large
+      // element buffer allocated by Array.fill. Length-property creation must
+      // handle allocation failure before the object enters the GC list.
+      final result = await runtime.execute(
+        input(
+          'const retained = []; while(true) retained.push(new Array(8192));',
+        ),
+        cancellation: ScriptCancellation(),
+        limits: const ScriptLimits(
+          memoryBytes: 2 * 1024 * 1024,
+          timeout: Duration(seconds: 3),
+        ),
+      );
+      expect(result.error?.kind, ScriptErrorKind.memoryLimit);
+      expect(native.liveControls(), 0);
+      expect(native.liveRuntimes(), 0);
+      expect(
+        (await runtime.execute(
+          input('1 + 1;'),
+          cancellation: ScriptCancellation(),
+        )).error,
+        isNull,
+      );
+      await runtime.close();
+      expect(native.liveControls(), 0);
+      expect(native.liveRuntimes(), 0);
+    },
+  );
   test('input quota rejects variable snapshots before execution', () async {
     final runtime = createScriptRuntime();
     addTearDown(runtime.close);

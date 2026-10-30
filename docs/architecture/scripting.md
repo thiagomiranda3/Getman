@@ -8,6 +8,14 @@ newer 0.19.5 requires a meta version incompatible with Flutter 3.44.4.
 No download, executable lookup, browser host API or external module loader is
 available to guest JavaScript.
 
+The vendored 0.14.0 `quickjs.c` includes one local allocation-failure fix:
+`JS_NewObjectFromShape` checks failure when adding an array's `length` property
+and frees the unfinished object, its current shape and property storage before
+returning the exception. Sparse-array heap exhaustion otherwise dereferenced a
+null property pointer on Linux. The upstream version remains 0.14.0; the source
+manifest records the patched file hash. The native contract asserts a memory
+limit result, zero live ownership counters and successful subsequent execution.
+
 Each nonempty execution creates one isolate, runtime and context. At most two
 isolates execute concurrently; additional calls queue. Empty scripts bypass the
 engine. Cancellation removes queued admission or sets an atomic native flag.
@@ -68,10 +76,22 @@ Desktop C compilation explicitly selects C11. On Windows, the native-assets
 hook also passes `/experimental:c11atomics`, matching upstream QuickJS-NG
 CMake; the engine's `quickjs-c-atomics.h` uses `<stdatomic.h>` for MSVC as does
 bridge cancellation. This requires a Visual Studio toolset supporting C11
-atomics (VS 2022 17.5 or later). `.github/workflows/scripting-native.yml`
+atomics (VS 2022 17.5 or later). MSVC's C headers do not expose `max_align_t`,
+so its allocator prefix uses the Windows SDK's `MEMORY_ALLOCATION_ALIGNMENT`
+size, preserving malloc's 16-byte Win64 or 8-byte Win32 alignment. Other
+compilers retain the standard `max_align_t` prefix.
+`.github/workflows/scripting-native.yml`
 compiles and runs the real engine contract separately on macOS, Windows and
-Linux. Adding the workflow does not establish a passed Windows/Linux run;
-these platforms remain unverified until their CI executions pass.
+Linux. Each platform's workflow result establishes verification for that
+revision; the workflow definition alone is not evidence of a successful build.
+
+The focused allocator contract runs without Flutter:
+`bash packages/getman_quickjs/test/run_allocator_tests.sh` (macOS/Linux, C11
+compiler required). It compiles the real bridge and vendored engine, checking
+alignment, realloc contents, calloc zeroing, quota rejection and ownership
+cleanup. It also compiles the MSVC prefix with `max_align_t` unavailable;
+this regression catches the missing-type failure but does not replace the
+Windows native contract's actual MSVC build.
 
 Host-only atomic diagnostics count live execution controls and QuickJS runtimes.
 The native contract checks zero after ordinary errors, deadline interruption,

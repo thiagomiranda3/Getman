@@ -54,6 +54,9 @@ jobs:
       - run: fvm use 3.44.4 --force
       - run: fvm flutter config --enable-${{ matrix.platform }}-desktop
       - run: fvm flutter pub get
+      - name: Verify native allocator alignment and quotas
+        if: runner.os != 'Windows'
+        run: bash packages/getman_quickjs/test/run_allocator_tests.sh
       # Flutter test compiles and loads the native asset on each runner. The
       # contract executes C11 cancellation, timeout, allocation and disposal.
       - name: Verify native engine, public API and real HTTP pipeline

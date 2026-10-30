@@ -59,7 +59,14 @@ static void exception(JSContext *ctx, Control *c, JSValue error) {
  if(s)JS_FreeCString(ctx,s); if(st)JS_FreeCString(ctx,st); JS_FreeValue(ctx,stack); JS_FreeValue(ctx,error);
 }
 // Prefix keeps returned pointers maximally aligned and counts exact ownership.
+#ifdef _MSC_VER
+// MSVC's C headers omit max_align_t. malloc is aligned to the Windows SDK's
+// MEMORY_ALLOCATION_ALIGNMENT (16 on Win64, 8 on Win32); a prefix of that size
+// preserves the allocator's alignment when returning h+1.
+typedef union { char alignment[MEMORY_ALLOCATION_ALIGNMENT]; size_t size; } Header;
+#else
 typedef union { max_align_t alignment; size_t size; } Header;
+#endif
 static void *quota_malloc(void *opaque, size_t size) {
  Control *c=opaque;
  if(size > SIZE_MAX-sizeof(Header) || size+sizeof(Header)>c->limit-c->used) { c->memory_exceeded=1; return NULL; }
