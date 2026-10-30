@@ -144,10 +144,14 @@ class ResponseSection extends StatelessWidget {
               ),
             Expanded(
               child: DefaultTabController(
-                key: ValueKey((
-                  tab.executionId,
-                  tab.scriptExecutionResult?.error,
-                )),
+                // Preserve the selected tab on ordinary sends; a new script
+                // failure still opens its diagnostic on the first frame.
+                key: tab.scriptExecutionResult?.error == null
+                    ? null
+                    : ValueKey((
+                        tab.executionId,
+                        tab.scriptExecutionResult?.error,
+                      )),
                 initialIndex: tab.scriptExecutionResult?.error != null ? 4 : 0,
                 length: 5,
                 child: Column(
