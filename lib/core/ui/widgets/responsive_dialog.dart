@@ -48,11 +48,16 @@ class ResponsiveDialogScaffold extends StatelessWidget {
         child: surface(
           context,
           borderRadius: BorderRadius.circular(context.appShape.dialogRadius),
-          child: _DialogBody(
-            title: title,
-            content: content,
-            actions: actions,
-            contentPadding: contentPadding,
+          // Match AlertDialog's intrinsic sizing before the body stretches
+          // its children; otherwise even explicitly sized content fills the
+          // window under Dialog's loose constraints.
+          child: IntrinsicWidth(
+            child: _DialogBody(
+              title: title,
+              content: content,
+              actions: actions,
+              contentPadding: contentPadding,
+            ),
           ),
         ),
       );

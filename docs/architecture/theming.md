@@ -59,6 +59,11 @@ Split panes (the request/response split, the side-menu width) are a UI conventio
 
 ## Shared chrome atoms
 
+`ResponsiveDialogScaffold` preserves intrinsic content width in both Material
+and frosted-glass desktop dialogs. The glass body needs `IntrinsicWidth` before
+its stretching column, otherwise even a caller's bounded `SizedBox` fills the
+window. Keep content scrollable and actions reachable on short viewports.
+
 The filled-indicator tab strip is `BrandedTabBar` (`core/ui/widgets/`) — used by the request panel, unified phone panel, response panel, and side menu. Snackbars go through `showAppSnackBar(context, message)` — never construct styled `SnackBar`s inline (use `showAppSnackBarVia(messenger, …)` with a captured `ScaffoldMessenger` after an `await`/dialog dismissal). Irreversible actions confirm through `ConfirmDialog.show(...)`. `NamePromptDialog.show(...)` is the single-line text prompt (pass `allowEmpty: true` + `multiline: true` for clearable free-text).
 
 ## Motion

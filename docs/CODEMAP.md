@@ -151,7 +151,7 @@ widgets + screens). Shared cross-feature code lives under `lib/core/`. See
 | `lib/features/scripting/domain/repositories` | Runtime execution and local content-trust contracts. |
 | `lib/features/scripting/data/repositories` | Lazy runtime and installation-local content trust. |
 | `lib/features/scripting/data/runtime` | Native isolate and web Worker adapters; JSON-only protocol. |
-| `lib/features/scripting/presentation/widgets` | SCRIPTS editor, trust review, test results and console. |
+| `lib/features/scripting/presentation/widgets` | SCRIPTS editor, bounded API help (`script_help_dialog.dart`), trust review, test results and console. |
 
 ### `settings` — single app-wide settings record
 
