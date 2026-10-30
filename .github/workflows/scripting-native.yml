@@ -29,7 +29,8 @@ jobs:
       CMAKE_POLICY_VERSION_MINIMUM: '3.5'
     defaults:
       run:
-        shell: bash
+        # Pub installs fvm.bat on Windows; Git Bash cannot resolve it as `fvm`.
+        shell: ${{ matrix.platform == 'windows' && 'pwsh' || 'bash' }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - name: Install Linux build dependencies
@@ -86,6 +87,7 @@ jobs:
         run: test -n "$(find build/linux/x64/release/bundle -name '*getman_quickjs*.so' -print -quit)"
       - name: Verify Windows native engine bundle
         if: runner.os == 'Windows'
+        shell: bash
         run: test -n "$(find build/windows/x64/runner/Release -name '*getman_quickjs*.dll' -print -quit)"
       - name: Require native contracts to pass
         if: steps.contracts.outcome != 'success'
