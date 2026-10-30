@@ -65,8 +65,12 @@ The metadata-row timeline is `ResponseHistoryTimeline` (hidden under 2 entries);
 
 `BodyCodeEditor` adds request-only assistance around `JsonCodeEditor`; response
 editors keep their existing behavior. `body_completion.dart` computes the caret
-context and complete replacement range. Typing a property name in a JSON object
-opens a caret-anchored menu of learned names; typing `{{` offers variables.
+context and complete replacement range. Typing a property name in a JSON object,
+with or without an opening quote, opens a caret-anchored menu of learned names;
+typing `{{` offers variables. Empty property slots still require explicit
+activation. Accepting a bare prefix inserts a JSON-escaped, quoted key and adds
+the colon only when absent; existing quotes/colons are not duplicated. Bare
+prefix detection is restricted to property slots, never ordinary JSON values.
 **Option+Space on macOS / Ctrl+Space elsewhere** explicitly opens completion.
 Up/Down changes the selected row, Enter or Tab accepts it, and Escape dismisses
 it. Acceptance replaces the full token, including a suffix after the caret,
