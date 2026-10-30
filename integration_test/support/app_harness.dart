@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -21,6 +22,17 @@ const Size kE2eWindowSize = Size(1500, 950);
 /// (see `macos/Runner/MainFlutterWindow.swift`). Test-only.
 const MethodChannel _testWindowChannel = MethodChannel('getman/test_window');
 
+/// Live pumps need a visible native window. macOS stops scheduling frames when
+/// another window obscures this one. Restore it only while a UI test owns it.
+class _VisibleTestWindow extends WidgetsBindingObserver {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.hidden) {
+      unawaited(_testWindowChannel.invokeMethod<void>('activate'));
+    }
+  }
+}
+
 /// Watch mode is on whenever a slow-motion delay is requested
 /// (`--dart-define=E2E_SLOW_MS=<ms>`). A getter (not a const) so the analyzer
 /// doesn't fold the default 0 into dead-code warnings.
@@ -39,7 +51,11 @@ double _logicalWidth(PatrolTester $) =>
 /// await resizeWindow($, const Size(560, 900)); // phone-ish → unified panel
 /// ```
 /// No-op off macOS (the channel isn't registered).
-Future<void> resizeWindow(PatrolTester $, Size size) async {
+Future<void> resizeWindow(
+  PatrolTester $,
+  Size size, {
+  bool settle = false,
+}) async {
   try {
     await _testWindowChannel.invokeMethod<void>('setContentSize', {
       'width': size.width,
@@ -54,7 +70,17 @@ Future<void> resizeWindow(PatrolTester $, Size size) async {
     await $.tester.pump(const Duration(milliseconds: 16));
     if ((_logicalWidth($) - size.width).abs() < 2) break;
   }
-  await $.pumpAndSettle();
+  if ((_logicalWidth($) - size.width).abs() >= 2) {
+    throw StateError(
+      'Native test window did not reach width ${size.width}; '
+      'actual width is ${_logicalWidth($)}',
+    );
+  }
+  if (settle) {
+    await $.pumpAndSettle();
+  } else {
+    await $.tester.pump();
+  }
 }
 
 /// Boots the **real** Getman app for an E2E flow and pumps it until settled.
@@ -80,6 +106,7 @@ Future<void> resizeWindow(PatrolTester $, Size size) async {
 Future<void> bootGetman(
   PatrolTester $, {
   Size windowSize = kE2eWindowSize,
+  bool settleResize = false,
 }) async {
   // The app bundles its Google Fonts; forbid runtime fetching so a test never
   // hits the network for a font (matches main.dart).
@@ -101,11 +128,19 @@ Future<void> bootGetman(
     }
   });
 
+  if (Platform.isMacOS) {
+    final visibility = _VisibleTestWindow();
+    binding.addObserver(visibility);
+    addTearDown(() => binding.removeObserver(visibility));
+  }
+
   final settings = await di.init(storageDirectoryOverride: tempDir.path);
   await disableStartupUpdateCheck();
 
+  // Activate and size the native window before waiting for the first live
+  // Flutter frame; an unfocused cold window can otherwise stall that wait.
+  await resizeWindow($, windowSize, settle: settleResize);
   await $.pumpWidgetAndSettle(MyApp(initialSettings: settings));
-  await resizeWindow($, windowSize);
 }
 
 /// Disables the startup auto-update check on the freshly-booted SettingsBloc.

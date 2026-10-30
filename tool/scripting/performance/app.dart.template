@@ -1,0 +1,116 @@
+// Generated benchmark entrypoint. Real app, fresh Hive, production SEND path.
+// Built only in disposable benchmark checkouts; never a shipping entrypoint.
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:getman/core/di/injection_container.dart' as di;
+import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/settings/presentation/bloc/settings_event.dart';
+import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
+import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
+import 'package:getman/main.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:media_kit/media_kit.dart';
+__SCRIPT_IMPORTS__
+
+Future<void> main() async {
+  final startup = Stopwatch()..start();
+  final binding = WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
+  GoogleFonts.config.allowRuntimeFetching = false;
+  final host = Platform.environment['GETMAN_BENCH_URL']!;
+  final token = Platform.environment['GETMAN_BENCH_TOKEN']!;
+  final mode = Platform.environment['GETMAN_BENCH_MODE']!;
+  final scriptMode = mode.startsWith('script');
+  final coldScript = mode == 'script_cold';
+  final storage = await Directory.systemTemp.createTemp('getman-benchmark-hive-');
+  final client = HttpClient();
+  Future<void> report(Map<String, Object?> data) async {
+    final request = await client.postUrl(Uri.parse('$host/report/$token'));
+    request.headers.contentType = ContentType.json;
+    request.write(jsonEncode(data));
+    final response = await request.close();
+    await response.drain<void>();
+  }
+
+  try {
+    const releaseBuild = bool.fromEnvironment('dart.vm.product');
+    if (!releaseBuild) throw StateError('Benchmark requires a release build');
+    final settings = await di.init(storageDirectoryOverride: storage.path);
+    // Disable unrelated external update I/O in both revisions identically.
+    final settingsBloc = di.sl<SettingsBloc>();
+    final updated = settingsBloc.stream.firstWhere(
+      (state) => !state.settings.checkForUpdatesOnStartup,
+    );
+    settingsBloc.add(const UpdateCheckForUpdatesOnStartup(enabled: false));
+    await updated;
+    runApp(MyApp(initialSettings: settings));
+    await binding.waitUntilFirstFrameRasterized;
+    startup.stop();
+    await report({'event': 'first_frame', 'elapsed_us': startup.elapsedMicroseconds});
+    final tabs = di.sl<TabsBloc>();
+    if (tabs.state.tabs.isEmpty || tabs.state.isLoading) {
+      await tabs.stream.firstWhere((s) => s.tabs.isNotEmpty && !s.isLoading);
+    }
+    final config = HttpRequestConfigEntity(id: 'benchmark', url: '$host/echo/$token');
+    final added = tabs.stream.firstWhere((s) => s.tabs.any((t) => t.config.id == config.id));
+    tabs.add(AddTab(config: config));
+    await added;
+    final tabId = tabs.state.tabs.firstWhere((t) => t.config.id == config.id).tabId;
+    var httpRequests = 0;
+    Future<int> send() async {
+      var sending = false;
+      final completed = tabs.stream.firstWhere((s) {
+        final tab = s.tabs.byId(tabId);
+        if (tab?.isSending ?? false) sending = true;
+        return sending && tab != null && !tab.isSending;
+      });
+      final watch = Stopwatch()..start();
+      tabs.add(SendRequest(tabId: tabId));
+      final state = await completed.timeout(const Duration(seconds: 15));
+      watch.stop();
+      final tab = state.tabs.byId(tabId)!;
+      if (tab.response?.statusCode != 200 || tab.response?.body != '{"ok":true,"answer":42}') {
+        throw StateError('HTTP response mismatch: ${tab.response}');
+      }
+      __SCRIPT_ASSERTION__
+      httpRequests++;
+      // Let the normal UI/render work finish between samples; it remains
+      // active during the measured SEND but cannot accumulate a frame backlog.
+      await binding.endOfFrame;
+      return watch.elapsedMicroseconds;
+    }
+
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    final data = <String, Object?>{
+      'warmup_count': 10, 'rss_after_boot': ProcessInfo.currentRss,
+      'dart_version': Platform.version, 'os_version': Platform.operatingSystemVersion,
+    };
+    for (var i = 0; i < 10; i++) { await send(); }
+    final noScript = <int>[];
+    for (var i = 0; i < 30; i++) { noScript.add(await send()); }
+    data['no_script_us'] = noScript;
+    data['rss_after_no_script'] = ProcessInfo.currentRss;
+    __SCRIPT_MEASUREMENT__
+    data['http_requests'] = httpRequests;
+    // Close the real mounted app first so blocs flush their pending writes.
+    runApp(const SizedBox.shrink());
+    await binding.endOfFrame;
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await di.reset();
+    __AFTER_CLOSE__
+    data['rss_after_close'] = ProcessInfo.currentRss;
+    await storage.delete(recursive: true);
+    await report(data);
+    client.close(force: true);
+    exit(0);
+  } on Object catch (error, stack) {
+    await report({'error': '$error\n$stack'});
+    client.close(force: true);
+    exit(1);
+  }
+}

@@ -93,6 +93,36 @@ class RequestConfigDiff {
     HttpRequestConfigEntity? after,
   ) {
     final out = <FieldChange>[];
+    _scalar(
+      out,
+      'scripts.apiVersion',
+      before == null ? null : '${before.scripts.apiVersion}',
+      after == null ? null : '${after.scripts.apiVersion}',
+    );
+    _scalar(
+      out,
+      'scripts.preRequest',
+      before?.scripts.preRequest,
+      after?.scripts.preRequest,
+    );
+    _scalar(
+      out,
+      'scripts.postResponse',
+      before?.scripts.postResponse,
+      after?.scripts.postResponse,
+    );
+    _scalar(
+      out,
+      'scripts.preRequestEnabled',
+      before == null ? null : '${before.scripts.preRequestEnabled}',
+      after == null ? null : '${after.scripts.preRequestEnabled}',
+    );
+    _scalar(
+      out,
+      'scripts.postResponseEnabled',
+      before == null ? null : '${before.scripts.postResponseEnabled}',
+      after == null ? null : '${after.scripts.postResponseEnabled}',
+    );
     _scalar(out, 'method', before?.method, after?.method);
     _scalar(out, 'url', before?.url, after?.url);
     _scalar(out, 'kind', before?.kind.name, after?.kind.name);

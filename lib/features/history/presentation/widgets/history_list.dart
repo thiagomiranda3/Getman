@@ -5,7 +5,7 @@
 // snackbar), and a CLEAR ALL toolbar button (ConfirmDialog, then UNDO
 // snackbar restoring the captured list) — the A1 undo patterns. Tapping an
 // entry opens it as a new (unlinked) tab via AddTab with the stored,
-// templated config under a FRESH config id (withId — chaining rules are
+// templated config under a FRESH config id (withId — local script approvals are
 // keyed by config id, so two opens of the same entry must never alias each
 // other's rules) — re-sending stays free to pick up whatever environment
 // is active. Zero-history first-run shows guidance copy, distinct from the
@@ -245,7 +245,8 @@ class _HistoryListState extends State<HistoryList> {
           config: config,
           onTap: () {
             // Fresh config id per open (copyWith would PIN the stored id):
-            // chaining rules are keyed by config id, so two tabs opened from
+            // local script approvals are keyed by config id, so two tabs
+            // opened from
             // the same history row must not alias each other's rules — same
             // reason TabsBloc._onDuplicateTab mints withId(uuid).
             context.read<TabsBloc>().add(

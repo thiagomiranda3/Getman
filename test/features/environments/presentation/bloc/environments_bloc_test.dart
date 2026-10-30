@@ -6,6 +6,7 @@ import 'package:getman/features/environments/domain/usecases/environments_usecas
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_event.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_state.dart';
+import 'package:getman/features/scripting/domain/entities/script_patch.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockEnvironmentsRepository extends Mock
@@ -16,6 +17,7 @@ void main() {
   late EnvironmentsBloc bloc;
 
   setUpAll(() {
+    registerFallbackValue(ScriptPatch());
     registerFallbackValue(EnvironmentEntity(id: 'fallback', name: 'fallback'));
   });
 
@@ -26,6 +28,12 @@ void main() {
       () => mockRepository.deleteEnvironment(any()),
     ).thenAnswer((_) async {});
     when(() => mockRepository.saveEnvironments(any())).thenAnswer((_) async {});
+    when(
+      () => mockRepository.importEnvironments(any()),
+    ).thenAnswer((_) async {});
+    when(
+      () => mockRepository.applyVariablePatch(any(), any()),
+    ).thenAnswer((_) async {});
     bloc = EnvironmentsBloc(
       getEnvironmentsUseCase: GetEnvironmentsUseCase(mockRepository),
       saveEnvironmentsUseCase: SaveEnvironmentsUseCase(mockRepository),
@@ -182,10 +190,10 @@ void main() {
       final b = EnvironmentEntity(id: 'b', name: 'B');
 
       bloc.add(ImportEnvironments([a, b]));
-      await untilCalled(() => mockRepository.saveEnvironments(any()));
+      await untilCalled(() => mockRepository.importEnvironments(any()));
 
       expect(bloc.state.environments, [a, b]);
-      verify(() => mockRepository.saveEnvironments([a, b])).called(1);
+      verify(() => mockRepository.importEnvironments([a, b])).called(1);
     });
 
     test(
@@ -198,7 +206,7 @@ void main() {
         final imported1 = EnvironmentEntity(id: 'a', name: 'alpha');
         final imported2 = EnvironmentEntity(id: 'd', name: 'Delta');
         bloc.add(ImportEnvironments([imported1, imported2]));
-        await untilCalled(() => mockRepository.saveEnvironments(any()));
+        await untilCalled(() => mockRepository.importEnvironments(any()));
 
         expect(bloc.state.environments.map((e) => e.name).toList(), [
           'alpha',

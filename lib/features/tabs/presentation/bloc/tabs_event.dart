@@ -8,6 +8,7 @@ import 'package:equatable/equatable.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/features/tabs/domain/entities/script_variable_snapshot.dart';
 
 abstract class TabsEvent extends Equatable {
   const TabsEvent();
@@ -125,11 +126,13 @@ class SendRequest extends TabsEvent {
   const SendRequest({
     required this.tabId,
     this.envVars = const {},
+    this.variables,
     this.responseHistoryLimit = 5,
     this.saveLargeResponsesInHistory = true,
   });
   final String tabId;
   final Map<String, String> envVars;
+  final ScriptVariableSnapshot? variables;
 
   /// How many recent responses to retain for time-travel (0 disables history).
   /// Carried on the event (like [envVars]) because the dispatcher reads it from
@@ -143,6 +146,7 @@ class SendRequest extends TabsEvent {
   List<Object?> get props => [
     tabId,
     envVars,
+    variables,
     responseHistoryLimit,
     saveLargeResponsesInHistory,
   ];

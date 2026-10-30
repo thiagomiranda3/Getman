@@ -8,6 +8,7 @@ import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/entities/request_scripts.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 
@@ -313,6 +314,48 @@ class ThreeWayMerge {
     );
 
     return skeleton.copyWith(
+      scripts: RequestScripts(
+        apiVersion: _pick(
+          conflicts,
+          'scripts.apiVersion',
+          (base?.scripts ?? const RequestScripts()).apiVersion,
+          (incoming?.scripts ?? const RequestScripts()).apiVersion,
+          (yours?.scripts ?? const RequestScripts()).apiVersion,
+          (v) => '$v',
+        ),
+        preRequest: _pick(
+          conflicts,
+          'scripts.preRequest',
+          (base?.scripts ?? const RequestScripts()).preRequest,
+          (incoming?.scripts ?? const RequestScripts()).preRequest,
+          (yours?.scripts ?? const RequestScripts()).preRequest,
+          (v) => v,
+        ),
+        postResponse: _pick(
+          conflicts,
+          'scripts.postResponse',
+          (base?.scripts ?? const RequestScripts()).postResponse,
+          (incoming?.scripts ?? const RequestScripts()).postResponse,
+          (yours?.scripts ?? const RequestScripts()).postResponse,
+          (v) => v,
+        ),
+        preRequestEnabled: _pick(
+          conflicts,
+          'scripts.preRequestEnabled',
+          (base?.scripts ?? const RequestScripts()).preRequestEnabled,
+          (incoming?.scripts ?? const RequestScripts()).preRequestEnabled,
+          (yours?.scripts ?? const RequestScripts()).preRequestEnabled,
+          (v) => '$v',
+        ),
+        postResponseEnabled: _pick(
+          conflicts,
+          'scripts.postResponseEnabled',
+          (base?.scripts ?? const RequestScripts()).postResponseEnabled,
+          (incoming?.scripts ?? const RequestScripts()).postResponseEnabled,
+          (yours?.scripts ?? const RequestScripts()).postResponseEnabled,
+          (v) => '$v',
+        ),
+      ),
       method: method,
       url: url,
       headers: headers,

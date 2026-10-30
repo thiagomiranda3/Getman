@@ -30,7 +30,6 @@ import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/ui/widgets/responsive_dialog.dart';
 import 'package:getman/core/ui/widgets/splitter.dart';
 import 'package:getman/core/utils/request_variable_resolver.dart';
-import 'package:getman/features/chaining/presentation/widgets/chaining_write_back_listener.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/command_palette/presentation/widgets/command_palette.dart';
@@ -398,7 +397,7 @@ class _MainScreenState extends State<MainScreen> {
                           .read<SettingsBloc>()
                           .state
                           .settings;
-                      final envVars = RequestVariableResolver.variablesFor(
+                      final variables = RequestVariableResolver.snapshotFor(
                         environments: context
                             .read<EnvironmentsBloc>()
                             .state
@@ -413,7 +412,7 @@ class _MainScreenState extends State<MainScreen> {
                       context.read<TabsBloc>().add(
                         SendRequest(
                           tabId: liveTabs[liveIndex].tabId,
-                          envVars: envVars,
+                          variables: variables,
                           responseHistoryLimit: settings.responseHistoryLimit,
                           saveLargeResponsesInHistory:
                               settings.saveLargeResponsesInHistory,
@@ -516,33 +515,31 @@ class _MainScreenState extends State<MainScreen> {
               },
               child: Focus(
                 focusNode: _mainFocusNode,
-                child: ChainingWriteBackListener(
-                  child: Scaffold(
-                    drawer: context.useDrawerNav
-                        ? const Drawer(child: SideMenu())
-                        : null,
-                    body: Stack(
-                      children: [
-                        if (context.useDrawerNav)
-                          _buildDrawerShell(
-                            context,
-                            theme,
-                            tabsState,
-                            activeIndex,
-                            tabs,
-                          )
-                        else
-                          _buildSplitShell(
-                            context,
-                            theme,
-                            tabsState,
-                            activeIndex,
-                            tabs,
-                            currentSideMenuWidth,
-                          ),
-                        const UpdateGate(),
-                      ],
-                    ),
+                child: Scaffold(
+                  drawer: context.useDrawerNav
+                      ? const Drawer(child: SideMenu())
+                      : null,
+                  body: Stack(
+                    children: [
+                      if (context.useDrawerNav)
+                        _buildDrawerShell(
+                          context,
+                          theme,
+                          tabsState,
+                          activeIndex,
+                          tabs,
+                        )
+                      else
+                        _buildSplitShell(
+                          context,
+                          theme,
+                          tabsState,
+                          activeIndex,
+                          tabs,
+                          currentSideMenuWidth,
+                        ),
+                      const UpdateGate(),
+                    ],
                   ),
                 ),
               ),

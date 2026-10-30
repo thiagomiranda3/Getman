@@ -51,6 +51,19 @@ class CodeGenService {
     String Function(String value) resolve = _identity,
   }) {
     final eff = _effective(config, resolve);
+    final code = _generate(eff, target);
+    if (config.scripts.isEmpty) return code;
+    final comment =
+        target == CodeGenTarget.curl || target == CodeGenTarget.pythonRequests
+        ? '#'
+        : '//';
+    return '$comment $scriptsOmittedWarning\n$code';
+  }
+
+  static const scriptsOmittedWarning =
+      'Scripts are not included in generated code';
+
+  static String _generate(_Effective eff, CodeGenTarget target) {
     switch (target) {
       case CodeGenTarget.curl:
         return _curl(eff);

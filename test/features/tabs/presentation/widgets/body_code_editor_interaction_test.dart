@@ -127,6 +127,32 @@ void main() {
   }
 
   testWidgets(
+    'typing an unquoted field opens suggestions and Tab adds quotes',
+    (tester) async {
+      cleanup(tester);
+      controller.text = '{}';
+      await mount(tester);
+      controller.selection = const CodeLineSelection.collapsed(
+        index: 0,
+        offset: 1,
+      );
+      await tester.pump();
+      await _insert(tester, oldText: '{}', text: 'na', offset: 1);
+      await tester.pump();
+      await tester.pump();
+      expect(controller.text, '{na}');
+      expect(find.text('name').hitTestable(), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(controller.text, '{"name": }');
+      expect(controller.selection.extentOffset, 9);
+      expect(find.text('name').hitTestable(), findsNothing);
+      await tester.pump(const Duration(milliseconds: 500));
+    },
+    variant: TargetPlatformVariant.desktop(),
+  );
+
+  testWidgets(
     'real typing opens suggestions and Tab replaces the key token',
     (
       tester,

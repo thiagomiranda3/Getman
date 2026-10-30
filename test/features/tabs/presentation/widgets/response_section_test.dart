@@ -4,13 +4,13 @@
 // (which wraps it) with a real TabsBloc fed by a mocked repository and use
 // case — the same construction pattern as tabs_bloc_test.dart.
 
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getman/core/domain/entities/assertion_result.dart';
-import 'package:getman/core/domain/entities/extraction_result.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/network/http_response.dart';
@@ -22,9 +22,15 @@ import 'package:getman/features/collections/presentation/bloc/collections_state.
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/history/presentation/bloc/history_event.dart';
 import 'package:getman/features/history/presentation/bloc/history_state.dart';
+import 'package:getman/features/scripting/domain/entities/script_error.dart';
+import 'package:getman/features/scripting/domain/entities/script_error_kind.dart';
+import 'package:getman/features/scripting/domain/entities/script_output.dart';
+import 'package:getman/features/scripting/domain/entities/script_phase.dart';
+import 'package:getman/features/scripting/domain/entities/script_test_result.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/tabs/domain/entities/execute_request_result.dart';
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/entities/response_history_entry.dart';
@@ -755,26 +761,38 @@ void main() {
   // -------------------------------------------------------------------------
   // Test 8: TESTS tab renders assertion results, a summary, and captures
   // -------------------------------------------------------------------------
-  testWidgets('TESTS tab shows assertion results + summary + captures', (
+  testWidgets('TESTS tab shows script test results and summary', (
     tester,
   ) async {
     const tabId = 'tab8';
-    const tab = HttpRequestTabEntity(
+    final tab = HttpRequestTabEntity(
       tabId: tabId,
-      config: HttpRequestConfigEntity(id: tabId),
-      response: HttpResponseEntity(
+      config: const HttpRequestConfigEntity(id: tabId),
+      response: const HttpResponseEntity(
         statusCode: 200,
         body: '{}',
         headers: {},
         durationMs: 5,
       ),
-      assertionResults: [
-        AssertionResult(label: 'status = 200', passed: true, actual: '200'),
-        AssertionResult(label: 'status = 201', passed: false, actual: '200'),
-      ],
-      extractionResults: [
-        ExtractionResult(variable: 'tok', value: 'abc', matched: true),
-      ],
+      scriptExecutionResult: ExecuteRequestResult(
+        postResponse: ScriptOutput(
+          tests: const [
+            ScriptTestResult(
+              id: '1',
+              name: 'status = 200',
+              phase: ScriptPhase.postResponse,
+              passed: true,
+            ),
+            ScriptTestResult(
+              id: '2',
+              name: 'status = 201',
+              phase: ScriptPhase.postResponse,
+              passed: false,
+              message: 'Expected 201',
+            ),
+          ],
+        ),
+      ),
     );
     final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
     addTearDown(bloc.close);
@@ -786,10 +804,10 @@ void main() {
     await tester.tap(find.text('TESTS'));
     await _settleResponseWork(tester);
 
-    expect(find.text('1 / 2 PASSED'), findsOneWidget);
-    expect(find.textContaining('PASS · status = 200'), findsOneWidget);
-    expect(find.textContaining('FAIL · status = 201'), findsOneWidget);
-    expect(find.textContaining('{{tok}} = abc'), findsOneWidget);
+    expect(find.text('1/2 passed'), findsOneWidget);
+    expect(find.textContaining('POST-RESPONSE: status = 200'), findsOneWidget);
+    expect(find.textContaining('POST-RESPONSE: status = 201'), findsOneWidget);
+    expect(find.text('Expected 201'), findsOneWidget);
   });
 
   // -------------------------------------------------------------------------
@@ -875,6 +893,130 @@ void main() {
       find.byKey(const ValueKey('response_pending_indicator')),
       findsNothing,
     );
+  });
+
+  testWidgets('preserves the selected response tab across another send', (
+    tester,
+  ) async {
+    const tabId = 'resend';
+    final tab = _tabWithBody(tabId, 'PREVIOUS').copyWith(executionId: 'first');
+    var state = TabsState(tabs: [tab]);
+    final stream = StreamController<TabsState>.broadcast();
+    addTearDown(stream.close);
+    final bloc = _MockTabsBloc();
+    when(() => bloc.state).thenAnswer((_) => state);
+    when(() => bloc.stream).thenAnswer((_) => stream.stream);
+    final controller = CodeLineEditingController();
+    addTearDown(controller.dispose);
+    await _pump(tester, bloc: bloc, tabId: tabId, controller: controller);
+    await tester.tap(find.text('HEADERS'));
+    await tester.pumpAndSettle();
+    final tabs = DefaultTabController.of(
+      tester.element(find.byType(TabBarView)),
+    );
+    expect(tabs.index, 1);
+
+    final sending = tab.copyWith(
+      executionId: 'second',
+      isSending: true,
+      scriptExecutionPhase: ScriptExecutionPhase.network,
+    );
+    state = TabsState(tabs: [sending]);
+    stream.add(state);
+    await tester.pump();
+    expect(
+      DefaultTabController.of(tester.element(find.byType(TabBarView))).index,
+      1,
+      reason: 'Sending must keep the selected HEADERS tab visible.',
+    );
+    expect(find.text('NO RESPONSE HEADERS').hitTestable(), findsOneWidget);
+
+    state = TabsState(
+      tabs: [
+        sending.copyWith(
+          isSending: false,
+          response: _okResponse(body: 'NEXT'),
+          scriptExecutionPhase: ScriptExecutionPhase.idle,
+          scriptExecutionResult: const ExecuteRequestResult(),
+        ),
+      ],
+    );
+    stream.add(state);
+    await tester.pump();
+    expect(
+      DefaultTabController.of(tester.element(find.byType(TabBarView))),
+      same(tabs),
+      reason:
+          'A successful response must preserve the response tab controller.',
+    );
+    expect(tabs.index, 1);
+    expect(find.text('NO RESPONSE HEADERS').hitTestable(), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('each new script failure opens CONSOLE from selected HEADERS', (
+    tester,
+  ) async {
+    const tabId = 'repeated-script-failure';
+    var tab = _tabWithBody(tabId, 'PREVIOUS');
+    var state = TabsState(tabs: [tab]);
+    final stream = StreamController<TabsState>.broadcast();
+    addTearDown(stream.close);
+    final bloc = _MockTabsBloc();
+    when(() => bloc.state).thenAnswer((_) => state);
+    when(() => bloc.stream).thenAnswer((_) => stream.stream);
+    final controller = CodeLineEditingController();
+    addTearDown(controller.dispose);
+    await _pump(tester, bloc: bloc, tabId: tabId, controller: controller);
+
+    const failure = ExecuteRequestResult(
+      error: ScriptError(
+        kind: ScriptErrorKind.runtime,
+        phase: ScriptPhase.preRequest,
+        message: 'Preparation stopped',
+        line: 2,
+      ),
+    );
+    final diagnostic = find.text(
+      'PRE-REQUEST: runtime at line 2: Preparation stopped',
+    );
+    for (final executionId in ['first-failure', 'second-failure']) {
+      // A user can leave the previous failure's CONSOLE for HEADERS before
+      // retrying; the next failure must reveal its diagnostic again.
+      await tester.tap(find.text('HEADERS'));
+      await tester.pumpAndSettle();
+      expect(find.text('NO RESPONSE HEADERS').hitTestable(), findsOneWidget);
+      expect(diagnostic.hitTestable(), findsNothing);
+
+      tab = tab.copyWith(
+        executionId: executionId,
+        isSending: true,
+        scriptExecutionPhase: ScriptExecutionPhase.preRequest,
+        scriptExecutionResult: null,
+      );
+      state = TabsState(tabs: [tab]);
+      stream.add(state);
+      await tester.pump();
+
+      // The real pipeline emits the failed stage while the send is still
+      // active. Assert this first frame before its final completion emission.
+      tab = tab.copyWith(scriptExecutionResult: failure);
+      state = TabsState(tabs: [tab]);
+      stream.add(state);
+      await tester.pump();
+      expect(diagnostic.hitTestable(), findsOneWidget);
+      expect(find.text('NO RESPONSE HEADERS').hitTestable(), findsNothing);
+
+      tab = tab.copyWith(
+        isSending: false,
+        scriptExecutionPhase: ScriptExecutionPhase.idle,
+      );
+      state = TabsState(tabs: [tab]);
+      stream.add(state);
+      await tester.pump();
+      expect(diagnostic.hitTestable(), findsOneWidget);
+    }
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   // -------------------------------------------------------------------------

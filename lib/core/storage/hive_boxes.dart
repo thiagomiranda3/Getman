@@ -16,7 +16,9 @@ class HiveBoxes {
   static const String collections = 'collections';
   static const String environments = 'environments';
   static const String cookies = 'cookies';
-  static const String requestRules = 'request_rules';
+
+  /// Local content approvals; primitive digests, never shared with a workspace.
+  static const String scriptTrust = 'script_trust';
 
   /// Panel structure (typeId 12). Tab entities stay in [tabs]; this box stores
   /// only `{id, name, orderedTabIds, activeTabId}`. Order + active panel live

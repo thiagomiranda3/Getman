@@ -40,3 +40,19 @@ The tree uses `two_dimensional_scrollables`'s `TreeView` (sole consumer: `collec
 ## Git-friendly workspace mirror
 
 `collections/data/services/workspace_sync_service.dart` mirrors the collections forest to a clean, diff-friendly on-disk tree so it can be tracked by git. Hive stays the source of truth during a session: opening a workspace imports disk → Hive once (`read`), then every mutation debounces a Hive → disk write (`scheduleMirror`). The serializer (`core/utils/workspace/workspace_collection_serializer.dart`) omits response-cache fields and saved examples from the mirrored files. See docs/architecture/git-sync.md for the full git workflow built on top of this mirror.
+
+## Script sharing
+
+Workspace request JSON stores a nonempty `request.scripts` primitive bundle
+(`apiVersion`, `preRequest`, `postResponse`, `preRequestEnabled`,
+`postResponseEnabled`). Sources round-trip verbatim, including disabled sources
+and unknown API versions. Empty bundles are omitted. Trust grants and execution
+results are local and never imported or exported by these serializers.
+
+Postman sharing uses the inert `x-getman-scripts` extension inside `request`;
+Getman JavaScript is never translated into Postman `event` scripts. Import
+preflights every collection, folder and request before constructing the tree.
+A nonempty external `event` aborts the entire import with `Postman scripts are
+not supported` and the offending item path. The import UI therefore dispatches
+no partial collection. Code generation and API-doc export omit scripts and
+surface `Scripts are not included in generated code`; neither evaluates source.

@@ -9,7 +9,7 @@
 #
 # Usage:
 #   bash integration_test/run_macos_watch.sh tabs
-#   bash integration_test/run_macos_watch.sh chaining_rules
+#   bash integration_test/run_macos_watch.sh scripts_ui
 #   E2E_SLOW_MS=1200 bash integration_test/run_macos_watch.sh environments
 #
 # One flow per run. For the full, fast pass use `run_macos.sh` (no args).

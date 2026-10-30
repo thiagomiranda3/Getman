@@ -40,13 +40,14 @@ class HttpRequestConfigAdapter extends TypeAdapter<HttpRequestConfig> {
       disabledHeaderKeys: fields[17] == null
           ? []
           : (fields[17] as List?)?.cast<String>(),
+      scripts: (fields[19] as Map?)?.cast<String, dynamic>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, HttpRequestConfig obj) {
     writer
-      ..writeByte(19)
+      ..writeByte(20)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -84,7 +85,9 @@ class HttpRequestConfigAdapter extends TypeAdapter<HttpRequestConfig> {
       ..writeByte(17)
       ..write(obj.disabledHeaderKeys)
       ..writeByte(18)
-      ..write(obj.sentAt);
+      ..write(obj.sentAt)
+      ..writeByte(19)
+      ..write(obj.scripts);
   }
 
   @override

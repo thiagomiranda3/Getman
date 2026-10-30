@@ -61,20 +61,6 @@ widgets + screens). Shared cross-feature code lives under `lib/core/`. See
 | `lib/core/utils/postman` | Postman v2.1 collection/environment mappers. | `postman_collection_mapper.dart`, `postman_environment_mapper.dart` |
 | `lib/core/utils/workspace` | On-disk git-workspace (de)serialization + picker. | `workspace_collection_serializer.dart`, `workspace_picker.dart`, `workspace_bookmark.dart` |
 
-### `chaining` — no-code post-response assertions + variable extraction
-
-| Path | Purpose |
-|---|---|
-| `lib/features/chaining/data/datasources` | Hive persistence for per-request rules (`request_rules_local_data_source.dart`). |
-| `lib/features/chaining/data/models` | Hive models: `assertion_model.dart` (typeId 8), `extraction_rule_model.dart` (7), `request_rules_model.dart` (9). |
-| `lib/features/chaining/data/repositories` | `request_rules_repository_impl.dart`. |
-| `lib/features/chaining/domain/entities` | `assertion.dart`, `extraction_rule.dart`, `request_rules_entity.dart`. |
-| `lib/features/chaining/domain/logic` | Pure engines: `assertion_engine.dart`, `extraction_engine.dart`, `rules_runner.dart`. |
-| `lib/features/chaining/domain/repositories` | `request_rules_repository.dart` (abstract). |
-| `lib/features/chaining/domain/usecases` | `request_rules_usecases.dart`. |
-| `lib/features/chaining/presentation/bloc` | `rules_bloc.dart` / `rules_event.dart` / `rules_state.dart`. |
-| `lib/features/chaining/presentation/widgets` | RULES tab UI + `chaining_write_back_listener.dart` (writes captures back to the active env). |
-
 ### `collections` — tree of folders/requests, git workspace, imports
 
 | Path | Purpose |
@@ -156,6 +142,17 @@ widgets + screens). Shared cross-feature code lives under `lib/core/`. See
 | `lib/features/realtime/presentation/bloc` | `realtime_bloc.dart` / `realtime_event.dart` / `realtime_state.dart` (per-tab connection + frame log). |
 | `lib/features/realtime/presentation/widgets` | `realtime_panel.dart` (live WS/SSE view; composer WS-only). |
 
+### `scripting` — bounded JavaScript request automation
+
+| Path | Purpose |
+|---|---|
+| `lib/features/scripting/domain/entities` | Immutable script inputs, outputs, patches, errors and resource limits. |
+| `lib/features/scripting/domain/logic` | Cancellation and execution validation without infrastructure. |
+| `lib/features/scripting/domain/repositories` | Runtime execution and local content-trust contracts. |
+| `lib/features/scripting/data/repositories` | Lazy runtime and installation-local content trust. |
+| `lib/features/scripting/data/runtime` | Native isolate and web Worker adapters; JSON-only protocol. |
+| `lib/features/scripting/presentation/widgets` | SCRIPTS editor, trust review, test results and console. |
+
 ### `settings` — single app-wide settings record
 
 | Path | Purpose |
@@ -208,7 +205,6 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | Concept | File(s) |
 |---|---|
 | API docs export (OpenAPI/Markdown) | `lib/core/utils/apidoc/collection_to_api_doc.dart`, `lib/features/collections/presentation/widgets/export_api_docs_dialog.dart` |
-| Assertions (no-code) | `lib/features/chaining/domain/logic/assertion_engine.dart`, `lib/features/chaining/presentation/widgets/assertion_rule_row.dart` |
 | Auth (bearer/basic/api-key) | `lib/core/domain/entities/auth_config.dart`, `lib/core/domain/auth_application.dart`, `lib/features/tabs/presentation/widgets/auth_tab_view.dart` |
 | Auto-update | `lib/features/updates/presentation/update_gate.dart`, `lib/features/updates/presentation/update_decision.dart` |
 | Autocomplete (`{{var}}`) | `lib/core/ui/widgets/variable_autocomplete.dart`, `lib/core/utils/variable_suggestions.dart`, `lib/features/tabs/presentation/widgets/body_code_editor.dart` (request-body caret menu) |
@@ -220,7 +216,6 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | Bulk edit (key/value) | `lib/core/ui/widgets/bulk_kv_editor.dart`, `lib/core/utils/bulk_kv_codec.dart`, `lib/features/tabs/presentation/widgets/bulk_mode_toggle.dart` |
 | Byte size / response size | `lib/core/utils/byte_format.dart` |
 | Cancel request | `lib/core/network/cancel_handle.dart`, `lib/features/tabs/presentation/bloc/request_manager.dart` |
-| Chaining / extraction | `lib/features/chaining/domain/logic/extraction_engine.dart`, `lib/features/chaining/domain/logic/rules_runner.dart` |
 | Closed-tab reopen stack | `lib/features/tabs/presentation/bloc/tabs_bloc.dart` (in-memory LIFO, max 10, never persisted), `lib/core/navigation/intents.dart` (`ReopenClosedTabIntent`) |
 | Code generation (cURL/JS/Python/Go/Java) | `lib/core/utils/code_gen_service.dart`, `lib/features/tabs/presentation/widgets/code_export_dialog.dart` |
 | Collection-scoped variables | `lib/core/utils/request_variable_resolver.dart`, `lib/features/collections/presentation/widgets/collection_variables_dialog.dart` |
@@ -311,7 +306,7 @@ features; follow them to trace an end-to-end behavior.
 3. `lib/features/tabs/domain/usecases/send_request_use_case.dart` — couples the network send with best-effort history recording.
 4. `lib/features/tabs/data/repositories/tabs_repository_impl.dart` — resolves `{{var}}` in URL/params/headers/body directly via `EnvironmentResolver`; `lib/features/tabs/data/request_serializer.dart` handles auth injection + body building (also resolving vars in auth/body values), then the repository calls the network service.
 5. `lib/core/network/network_service.dart` — performs the send with the manual redirect loop; the cookie interceptor (`cookie_interceptor.dart`) runs per hop.
-6. `lib/features/tabs/presentation/bloc/tabs_bloc.dart` — `_recordResponse` stores the response, trims time-travel history, runs chaining rules.
+6. `lib/features/tabs/presentation/bloc/tabs_bloc.dart` — `_recordResponse` stores the response, trims time-travel history, publishes script phase results through ExecuteRequestUseCase.
 7. `lib/features/tabs/presentation/widgets/response_section.dart` (+ `response/` tab bodies) — renders the response.
    - Side branch: `lib/features/history/data/datasources/history_local_data_source.dart` — the use case writes the templated (unresolved) config to history.
 
@@ -348,12 +343,14 @@ features; follow them to trace an end-to-end behavior.
 2. `lib/features/tabs/data/models/panel_model.dart` — persists panels (ids only) to the `panels` box; order/active in `tabs_meta`.
 3. `lib/features/tabs/presentation/widgets/panel_selector.dart` — panel dropdown in the tab strip; `lib/features/home/presentation/screens/main_screen.dart` (`_buildTabBar`) + `lib/features/home/presentation/widgets/request_tab_chip.dart` render the strip; `lib/features/tabs/presentation/widgets/tab_switcher_sheet.dart` is the compact-phone stand-in.
 
-### 7. Chaining (post-response assertions + extraction)
+### 7. JavaScript scripts and confirmed variable captures
 
-1. Response arrives in `lib/features/tabs/presentation/bloc/tabs_bloc.dart` — loads rules via `GetRequestRulesUseCase`.
-2. `lib/features/chaining/domain/logic/rules_runner.dart` — decodes once and runs `lib/features/chaining/domain/logic/assertion_engine.dart` + `lib/features/chaining/domain/logic/extraction_engine.dart`.
-3. `lib/features/chaining/presentation/widgets/chaining_write_back_listener.dart` — writes captured values back into the active environment.
-4. `lib/features/environments/presentation/bloc/environments_bloc.dart` — `MergeEnvironmentVariables` persists the captures.
+1. SEND captures the environment identity and layered variables in `script_variable_snapshot.dart`.
+2. `features/tabs/domain/usecases/execute_request_use_case.dart` checks trust and orchestrates pre-script, HTTP, post-script and confirmed patches.
+3. `features/scripting/data/repositories/script_runtime_repository_impl.dart` lazily loads `assets/scripting/gm_bootstrap.js` and selects the native isolate or web Worker runtime.
+4. `features/scripting/domain/logic/script_output_validator.dart` validates guest output before effects.
+5. `features/environments/data/repositories/environments_repository_impl.dart` serializes patches against live state; its watcher refreshes the editor.
+6. Scripts, TESTS and CONSOLE UI lives in `features/scripting/presentation/widgets`.
 
 ### 8. Postman import / export
 
@@ -368,3 +365,7 @@ features; follow them to trace an end-to-end behavior.
 3. `lib/features/updates/presentation/update_decision.dart` — `isNewerVersion` + `shouldPromptForUpdate`.
 4. `lib/features/updates/presentation/update_controller.dart` — drives dialog state (a `ChangeNotifier`).
 5. `lib/features/updates/presentation/widgets/update_dialog.dart` — Update now / Skip this version / Later (UPDATE NOW: macOS opens the browser; Windows/Linux confirm, download in-app, launch the installer, and quit).
+
+
+
+Script API, quotas and execution semantics: [scripting.md](architecture/scripting.md).

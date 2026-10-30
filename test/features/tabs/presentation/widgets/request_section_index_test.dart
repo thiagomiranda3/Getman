@@ -2,14 +2,14 @@
 // selection (RequestSectionIndex): the section strip selection is shared
 // across request tabs instead of being remembered per tab.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/entities/request_scripts.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
-import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';
-import 'package:getman/features/chaining/domain/usecases/request_rules_usecases.dart';
-import 'package:getman/features/chaining/presentation/bloc/rules_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
@@ -19,6 +19,8 @@ import 'package:getman/features/environments/presentation/bloc/environments_bloc
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/history/presentation/bloc/history_event.dart';
 import 'package:getman/features/history/presentation/bloc/history_state.dart';
+import 'package:getman/features/scripting/domain/repositories/script_trust_repository.dart';
+import 'package:getman/features/scripting/presentation/widgets/scripts_tab_view.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
@@ -30,6 +32,7 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/widgets/auth_tab_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/headers_tab_view.dart';
+import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart';
 import 'package:getman/features/tabs/presentation/widgets/params_tab_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_config_section.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_section_index.dart';
@@ -37,6 +40,26 @@ import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.
 import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
 import 'package:re_editor/re_editor.dart';
+
+class _Trust implements ScriptTrustRepository {
+  final approved = <RequestScripts>[];
+  @override
+  Future<bool> isTrusted(String configId, RequestScripts scripts) async =>
+      approved.contains(scripts);
+  @override
+  Future<void> trust(String configId, RequestScripts scripts) async {
+    approved.add(scripts);
+  }
+}
+
+class _DelayedTrust extends _Trust {
+  final writesGate = Completer<void>();
+  @override
+  Future<void> trust(String configId, RequestScripts scripts) async {
+    await writesGate.future;
+    await super.trust(configId, scripts);
+  }
+}
 
 class _MockTabsRepository extends Mock implements TabsRepository {}
 
@@ -56,17 +79,9 @@ class _MockPutEnvironmentUseCase extends Mock
 class _MockDeleteEnvironmentUseCase extends Mock
     implements DeleteEnvironmentUseCase {}
 
-class _MockGetRequestRulesUseCase extends Mock
-    implements GetRequestRulesUseCase {}
-
-class _MockSaveRequestRulesUseCase extends Mock
-    implements SaveRequestRulesUseCase {}
-
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 
 class _FakePanel extends Fake implements PanelEntity {}
-
-class _FakeRules extends Fake implements RequestRulesEntity {}
 
 class _FakeCollectionsBloc extends Bloc<CollectionsEvent, CollectionsState>
     implements CollectionsBloc {
@@ -99,20 +114,6 @@ EnvironmentsBloc _environmentsBloc() {
     putEnvironmentUseCase: _MockPutEnvironmentUseCase(),
     deleteEnvironmentUseCase: _MockDeleteEnvironmentUseCase(),
   );
-}
-
-RulesBloc _rulesBloc() {
-  final get = _MockGetRequestRulesUseCase();
-  final save = _MockSaveRequestRulesUseCase();
-  when(
-    () => get.call(any()),
-  ).thenAnswer(
-    (inv) async => RequestRulesEntity(
-      configId: inv.positionalArguments.first as String,
-    ),
-  );
-  when(() => save.call(any())).thenAnswer((_) async {});
-  return RulesBloc(getRequestRulesUseCase: get, saveRequestRulesUseCase: save);
 }
 
 /// TabsBloc loaded with two request tabs (t1 active).
@@ -152,7 +153,6 @@ void main() {
   setUpAll(() {
     registerFallbackValue(_FakeConfig());
     registerFallbackValue(_FakePanel());
-    registerFallbackValue(_FakeRules());
     registerFallbackValue(
       const HttpRequestTabEntity(
         tabId: 'fallback',
@@ -180,7 +180,6 @@ void main() {
   /// the shared [RequestSectionIndex] under test.
   Widget host({
     required TabsBloc bloc,
-    required RulesBloc rulesBloc,
     required RequestSectionIndex sectionIndex,
     required Widget child,
   }) {
@@ -200,7 +199,6 @@ void main() {
                 create: (_) => _FakeCollectionsBloc(),
               ),
               BlocProvider<HistoryBloc>(create: (_) => _FakeHistoryBloc()),
-              BlocProvider<RulesBloc>.value(value: rulesBloc),
             ],
             child: child,
           ),
@@ -209,11 +207,412 @@ void main() {
     );
   }
 
+  testWidgets('scripts replaces rules at section four on the first frame', (
+    tester,
+  ) async {
+    final bloc = await _loadedBloc(repository, sendUseCase);
+    addTearDown(bloc.close);
+    final sectionIndex = RequestSectionIndex()..value = 4;
+    addTearDown(sectionIndex.dispose);
+    final body = CodeLineEditingController();
+    final variables = CodeLineEditingController();
+    addTearDown(body.dispose);
+    addTearDown(variables.dispose);
+    await tester.pumpWidget(
+      host(
+        bloc: bloc,
+        sectionIndex: sectionIndex,
+        child: RequestConfigSection(
+          tabId: 't1',
+          bodyController: body,
+          variablesController: variables,
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('SCRIPTS').hitTestable(), findsOneWidget);
+    expect(find.text('PRE-REQUEST').hitTestable(), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('script_editor_pre')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(find.text('RULES'), findsNothing);
+  });
+
+  testWidgets(
+    'offstage script sources sync; selection is inert',
+    (tester) async {
+      final bloc = await _loadedBloc(repository, sendUseCase);
+      addTearDown(bloc.close);
+      final trust = _Trust();
+      final sectionIndex = RequestSectionIndex();
+      addTearDown(sectionIndex.dispose);
+      await tester.pumpWidget(
+        host(
+          bloc: bloc,
+          sectionIndex: sectionIndex,
+          child: RepositoryProvider<ScriptTrustRepository>.value(
+            value: trust,
+            child: const Offstage(child: ScriptsTabView(tabId: 't1')),
+          ),
+        ),
+      );
+      final original = bloc.state.tabs.byId('t1')!;
+      bloc.add(
+        UpdateTab(
+          original.copyWith(
+            config: original.config.copyWith(
+              scripts: const RequestScripts(
+                preRequest: 'console.log("external");',
+                postResponse: 'gm.test("ok", () => {});',
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      final editors = tester
+          .widgetList<JsonCodeEditor>(
+            find.byType(JsonCodeEditor, skipOffstage: false),
+          )
+          .toList();
+      expect(editors.first.controller.text, 'console.log("external");');
+      final before = bloc.state;
+      editors.first.controller.selection = const CodeLineSelection.collapsed(
+        index: 0,
+        offset: 3,
+      );
+      await tester.pump();
+      expect(bloc.state, before);
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(tester.takeException(), isNull);
+      await tester.runAsync(bloc.close);
+    },
+  );
+
+  testWidgets('trust approval reviews both exact sources before approving', (
+    tester,
+  ) async {
+    final bloc = await _loadedBloc(repository, sendUseCase);
+    addTearDown(bloc.close);
+    final trust = _Trust();
+    final sectionIndex = RequestSectionIndex();
+    addTearDown(sectionIndex.dispose);
+    const scripts = RequestScripts(
+      preRequest: 'console.log("pre");',
+      postResponse: 'console.log("post");',
+    );
+    final tab = bloc.state.tabs.byId('t1')!;
+    bloc.add(
+      UpdateTab(tab.copyWith(config: tab.config.copyWith(scripts: scripts))),
+    );
+    await tester.pump();
+    await tester.pumpWidget(
+      host(
+        bloc: bloc,
+        sectionIndex: sectionIndex,
+        child: RepositoryProvider<ScriptTrustRepository>.value(
+          value: trust,
+          child: const ScriptsTabView(tabId: 't1'),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text('TRUST SCRIPTS'));
+    await tester.pump();
+    expect(trust.approved, isEmpty);
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text('console.log("pre");'), findsOneWidget);
+    expect(find.text('console.log("post");'), findsOneWidget);
+    await tester.tap(find.text('TRUST EXACT CONTENT'));
+    await tester.pump();
+    expect(trust.approved, [scripts]);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(bloc.close);
+  });
+
+  testWidgets('JWT snippet inserts into pre-request without sending', (
+    tester,
+  ) async {
+    final bloc = await _loadedBloc(repository, sendUseCase);
+    addTearDown(bloc.close);
+    final trust = _Trust();
+    final sectionIndex = RequestSectionIndex();
+    addTearDown(sectionIndex.dispose);
+    await tester.pumpWidget(
+      host(
+        bloc: bloc,
+        sectionIndex: sectionIndex,
+        child: RepositoryProvider<ScriptTrustRepository>.value(
+          value: trust,
+          child: const ScriptsTabView(tabId: 't1'),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('JWT session payload'), findsOneWidget);
+    await tester.tap(find.text('INSERT'));
+    await tester.pump();
+    final scripts = bloc.state.tabs.byId('t1')!.config.scripts;
+    expect(scripts.preRequest, contains('gm.jwt'));
+    expect(scripts.postResponse, isEmpty);
+    expect(bloc.state.tabs.byId('t1')!.isSending, isFalse);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(bloc.close);
+  });
+
+  testWidgets('enabling an imported script does not approve its source', (
+    tester,
+  ) async {
+    final bloc = await _loadedBloc(repository, sendUseCase);
+    addTearDown(bloc.close);
+    final trust = _Trust();
+    final sectionIndex = RequestSectionIndex();
+    addTearDown(sectionIndex.dispose);
+    final tab = bloc.state.tabs.byId('t1')!;
+    bloc.add(
+      UpdateTab(
+        tab.copyWith(
+          config: tab.config.copyWith(
+            scripts: const RequestScripts(
+              preRequest: 'console.log("imported");',
+              preRequestEnabled: false,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpWidget(
+      host(
+        bloc: bloc,
+        sectionIndex: sectionIndex,
+        child: RepositoryProvider<ScriptTrustRepository>.value(
+          value: trust,
+          child: const ScriptsTabView(tabId: 't1'),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.byType(Switch).first);
+    await tester.pump();
+    expect(
+      bloc.state.tabs.byId('t1')!.config.scripts.preRequestEnabled,
+      isTrue,
+    );
+    expect(trust.approved, isEmpty);
+    expect(find.text('TRUST SCRIPTS'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(bloc.close);
+  });
+
+  testWidgets(
+    'diagnostic location opens post-response source and caret immediately',
+    (tester) async {
+      final bloc = await _loadedBloc(repository, sendUseCase);
+      addTearDown(bloc.close);
+      final trust = _Trust();
+      final sectionIndex = RequestSectionIndex()
+        ..openScript(tabId: 't1', postResponse: true, line: 2, column: 3);
+      addTearDown(sectionIndex.dispose);
+      final tab = bloc.state.tabs.byId('t1')!;
+      bloc.add(
+        UpdateTab(
+          tab.copyWith(
+            config: tab.config.copyWith(
+              scripts: const RequestScripts(
+                postResponse: 'console.log("first");\nconsole.log("second");',
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pumpWidget(
+        host(
+          bloc: bloc,
+          sectionIndex: sectionIndex,
+          child: RepositoryProvider<ScriptTrustRepository>.value(
+            value: trust,
+            child: const ScriptsTabView(tabId: 't1'),
+          ),
+        ),
+      );
+      await tester.pump();
+      final editor = tester.widget<JsonCodeEditor>(
+        find.byKey(const ValueKey('script_editor_post')).hitTestable(),
+      );
+      expect(editor.controller.text, contains('second'));
+      expect(editor.controller.selection.extentIndex, 1);
+      expect(editor.controller.selection.extentOffset, 2);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.runAsync(bloc.close);
+    },
+  );
+
+  testWidgets(
+    'editing pre script cannot approve untouched imported post source',
+    (tester) async {
+      final bloc = await _loadedBloc(repository, sendUseCase);
+      addTearDown(bloc.close);
+      final trust = _Trust();
+      final sectionIndex = RequestSectionIndex();
+      addTearDown(sectionIndex.dispose);
+      final tab = bloc.state.tabs.byId('t1')!;
+      bloc.add(
+        UpdateTab(
+          tab.copyWith(
+            config: tab.config.copyWith(
+              scripts: const RequestScripts(
+                postResponse: 'console.log("unreviewed imported post");',
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pumpWidget(
+        host(
+          bloc: bloc,
+          sectionIndex: sectionIndex,
+          child: RepositoryProvider<ScriptTrustRepository>.value(
+            value: trust,
+            child: const ScriptsTabView(tabId: 't1'),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.text('INSERT'));
+      await tester.pump();
+      await tester.pump();
+      final edited = bloc.state.tabs.byId('t1')!.config.scripts;
+      expect(edited.preRequest, contains('gm.jwt'));
+      expect(edited.postResponse, contains('unreviewed imported post'));
+      expect(trust.approved, isEmpty);
+      expect(await trust.isTrusted('t1', edited), isFalse);
+      await tester.tap(find.text('TRUST SCRIPTS'));
+      await tester.pump();
+      await tester.tap(find.text('TRUST EXACT CONTENT'));
+      await tester.pump();
+      expect(trust.approved, [edited]);
+      final editor = tester.widget<JsonCodeEditor>(
+        find.byKey(const ValueKey('script_editor_pre')),
+      );
+      editor.controller.text =
+          '${edited.preRequest}\nconsole.log("reviewed edit");';
+      await tester.pump();
+      await tester.pump();
+      final nextEdit = bloc.state.tabs.byId('t1')!.config.scripts;
+      expect(await trust.isTrusted('t1', nextEdit), isTrue);
+      expect(find.text('TRUST SCRIPTS'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.runAsync(bloc.close);
+    },
+  );
+
+  testWidgets('rapid local edits inherit pending empty-bundle approval', (
+    tester,
+  ) async {
+    final bloc = await _loadedBloc(repository, sendUseCase);
+    addTearDown(bloc.close);
+    final trust = _DelayedTrust();
+    final sectionIndex = RequestSectionIndex();
+    addTearDown(sectionIndex.dispose);
+    await tester.pumpWidget(
+      host(
+        bloc: bloc,
+        sectionIndex: sectionIndex,
+        child: RepositoryProvider<ScriptTrustRepository>.value(
+          value: trust,
+          child: const ScriptsTabView(tabId: 't1'),
+        ),
+      ),
+    );
+    final editor = tester.widget<JsonCodeEditor>(
+      find.byKey(const ValueKey('script_editor_pre')),
+    );
+    editor.controller.text = 'console.log("first");';
+    editor.controller.text = 'console.log("second");';
+    await tester.pump();
+    await tester.pump();
+    expect(editor.controller.text, 'console.log("second");');
+    expect(trust.approved, isEmpty);
+    trust.writesGate.complete();
+    await tester.pump();
+    await tester.pump();
+    final scripts = bloc.state.tabs.byId('t1')!.config.scripts;
+    expect(scripts.preRequest, 'console.log("second");');
+    expect(await trust.isTrusted('t1', scripts), isTrue);
+    editor.controller.text = 'console.log("third");';
+    await tester.pump();
+    await tester.pump();
+    expect(
+      await trust.isTrusted('t1', bloc.state.tabs.byId('t1')!.config.scripts),
+      isTrue,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(bloc.close);
+  });
+
+  testWidgets('pending local approval cannot approve a later imported source', (
+    tester,
+  ) async {
+    final bloc = await _loadedBloc(repository, sendUseCase);
+    addTearDown(bloc.close);
+    final trust = _DelayedTrust();
+    final sectionIndex = RequestSectionIndex();
+    addTearDown(sectionIndex.dispose);
+    await tester.pumpWidget(
+      host(
+        bloc: bloc,
+        sectionIndex: sectionIndex,
+        child: RepositoryProvider<ScriptTrustRepository>.value(
+          value: trust,
+          child: const ScriptsTabView(tabId: 't1'),
+        ),
+      ),
+    );
+    final editor = tester.widget<JsonCodeEditor>(
+      find.byKey(const ValueKey('script_editor_pre')),
+    );
+    editor.controller.text = 'console.log("first");';
+    editor.controller.text = 'console.log("second");';
+    await tester.pump();
+    await tester.pump();
+    final tab = bloc.state.tabs.byId('t1')!;
+    bloc.add(
+      UpdateTab(
+        tab.copyWith(
+          config: tab.config.copyWith(
+            scripts: tab.config.scripts.copyWith(
+              postResponse: 'console.log("unseen import");',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    editor.controller.text = 'console.log("third");';
+    await tester.pump();
+    await tester.pump();
+    trust.writesGate.complete();
+    await tester.pump();
+    await tester.pump();
+    final scripts = bloc.state.tabs.byId('t1')!.config.scripts;
+    expect(scripts.preRequest, 'console.log("third");');
+    expect(scripts.postResponse, contains('unseen import'));
+    expect(await trust.isTrusted('t1', scripts), isFalse);
+    expect(trust.approved.every((s) => s.postResponse.isEmpty), isTrue);
+    expect(find.text('TRUST SCRIPTS'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(bloc.close);
+  });
+
   testWidgets('tapping a section writes the shared index', (tester) async {
     final bloc = await _loadedBloc(repository, sendUseCase);
     addTearDown(bloc.close);
-    final rulesBloc = _rulesBloc();
-    addTearDown(rulesBloc.close);
     final sectionIndex = RequestSectionIndex();
     addTearDown(sectionIndex.dispose);
     final bodyController = CodeLineEditingController();
@@ -224,7 +623,6 @@ void main() {
     await tester.pumpWidget(
       host(
         bloc: bloc,
-        rulesBloc: rulesBloc,
         sectionIndex: sectionIndex,
         child: RequestConfigSection(
           tabId: 't1',
@@ -247,8 +645,6 @@ void main() {
   ) async {
     final bloc = await _loadedBloc(repository, sendUseCase);
     addTearDown(bloc.close);
-    final rulesBloc = _rulesBloc();
-    addTearDown(rulesBloc.close);
     // As if HEADERS was picked in some other request tab earlier.
     final sectionIndex = RequestSectionIndex()..value = 2;
     addTearDown(sectionIndex.dispose);
@@ -260,7 +656,6 @@ void main() {
     await tester.pumpWidget(
       host(
         bloc: bloc,
-        rulesBloc: rulesBloc,
         sectionIndex: sectionIndex,
         child: RequestConfigSection(
           tabId: 't2',
@@ -280,8 +675,6 @@ void main() {
   ) async {
     final bloc = await _loadedBloc(repository, sendUseCase);
     addTearDown(bloc.close);
-    final rulesBloc = _rulesBloc();
-    addTearDown(rulesBloc.close);
     final sectionIndex = RequestSectionIndex();
     addTearDown(sectionIndex.dispose);
     // Separate controllers per section: two JsonCodeEditors must not share
@@ -299,7 +692,6 @@ void main() {
     // is on stage.
     Widget stack({required bool showFirst}) => host(
       bloc: bloc,
-      rulesBloc: rulesBloc,
       sectionIndex: sectionIndex,
       child: Stack(
         children: [
@@ -376,8 +768,6 @@ void main() {
   ) async {
     final bloc = await _loadedBloc(repository, sendUseCase);
     addTearDown(bloc.close);
-    final rulesBloc = _rulesBloc();
-    addTearDown(rulesBloc.close);
     final sectionIndex = RequestSectionIndex();
     addTearDown(sectionIndex.dispose);
     final bodyController = CodeLineEditingController();
@@ -390,7 +780,6 @@ void main() {
     await tester.pumpWidget(
       host(
         bloc: bloc,
-        rulesBloc: rulesBloc,
         sectionIndex: sectionIndex,
         child: UnifiedRequestPanel(
           tabId: 't1',

@@ -6,6 +6,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/branded_tab_bar.dart';
 import 'package:getman/core/utils/byte_format.dart';
+import 'package:getman/features/scripting/presentation/widgets/script_console_view.dart';
+import 'package:getman/features/tabs/domain/entities/execute_request_result.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
@@ -13,7 +15,6 @@ import 'package:getman/features/tabs/presentation/widgets/response/response_body
 import 'package:getman/features/tabs/presentation/widgets/response/response_cookies_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_headers_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/response_history_timeline.dart';
-import 'package:getman/features/tabs/presentation/widgets/response/response_tests_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/unified_request_panel.dart'
     show UnifiedRequestPanel;
 import 'package:re_editor/re_editor.dart';
@@ -46,7 +47,9 @@ class ResponseSection extends StatelessWidget {
         final p = prev.tabs.byId(tabId);
         final n = next.tabs.byId(tabId);
         if (p == null || n == null) return true;
-        return p.isSending != n.isSending ||
+        return p.scriptExecutionResult != n.scriptExecutionResult ||
+            p.scriptExecutionPhase != n.scriptExecutionPhase ||
+            p.isSending != n.isSending ||
             p.response?.statusCode != n.response?.statusCode ||
             p.response?.durationMs != n.response?.durationMs ||
             p.response?.body.length != n.response?.body.length ||
@@ -60,10 +63,21 @@ class ResponseSection extends StatelessWidget {
         if (tab == null) return const SizedBox.shrink();
 
         final response = tab.response;
-        if (tab.isSending && response == null) {
-          return context.appComponents.pendingIndicator(context);
+        if (tab.isSending &&
+            response == null &&
+            tab.scriptExecutionResult == null) {
+          return Column(
+            children: [
+              Text(switch (tab.scriptExecutionPhase) {
+                ScriptExecutionPhase.preRequest => 'RUNNING PRE-REQUEST',
+                ScriptExecutionPhase.postResponse => 'RUNNING POST-RESPONSE',
+                _ => 'SENDING',
+              }),
+              Expanded(child: context.appComponents.pendingIndicator(context)),
+            ],
+          );
         }
-        if (response == null) {
+        if (response == null && tab.scriptExecutionResult == null) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -93,7 +107,13 @@ class ResponseSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (showMetadata)
+            if (tab.isSending)
+              Text(switch (tab.scriptExecutionPhase) {
+                ScriptExecutionPhase.preRequest => 'RUNNING PRE-REQUEST',
+                ScriptExecutionPhase.postResponse => 'RUNNING POST-RESPONSE',
+                _ => 'SENDING',
+              }),
+            if (showMetadata && response != null)
               Padding(
                 padding: EdgeInsets.only(bottom: layout.isCompact ? 8.0 : 12.0),
                 child: Wrap(
@@ -124,11 +144,26 @@ class ResponseSection extends StatelessWidget {
               ),
             Expanded(
               child: DefaultTabController(
-                length: 4,
+                // Preserve the selected tab on ordinary sends; a new script
+                // failure still opens its diagnostic on the first frame.
+                key: tab.scriptExecutionResult?.error == null
+                    ? null
+                    : ValueKey((
+                        tab.executionId,
+                        tab.scriptExecutionResult?.error,
+                      )),
+                initialIndex: tab.scriptExecutionResult?.error != null ? 4 : 0,
+                length: 5,
                 child: Column(
                   children: [
                     const BrandedTabBar(
-                      labels: ['BODY', 'HEADERS', 'COOKIES', 'TESTS'],
+                      labels: [
+                        'BODY',
+                        'HEADERS',
+                        'COOKIES',
+                        'TESTS',
+                        'CONSOLE',
+                      ],
                       tabKeyPrefix: 'resptab',
                     ),
                     Expanded(
@@ -141,13 +176,28 @@ class ResponseSection extends StatelessWidget {
                           context,
                           child: TabBarView(
                             children: [
-                              ResponseBodyView(
-                                tabId: tabId,
-                                responseController: responseController,
-                              ),
+                              if (response == null)
+                                const Center(child: Text('No HTTP response'))
+                              else
+                                ResponseBodyView(
+                                  tabId: tabId,
+                                  responseController: responseController,
+                                ),
                               ResponseHeadersView(tabId: tabId),
                               ResponseCookiesView(tabId: tabId),
-                              ResponseTestsView(tabId: tabId),
+                              ScriptTestsView(
+                                result:
+                                    tab.scriptExecutionResult ??
+                                    const ExecuteRequestResult(),
+                                secretValues: tab.scriptSecretValues,
+                              ),
+                              ScriptConsoleView(
+                                tabId: tabId,
+                                result:
+                                    tab.scriptExecutionResult ??
+                                    const ExecuteRequestResult(),
+                                secretValues: tab.scriptSecretValues,
+                              ),
                             ],
                           ),
                         ),

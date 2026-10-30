@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/failures.dart';
+import 'package:getman/core/network/cancel_handle.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/features/history/domain/usecases/history_usecases.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
@@ -385,4 +388,23 @@ void main() {
       expect(recorded.responseBody, kResponseBodyTooLargePlaceholder);
     });
   });
+  test(
+    'cancel during settings await prevents history write admission',
+    () async {
+      stubSendSuccess();
+      final settingsPending = Completer<SettingsEntity>();
+      final settingsStarted = Completer<void>();
+      when(() => getSettings.call()).thenAnswer((_) {
+        settingsStarted.complete();
+        return settingsPending.future;
+      });
+      final handle = NetworkCancelHandle();
+      final pending = useCase(config: config, cancelHandle: handle);
+      await settingsStarted.future;
+      handle.cancel();
+      settingsPending.complete(const SettingsEntity());
+      await pending;
+      verifyNever(() => addToHistory.call(any(), any()));
+    },
+  );
 }

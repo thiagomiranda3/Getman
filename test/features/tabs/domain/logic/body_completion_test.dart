@@ -28,6 +28,41 @@ String complete(String marked, String name, {bool explicit = false}) {
 
 void main() {
   group('JSON property completion', () {
+    test('automatically completes unquoted property prefixes', () {
+      final result = target('{sess|}')!;
+      expect(result.kind, BodyCompletionKind.field);
+      expect(result.query, 'sess');
+      expect(complete('{sess|}', 'sessionId'), '{"sessionId": }');
+      expect(complete('{sess|', 'sessionId'), '{"sessionId": ');
+    });
+    test(
+      'unquoted completion preserves suffix boundaries and existing values',
+      () {
+        expect(
+          complete('{sess|ion : "value"}', 'sessionId'),
+          '{"sessionId" : "value"}',
+        );
+        expect(
+          complete('{sess|": 42}', 'sessionId'),
+          '{"sessionId": 42}',
+        );
+        expect(complete('{sess|"}', 'sessionId'), '{"sessionId": }');
+      },
+    );
+    test('finds unquoted prefixes in nested and multiline property slots', () {
+      expect(
+        complete('{"items": [{"id": 1, sess|}]}', 'sessionId'),
+        '{"items": [{"id": 1, "sessionId": }]}',
+      );
+      expect(
+        complete('{\n  sess|: 42\n}', 'sessionId'),
+        '{\n  "sessionId": 42\n}',
+      );
+      expect(complete('{sessã|}', 'sessão'), '{"sessão": }');
+    });
+    test('escapes selected fields when replacing an unquoted prefix', () {
+      expect(complete('{a|}', 'a"b\\c\n'), r'{"a\"b\\c\n": }');
+    });
     test(
       'replaces the entire key while preserving existing colon and value',
       () {
@@ -70,6 +105,9 @@ void main() {
       // Suggestions distinguish property keys from values by syntax.
       for (final input in [
         '{"x":"na|"}',
+        '{"x":na|}',
+        '[na|]',
+        'na|',
         '{"x": |}',
         '["na|"]',
         '{"x":tru|e}',
@@ -80,6 +118,11 @@ void main() {
     });
     test('rejects malformed or ambiguous object syntax', () {
       for (final input in [
+        '{"x": 1 na|}',
+        '{previous: 1, na|}',
+        "{'na|}",
+        '{//na|}',
+        r'{\na|}',
         '{"x" "na|"}',
         '{"x": 1 "na|"}',
         '{["na|"}',

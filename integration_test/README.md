@@ -28,6 +28,13 @@ bash integration_test/run_macos.sh
 This runs `all_flows_test.dart`, an aggregator that composes every flow into a
 single entry point. One build (~12-15s), then each case takes ~1s.
 
+The macOS runners use a bounded watchdog and, when available, `caffeinate -di`
+to prevent display and idle sleep for the test process. No system power setting
+is changed. The UI harness restores its test window if macOS marks it hidden;
+Flutter's live frame waits otherwise stop progressing. This visibility observer
+is removed before test cleanup, and native reactivation exists only in debug
+builds. Keep the test window available while running graphical tests.
+
 Run a single flow while developing it (rebuilds, but isolates one flow):
 
 ```bash
@@ -51,7 +58,7 @@ strand it on the "Test starting…" stub. So watching just needs a **single flow
 
 ```bash
 bash integration_test/run_macos_watch.sh tabs            # one flow, slow, visible
-bash integration_test/run_macos_watch.sh chaining_rules
+bash integration_test/run_macos_watch.sh scripts_ui
 E2E_SLOW_MS=1200 bash integration_test/run_macos_watch.sh environments
 ```
 
@@ -123,7 +130,9 @@ integration_test/
     history_test.dart               # send → lands in HISTORY → re-send
     collections_test.dart           # save request / create folder / delete via menu
     environments_test.dart          # create env + variable → active → resolves on send
-    chaining_rules_test.dart        # assertion pass/fail + extraction capture in TESTS
+    scripts_jwt_test.dart           # real HTTP/Hive/QuickJS chaining, JWT and failures
+    scripts_ui_test.dart            # author scripts and inspect TESTS/CONSOLE
+    scripts_limits_test.dart        # real runtime limits, cancellation and recovery
     cookies_test.dart               # Set-Cookie → response COOKIES + jar manager + delete
     realtime_ws_test.dart           # WS connect/send/echo/disconnect (mock echo server)
     realtime_sse_test.dart          # SSE connect → streamed events (mock event-stream)
@@ -144,7 +153,6 @@ integration_test/
     saved_examples_test.dart        # capture / open-unlinked / rename / delete (M10)
     body_types_test.dart            # switch types, urlencoded send, beautify
     request_config_deep_test.dart   # bulk-edit params + headers
-    chaining_deep_test.dart         # JSONPath/header/contains + extraction write-back
     realtime_deep_test.dart         # WS broadcast, multi-message, multi-event SSE
     history_deep_test.dart          # search filter + re-send as tab
     command_palette_deep_test.dart  # jump to request/env + arrow-key nav
@@ -215,3 +223,41 @@ verbatim UI labels; add a new key in `lib/` only when there's no stable anchor.
 See [`BACKLOG.md`](BACKLOG.md) for the full list of not-yet-automated coverage
 (command palette, saved examples, drag-and-drop, deeper settings/error states,
 …) with a suggested approach per item.
+
+## JavaScript corpus and real runtime journeys
+
+The checked-in `fixtures/scripts/*.js` corpus is shared by the native and Chrome
+harnesses; `manifest.json` records each phase, input and expected outcome. These
+fixtures are test-only and are not release assets.
+
+```bash
+# Production QuickJS bridge, repositories, temporary Hive and local Dio server.
+fvm flutter test test/scripts_pipeline_integration_test.dart
+
+# One app build: HTTP journeys, persistence/trust, cancellation, quotas and UI.
+bash integration_test/run_scripts_macos.sh
+
+# Actual Flutter web integrationDriver + ChromeDriver, not a unit Chrome test.
+bash integration_test/run_scripts_web.sh
+```
+
+The macOS runner hosts the corpus over localhost because the sandboxed app
+cannot read files from the checkout. Both runners stop their fixture server on
+exit and enforce an independent process watchdog. Set
+`E2E_WATCHDOG_SECONDS` to override the default 240 seconds (the full macOS suite
+uses 1800 seconds). Native profiles use isolated temporary directories; the web
+runner starts a disposable ChromeDriver session and a random Flutter origin.
+
+The web runner needs Chrome and a compatible `chromedriver` on `PATH`. It
+installs real PDF.js 4.6.82 into a temporary harness directory before starting
+the browser, to satisfy the existing pdfx plugin startup requirement. Its EXIT
+trap restores the original `web/index.html`, removes the temporary files and
+stops ChromeDriver and the local server. Browser test traffic uses localhost.
+
+On Xcode versions that reject the project's macOS 10.15 deployment target, use
+a temporary build override without changing the product's target:
+
+```bash
+printf 'MACOSX_DEPLOYMENT_TARGET = 12.0\n' > /tmp/getman-e2e.xcconfig
+XCODE_XCCONFIG_FILE=/tmp/getman-e2e.xcconfig bash integration_test/run_scripts_macos.sh
+```

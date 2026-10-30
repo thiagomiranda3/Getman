@@ -1,0 +1,1 @@
+{"private":true,"type":"module","scripts":{"build":"node build.mjs"},"dependencies":{"quickjs-emscripten-core":"0.31.0","@jitl/quickjs-wasmfile-release-sync":"0.31.0"},"devDependencies":{"esbuild":"0.25.12"}}

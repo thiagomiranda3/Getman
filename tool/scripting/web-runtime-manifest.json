@@ -1,0 +1,8 @@
+{
+  "quickjsEmscripten": "0.31.0",
+  "esbuild": "0.25.12",
+  "hashes": {
+    "quickjs_worker.js": "20fb5c43c43bfd245a67acb6049128985eb4457ffbed154760f82917210f74bd",
+    "emscripten-module.wasm": "0c031dd404df00f2d1ed9491a6590d014e88a50424996e5fd70feff1c931c045"
+  }
+}

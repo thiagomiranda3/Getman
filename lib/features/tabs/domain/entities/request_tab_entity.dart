@@ -7,10 +7,9 @@
 // viewedHistoryEntryId back to null (vs. leaving them unchanged).
 import 'package:collection/collection.dart';
 import 'package:equatable/equatable.dart';
-import 'package:getman/core/domain/entities/assertion_result.dart';
-import 'package:getman/core/domain/entities/extraction_result.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/http_response.dart';
+import 'package:getman/features/tabs/domain/entities/execute_request_result.dart';
 import 'package:getman/features/tabs/domain/entities/response_history_entry.dart';
 
 // Sentinel used by copyWith to distinguish "not provided" from "explicitly
@@ -36,11 +35,13 @@ class HttpRequestTabEntity extends Equatable {
     required this.config,
     required this.tabId,
     this.response,
+    this.executionId,
+    this.scriptExecutionPhase = ScriptExecutionPhase.idle,
+    this.scriptExecutionResult,
+    this.scriptSecretValues = const {},
     this.isSending = false,
     this.collectionNodeId,
     this.collectionName,
-    this.extractionResults = const [],
-    this.assertionResults = const [],
     this.responseHistory = const [],
     this.viewedHistoryEntryId,
   });
@@ -52,14 +53,13 @@ class HttpRequestTabEntity extends Equatable {
   /// [responseHistory] entry without mutating the history.
   final HttpResponseEntity? response;
   final bool isSending;
+  final String? executionId;
+  final ScriptExecutionPhase scriptExecutionPhase;
+  final ExecuteRequestResult? scriptExecutionResult;
+  final Set<String> scriptSecretValues;
   final String? collectionNodeId;
   final String? collectionName;
   final String tabId;
-
-  /// Transient results from the last send's extraction rules / assertions.
-  /// Not persisted (recomputed on each send); excluded from the Hive model.
-  final List<ExtractionResult> extractionResults;
-  final List<AssertionResult> assertionResults;
 
   /// Recent responses for time-travel, newest-first. Capped to the user's
   /// `responseHistoryLimit`. The head mirrors [response] after a fresh send.
@@ -78,11 +78,13 @@ class HttpRequestTabEntity extends Equatable {
     HttpRequestConfigEntity? config,
     Object? response = _unset,
     bool? isSending,
+    Object? executionId = _unset,
+    ScriptExecutionPhase? scriptExecutionPhase,
+    Object? scriptExecutionResult = _unset,
+    Set<String>? scriptSecretValues,
     Object? collectionNodeId = _unset,
     Object? collectionName = _unset,
     String? tabId,
-    List<ExtractionResult>? extractionResults,
-    List<AssertionResult>? assertionResults,
     List<ResponseHistoryEntry>? responseHistory,
     Object? viewedHistoryEntryId = _unset,
   }) {
@@ -92,6 +94,14 @@ class HttpRequestTabEntity extends Equatable {
           ? this.response
           : response as HttpResponseEntity?,
       isSending: isSending ?? this.isSending,
+      executionId: identical(executionId, _unset)
+          ? this.executionId
+          : executionId as String?,
+      scriptExecutionPhase: scriptExecutionPhase ?? this.scriptExecutionPhase,
+      scriptSecretValues: scriptSecretValues ?? this.scriptSecretValues,
+      scriptExecutionResult: identical(scriptExecutionResult, _unset)
+          ? this.scriptExecutionResult
+          : scriptExecutionResult as ExecuteRequestResult?,
       collectionNodeId: identical(collectionNodeId, _unset)
           ? this.collectionNodeId
           : collectionNodeId as String?,
@@ -99,8 +109,6 @@ class HttpRequestTabEntity extends Equatable {
           ? this.collectionName
           : collectionName as String?,
       tabId: tabId ?? this.tabId,
-      extractionResults: extractionResults ?? this.extractionResults,
-      assertionResults: assertionResults ?? this.assertionResults,
       responseHistory: responseHistory ?? this.responseHistory,
       viewedHistoryEntryId: identical(viewedHistoryEntryId, _unset)
           ? this.viewedHistoryEntryId
@@ -113,11 +121,13 @@ class HttpRequestTabEntity extends Equatable {
     config,
     response,
     isSending,
+    executionId,
+    scriptExecutionPhase,
+    scriptExecutionResult,
+    scriptSecretValues,
     collectionNodeId,
     collectionName,
     tabId,
-    extractionResults,
-    assertionResults,
     responseHistory,
     viewedHistoryEntryId,
   ];

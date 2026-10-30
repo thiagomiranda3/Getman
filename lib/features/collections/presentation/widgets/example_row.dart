@@ -3,7 +3,7 @@
 // response shown; the trailing menu renames or deletes the example.
 //
 // Gotcha: the opened tab gets a fresh config id (via config.withId), not
-// the saved request's id — chaining rules (assertions/extractions) are
+// the saved request's id — local script approvals are
 // keyed by config id, so reusing the original id would silently alias an
 // "Extract to {{var}}" or a re-send onto the original saved request (D3).
 import 'package:flutter/material.dart';
@@ -56,7 +56,7 @@ class _ExampleRowState extends State<ExampleRow> {
         : null;
     // Opened unlinked (no collectionNodeId) so editing/re-sending a snapshot
     // never overwrites the saved request — AND with a fresh config id (mirrors
-    // TabsBloc._onDuplicateTab): chaining rules (assertions/extractions) and
+    // TabsBloc._onDuplicateTab): local script approvals and
     // rule-runs are keyed by config id, so reusing the saved request's id
     // would silently alias its rules — "Extract to {{var}}" from this tab
     // would add a rule to the ORIGINAL saved request, and re-sending this tab

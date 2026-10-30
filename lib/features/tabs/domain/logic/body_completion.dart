@@ -68,10 +68,10 @@ class BodyCompletionTarget extends Equatable {
 
 /// Detects suggestions at [caret] without parsing or rewriting the whole body.
 ///
-/// Bare property slots require explicit activation; quoted prefixes and open
-/// `{{variable}}` tokens activate automatically. With [fieldsEnabled] false,
-/// explicit activation inserts variables in arbitrary RAW/GraphQL text. Bodies
-/// larger than 1 Mi UTF-16 units are skipped to bound synchronous editor work.
+/// Empty property slots require explicit activation; bare/quoted prefixes and
+/// open `{{variable}}` tokens activate automatically. With [fieldsEnabled]
+/// false, explicit activation inserts variables in arbitrary RAW/GraphQL text.
+/// Bodies larger than 1 Mi UTF-16 units are skipped to bound editor work.
 BodyCompletionTarget? detectBodyCompletion(
   String text,
   int caret, {
@@ -202,10 +202,34 @@ class _JsonContext {
         index++;
         continue;
       }
+      if (slot == _Slot.key) return _bareKey();
       if (slot != _Slot.value || !_primitive()) return null;
       if (index >= caret) return explicit ? _emptyVariable(caret) : null;
     }
     return null;
+  }
+
+  BodyCompletionTarget? _bareKey() {
+    final start = index;
+    while (index < text.length && _bareKeyUnit(text.codeUnitAt(index))) {
+      index++;
+    }
+    if (caret <= start || caret > index) return null;
+    final prefix = text.substring(start, caret);
+    // A closing quote may remain after deleting an opening quote. Include it
+    // in the replacement, just as _string includes paired quotes.
+    if (index < text.length && text.codeUnitAt(index) == 34) index++;
+    var next = index;
+    while (next < text.length && _whitespace(text.codeUnitAt(next))) {
+      next++;
+    }
+    return BodyCompletionTarget(
+      kind: BodyCompletionKind.field,
+      query: prefix,
+      replaceStart: start,
+      replaceEnd: index,
+      appendColon: next == text.length || text.codeUnitAt(next) != 58,
+    );
   }
 
   BodyCompletionTarget? _atBoundary() {
@@ -314,6 +338,16 @@ class _JsonContext {
 
 bool _whitespace(int unit) =>
     unit == 32 || unit == 9 || unit == 10 || unit == 13;
+
+// JSON separators, quotes, escapes and comment markers are not bare key text.
+// Keep Unicode and punctuation such as '_'/'-' so dictionary prefixes need
+// not be valid JavaScript identifiers. Acceptance always JSON-encodes the key.
+bool _bareKeyUnit(int unit) =>
+    unit > 32 &&
+    switch (unit) {
+      34 || 39 || 44 || 47 || 58 || 91 || 92 || 93 || 123 || 125 => false,
+      _ => true,
+    };
 
 String? _decodeString(String token) {
   try {

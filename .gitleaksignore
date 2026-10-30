@@ -1,0 +1,7 @@
+# Reviewed synthetic/public values only; every other finding remains actionable.
+# Unsigned JWT header (alg:none), composed with a synthetic session and dummy sig
+# in the hermetic local HTTP test fixture. This is not a usable credential.
+9bc6da4a3ccef104caa546ee9a058bbec92cf6c0:integration_test/support/scripts_web_server.py:generic-api-key:10
+# SHA-256 of the checked-in QuickJS builtin-iterator-zip-keyed.h source bytes,
+# independently recomputed and matched to the runtime integrity manifest.
+9bc6da4a3ccef104caa546ee9a058bbec92cf6c0:tool/scripting/runtime-manifest.json:generic-api-key:14

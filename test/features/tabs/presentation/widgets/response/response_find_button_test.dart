@@ -6,9 +6,6 @@ import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/theme/theme_ids.dart';
 import 'package:getman/core/theme/theme_registry.dart';
-import 'package:getman/features/chaining/presentation/bloc/rules_bloc.dart';
-import 'package:getman/features/chaining/presentation/bloc/rules_event.dart';
-import 'package:getman/features/chaining/presentation/bloc/rules_state.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
@@ -57,10 +54,6 @@ class _FakeSettingsBloc extends Bloc<SettingsEvent, SettingsState>
   _FakeSettingsBloc(super.initialState);
 }
 
-class _FakeRulesBloc extends Bloc<RulesEvent, RulesState> implements RulesBloc {
-  _FakeRulesBloc() : super(const RulesState());
-}
-
 const _tabId = 'tab-find-button';
 
 Future<void> _pump(WidgetTester tester, {required String body}) async {
@@ -94,7 +87,6 @@ Future<void> _pump(WidgetTester tester, {required String body}) async {
         BlocProvider<SettingsBloc>(
           create: (_) => _FakeSettingsBloc(SettingsState.initial()),
         ),
-        BlocProvider<RulesBloc>(create: (_) => _FakeRulesBloc()),
       ],
       child: MaterialApp(
         theme: resolveTheme(kClassicThemeId)(

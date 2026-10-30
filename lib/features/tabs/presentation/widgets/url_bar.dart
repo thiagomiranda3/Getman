@@ -134,7 +134,17 @@ class _UrlBarState extends State<UrlBar> {
     final settings = context.read<SettingsBloc>().state.settings;
     return SendRequest(
       tabId: tabId,
-      envVars: _activeVariables(context),
+      variables: RequestVariableResolver.snapshotFor(
+        environments: context.read<EnvironmentsBloc>().state.environments,
+        activeEnvironmentId: settings.activeEnvironmentId,
+        collections: context.read<CollectionsBloc>().state.collections,
+        collectionNodeId: context
+            .read<TabsBloc>()
+            .state
+            .tabs
+            .byId(tabId)
+            ?.collectionNodeId,
+      ),
       responseHistoryLimit: settings.responseHistoryLimit,
       saveLargeResponsesInHistory: settings.saveLargeResponsesInHistory,
     );

@@ -35,7 +35,12 @@ class SendRequestUseCase {
     required HttpRequestConfigEntity config,
     Map<String, String> envVars = const {},
     NetworkCancelHandle? cancelHandle,
+    HttpRequestConfigEntity? historyConfig,
+    bool Function()? canRecordHistory,
   }) async {
+    bool admitted() =>
+        !(cancelHandle?.isCancelled ?? false) &&
+        (canRecordHistory?.call() ?? true);
     try {
       final response = await traceAsync(
         'send.request',
@@ -47,12 +52,16 @@ class SendRequestUseCase {
       );
       await traceAsync(
         'send.recordHistory',
-        () => _record(config, response: response),
+        () => _record(
+          historyConfig ?? config,
+          response: response,
+          admitted: admitted,
+        ),
       );
       return response;
     } on NetworkFailure catch (f) {
       if (f.type != NetworkFailureType.cancelled) {
-        await _record(config, failure: f);
+        await _record(historyConfig ?? config, failure: f, admitted: admitted);
       }
       rethrow;
     }
@@ -62,9 +71,12 @@ class SendRequestUseCase {
     HttpRequestConfigEntity config, {
     HttpResponseEntity? response,
     NetworkFailure? failure,
+    bool Function()? admitted,
   }) async {
     try {
+      if (!(admitted?.call() ?? true)) return;
       final settings = await getSettingsUseCase();
+      if (!(admitted?.call() ?? true)) return;
       final rawBody = response?.body ?? failure?.message;
       final cappedBody =
           rawBody != null && rawBody.length > kMaxPersistedResponseBodyChars

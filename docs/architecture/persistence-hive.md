@@ -9,15 +9,15 @@ Persistence is `hive_ce` + `hive_ce_flutter` (the community Hive fork — binary
 | typeId | Model | Box name | Notes |
 |---|---|---|---|
 | 0 | `SettingsModel` | `settings` | Single key `'current'`; loaded synchronously in `main()` |
-| 1 | `HttpRequestConfig` | `history` | Shared between history and collection nodes; `List<ParkedParamModel>? disabledParams` at `HiveField(16)` + `List<String>? disabledHeaderKeys` at `HiveField(17)` (B1 per-row disable); `DateTime? sentAt` at `HiveField(18)` (nullable — stamped by the history repository at send time, drives the HISTORY day-group headers, excluded from the dedup `==`/`hashCode`) (next free: 19) |
+| 1 | `HttpRequestConfig` | `history` | Shared between history and collection nodes; `List<ParkedParamModel>? disabledParams` at `HiveField(16)` + `List<String>? disabledHeaderKeys` at `HiveField(17)` (B1 per-row disable); `DateTime? sentAt` at `HiveField(18)` (nullable — stamped by the history repository at send time, drives the HISTORY day-group headers, excluded from the dedup `==`/`hashCode`) `Map<String, dynamic>? scripts` at `HiveField(19)` stores only API version, source and enablement for each stage; missing maps read as empty v1 bundles, unknown versions are preserved (next free: 20) |
 | 2 | `HttpRequestTabModel` | `tabs` | Tab state including response cache; `List<StoredResponseModel> responseHistory` at `HiveField(9)` — time-travel history (next free: 10) |
 | 3 | `CollectionNode` | `collections` | Nested (children list stored as `HiveField(3)`); `String? description` at `HiveField(6)`; `List<SavedExampleModel> examples` at `HiveField(7)`; `Map<String,String> variables` at `HiveField(8)`; `List<String> secretKeys` at `HiveField(9)` (next free: 10) |
 | 4 | `EnvironmentModel` | `environments` | Flat list; `variables` is `Map<String, String>` at `HiveField(2)`; `List<String> secretKeys` at `HiveField(3)` (next free: 4) |
 | 5 | `MultipartFieldModel` | (embedded) | Multipart/form-data field; nested inside `HttpRequestConfig` |
 | 6 | `StoredCookieModel` | `cookies` | Cookie jar; keyed by `domain\|path\|name` (one put/delete per cookie); `bool hostOnly` at `HiveField(7)` (default `false` — RFC 6265 host-only flag; absent Domain attribute → exact-host match; next free: 8) |
-| 7 | `ExtractionRuleModel` | (embedded) | One extraction rule; nested inside `RequestRulesModel` |
-| 8 | `AssertionModel` | (embedded) | One assertion; nested inside `RequestRulesModel` |
-| 9 | `RequestRulesModel` | `requestRules` | Per-request-config rules (assertions + extractions), keyed by configId |
+| 7 | Retired Rules model | — | Never reuse; no adapter registered, no migration or automatic deletion |
+| 8 | Retired Rules model | — | Never reuse; no adapter registered, no migration or automatic deletion |
+| 9 | Retired Rules model | — | Never reuse; no adapter registered, no migration or automatic deletion |
 | 10 | `SavedExampleModel` | (embedded) | A saved request+response example; nested in `CollectionNode.examples`. `name` + epoch-millis `capturedAt` + a reused `HttpRequestConfig` (carries the response columns) |
 | 11 | `StoredResponseModel` | (embedded) | One captured response in a tab's time-travel history; nested as a list in `HttpRequestTabModel` (field 9). `id` + status/body/headers/`durationMs` + epoch-millis `capturedAt` |
 | 12 | `PanelModel` | `panels` | Virtual-desktop workspace structure: `{id, name, List<String> orderedTabIds, activeTabId}` at `HiveField` 0–3. Stores only **ids** — tab entities stay in the `tabs` box (typeId 2). Panel order + active panel live in the `tabs_meta` box under keys `panelOrder` / `activePanelId` (next free: 4) |
@@ -79,3 +79,11 @@ dart run build_runner build --delete-conflicting-outputs
 | Tabs | debounced 10 s after any change + flush on `close()` AND on app exit/hide (`ExitFlushGuard` → `TabsBloc.flushPendingSaves`; `close()` never runs on process exit, so without the guard Cmd+Q inside the window lost the last edits) |
 | Environments | immediately after every mutation (single keyed put/delete per environment; batch import saves the list) |
 | JSON field dictionary | positive key-count additions after the body editor’s 200 ms debounce; repository writes immediately and serializes increments across editors (independent of the tabs’ 10 s save) |
+
+## Local script trust
+
+`script_trust` is a primitive `Box<String>` keyed by request config identity.
+Each value is a SHA-256 digest of API version and both source strings. It is
+installation-local, never part of workspace/Postman exports. Stage enablement
+does not grant trust. Transient tests, logs, patches and execution IDs are never
+persisted with requests. Field 19 stores only the request-owned script bundle.

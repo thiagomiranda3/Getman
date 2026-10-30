@@ -1,9 +1,9 @@
 // Workspace-global ValueNotifier<int> for the selected request-editor
-// section (PARAMS/AUTH/HEADERS/BODY/RULES); see the class doc for details.
+// section (PARAMS/AUTH/HEADERS/BODY/SCRIPTS); see the class doc for details.
 import 'package:flutter/foundation.dart';
 
 /// Session-global selected index of the request-editor section strip
-/// (PARAMS / AUTH / HEADERS / BODY / RULES).
+/// (PARAMS / AUTH / HEADERS / BODY / SCRIPTS).
 ///
 /// The selection is a workspace-level view preference, not per-request state:
 /// picking BODY in one request tab means every request tab shows BODY until
@@ -22,4 +22,24 @@ import 'package:flutter/foundation.dart';
 /// `WorkspacePulseController`).
 class RequestSectionIndex extends ValueNotifier<int> {
   RequestSectionIndex() : super(0);
+  String? scriptTabId;
+  bool scriptPostResponse = false;
+  int scriptLine = 1;
+  int scriptColumn = 1;
+  void openScript({
+    required String tabId,
+    required bool postResponse,
+    int line = 1,
+    int column = 1,
+  }) {
+    scriptTabId = tabId;
+    scriptPostResponse = postResponse;
+    scriptLine = line;
+    scriptColumn = column;
+    if (value == 4) {
+      notifyListeners();
+    } else {
+      value = 4;
+    }
+  }
 }

@@ -12,7 +12,7 @@ void main() {
     expect(HiveBoxes.collections, 'collections');
     expect(HiveBoxes.environments, 'environments');
     expect(HiveBoxes.cookies, 'cookies');
-    expect(HiveBoxes.requestRules, 'request_rules');
+    expect(HiveBoxes.scriptTrust, 'script_trust');
     expect(HiveBoxes.panels, 'panels');
     expect(HiveBoxes.bodyFieldDictionary, 'body_field_dictionary');
   });
@@ -26,7 +26,7 @@ void main() {
       HiveBoxes.collections,
       HiveBoxes.environments,
       HiveBoxes.cookies,
-      HiveBoxes.requestRules,
+      HiveBoxes.scriptTrust,
       HiveBoxes.panels,
       HiveBoxes.bodyFieldDictionary,
     ];

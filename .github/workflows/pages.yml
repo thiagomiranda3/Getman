@@ -31,8 +31,32 @@ jobs:
           channel: stable
           cache: true
 
-      - run: flutter pub get
-      - run: flutter build web --release --base-href "$BASE_HREF"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tool/scripting/package-lock.json
+
+      - name: Verify bundled offline JavaScript engine
+        run: |
+          npm ci --prefix tool/scripting --ignore-scripts
+          npm run build --prefix tool/scripting
+          git diff --exit-code -- assets/scripting tool/scripting/web-runtime-manifest.json
+
+      - name: Configure FVM
+        run: |
+          dart pub global activate fvm
+          fvm use "$FLUTTER_VERSION" --force
+      - run: fvm flutter pub get
+      - name: Verify real browser scripting contracts
+        run: >-
+          fvm flutter test --platform chrome
+          test/features/scripting/runtime/web_runtime_test.dart
+          test/features/scripting/runtime/script_api_test.dart
+          test/features/scripting/runtime/script_tests_test.dart
+          test/features/scripting/runtime/script_secret_values_test.dart
+          test/features/scripting/runtime/script_snippets_test.dart
+      - run: fvm flutter build web --release --base-href "$BASE_HREF"
 
       - name: Prepare Pages artifact
         run: |

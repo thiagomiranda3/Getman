@@ -53,7 +53,8 @@ notes as historical context and verify them against the current code.
 | Themes, AppComponents, motion | [docs/architecture/theming.md](docs/architecture/theming.md) (+ [docs/THEME_AUTHORING.md](docs/THEME_AUTHORING.md) to author) |
 | NetworkService, redirects, cookies, WS/SSE | [docs/architecture/network-and-cookies.md](docs/architecture/network-and-cookies.md) |
 | Any `@HiveType` / box / typeId | [docs/architecture/persistence-hive.md](docs/architecture/persistence-hive.md) |
-| Environments, variables, chaining | [docs/architecture/environments-and-chaining.md](docs/architecture/environments-and-chaining.md) |
+| Environments, variables | [docs/architecture/environments-and-chaining.md](docs/architecture/environments-and-chaining.md) |
+| JavaScript scripts, trust, runtime, tests/console | [docs/architecture/scripting.md](docs/architecture/scripting.md) |
 | Settings, history, auto-update | [docs/architecture/settings-history-updates.md](docs/architecture/settings-history-updates.md) |
 | Git sync/branches/PRs/conflicts | [docs/architecture/git-sync.md](docs/architecture/git-sync.md) |
 | MCP feature | [docs/architecture/mcp.md](docs/architecture/mcp.md) |
@@ -77,7 +78,7 @@ lib/
 ```
 
 Features: `tabs`, `collections`, `history`, `settings`, `home`, `environments`,
-`chaining`, `cookies`, `realtime`, `mcp`, `command_palette`, `updates`.
+`scripting`, `cookies`, `realtime`, `mcp`, `command_palette`, `updates`.
 **Git-native collaboration** (review/commit, branch/sync, PRs, conflict
 resolution) is built into `collections` (`collections/data/services/` +
 `collections/domain/`) over the `lib/core/git/` CLI gateways — see git-sync.md.
@@ -140,6 +141,7 @@ workspace mirror (`workspace_sync_service.dart`). Find any of these in CODEMAP.
 
 - **Never renumber an existing `typeId`.** Add new models with a fresh ID —
   **next free: 14** (highest in use is 13, `ParkedParamModel`).
+- **Retired typeIds 7, 8, 9:** former Rules models. Never reuse; old box is neither opened nor migrated.
 - **Retired `SettingsModel` fields — never reuse these indices:** `HiveField(22)`
   (`reduceVisualEffects`) and `HiveField(27)` (`enableThemeSounds`).
 - After any `@HiveType`/`@HiveField` change, regenerate:

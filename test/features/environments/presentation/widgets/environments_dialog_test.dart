@@ -163,8 +163,12 @@ void main() {
   setUp(() {
     repo = MockEnvironmentsRepository();
     when(() => repo.putEnvironment(any())).thenAnswer((_) async {});
+    when(
+      () => repo.updateEnvironment(any(), previous: any(named: 'previous')),
+    ).thenAnswer((_) async {});
     when(() => repo.deleteEnvironment(any())).thenAnswer((_) async {});
     when(() => repo.saveEnvironments(any())).thenAnswer((_) async {});
+    when(() => repo.importEnvironments(any())).thenAnswer((_) async {});
 
     settingsUc = MockSaveSettingsUseCase();
     when(() => settingsUc(any())).thenAnswer((_) async {});

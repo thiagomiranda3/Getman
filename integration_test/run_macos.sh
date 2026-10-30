@@ -21,8 +21,6 @@ set -uo pipefail
 
 cd "$(dirname "$0")/.."
 
-SLOW="${E2E_SLOW_MS:-0}"
-
 # Resolve the target: no arg → the aggregator (all flows, one build); an arg is
 # either a flow name ("tabs") or a path ("flows/tabs_test.dart" / absolute).
 target="${1:-integration_test/all_flows_test.dart}"
@@ -32,4 +30,4 @@ elif [[ "$target" != integration_test/* && "$target" != /* ]]; then
   target="integration_test/$target"
 fi
 
-exec fvm flutter test "$target" -d macos --dart-define=E2E_SLOW_MS="$SLOW"
+E2E_WATCHDOG_SECONDS="${E2E_WATCHDOG_SECONDS:-1800}" exec bash integration_test/run_scripts_macos.sh "$target"

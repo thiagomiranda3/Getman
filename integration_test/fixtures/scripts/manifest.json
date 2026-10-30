@@ -1,0 +1,137 @@
+{
+  "fixtures": [
+    {
+      "file": "jwt_session_pre.js",
+      "phase": "preRequest",
+      "expected": {
+        "error": null,
+        "temporarySets": [
+          "session_id"
+        ],
+        "requestHeader": "X-Session",
+        "bodyKeys": [
+          "sessionId",
+          "description"
+        ]
+      },
+      "input": {
+        "environmentVariables": {
+          "access_token": "<synthetic JWT with session.id>"
+        }
+      }
+    },
+    {
+      "file": "login_post.js",
+      "phase": "postResponse",
+      "expected": {
+        "error": null,
+        "testsPassed": 2,
+        "environmentSets": [
+          "access_token"
+        ]
+      },
+      "input": {
+        "response": {
+          "status": 200,
+          "json": {
+            "token": "<synthetic JWT from local login>"
+          }
+        }
+      }
+    },
+    {
+      "file": "response_tests_post.js",
+      "phase": "postResponse",
+      "expected": {
+        "error": null,
+        "tests": 5,
+        "testsPassed": 4,
+        "logContains": "Resposta verificada"
+      },
+      "input": {
+        "response": {
+          "status": 200,
+          "headers": {
+            "X-Trace": "trace-42"
+          },
+          "json": {
+            "nullable": null
+          }
+        }
+      }
+    },
+    {
+      "file": "extract_regex_post.js",
+      "phase": "postResponse",
+      "expected": {
+        "error": null,
+        "environmentSets": {
+          "capture": "captured42",
+          "trace": "trace-42"
+        }
+      },
+      "input": {
+        "response": {
+          "status": 200,
+          "headers": {
+            "X-Trace": "trace-42"
+          },
+          "text": "b=captured42"
+        }
+      }
+    },
+    {
+      "file": "pre_failure.js",
+      "phase": "preRequest",
+      "expected": {
+        "error": "runtime",
+        "committedVariables": []
+      },
+      "input": {}
+    },
+    {
+      "file": "post_failure.js",
+      "phase": "postResponse",
+      "expected": {
+        "error": "runtime",
+        "committedVariables": []
+      },
+      "input": {}
+    },
+    {
+      "file": "infinite_loop.js",
+      "phase": "preRequest",
+      "expected": {
+        "error": "timeout"
+      },
+      "input": {}
+    },
+    {
+      "file": "pending_promise.js",
+      "phase": "preRequest",
+      "expected": {
+        "error": "timeout"
+      },
+      "input": {}
+    },
+    {
+      "file": "memory_limit.js",
+      "phase": "preRequest",
+      "expected": {
+        "error": "memoryLimit"
+      },
+      "input": {}
+    },
+    {
+      "file": "console_limit.js",
+      "phase": "preRequest",
+      "expected": {
+        "error": null,
+        "maxLogs": 200
+      },
+      "input": {}
+    }
+  ],
+  "apiVersion": 1,
+  "notes": "Synthetic tokens only. Input values are supplied by the native and Chrome harnesses; fixtures are not release assets."
+}

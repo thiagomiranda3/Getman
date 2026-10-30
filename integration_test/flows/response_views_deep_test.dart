@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -27,12 +29,20 @@ void main() {
     addTearDown(server.close);
 
     await bootGetman($);
+    await Clipboard.setData(const ClipboardData(text: 'not-the-response'));
     await sendTo($, server.url('/copyable'));
     await waitForStatus($, 200);
 
-    await $(find.byTooltip('Copy response')).tap();
-    await $.pumpAndSettle();
-    expect($('Response copied'), findsWidgets);
+    await $(
+      find.byTooltip('Copy response'),
+    ).tap(settlePolicy: SettlePolicy.noSettle);
+    // The native clipboard reply is asynchronous and need not schedule a frame
+    // before pumpAndSettle returns. Wait for the user-visible acknowledgement.
+    await $('Response copied').waitUntilVisible();
+    expect(find.text('Response copied').hitTestable(), findsOneWidget);
+    final clipboard = await Clipboard.getData(Clipboard.kTextPlain);
+    expect(clipboard?.text, isNotNull);
+    expect(jsonDecode(clipboard!.text!), {'copy': 'me'});
   });
 
   patrolWidgetTest('cookies tab is empty when no Set-Cookie', ($) async {

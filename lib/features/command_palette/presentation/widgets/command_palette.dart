@@ -209,9 +209,9 @@ class _CommandPaletteState extends State<CommandPalette> {
     // matching history_list.dart verbatim (no collectionNodeId/Name) so a
     // re-send never compares against / overwrites a collection node, and the
     // {{var}} placeholders stay unresolved for re-sending under another env.
-    // Fresh config id per open (copyWith would PIN the stored id): chaining
-    // rules are keyed by config id, so two tabs opened from the same history
-    // entry must not alias each other's rules — same reason
+    // Fresh config id per open (copyWith would PIN the stored id): local script
+    // approvals are keyed by config id, so tabs opened from the same history
+    // entry must not inherit another request's approval — same reason
     // TabsBloc._onDuplicateTab mints withId(uuid). matchExtra folds in the
     // status code so the palette finds history by '404' etc., matching the
     // HISTORY tab's own search (URL/method/status code).

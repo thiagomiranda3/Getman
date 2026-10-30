@@ -15,6 +15,9 @@ class _FakeEnvironmentsDataSource implements EnvironmentsLocalDataSource {
   bool throwOnGet = false;
 
   @override
+  Stream<void> watchChanges() => const Stream<void>.empty();
+
+  @override
   Future<List<EnvironmentModel>> getEnvironments() async {
     if (throwOnGet) throw PersistenceException('boom');
     return stored;

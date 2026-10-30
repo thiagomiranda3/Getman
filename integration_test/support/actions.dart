@@ -106,7 +106,7 @@ Future<void> setRequestKind(PatrolTester $, String kind) async {
 }
 
 /// Taps a request-config sub-tab by its [label] (`PARAMS`/`AUTH`/`HEADERS`/
-/// `BODY`/`RULES`).
+/// `BODY`/`SCRIPTS`).
 Future<void> openRequestTab(PatrolTester $, String label) async {
   await $(ValueKey('reqtab_tab_$label')).tap();
   await slowMo($);

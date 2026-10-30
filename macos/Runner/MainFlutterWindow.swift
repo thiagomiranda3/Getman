@@ -33,6 +33,16 @@ class MainFlutterWindow: NSWindow {
       name: "getman/test_window",
       binaryMessenger: flutterViewController.registrar(forPlugin: "TestWindow").messenger)
     channel.setMethodCallHandler { [weak self] call, result in
+      #if DEBUG
+        if call.method == "activate" {
+          // A hidden/occluded window stops live integration-test frame pumps.
+          // Only the test harness requests activation during its own lifetime.
+          self?.makeKeyAndOrderFront(nil)
+          NSApp.activate(ignoringOtherApps: true)
+          result(nil)
+          return
+        }
+      #endif
       guard call.method == "setContentSize",
         let args = call.arguments as? [String: Any],
         let width = args["width"] as? Double,
@@ -43,6 +53,12 @@ class MainFlutterWindow: NSWindow {
       }
       self?.setContentSize(NSSize(width: width, height: height))
       self?.center()
+      #if DEBUG
+        // Integration tests need an active window for live frame callbacks.
+        // Activation belongs to this test-only resize request, never launch.
+        self?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+      #endif
       result(nil)
     }
     testWindowChannel = channel

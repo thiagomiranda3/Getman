@@ -68,12 +68,13 @@ ritual, animated backgrounds, and optional sound cues.
 - **Code generation.** Export any request as cURL, JavaScript `fetch`,
   Node.js `axios`, Python `requests`, Go `net/http`, or Java OkHttp —
   `{{variables}}` left intact.
-- **No-code tests & chaining.** Capture a value from one response (JSONPath,
-  header, or regex) into an environment variable, and assert on status,
-  time, body, or headers — all without writing a script.
+- **JavaScript scripts.** QuickJS pre-request and post-response scripts decode
+  JWT session data, prepare payloads, capture environment variables, and run
+  named assertions. Isolated execution has time/memory limits and a console.
+  Imported scripts require local content approval before running.
 - **Rich response viewer.** Pretty / raw / **collapsible JSON tree** (copy a
-  value, copy its JSONPath, or one-click **extract to `{{var}}`**), plus
-  headers, cookies, and test results. **Per-tab response time-travel** keeps
+  value or copy its JSONPath), plus
+  headers, cookies, test results and console. **Per-tab response time-travel** keeps
   recent responses so you can step back through them, and a **compare/diff**
   view shows exactly what changed between two responses. Copy the body or save
   it to a file.

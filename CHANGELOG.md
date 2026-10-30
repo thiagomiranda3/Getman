@@ -5,6 +5,45 @@ All notable changes to **Getman** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-10-30
+
+Requests now support JavaScript automation with an isolated QuickJS runtime,
+including JWT payload decoding, variable capture, request preparation and tests.
+
+### Added
+
+- **SCRIPTS** with **PRE-REQUEST** and **POST-RESPONSE** editors, per-stage
+  enable controls, executable examples and built-in API help.
+- **`gm` scripting API** for temporary and environment variables, request
+  URL/method/body/header changes, response JSON and JSONPath access, JWT payload
+  decoding, UTF-8 Base64 helpers, assertions and synchronous/asynchronous tests.
+  JWT decoding reads claims; it does not verify signatures or expiration.
+- **TESTS** and **CONSOLE** results with bounded logs, secret-value masking and
+  clickable diagnostics that open the failing stage and source location.
+- **Isolated execution** through native QuickJS workers on desktop and bundled
+  QuickJS/WASM workers on the web. Scripts run offline with time, memory and
+  output limits; cancellation and request ownership prevent late results from
+  updating a superseded or closed request.
+- **Explicit trust review** for imported or externally changed scripts.
+  Script source persists with requests and git workspaces; local trust does not
+  travel with shared or exported requests.
+
+### Changed
+
+- Request automation and assertions now use JavaScript. The unused declarative
+  **Rules** workflow has been removed without migrating legacy rule data.
+
+### Fixed
+
+- JSON field autocomplete accepts names typed without an opening quote and
+  inserts the required quotes when a suggestion is selected. Existing quotes
+  are preserved without duplication.
+- Sending again preserves the selected response tab when there is no script
+  error. Script failures still open **CONSOLE** immediately.
+- Copying or saving while JSON formatting is pending uses the current raw
+  response, avoiding empty content or a previous response. Once formatting
+  finishes, the full displayed text is used.
+
 ## [1.11.1] - 2026-10-29
 
 ### Fixed
@@ -618,6 +657,7 @@ workflow. Runs on macOS, Windows, and Linux.
   machine.
 - Ships for **macOS**, **Windows**, and **Linux** desktop.
 
+[1.12.0]: https://github.com/thiagomiranda3/Getman/releases/tag/v1.12.0
 [1.11.1]: https://github.com/thiagomiranda3/Getman/releases/tag/v1.11.1
 [1.11.0]: https://github.com/thiagomiranda3/Getman/releases/tag/v1.11.0
 [1.8.0]: https://github.com/thiagomiranda3/Getman/releases/tag/v1.8.0

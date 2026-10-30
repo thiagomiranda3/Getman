@@ -150,7 +150,8 @@ class BranchSyncListener extends StatelessWidget {
 /// "Untouched" mirrors `TabDirtyChecker`: a clean tab's config equals what was
 /// saved before the pull. `HttpRequestConfigEntity` equality excludes `id`, so
 /// the comparison is on the request signature; the pulled config keeps the
-/// same persisted `id`, so linkage (e.g. chaining rules) survives the refresh.
+/// same persisted `id`, so linkage (e.g. local script approvals) survives the
+/// refresh.
 @visibleForTesting
 List<HttpRequestTabEntity> tabsToRefreshAfterReload(
   List<PanelEntity> panels,
