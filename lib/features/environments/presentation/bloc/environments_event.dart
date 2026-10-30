@@ -1,7 +1,7 @@
 // EnvironmentsBloc events. AddEnvironment carries the full entity (not just
 // a name) so the dispatching widget knows the new id synchronously;
 // MergeEnvironmentVariables merges into the bloc's live entity (see its own
-// doc comment) for the chaining write-back's concurrent-capture safety.
+// doc comment) for the variable patch's concurrent-capture safety.
 
 import 'package:equatable/equatable.dart';
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
@@ -27,14 +27,15 @@ class AddEnvironment extends EnvironmentsEvent {
 }
 
 class UpdateEnvironment extends EnvironmentsEvent {
-  const UpdateEnvironment(this.environment);
+  const UpdateEnvironment(this.environment, {this.previous});
   final EnvironmentEntity environment;
+  final EnvironmentEntity? previous;
   @override
-  List<Object?> get props => [environment];
+  List<Object?> get props => [environment, previous];
 }
 
 /// Merges [variables] into the environment's CURRENT variable map inside the
-/// bloc handler. Used by the chaining write-back: an `UpdateEnvironment`
+/// bloc handler. Used by the variable merge: an `UpdateEnvironment`
 /// carrying a full replacement built from a state snapshot loses concurrent
 /// changes (two captures flushing in the same event-loop turn, or a keystroke
 /// in the open env editor) — the merge must read the live entity.
@@ -55,6 +56,14 @@ class DeleteEnvironment extends EnvironmentsEvent {
 
 class ImportEnvironments extends EnvironmentsEvent {
   const ImportEnvironments(this.environments);
+  final List<EnvironmentEntity> environments;
+  @override
+  List<Object?> get props => [environments];
+}
+
+/// Committed repository snapshot, including writes from script execution.
+class EnvironmentsChanged extends EnvironmentsEvent {
+  const EnvironmentsChanged(this.environments);
   final List<EnvironmentEntity> environments;
   @override
   List<Object?> get props => [environments];

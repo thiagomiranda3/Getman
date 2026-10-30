@@ -68,7 +68,7 @@ void main() {
         ..finish('tab-1', handle: previous)
         ..cancel('tab-1');
       expect(current.isCancelled, isTrue);
-      expect(previous.isCancelled, isFalse);
+      expect(previous.isCancelled, isTrue);
     });
     test('cancelAll is a no-op when no handles are registered', () {
       expect(() => manager.cancelAll(), returnsNormally);

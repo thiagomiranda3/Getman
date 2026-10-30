@@ -41,6 +41,7 @@ import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/utils/body_type_utils.dart';
 import 'package:getman/core/utils/header_utils.dart';
 import 'package:getman/core/utils/param_row_composer.dart';
+import 'package:getman/core/utils/request_scripts_json.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 import 'package:uuid/uuid.dart';
@@ -112,6 +113,7 @@ class PostmanCollectionMapper {
       );
     }
     final name = info['name']?.toString() ?? 'Imported Collection';
+    _rejectExternalEvents(parsed, name);
     final rawItems = parsed['item'];
     final items = rawItems is List ? rawItems : const <dynamic>[];
     final children = items
@@ -127,6 +129,30 @@ class PostmanCollectionMapper {
       variables: vars.variables,
       secretKeys: vars.secretKeys,
     );
+  }
+
+  // Validate the complete tree before constructing any node. Import callers
+  // receive a single failure and cannot dispatch a partial collection.
+  static void _rejectExternalEvents(Map<dynamic, dynamic> node, String path) {
+    if (node.containsKey('event') &&
+        node['event'] != null &&
+        (node['event'] is! List || (node['event'] as List).isNotEmpty)) {
+      throw FormatException('Postman scripts are not supported: $path');
+    }
+    final request = node['request'];
+    if (request is Map) _rejectExternalEvents(request, '$path/request');
+    final items = node['item'];
+    if (items is List) {
+      for (var i = 0; i < items.length; i++) {
+        final item = items[i];
+        if (item is Map) {
+          _rejectExternalEvents(
+            item,
+            '$path/item[$i] (${item['name'] ?? 'Unnamed'})',
+          );
+        }
+      }
+    }
   }
 
   // ---------- export helpers ----------
@@ -211,6 +237,8 @@ class PostmanCollectionMapper {
     }
     final result = <String, dynamic>{
       'method': config.method,
+      if (!config.scripts.isEmpty)
+        'x-getman-scripts': RequestScriptsJson.toJson(config.scripts),
       'header': headers,
       'url': urlObj,
       // Vendor key (inert to real Postman): round-trips the protocol so a
@@ -423,6 +451,7 @@ class PostmanCollectionMapper {
     final headers = _parseHeaders(request['header']);
     final body = _parseBody(request['body']);
     return HttpRequestConfigEntity(
+      scripts: RequestScriptsJson.fromJson(request['x-getman-scripts']),
       id: _uuid.v4(),
       method: method,
       url: mergedUrl,

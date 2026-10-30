@@ -3,9 +3,6 @@
 // Check in to version control
 
 import 'package:hive_ce/hive.dart';
-import 'package:getman/features/chaining/data/models/assertion_model.dart';
-import 'package:getman/features/chaining/data/models/extraction_rule_model.dart';
-import 'package:getman/features/chaining/data/models/request_rules_model.dart';
 import 'package:getman/features/collections/data/models/collection_node_model.dart';
 import 'package:getman/features/collections/data/models/saved_example_model.dart';
 import 'package:getman/features/cookies/data/models/stored_cookie_model.dart';
@@ -20,16 +17,13 @@ import 'package:getman/features/tabs/data/models/stored_response_model.dart';
 
 extension HiveRegistrar on HiveInterface {
   void registerAdapters() {
-    registerAdapter(AssertionModelAdapter());
     registerAdapter(CollectionNodeAdapter());
     registerAdapter(EnvironmentModelAdapter());
-    registerAdapter(ExtractionRuleModelAdapter());
     registerAdapter(HttpRequestConfigAdapter());
     registerAdapter(HttpRequestTabModelAdapter());
     registerAdapter(MultipartFieldModelAdapter());
     registerAdapter(PanelModelAdapter());
     registerAdapter(ParkedParamModelAdapter());
-    registerAdapter(RequestRulesModelAdapter());
     registerAdapter(SavedExampleModelAdapter());
     registerAdapter(SettingsModelAdapter());
     registerAdapter(StoredCookieModelAdapter());
@@ -39,16 +33,13 @@ extension HiveRegistrar on HiveInterface {
 
 extension IsolatedHiveRegistrar on IsolatedHiveInterface {
   void registerAdapters() {
-    registerAdapter(AssertionModelAdapter());
     registerAdapter(CollectionNodeAdapter());
     registerAdapter(EnvironmentModelAdapter());
-    registerAdapter(ExtractionRuleModelAdapter());
     registerAdapter(HttpRequestConfigAdapter());
     registerAdapter(HttpRequestTabModelAdapter());
     registerAdapter(MultipartFieldModelAdapter());
     registerAdapter(PanelModelAdapter());
     registerAdapter(ParkedParamModelAdapter());
-    registerAdapter(RequestRulesModelAdapter());
     registerAdapter(SavedExampleModelAdapter());
     registerAdapter(SettingsModelAdapter());
     registerAdapter(StoredCookieModelAdapter());

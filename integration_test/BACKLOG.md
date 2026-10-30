@@ -42,8 +42,9 @@ dirty/edge-path coverage (~95 cases). What remains is genuinely blocked
   asserting the app survives + the 200 renders; plus a reduce-effects send that
   must still complete with motion degraded to static). E2E guard for the
   in-flight-frame dispose fix.
-- **Chaining (deep)** — `chaining_deep_test` (JSONPath / header / contains
-  assertions, mixed pass-count, extraction write-back into the active env).
+- **JavaScript scripts** — `scripts_jwt_test`, `scripts_limits_test` and
+  `scripts_ui_test` (JWT payloads, captures, assertions, failures, real engine
+  limits and visible editor/results). These replace the retired Rules flows.
 - **Realtime (deep)** — `realtime_deep_test` (server-initiated WS broadcast,
   multiple WS messages, multi-event SSE).
 - **Body types** — `body_types_test` (switch every type, urlencoded send,

@@ -43,6 +43,12 @@ class MainFlutterWindow: NSWindow {
       }
       self?.setContentSize(NSSize(width: width, height: height))
       self?.center()
+      #if DEBUG
+        // Integration tests need an active window for live frame callbacks.
+        // Activation belongs to this test-only resize request, never launch.
+        self?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+      #endif
       result(nil)
     }
     testWindowChannel = channel

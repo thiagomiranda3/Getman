@@ -11,6 +11,9 @@ import 'package:hive_ce_flutter/hive_flutter.dart';
 abstract class EnvironmentsLocalDataSource {
   Future<List<EnvironmentModel>> getEnvironments();
 
+  /// Initial notification followed by storage changes, with cancellation.
+  Stream<void> watchChanges();
+
   /// Inserts or overwrites one environment, keyed by its id — a single put, not
   /// a whole-list rewrite.
   Future<void> putEnvironment(EnvironmentModel environment);
@@ -22,7 +25,7 @@ abstract class EnvironmentsLocalDataSource {
   ///
   /// Non-destructive: puts the new entries, then deletes only the keys that
   /// are absent from [environments] — never `clear()` — so a concurrent
-  /// [putEnvironment] (e.g. the chaining write-back merging captured
+  /// [putEnvironment] (e.g. the variable merge merging captured
   /// variables mid-import) is not wiped by the replace.
   Future<void> saveEnvironments(List<EnvironmentModel> environments);
 }
@@ -30,6 +33,17 @@ abstract class EnvironmentsLocalDataSource {
 class EnvironmentsLocalDataSourceImpl implements EnvironmentsLocalDataSource {
   static Box<EnvironmentModel> _box() =>
       Hive.box<EnvironmentModel>(HiveBoxes.environments);
+
+  @override
+  Stream<void> watchChanges() => Stream<void>.multi((controller) {
+    final subscription = _box().watch().listen(
+      (_) => controller.add(null),
+      onError: controller.addError,
+    );
+    controller
+      ..add(null)
+      ..onCancel = subscription.cancel;
+  });
 
   @override
   Future<List<EnvironmentModel>> getEnvironments() async {
@@ -73,7 +87,7 @@ class EnvironmentsLocalDataSourceImpl implements EnvironmentsLocalDataSource {
       final next = {for (final e in environments) e.id: e};
       // Diff-based replace — never `clear()`. A clear+putAll is a destructive
       // two-phase write: a putEnvironment landing in the await gap (the
-      // chaining write-back dispatches MergeEnvironmentVariables whenever a
+      // variable merge dispatches MergeEnvironmentVariables whenever a
       // response with extraction rules finishes, so it CAN race an import's
       // save) was erased by the clear/overwritten by the stale putAll, and the
       // captured variables silently vanished on restart. putAll applies to the

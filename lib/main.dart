@@ -1,7 +1,7 @@
 // App entry point: boots DI (di.init()), re-acquires macOS security-scoped
 // workspace access from a saved bookmark before the first git-mirror write,
 // then runs MyApp — MultiRepositoryProvider/MultiBlocProvider wiring every
-// feature bloc (settings/history/collections/tabs/environments/chaining/
+// feature bloc (settings/history/collections/tabs/environments/scripting/
 // realtime/MCP/git review+sync+PRs+conflicts), the root MaterialApp.router
 // with theme resolution, and the global keyboard Shortcuts map.
 //
@@ -31,7 +31,6 @@ import 'package:getman/core/theme/motion/theme_switch_transition.dart';
 import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
 import 'package:getman/core/theme/theme_registry.dart';
 import 'package:getman/core/utils/workspace/workspace_bookmark.dart';
-import 'package:getman/features/chaining/presentation/bloc/rules_bloc.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
@@ -49,6 +48,7 @@ import 'package:getman/features/home/presentation/widgets/exit_flush_guard.dart'
 import 'package:getman/features/home/presentation/widgets/tab_close_teardown_listener.dart';
 import 'package:getman/features/mcp/presentation/bloc/mcp_bloc.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
+import 'package:getman/features/scripting/domain/repositories/script_trust_repository.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
@@ -199,6 +199,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiRepositoryProvider(
       providers: [
+        RepositoryProvider<ScriptTrustRepository>.value(
+          value: di.sl<ScriptTrustRepository>(),
+        ),
         RepositoryProvider<TabDirtyChecker>.value(
           value: di.sl<TabDirtyChecker>(),
         ),
@@ -241,7 +244,6 @@ class MyApp extends StatelessWidget {
             create: (_) =>
                 di.sl<EnvironmentsBloc>()..add(const LoadEnvironments()),
           ),
-          BlocProvider(create: (_) => di.sl<RulesBloc>()),
           BlocProvider(create: (_) => di.sl<RealtimeBloc>()),
           BlocProvider(create: (_) => di.sl<McpBloc>()),
           BlocProvider(create: (_) => di.sl<ReviewBloc>()),

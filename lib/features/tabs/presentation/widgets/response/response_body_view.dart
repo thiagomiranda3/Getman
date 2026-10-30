@@ -9,8 +9,7 @@
 // the kResponseBodyTooLargePlaceholder sentinel always stays plain text.
 // Large plain/pretty bodies use bounded, virtualized chunks; formatting is
 // available above the editor highlight cap and Copy/Find use the displayed text.
-// Extract-to-{{var}} from a tree node dispatches AddExtractionRule to the
-// global RulesBloc, closing the loop with the chaining feature.
+// Response values can be copied from the tree; script captures use gm.response.
 //
 // C1 find-everywhere: ResponseBodyControls' magnifier calls
 // `_onFindPressed()`, which dispatches per body mode — large plain-text
@@ -33,9 +32,6 @@ import 'package:getman/core/ui/widgets/app_snack_bar.dart';
 import 'package:getman/core/utils/json_path.dart';
 import 'package:getman/core/utils/json_utils.dart';
 import 'package:getman/core/utils/response_media.dart';
-import 'package:getman/features/chaining/domain/entities/extraction_rule.dart';
-import 'package:getman/features/chaining/presentation/bloc/rules_bloc.dart';
-import 'package:getman/features/chaining/presentation/bloc/rules_event.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_state.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
@@ -49,7 +45,6 @@ import 'package:getman/features/tabs/presentation/widgets/response/response_body
 import 'package:getman/features/tabs/presentation/widgets/response/response_large_body_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/response/viewers/response_media_panel.dart';
 import 'package:re_editor/re_editor.dart';
-import 'package:uuid/uuid.dart';
 
 /// How the response body is displayed in the sub-threshold path.
 enum _BodyMode { pretty, raw, tree }
@@ -162,14 +157,6 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
   final FocusNode _treeFilterFocusNode = FocusNode();
   bool _findActive = false;
 
-  // Hoisted out of [_suggestVariableName] so the patterns compile once, not on
-  // every "Extract to {{var}}" click.
-  static final RegExp _dotTailRe = RegExp(r'\.([A-Za-z_$][\w$]*)$');
-  static final RegExp _bracketTailRe = RegExp(r'\[(.+)\]$');
-  static final RegExp _quoteStripRe = RegExp('''['"]''');
-  static final RegExp _nonIdentRe = RegExp('[^A-Za-z0-9_]');
-  static final RegExp _digitsRe = RegExp(r'^[0-9]+$');
-
   @override
   void initState() {
     super.initState();
@@ -266,56 +253,6 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
     if (_mode == _BodyMode.tree && treeMaybe) {
       unawaited(_decodeForTree());
     }
-  }
-
-  /// Creates a JSONPath extraction rule from a tree node and appends it to the
-  /// active request's chaining rules — the bridge from "I see this value" to
-  /// "capture it into {{var}}". The user refines the variable name in RULES.
-  void _extractToVariable(String jsonPath) {
-    if (!JsonPath.isValid(jsonPath)) {
-      showAppSnackBar(context, 'Cannot extract: unsupported path');
-      return;
-    }
-    final configId = context
-        .read<TabsBloc>()
-        .state
-        .tabs
-        .byId(widget.tabId)
-        ?.config
-        .id;
-    if (configId == null) return;
-    final varName = _suggestVariableName(jsonPath);
-    context.read<RulesBloc>().add(
-      AddExtractionRule(
-        configId: configId,
-        rule: ExtractionRule(
-          id: const Uuid().v4(),
-          expression: jsonPath,
-          targetVariable: varName,
-        ),
-      ),
-    );
-    showAppSnackBar(context, 'Added extraction → {{$varName}} (edit in RULES)');
-  }
-
-  /// Derives a starting variable name from a JSONPath's last named segment;
-  /// falls back to `value` for array-index or unnamed tails.
-  static String _suggestVariableName(String jsonPath) {
-    var raw = '';
-    final dot = _dotTailRe.firstMatch(jsonPath);
-    if (dot != null) {
-      raw = dot.group(1)!;
-    } else {
-      final bracket = _bracketTailRe.firstMatch(jsonPath);
-      if (bracket != null) {
-        raw = bracket.group(1)!.replaceAll(_quoteStripRe, '');
-      }
-    }
-    final cleaned = raw.replaceAll(_nonIdentRe, '_');
-    if (cleaned.isEmpty || _digitsRe.hasMatch(cleaned)) {
-      return 'value';
-    }
-    return cleaned;
   }
 
   /// Cheap shape probe — a JSON object/array body starts with `{`/`[`. Used to
@@ -509,7 +446,6 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
               ? (_decoded != null
                     ? JsonTreeView(
                         data: _decoded,
-                        onExtract: _extractToVariable,
                         filterFocusNode: _treeFilterFocusNode,
                       )
                     : const Center(child: CircularProgressIndicator()))

@@ -1,6 +1,6 @@
 // BLoC for request tabs, grouped into virtual-desktop "panels". Owns tab
 // CRUD, panel CRUD, send/cancel, response time-travel history, and
-// post-response chaining (extraction/assertions) via GetRequestRulesUseCase.
+// bounded JavaScript execution via ExecuteRequestUseCase.
 //
 // Gotchas:
 // - Identity-addressed events (tabId), never index — only SetActiveIndex and
@@ -36,26 +36,20 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:collection/collection.dart';
-// Imported only for `compute` (evaluates rules off the UI isolate for large
-// bodies). There is no Flutter-free equivalent — Isolate.run is unsupported on
-// web, which this app targets — so this import must stay.
-// ignore: avoid_flutter_imports
-import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/failures.dart';
-import 'package:getman/core/network/cancel_handle.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/utils/perf_trace.dart';
-import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';
-import 'package:getman/features/chaining/domain/logic/rules_runner.dart';
-import 'package:getman/features/chaining/domain/usecases/request_rules_usecases.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
+import 'package:getman/features/tabs/domain/entities/execute_request_result.dart';
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/entities/response_history_entry.dart';
+import 'package:getman/features/tabs/domain/entities/script_variable_snapshot.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
+import 'package:getman/features/tabs/domain/usecases/execute_request_use_case.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
 import 'package:getman/features/tabs/presentation/bloc/request_manager.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
@@ -66,7 +60,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   TabsBloc({
     required this._repository,
     required this._sendRequestUseCase,
-    this._getRequestRulesUseCase,
+    this._executeRequestUseCase,
   }) : super(const TabsState()) {
     on<LoadTabs>(_onLoadTabs);
     on<AddTab>(_onAddTab);
@@ -94,10 +88,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
   }
   final TabsRepository _repository;
   final SendRequestUseCase _sendRequestUseCase;
-
-  /// Optional: when provided, post-response extraction + assertions run after
-  /// each send. Nullable so tests can construct the bloc without it.
-  final GetRequestRulesUseCase? _getRequestRulesUseCase;
+  final ExecuteRequestUseCase? _executeRequestUseCase;
 
   final RequestManager _requests = RequestManager();
 
@@ -153,11 +144,6 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
       _closedTabs.removeAt(0);
     }
   }
-
-  /// Bodies at or below this run the post-response rules inline; larger bodies
-  /// decode + evaluate on a background isolate (`compute`). The threshold sits
-  /// well above isolate-spawn overhead so small responses don't pay it.
-  static const int _ruleComputeThresholdBytes = 64 * 1024;
 
   void _scheduleSave() {
     _debounceTimer?.cancel();
@@ -621,7 +607,8 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final active = _activePanel;
     final index = active.tabs.indexWhere((t) => t.tabId == event.tabId);
     if (index == -1) return;
-    // A fresh config id too: chaining rules are keyed by config id, so a
+    // A fresh config id too: local script approvals are keyed by config id, so
+    // a
     // duplicate sharing the original's id would silently alias its rules
     // (editing/deleting one would affect both).
     final dup = HttpRequestTabEntity(
@@ -690,6 +677,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final tabId = tab.tabId;
     final config = tab.config;
     final handle = _requests.start(tabId);
+    final executionId = _uuid.v4();
 
     // Clear the previous run's rule results when a new send starts.
     emit(
@@ -697,8 +685,10 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         _replaceTabAcrossPanels(
           tab.copyWith(
             isSending: true,
-            extractionResults: const [],
-            assertionResults: const [],
+            executionId: executionId,
+            scriptExecutionResult: null,
+            scriptSecretValues: const {},
+            scriptExecutionPhase: ScriptExecutionPhase.preRequest,
           ),
         ),
         state.activePanelId,
@@ -706,6 +696,70 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     );
 
     try {
+      final execute = _executeRequestUseCase;
+      if (execute != null) {
+        final result = await execute(
+          executionId: executionId,
+          tabId: tabId,
+          config: config,
+          variables:
+              event.variables ??
+              ScriptVariableSnapshot(environmentVariables: event.envVars),
+          cancellation: _requests.cancellationFor(tabId),
+          cancelHandle: handle,
+          onProgress: (progress) {
+            if (!emit.isDone &&
+                _requests.isCurrent(tabId, handle) &&
+                !handle.isCancelled) {
+              _applyToTab(
+                emit,
+                tabId,
+                (live) => live.copyWith(
+                  scriptExecutionResult: progress,
+                  scriptSecretValues: progress.secretValues,
+                ),
+              );
+            }
+          },
+          onPhase: (phase) {
+            if (!emit.isDone &&
+                _requests.isCurrent(tabId, handle) &&
+                !handle.isCancelled) {
+              _applyToTab(
+                emit,
+                tabId,
+                (live) => live.copyWith(scriptExecutionPhase: phase),
+              );
+            }
+          },
+        );
+        if (emit.isDone ||
+            !_requests.isCurrent(tabId, handle) ||
+            handle.isCancelled) {
+          return;
+        }
+        _applyToTab(emit, tabId, (live) {
+          final updated = result.response == null
+              ? live
+              : _recordResponse(
+                  live,
+                  result.response!,
+                  event.responseHistoryLimit,
+                  saveLarge: event.saveLargeResponsesInHistory,
+                );
+          return updated.copyWith(
+            isSending: false,
+            scriptExecutionPhase: ScriptExecutionPhase.idle,
+            scriptExecutionResult: result,
+            scriptSecretValues: result.secretValues,
+          );
+        });
+        if (result.response != null) _markResponseDirty(tabId);
+        return;
+      }
+      if (config.scripts.hasEnabledScripts) {
+        throw StateError('Script pipeline is unavailable');
+      }
       final response = await _sendRequestUseCase(
         config: config,
         envVars: event.envVars,
@@ -723,12 +777,18 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         ),
       );
       _markResponseDirty(tabId);
-      await _applyRules(emit, tabId, config, response, handle);
     } on NetworkFailure catch (f) {
       if (emit.isDone || !_requests.isCurrent(tabId, handle)) return;
 
       if (f.type == NetworkFailureType.cancelled) {
-        _applyToTab(emit, tabId, (live) => live.copyWith(isSending: false));
+        _applyToTab(
+          emit,
+          tabId,
+          (live) => live.copyWith(
+            isSending: false,
+            scriptExecutionPhase: ScriptExecutionPhase.idle,
+          ),
+        );
         return;
       }
 
@@ -749,17 +809,21 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
         ),
       );
       _markResponseDirty(tabId);
-      // Assertions are meaningful on error responses too
-      // (e.g. "status in 2xx").
-      await _applyRules(emit, tabId, config, errorResponse, handle);
     } on Object catch (e) {
       // Anything unexpected must still release the tab — otherwise it is
       // stuck on "SENDING" with no way to retry or cancel.
       if (emit.isDone || !_requests.isCurrent(tabId, handle)) return;
       log('SendRequest failed unexpectedly: $e', name: 'TabsBloc');
-      _applyToTab(emit, tabId, (live) => live.copyWith(isSending: false));
+      _applyToTab(
+        emit,
+        tabId,
+        (live) => live.copyWith(
+          isSending: false,
+          scriptExecutionPhase: ScriptExecutionPhase.idle,
+        ),
+      );
     } finally {
-      // A newer send can start while the previous run evaluates rules.
+      // A newer send can start while the previous script finishes.
       // Never remove that newer run's cancel handle from an older handler.
       _requests.finish(tabId, handle: handle);
     }
@@ -788,6 +852,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     if (limit <= 0) {
       return live.copyWith(
         isSending: false,
+        scriptExecutionPhase: ScriptExecutionPhase.idle,
         response: response,
         responseHistory: const [],
         viewedHistoryEntryId: null,
@@ -817,6 +882,7 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     final history = [entry, ...older];
     return live.copyWith(
       isSending: false,
+      scriptExecutionPhase: ScriptExecutionPhase.idle,
       response: response,
       responseHistory: history.length > limit
           ? history.sublist(0, limit)
@@ -879,60 +945,23 @@ class TabsBloc extends Bloc<TabsEvent, TabsState> {
     );
   }
 
-  /// Loads the request's rules and runs the extraction + assertion engines
-  /// against [response], stashing the (transient) results on the tab. No-op
-  /// when no rules use case is wired or the request has no rules. The captured
-  /// values are written back to the environment by a widget-layer coordinator.
-  Future<void> _applyRules(
-    Emitter<TabsState> emit,
-    String tabId,
-    HttpRequestConfigEntity config,
-    HttpResponseEntity response,
-    NetworkCancelHandle handle,
-  ) async {
-    final useCase = _getRequestRulesUseCase;
-    if (useCase == null) return;
-    RequestRulesEntity rules;
-    try {
-      rules = await useCase(config.id);
-    } on Failure catch (f) {
-      log('Loading rules failed: $f', name: 'TabsBloc');
-      return;
-    }
-    if (rules.isEmpty ||
-        emit.isDone ||
-        handle.isCancelled ||
-        !_requests.isCurrent(tabId, handle)) {
-      return;
-    }
-    final input = RulesRunInput(
-      extractionRules: rules.extractionRules,
-      assertions: rules.assertions,
-      response: response,
-    );
-    // Decode + evaluate once; off the UI isolate for large bodies.
-    // Check execution identity and cancellation after both async boundaries:
-    // cancelled, replaced, or closed-tab executions cannot publish captures.
-    final output = response.body.length <= _ruleComputeThresholdBytes
-        ? traceSync('rules.run', () => runRules(input))
-        : await traceAsync('rules.run.isolate', () => compute(runRules, input));
-    if (emit.isDone ||
-        handle.isCancelled ||
-        !_requests.isCurrent(tabId, handle)) {
-      return;
-    }
-    _applyToTab(
-      emit,
-      tabId,
-      (live) => live.copyWith(
-        extractionResults: output.extraction,
-        assertionResults: output.assertions,
-      ),
-    );
-  }
-
   void _onCancelRequest(CancelRequest event, Emitter<TabsState> emit) {
     _requests.cancel(event.tabId);
+    _applyToTab(
+      emit,
+      event.tabId,
+      (live) => live.copyWith(
+        isSending: false,
+        scriptExecutionPhase: ScriptExecutionPhase.idle,
+        scriptExecutionResult: ExecuteRequestResult(
+          cancelled: true,
+          response: live.scriptExecutionResult?.response,
+          preRequest: live.scriptExecutionResult?.preRequest,
+          postResponse: live.scriptExecutionResult?.postResponse,
+          secretValues: live.scriptSecretValues,
+        ),
+      ),
+    );
   }
 
   Future<void> _onAddPanel(AddPanel event, Emitter<TabsState> emit) async {

@@ -21,6 +21,15 @@ else
   FLUTTER="flutter"
 fi
 
+# Git exports repository-local variables to hooks. In a worktree, GIT_DIR is
+# absolute; passing it into FVM makes Flutter describe Getman's git revision as
+# its SDK version. Clear those variables only in SDK subprocesses, preserving
+# the hook's index environment for the staged secret scan below.
+run_sdk() (
+  unset $(git rev-parse --local-env-vars)
+  "$@"
+)
+
 step() { printf '\033[1m▶ %s\033[0m\n' "$1"; }
 fail() {
   printf '\033[31m✗ pre-commit failed: %s\033[0m\n' "$1" >&2
@@ -29,21 +38,21 @@ fail() {
 }
 
 step "dart format (check only)"
-$DART format --output=none --set-exit-if-changed lib test tools \
+run_sdk $DART format --output=none --set-exit-if-changed lib test tools \
   || fail "code is not formatted — run: $DART format lib test tools"
 
 step "flutter analyze (very_good_analysis)"
-$FLUTTER analyze || fail "analyzer reported issues"
+run_sdk $FLUTTER analyze || fail "analyzer reported issues"
 
 step "custom_lint (Getman architecture rules)"
-$DART run custom_lint || fail "custom_lint reported issues"
+run_sdk $DART run custom_lint || fail "custom_lint reported issues"
 
 step "custom_lint fixtures (getman_lints self-test)"
-( cd tools/getman_lints/example && $DART run custom_lint ) \
+( cd tools/getman_lints/example && run_sdk $DART run custom_lint ) \
   || fail "getman_lints fixtures failed — a rule regressed"
 
 step "bloc lint"
-$DART run bloc_tools:bloc lint lib </dev/null || fail "bloc_lint reported issues"
+run_sdk $DART run bloc_tools:bloc lint lib </dev/null || fail "bloc_lint reported issues"
 
 # Optional local secret scan — mirrors the gitleaks CI gate. Only runs if
 # gitleaks is installed (`brew install gitleaks`); CI scans regardless, so a

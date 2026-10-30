@@ -3,8 +3,6 @@ import 'package:integration_test/integration_test.dart';
 import 'flows/auth_deep_test.dart' as auth_deep;
 import 'flows/auth_test.dart' as auth;
 import 'flows/body_types_test.dart' as body_types;
-import 'flows/chaining_deep_test.dart' as chaining_deep;
-import 'flows/chaining_rules_test.dart' as chaining_rules;
 import 'flows/code_export_edits_test.dart' as code_export_edits;
 import 'flows/code_gen_test.dart' as code_gen;
 import 'flows/collections_context_menu_test.dart' as collections_context_menu;
@@ -36,6 +34,9 @@ import 'flows/response_views_deep_test.dart' as response_views_deep;
 import 'flows/response_views_test.dart' as response_views;
 import 'flows/responsive_test.dart' as responsive;
 import 'flows/saved_examples_test.dart' as saved_examples;
+import 'flows/scripts_jwt_test.dart' as scripts_jwt;
+import 'flows/scripts_limits_test.dart' as scripts_limits;
+import 'flows/scripts_ui_test.dart' as scripts_ui;
 import 'flows/settings_network_test.dart' as settings_network;
 import 'flows/settings_tabs_test.dart' as settings_tabs;
 import 'flows/settings_test.dart' as settings;
@@ -72,6 +73,10 @@ void main() {
   large_json_response.main();
   variable_substitution.main();
 
+  scripts_jwt.main();
+  scripts_limits.main();
+  scripts_ui.main();
+
   // Feature flows.
   tabs.main();
   tab_management.main();
@@ -94,8 +99,6 @@ void main() {
   saved_examples.main();
   environments.main();
   environments_deep.main();
-  chaining_rules.main();
-  chaining_deep.main();
   error_states.main();
   cookies.main();
   realtime_ws.main();

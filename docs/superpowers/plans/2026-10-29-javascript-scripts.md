@@ -10,6 +10,22 @@
 
 **Spec:** [2026-10-29-javascript-scripts-design.md](../specs/2026-10-29-javascript-scripts-design.md). Ler ambos antes de executar.
 
+## Estado da execução — 2026-10-30
+
+Tarefas 1–13 implementadas com incrementos RED/GREEN e revisão independente.
+Na tarefa 14, os 11 cenários reais de scripts passaram no aplicativo macOS;
+o harness oficial Chrome passou as duas jornadas de integração. O corpus
+público executa em QuickJS nativo e WASM, incluindo os exemplos da ajuda.
+Rules e seus testes de integração foram substituídos sem migração.
+
+A tarefa 15 consolida as verificações em
+[Registro de validação](../../architecture/scripting-verification.md): quatro
+linters separados, suíte completa, cobertura, corpus Chrome, benchmark AOT,
+manifestos/licenças e documentação/wiki. A matriz Windows/Linux e a comparação
+de cold boot/HTTP antes/depois continuam explicitamente não verificadas.
+Os checklists abaixo preservam a sequência originalmente planejada; o registro
+informa o resultado efetivamente executado e suas limitações.
+
 ## Global Constraints
 
 - **Não implementar migração de Rules.** Remover o mecanismo antigo; typeIds 7, 8 e 9 ficam aposentados. Não converter dados, abrir ou apagar automaticamente a box antiga.
@@ -646,14 +662,14 @@ O marco intermediário útil é a tarefa 9: engine + API + persistência + pipel
 
 Checklist final:
 
-- [ ] Usuário extrai sessão de JWT com script e servidor recebe payload correto.
-- [ ] Scripts antes/depois e testes funcionam; Rules não existe mais na UI/execução.
-- [ ] Nenhuma migração de Rules foi implementada.
-- [ ] RED/GREEN registrado em cada incremento comportamental; exemplos da ajuda executam no corpus.
-- [ ] Runtime não bloqueia UI; limites/cancelamento/recovery comprovados com JS real.
-- [ ] Scripts sobrevivem save/restart/clone/history/Git sem exportar confiança/logs/resultados.
+- [x] Usuário extrai sessão de JWT com script e servidor recebe payload correto.
+- [x] Scripts antes/depois e testes funcionam; Rules não existe mais na UI/execução.
+- [x] Nenhuma migração de Rules foi implementada.
+- [x] RED/GREEN registrado em cada incremento comportamental; exemplos da ajuda executam no corpus.
+- [x] Runtime não bloqueia UI; limites/cancelamento/recovery comprovados com JS real.
+- [x] Scripts sobrevivem save/restart/clone/history/Git sem exportar confiança/logs/resultados.
 - [ ] Todos os linters, formatter, testes unitários/widgets, E2E e matriz de plataforma aprovados.
-- [ ] Wiki e documentação técnica atualizadas com o comportamento efetivamente entregue.
+- [x] Wiki e documentação técnica atualizadas com o comportamento efetivamente entregue.
 
 ## Handoff
 

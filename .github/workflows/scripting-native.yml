@@ -1,0 +1,44 @@
+name: Native JavaScript runtime
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  engine-contract:
+    name: QuickJS engine (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.44.4'
+          channel: stable
+          cache: true
+      # Bootstrap FVM using the action's Dart SDK; project commands use FVM.
+      - run: dart pub global activate fvm
+      - run: fvm use 3.44.4 --force
+      - run: fvm flutter pub get
+      # Flutter test compiles and loads the native asset on each runner. The
+      # contract executes C11 cancellation, timeout, allocation and disposal.
+      - name: Verify native engine, public API and real HTTP pipeline
+        run: >-
+          fvm flutter test --no-pub
+          test/features/scripting/runtime/native_runtime_test.dart
+          test/features/scripting/runtime/script_api_test.dart
+          test/features/scripting/runtime/script_tests_test.dart
+          test/features/scripting/runtime/script_secret_values_test.dart
+          test/features/scripting/runtime/script_snippets_test.dart
+          test/scripts_pipeline_integration_test.dart

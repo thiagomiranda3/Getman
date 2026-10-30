@@ -2,7 +2,8 @@
 // a stored HTTP request + its captured response columns. `==`/`hashCode`
 // DELIBERATELY exclude `id` and the response fields so history dedup works on
 // request signature (method/url/body plus the body-shape fields bodyType/
-// graphqlVariables/bodyFilePath/formFields) — do not re-include `id` without
+// graphqlVariables/bodyFilePath/formFields and script source/enabled/version)
+// — do not re-include `id` without
 // a discussion (see docs/architecture/settings-history-updates.md). Also
 // carries a lazy one-time migration of legacy `params` map entries into the
 // URL's query string (see toEntity).
@@ -12,6 +13,7 @@ import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/entities/request_scripts.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
 import 'package:getman/features/tabs/data/models/multipart_field_model.dart';
@@ -43,6 +45,7 @@ class HttpRequestConfig extends HiveObject {
     this.sentAt,
     this.disabledParams,
     this.disabledHeaderKeys,
+    this.scripts,
   }) : id = id ?? const Uuid().v4(),
        headers =
            headers ??
@@ -57,6 +60,7 @@ class HttpRequestConfig extends HiveObject {
   factory HttpRequestConfig.fromEntity(HttpRequestConfigEntity entity) =>
       HttpRequestConfig(
         id: entity.id,
+        scripts: _encodeScripts(entity.scripts),
         method: entity.method,
         url: entity.url,
         headers: entity.headers,
@@ -152,6 +156,26 @@ class HttpRequestConfig extends HiveObject {
   @HiveField(17, defaultValue: <String>[])
   List<String>? disabledHeaderKeys;
 
+  // Primitive map keeps script bundles independent from runtime/model adapters.
+  @HiveField(19)
+  Map<String, dynamic>? scripts;
+
+  static Map<String, dynamic> _encodeScripts(RequestScripts value) => {
+    'apiVersion': value.apiVersion,
+    'preRequest': value.preRequest,
+    'postResponse': value.postResponse,
+    'preRequestEnabled': value.preRequestEnabled,
+    'postResponseEnabled': value.postResponseEnabled,
+  };
+
+  RequestScripts get _scriptSignature => RequestScripts(
+    apiVersion: scripts?['apiVersion'] as int? ?? 1,
+    preRequest: scripts?['preRequest'] as String? ?? '',
+    postResponse: scripts?['postResponse'] as String? ?? '',
+    preRequestEnabled: scripts?['preRequestEnabled'] as bool? ?? true,
+    postResponseEnabled: scripts?['postResponseEnabled'] as bool? ?? true,
+  );
+
   HttpRequestConfigEntity toEntity() {
     // Lazy migration: if a legacy record stored params in the separate map,
     // merge them into the URL's query string. Next save writes params back
@@ -171,6 +195,7 @@ class HttpRequestConfig extends HiveObject {
     }
     return HttpRequestConfigEntity(
       id: id,
+      scripts: _scriptSignature,
       method: method,
       url: entityUrl,
       headers: headers,
@@ -218,6 +243,7 @@ class HttpRequestConfig extends HiveObject {
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     return other is HttpRequestConfig &&
+        other._scriptSignature == _scriptSignature &&
         other.method == method &&
         other.url == url &&
         other.body == body &&
@@ -235,6 +261,7 @@ class HttpRequestConfig extends HiveObject {
   // inherently mutable so it can't be @immutable.
   // ignore: avoid_equals_and_hash_code_on_mutable_classes
   int get hashCode => Object.hash(
+    _scriptSignature,
     method,
     url,
     body,

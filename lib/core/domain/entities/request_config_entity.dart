@@ -17,8 +17,8 @@
 // unchanged" from "explicitly set to null" for the nullable response/body
 // fields, so pass the value (even null) explicitly to clear one. withId()
 // is a separate constructor path used when duplicating a tab: it does not
-// go through copyWith's own-id default, since per-request state (chaining
-// rules, saved collection nodes) is keyed by id and a duplicate must get a
+// go through copyWith's own-id default, since per-request state (local script
+// approvals, saved collection nodes) is keyed by id and a duplicate must get a
 // genuinely new one, never silently share the original's.
 
 import 'package:equatable/equatable.dart';
@@ -27,6 +27,7 @@ import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/query_param_entity.dart';
+import 'package:getman/core/domain/entities/request_scripts.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/utils/body_type_utils.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
@@ -58,7 +59,12 @@ class HttpRequestConfigEntity extends Equatable {
     this.sentAt,
     this.disabledParams = const [],
     this.disabledHeaderKeys = const {},
+    this.scripts = const RequestScripts(),
   });
+
+  /// Original script templates. Execution results and trust live elsewhere.
+  final RequestScripts scripts;
+
   final String id;
   final String method;
   final String url;
@@ -143,6 +149,7 @@ class HttpRequestConfigEntity extends Equatable {
     Object? sentAt = _unset,
     List<ParkedParamEntity>? disabledParams,
     Set<String>? disabledHeaderKeys,
+    RequestScripts? scripts,
   }) {
     final resolvedUrl =
         url ??
@@ -151,6 +158,7 @@ class HttpRequestConfigEntity extends Equatable {
             : this.url);
     return HttpRequestConfigEntity(
       id: id,
+      scripts: scripts ?? this.scripts,
       method: method ?? this.method,
       url: resolvedUrl,
       headers: headers ?? Map.from(this.headers),
@@ -199,11 +207,13 @@ class HttpRequestConfigEntity extends Equatable {
   }
 
   /// An identical config under a different [id]. Used when duplicating a tab:
-  /// per-request state (chaining rules, saved collection nodes) is keyed by
+  /// per-request state (local script approvals, saved collection nodes) is
+  /// keyed by
   /// config id, so a duplicate must not silently share the original's id —
   /// [copyWith] deliberately pins it.
   HttpRequestConfigEntity withId(String id) => HttpRequestConfigEntity(
     id: id,
+    scripts: scripts,
     method: method,
     url: url,
     headers: Map.from(headers),
@@ -248,5 +258,6 @@ class HttpRequestConfigEntity extends Equatable {
     sentAt,
     disabledParams,
     disabledHeaderKeys,
+    scripts,
   ];
 }

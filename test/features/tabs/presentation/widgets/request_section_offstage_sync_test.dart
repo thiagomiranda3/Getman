@@ -10,9 +10,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
-import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';
-import 'package:getman/features/chaining/domain/usecases/request_rules_usecases.dart';
-import 'package:getman/features/chaining/presentation/bloc/rules_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_event.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_state.dart';
@@ -58,17 +55,9 @@ class _MockPutEnvironmentUseCase extends Mock
 class _MockDeleteEnvironmentUseCase extends Mock
     implements DeleteEnvironmentUseCase {}
 
-class _MockGetRequestRulesUseCase extends Mock
-    implements GetRequestRulesUseCase {}
-
-class _MockSaveRequestRulesUseCase extends Mock
-    implements SaveRequestRulesUseCase {}
-
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 
 class _FakePanel extends Fake implements PanelEntity {}
-
-class _FakeRules extends Fake implements RequestRulesEntity {}
 
 class _FakeCollectionsBloc extends Bloc<CollectionsEvent, CollectionsState>
     implements CollectionsBloc {
@@ -101,17 +90,6 @@ EnvironmentsBloc _environmentsBloc() {
     putEnvironmentUseCase: _MockPutEnvironmentUseCase(),
     deleteEnvironmentUseCase: _MockDeleteEnvironmentUseCase(),
   );
-}
-
-RulesBloc _rulesBloc() {
-  final get = _MockGetRequestRulesUseCase();
-  final save = _MockSaveRequestRulesUseCase();
-  when(() => get.call(any())).thenAnswer(
-    (inv) async =>
-        RequestRulesEntity(configId: inv.positionalArguments.first as String),
-  );
-  when(() => save.call(any())).thenAnswer((_) async {});
-  return RulesBloc(getRequestRulesUseCase: get, saveRequestRulesUseCase: save);
 }
 
 Future<TabsBloc> _loadedBloc(
@@ -150,7 +128,6 @@ void main() {
   setUpAll(() {
     registerFallbackValue(_FakeConfig());
     registerFallbackValue(_FakePanel());
-    registerFallbackValue(_FakeRules());
     registerFallbackValue(
       const HttpRequestTabEntity(
         tabId: 'fallback',
@@ -179,8 +156,6 @@ void main() {
     (tester) async {
       final bloc = await _loadedBloc(repository, sendUseCase);
       addTearDown(bloc.close);
-      final rulesBloc = _rulesBloc();
-      addTearDown(rulesBloc.close);
       final sectionIndex = RequestSectionIndex();
       addTearDown(sectionIndex.dispose);
       final bodyA = CodeLineEditingController();
@@ -210,7 +185,6 @@ void main() {
                   create: (_) => _FakeCollectionsBloc(),
                 ),
                 BlocProvider<HistoryBloc>(create: (_) => _FakeHistoryBloc()),
-                BlocProvider<RulesBloc>.value(value: rulesBloc),
               ],
               child: Stack(
                 children: [
@@ -284,8 +258,6 @@ void main() {
     (tester) async {
       final bloc = await _loadedBloc(repository, sendUseCase);
       addTearDown(bloc.close);
-      final rulesBloc = _rulesBloc();
-      addTearDown(rulesBloc.close);
       final sectionIndex = RequestSectionIndex();
       addTearDown(sectionIndex.dispose);
       final body = CodeLineEditingController();
@@ -311,7 +283,6 @@ void main() {
                   create: (_) => _FakeCollectionsBloc(),
                 ),
                 BlocProvider<HistoryBloc>(create: (_) => _FakeHistoryBloc()),
-                BlocProvider<RulesBloc>.value(value: rulesBloc),
               ],
               child: Offstage(
                 offstage: !onStage,

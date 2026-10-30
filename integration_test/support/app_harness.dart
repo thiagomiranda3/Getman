@@ -39,7 +39,11 @@ double _logicalWidth(PatrolTester $) =>
 /// await resizeWindow($, const Size(560, 900)); // phone-ish → unified panel
 /// ```
 /// No-op off macOS (the channel isn't registered).
-Future<void> resizeWindow(PatrolTester $, Size size) async {
+Future<void> resizeWindow(
+  PatrolTester $,
+  Size size, {
+  bool settle = false,
+}) async {
   try {
     await _testWindowChannel.invokeMethod<void>('setContentSize', {
       'width': size.width,
@@ -54,7 +58,17 @@ Future<void> resizeWindow(PatrolTester $, Size size) async {
     await $.tester.pump(const Duration(milliseconds: 16));
     if ((_logicalWidth($) - size.width).abs() < 2) break;
   }
-  await $.pumpAndSettle();
+  if ((_logicalWidth($) - size.width).abs() >= 2) {
+    throw StateError(
+      'Native test window did not reach width ${size.width}; '
+      'actual width is ${_logicalWidth($)}',
+    );
+  }
+  if (settle) {
+    await $.pumpAndSettle();
+  } else {
+    await $.tester.pump();
+  }
 }
 
 /// Boots the **real** Getman app for an E2E flow and pumps it until settled.
@@ -80,6 +94,7 @@ Future<void> resizeWindow(PatrolTester $, Size size) async {
 Future<void> bootGetman(
   PatrolTester $, {
   Size windowSize = kE2eWindowSize,
+  bool settleResize = false,
 }) async {
   // The app bundles its Google Fonts; forbid runtime fetching so a test never
   // hits the network for a font (matches main.dart).
@@ -104,8 +119,10 @@ Future<void> bootGetman(
   final settings = await di.init(storageDirectoryOverride: tempDir.path);
   await disableStartupUpdateCheck();
 
+  // Activate and size the native window before waiting for the first live
+  // Flutter frame; an unfocused cold window can otherwise stall that wait.
+  await resizeWindow($, windowSize, settle: settleResize);
   await $.pumpWidgetAndSettle(MyApp(initialSettings: settings));
-  await resizeWindow($, windowSize);
 }
 
 /// Disables the startup auto-update check on the freshly-booted SettingsBloc.

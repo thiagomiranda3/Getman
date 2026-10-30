@@ -2,7 +2,8 @@
 // variables with per-row secret toggles and B2 reorder/duplicate (duplicate
 // key gets a unique '-copy' suffix and inherits the secret flag). Emits
 // UpdateEnvironment on edit; blank-name edits are dropped, and losing focus
-// reverts an emptied name.
+// reverts an emptied name. External snapshots reconcile with local edits
+// awaiting their BLoC echo; clean fields follow committed changes.
 //
 // B2.4 order-significance note: the `equals:` handed to KeyValueListEditor is
 // order-SIGNIFICANT (`_orderedVariablesEqual`, a key-order ListEquality
@@ -49,12 +50,61 @@ class EnvironmentEditor extends StatefulWidget {
 class _EnvironmentEditorState extends State<EnvironmentEditor> {
   late final TextEditingController _nameController;
   late final FocusNode _nameFocus;
+  late EnvironmentEntity _draft;
 
   @override
   void initState() {
     super.initState();
+    _draft = widget.environment;
     _nameController = TextEditingController(text: widget.environment.name);
     _nameFocus = FocusNode()..addListener(_onNameFocusChange);
+  }
+
+  @override
+  void didUpdateWidget(EnvironmentEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final incoming = widget.environment;
+    if (incoming.id != oldWidget.environment.id) {
+      _draft = incoming;
+      _nameController.text = incoming.name;
+      return;
+    }
+    // Reconcile the latest committed snapshot with edits that have not yet
+    // echoed through the BLoC. Unchanged fields always take the live value.
+    final before = oldWidget.environment;
+    final variables = {...incoming.variables};
+    for (final key in before.variables.keys) {
+      if (!_draft.variables.containsKey(key)) variables.remove(key);
+    }
+    for (final entry in _draft.variables.entries) {
+      if (!before.variables.containsKey(entry.key) ||
+          before.variables[entry.key] != entry.value) {
+        variables[entry.key] = entry.value;
+      }
+    }
+    final secrets = {...incoming.secretKeys}
+      ..removeAll(before.secretKeys.difference(_draft.secretKeys))
+      ..addAll(_draft.secretKeys.difference(before.secretKeys));
+    if (_nameController.text == before.name) {
+      _nameController.text = incoming.name;
+    }
+    final localOrderChanged = !_stringListEquality.equals(
+      before.variables.keys.toList(),
+      _draft.variables.keys.toList(),
+    );
+    final ordered = localOrderChanged
+        ? <String, String>{
+            for (final key in _draft.variables.keys)
+              if (variables.containsKey(key)) key: variables[key]!,
+            for (final entry in variables.entries)
+              if (!_draft.variables.containsKey(entry.key))
+                entry.key: entry.value,
+          }
+        : variables;
+    _draft = incoming.copyWith(
+      variables: ordered,
+      secretKeys: secrets.intersection(variables.keys.toSet()),
+    );
   }
 
   @override
@@ -83,14 +133,16 @@ class _EnvironmentEditorState extends State<EnvironmentEditor> {
   }
 
   void _emit({Map<String, String>? variables, Set<String>? secretKeys}) {
+    final updated = _draft.copyWith(
+      name: _nameController.text.trim().isEmpty
+          ? _draft.name
+          : _nameController.text,
+      variables: variables ?? _draft.variables,
+      secretKeys: secretKeys ?? _draft.secretKeys,
+    );
+    setState(() => _draft = updated);
     context.read<EnvironmentsBloc>().add(
-      UpdateEnvironment(
-        widget.environment.copyWith(
-          name: _nameController.text,
-          variables: variables ?? widget.environment.variables,
-          secretKeys: secretKeys ?? widget.environment.secretKeys,
-        ),
-      ),
+      UpdateEnvironment(updated, previous: widget.environment),
     );
   }
 
@@ -98,7 +150,7 @@ class _EnvironmentEditorState extends State<EnvironmentEditor> {
   // Indices arrive in decoded-row space from KeyValueListEditor and are
   // range-guarded against the persisted map.
   void _reorderVariable(int oldIndex, int newIndex) {
-    final entries = widget.environment.variables.entries.toList();
+    final entries = _draft.variables.entries.toList();
     if (oldIndex < 0 || oldIndex >= entries.length) return;
     final entry = entries.removeAt(oldIndex);
     entries.insert(newIndex.clamp(0, entries.length), entry);
@@ -106,7 +158,7 @@ class _EnvironmentEditorState extends State<EnvironmentEditor> {
   }
 
   void _duplicateVariable(int index) {
-    final variables = widget.environment.variables;
+    final variables = _draft.variables;
     final entries = variables.entries.toList();
     if (index < 0 || index >= entries.length) return;
     final source = entries[index];
@@ -119,7 +171,7 @@ class _EnvironmentEditorState extends State<EnvironmentEditor> {
       key = '$key-copy';
     }
     entries.insert(index + 1, MapEntry(key, source.value));
-    final secrets = widget.environment.secretKeys;
+    final secrets = _draft.secretKeys;
     _emit(
       variables: Map.fromEntries(entries),
       // A copy of a secret variable is itself secret — it must not render
@@ -158,7 +210,7 @@ class _EnvironmentEditorState extends State<EnvironmentEditor> {
         SizedBox(height: layout.tabSpacing),
         Expanded(
           child: KeyValueListEditor<Map<String, String>>(
-            items: widget.environment.variables,
+            items: _draft.variables,
             fieldPrefix: 'env_var',
             decode: (variables) => [
               for (final e in variables.entries) (e.key, e.value),
@@ -168,13 +220,13 @@ class _EnvironmentEditorState extends State<EnvironmentEditor> {
                 if (key.trim().isNotEmpty) key.trim(): value,
             },
             equals: _orderedVariablesEqual,
-            secretKeys: widget.environment.secretKeys,
+            secretKeys: _draft.secretKeys,
             onSecretKeysChanged: (keys) => _emit(secretKeys: keys),
             // Drop secret flags for variables that no longer exist (e.g. a
             // renamed or deleted key) so the set never drifts from the map.
             onChanged: (variables) => _emit(
               variables: variables,
-              secretKeys: widget.environment.secretKeys.intersection(
+              secretKeys: _draft.secretKeys.intersection(
                 variables.keys.toSet(),
               ),
             ),

@@ -1,6 +1,6 @@
-# Environments & chaining — variables, resolution, assertions, extraction
+# Environments — variables, resolution and script commits
 
-> Deep-dive for environments (`{{var}}` variable sets + resolution) and chaining (no-code post-response assertions + variable extraction). Loaded on demand — see the routing table in CLAUDE.md. For "where is X" lookups use docs/CODEMAP.md.
+> Deep-dive for environments (`{{var}}` variable sets + resolution) and confirmed JavaScript variable patches. Loaded on demand — see the routing table in CLAUDE.md. For "where is X" lookups use docs/CODEMAP.md.
 
 ## Environments
 
@@ -58,28 +58,39 @@ the unresolved-variable chip's concern, and neither advisory blocks sending.
 
 `EnvironmentEntity.secretKeys` (a `Set<String>` of variable names; `EnvironmentModel` stores it as a `List<String>` at `HiveField(3)`). `KeyValueListEditor` takes an optional `secretKeys` + `onSecretKeysChanged` — when non-null, each row shows a lock toggle and secret rows obscure their value with a reveal toggle. Params/headers pass neither, so their behavior is unchanged. The env editor prunes stale secret flags on rename/delete (intersect with the live keys). Postman export masks secret values (empty value, `type: 'secret'`); **send-time resolution is unaffected** (secrets resolve like any other variable). The C5 bug-report bundle (`BugReportComposer`, docs/architecture/tabs-and-panels.md) applies the same masking to both env and collection-scoped secret keys before resolving `{{var}}` into the copied markdown.
 
+### Confirmed script variable patches and external edits
+
+`EnvironmentsRepository.applyVariablePatch(environmentId, ScriptPatch)` merges
+sets and unsets against the current stored environment in the repository's
+single mutation queue. Put, editor update, import, replace, delete and script
+patches share that queue. Admission order determines the winner for the same
+key; independent keys survive. A missing or deleted target raises
+`PersistenceFailure` and is never recreated. The returned Future completes only
+after the storage write; failures propagate to the script orchestrator, while
+later writes can still proceed. Sets preserve existing secret flags, new keys
+are public, and unsets prune flags.
+
+Editor updates carry the prior entity via `UpdateEnvironment.previous` and
+`updateEnvironment(previous:)`. Only fields changed from that snapshot merge
+into the live record, so a rename or ordinary variable edit cannot overwrite
+an unrelated capture. Imports admit incoming records without replaying a stale
+whole-list UI snapshot; explicit `saveEnvironments` retains replace semantics.
+
+`watchEnvironments()` starts with the sorted current list, follows Hive changes,
+and suppresses equal snapshots. `WatchEnvironmentsUseCase` feeds the optional
+`EnvironmentsBloc` watcher; the BLoC cancels its subscription on close. The
+editor reconciles external snapshots with local edits awaiting their echo,
+including variable order and secret toggles; clean name fields refresh on an
+external rename, while unfinished local name edits remain intact.
+
 ### Add / delete gotchas
 
 - **`AddEnvironment` carries the full `EnvironmentEntity`,** not a name: bloc state updates are asynchronous, so an id generated inside the handler would be unknowable at the call site (the dialog needs it to select the new row).
 - **Deleting the active environment** is handled at the widget layer in `EnvironmentsDialog._deleteEnvironment`: if the just-deleted id matches `SettingsEntity.activeEnvironmentId`, dispatch `UpdateActiveEnvironmentId(null)` on `SettingsBloc` after the delete. BLoC-to-BLoC coupling is intentionally avoided — the coordinator is the widget with both blocs in scope.
 
-## Chaining — post-response assertions + extraction
+## Script captures
 
-No-code post-response **assertions** + variable **extraction**. Pure engines live in `chaining/domain/logic/`: `assertion_engine.dart`, `extraction_engine.dart`, `rules_runner.dart`. Rules are stored per request-config id (`RequestRulesModel`, typeId 9, box `requestRules`) and run after a send.
-
-Flow:
-
-1. A response arrives in `TabsBloc` — it loads rules via `GetRequestRulesUseCase`.
-2. `rules_runner.dart` decodes the body once and runs `assertion_engine.dart` + `extraction_engine.dart`.
-3. Captured values are written back to the active environment by `ChainingWriteBackListener` (a widget-layer coordinator, never bloc→bloc).
-4. `EnvironmentsBloc.MergeEnvironmentVariables` persists the captures.
-
-The response TREE mode's **Extract to `{{var}}`** action closes the loop from the other direction: it dispatches `AddExtractionRule(configId, rule)` to the global `RulesBloc`.
-
-Each send keeps its cancellation handle as an execution identity until rule
-processing finishes. A newer send or tab close invalidates older asynchronous
-results; cancellation also suppresses pending rule results, including rules
-still loading or evaluating in an isolate. The write-back
-listener observes the cleared results at the start of each execution, so equal
-captures from successive sends are each merged once. Selecting another tab or
-panel without a new send does not repeat a merge.
+Scripts replace the former Rules feature. `gm.environment.set/unset` proposes
+patches to the environment captured at SEND. ExecuteRequestUseCase confirms them
+only after a successful stage, using the serialized repository described below.
+There is no cross-BLoC write-back listener. See [scripting.md](scripting.md).

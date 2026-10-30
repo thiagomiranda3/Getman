@@ -63,14 +63,11 @@
 
 ## 📦 Request & Body Types
 
-### M9 — Pre-request scripts (no-code)
-- **Files**: `lib/features/chaining/…` (post-response only today), send pipeline
-  in `tabs_bloc.dart`.
-- **Fix**: Prefer a **no-code** pre-request rules pass (set-header-from-variable,
-  compute-HMAC, set-timestamp) mirroring `RulesRunInput`, run before dispatch —
-  consistent with the existing no-code chaining design (avoid a JS sandbox
-  initially).
-- **Effort**: L.
+### M9 — Pre-request JavaScript scripts (implemented)
+
+QuickJS pre/post scripts, variables, JWT, named tests and console replace the
+unused Rules mechanism. See `docs/architecture/scripting.md` and the scripting
+verification record for platform coverage. No Rules migration is provided.
 
 ---
 
@@ -79,11 +76,10 @@
 ### H4 — Collection runner (batch-run a folder)
 - **Files**: new `lib/features/collections/domain/usecases/run_folder_use_case.dart`;
   `tabs_bloc.dart` send path; `node_action_sheet.dart` (add a Run action).
-- **Problem**: No batch orchestration; chaining runs one request at a time. The
-  per-request verdict primitive exists (`rules_runner.dart` `runRules` /
-  `RulesRunOutput`, called once per send).
+- **Problem**: No batch orchestration; scripts run one request at a time. Per-request results are available through
+  `ExecuteRequestUseCase` and `ExecuteRequestResult`.
 - **Fix**: `RunFolderUseCase` walks a `CollectionNodeEntity` subtree, sends each
-  leaf sequentially through the existing send + rules pipeline (reuse active-env
+  leaf sequentially through the existing script + HTTP pipeline (reuse active-env
   resolution), aggregates pass/fail, emits a run-summary state. Surface a "Run"
   folder action + a results panel.
 - **Effort**: L. **Verify**: use-case test over a small tree with a mocked send.
@@ -181,6 +177,7 @@
 > Postman does poorly.
 
 ### DL2 — Inline JWT / base64 decoder
+- **Status**: script helpers `gm.jwt.decode`, `gm.base64` and `gm.base64url` are implemented. The inline decoded preview remains a separate UI enhancement.
 - **Idea**: detect a JWT or base64 blob in a body/header/auth value and offer a
   decoded view (JWT header/payload/exp; base64 → text).
 - **Seam**: response views + a small pure-Dart util in `core/utils`.

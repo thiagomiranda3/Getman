@@ -71,3 +71,12 @@ Every op that reads or mutates the working tree first flushes the pending Hive �
 2. **Branch & sync:** BranchChip → `GitSyncBloc` over `BranchService` — status / switchTo / create / pull / push / stash / popStash / dropStash / addRemote / fetch.
 3. **Pull request:** `PullRequestsDialog` (`PullRequestsBloc` → `PullRequestService`) — availability (gh installed + authenticated), list open PRs (with a rolled-up check verdict), and create (pushes the branch first via the flush-guarded push, then `gh pr create`). `defaultBase` is cached per workspace root.
 4. **Conflict resolution:** `ConflictResolutionDialog` (`ConflictBloc` → `ConflictService`) — `LoadConflicts` (classify + pre-merge) → `ResolveAndContinue` (apply picks, stage, `rebase --continue`) one batch at a time → `AbortRebase`. The rebase is never auto-aborted on error — it's left paused so no work is lost.
+
+### Script source review and conflicts
+
+Semantic request diffs and three-way merges treat each `scripts.*` field as an
+independent scalar: API version, each phase's source, and each enable flag.
+Changes to different phases auto-merge; divergent edits to the same source
+require a field choice. The resolver persists the selected source verbatim,
+never concatenating JavaScript. Workspace reload imports source only and cannot
+supply local trust or execution results.

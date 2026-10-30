@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
+import 'package:getman/core/ui/widgets/key_value_list_editor.dart';
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 import 'package:getman/features/environments/domain/repositories/environments_repository.dart';
 import 'package:getman/features/environments/domain/usecases/environments_usecases.dart';
@@ -59,6 +60,9 @@ void main() {
   setUp(() {
     repo = MockEnvironmentsRepository();
     when(() => repo.putEnvironment(any())).thenAnswer((_) async {});
+    when(
+      () => repo.updateEnvironment(any(), previous: any(named: 'previous')),
+    ).thenAnswer((_) async {});
     when(() => repo.deleteEnvironment(any())).thenAnswer((_) async {});
     when(() => repo.saveEnvironments(any())).thenAnswer((_) async {});
   });
@@ -90,7 +94,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     // putEnvironment should have been called (UpdateEnvironment persists).
-    await untilCalled(() => repo.putEnvironment(any()));
+    await untilCalled(
+      () => repo.updateEnvironment(any(), previous: any(named: 'previous')),
+    );
 
     // The environment in the bloc's state should now have name='Staging'.
     expect(bloc.state.environments.first.name, 'Staging');
@@ -163,7 +169,9 @@ void main() {
       await tester.enterText(valField, 'https://api.dev');
       await tester.pump(const Duration(milliseconds: 50));
 
-      await untilCalled(() => repo.putEnvironment(any()));
+      await untilCalled(
+        () => repo.updateEnvironment(any(), previous: any(named: 'previous')),
+      );
 
       expect(
         bloc.state.environments.first.variables,
@@ -195,7 +203,9 @@ void main() {
       await tester.tap(lockBtns.first);
       await tester.pump(const Duration(milliseconds: 50));
 
-      await untilCalled(() => repo.putEnvironment(any()));
+      await untilCalled(
+        () => repo.updateEnvironment(any(), previous: any(named: 'previous')),
+      );
 
       expect(bloc.state.environments.first.secretKeys, contains('API_KEY'));
       expect(tester.takeException(), isNull);
@@ -224,7 +234,9 @@ void main() {
       await tester.tap(deleteBtn);
       await tester.pump(const Duration(milliseconds: 50));
 
-      await untilCalled(() => repo.putEnvironment(any()));
+      await untilCalled(
+        () => repo.updateEnvironment(any(), previous: any(named: 'previous')),
+      );
 
       // After deletion secretKeys must NOT contain 'TOKEN' anymore.
       expect(
@@ -262,7 +274,9 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
 
-    await untilCalled(() => repo.putEnvironment(any()));
+    await untilCalled(
+      () => repo.updateEnvironment(any(), previous: any(named: 'previous')),
+    );
 
     expect(
       bloc.state.environments.first.variables.keys.toList(),
@@ -308,7 +322,9 @@ void main() {
       await tester.tap(find.byIcon(Icons.content_copy).first);
       await tester.pump(const Duration(milliseconds: 50));
 
-      await untilCalled(() => repo.putEnvironment(any()));
+      await untilCalled(
+        () => repo.updateEnvironment(any(), previous: any(named: 'previous')),
+      );
 
       final updated = bloc.state.environments.first;
       expect(
@@ -324,4 +340,99 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets('external changes preserve a local variable awaiting its echo', (
+    tester,
+  ) async {
+    final env = EnvironmentEntity(
+      id: 'e1',
+      name: 'Production',
+      variables: const {'local': 'old'},
+    );
+    final bloc = _makeBloc(repo, [env]);
+    addTearDown(bloc.close);
+    await _pump(tester, bloc: bloc, environment: env);
+    await tester.enterText(
+      find.byKey(const ValueKey('env_var_val_0')),
+      'draft',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: brutalistTheme(Brightness.light),
+        home: Scaffold(
+          body: BlocProvider.value(
+            value: bloc,
+            child: EnvironmentEditor(
+              environment: env.copyWith(
+                variables: {'local': 'old', 'script': 'new'},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.widgetWithText(TextField, 'draft'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'new'), findsOneWidget);
+  });
+
+  testWidgets('external rename refreshes a clean name field', (tester) async {
+    final env = EnvironmentEntity(id: 'e1', name: 'Production');
+    final bloc = _makeBloc(repo, [env]);
+    addTearDown(bloc.close);
+    await _pump(tester, bloc: bloc, environment: env);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: brutalistTheme(Brightness.light),
+        home: Scaffold(
+          body: BlocProvider.value(
+            value: bloc,
+            child: EnvironmentEditor(
+              environment: env.copyWith(name: 'Renamed'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.widgetWithText(TextField, 'Renamed'), findsOneWidget);
+  });
+
+  testWidgets('external patch preserves a local reorder awaiting its echo', (
+    tester,
+  ) async {
+    final env = EnvironmentEntity(
+      id: 'e1',
+      name: 'Production',
+      variables: const {'a': '1', 'b': '2'},
+    );
+    final bloc = _makeBloc(repo, [env]);
+    addTearDown(bloc.close);
+    await _pump(tester, bloc: bloc, environment: env);
+    tester
+        .widget<KeyValueListEditor<Map<String, String>>>(
+          find.byType(KeyValueListEditor<Map<String, String>>),
+        )
+        .onReorder!(0, 1);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: brutalistTheme(Brightness.light),
+        home: Scaffold(
+          body: BlocProvider.value(
+            value: bloc,
+            child: EnvironmentEditor(
+              environment: env.copyWith(
+                variables: {'a': '1', 'b': '2', 'script': 'new'},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    String keyAt(int index) => tester
+        .widget<TextField>(find.byKey(ValueKey('env_var_key_$index')))
+        .controller!
+        .text;
+    expect([keyAt(0), keyAt(1), keyAt(2)], ['b', 'a', 'script']);
+  });
 }

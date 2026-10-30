@@ -3,14 +3,11 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/entities/request_scripts.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/failures.dart';
 import 'package:getman/core/network/cancel_handle.dart';
 import 'package:getman/core/network/http_response.dart';
-import 'package:getman/features/chaining/domain/entities/assertion.dart';
-import 'package:getman/features/chaining/domain/entities/extraction_rule.dart';
-import 'package:getman/features/chaining/domain/entities/request_rules_entity.dart';
-import 'package:getman/features/chaining/domain/usecases/request_rules_usecases.dart';
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
@@ -23,9 +20,6 @@ import 'package:mocktail/mocktail.dart';
 class MockTabsRepository extends Mock implements TabsRepository {}
 
 class MockSendRequestUseCase extends Mock implements SendRequestUseCase {}
-
-class MockGetRequestRulesUseCase extends Mock
-    implements GetRequestRulesUseCase {}
 
 class _FakeConfig extends Fake implements HttpRequestConfigEntity {}
 
@@ -135,6 +129,57 @@ void main() {
       ),
     ).thenAnswer((_) => answer());
   }
+
+  test('script edits revert, duplicate, reopen and flush on exit', () async {
+    const savedScripts = RequestScripts(
+      preRequest: 'saved();',
+      postResponse: 'after();',
+      postResponseEnabled: false,
+    );
+    const saved = HttpRequestConfigEntity(id: 'config', scripts: savedScripts);
+    const original = HttpRequestTabEntity(
+      tabId: 'script-tab',
+      config: saved,
+      collectionNodeId: 'node',
+    );
+    await loadWith([original]);
+    final edited = original.copyWith(
+      config: saved.copyWith(
+        scripts: savedScripts.copyWith(preRequest: 'edited();'),
+      ),
+    );
+    bloc.add(UpdateTab(edited));
+    await bloc.stream.first;
+    expect(bloc.state.tabs.single.config.scripts.preRequest, 'edited();');
+    bloc.add(const RevertTab(tabId: 'script-tab', savedConfig: saved));
+    await bloc.stream.first;
+    expect(bloc.state.tabs.single.config.scripts, savedScripts);
+    bloc.add(const DuplicateTab('script-tab'));
+    await bloc.stream.first;
+    final duplicate = bloc.state.tabs.last;
+    expect(duplicate.config.id, isNot(saved.id));
+    expect(duplicate.config.scripts, savedScripts);
+    bloc.add(RemoveTab(duplicate.tabId));
+    await bloc.stream.first;
+    bloc.add(const ReopenClosedTab());
+    await bloc.stream.first;
+    expect(bloc.state.tabs.last.config.scripts, savedScripts);
+    clearInteractions(repository);
+    bloc.add(UpdateTab(bloc.state.tabs.first.copyWith(config: edited.config)));
+    await bloc.stream.first;
+    await bloc.close();
+    final written = verify(
+      () => repository.putTab(captureAny()),
+    ).captured.cast<HttpRequestTabEntity>();
+    expect(
+      written.any(
+        (tab) =>
+            tab.tabId == 'script-tab' &&
+            tab.config.scripts.preRequest == 'edited();',
+      ),
+      isTrue,
+    );
+  });
 
   group('LoadTabs', () {
     test('seeds a single sample request when nothing is persisted', () async {
@@ -1035,132 +1080,5 @@ void main() {
     // viewedHistoryEntryId identity tracking (G2) are covered in
     // tabs_bloc_time_travel_test.dart (main() here is at the
     // function_lines_of_code metric gate).
-  });
-
-  group('post-response rules', () {
-    test(
-      'runs extraction + assertions after a send and stashes results',
-      () async {
-        final rules = MockGetRequestRulesUseCase();
-        when(() => rules.call('t1')).thenAnswer(
-          (_) async => const RequestRulesEntity(
-            configId: 't1',
-            extractionRules: [
-              ExtractionRule(
-                id: 'e1',
-                expression: 'token',
-                targetVariable: 'tok',
-              ),
-            ],
-            assertions: [
-              Assertion(id: 'a1', expected: '200'),
-            ],
-          ),
-        );
-        final ruleBloc = TabsBloc(
-          repository: repository,
-          sendRequestUseCase: sendRequestUseCase,
-          getRequestRulesUseCase: rules,
-        );
-        addTearDown(ruleBloc.close);
-
-        when(() => repository.getPanels()).thenAnswer(
-          (_) async => [
-            PanelEntity(
-              id: 'p1',
-              name: 'Panel 1',
-              tabs: [tab('t1')],
-              activeTabId: 't1',
-            ),
-          ],
-        );
-        when(() => repository.getActivePanelId()).thenAnswer((_) async => 'p1');
-        ruleBloc.add(const LoadTabs());
-        await ruleBloc.stream.firstWhere(
-          (s) => !s.isLoading && s.tabs.isNotEmpty,
-        );
-
-        stubSend(
-          () async => const HttpResponseEntity(
-            statusCode: 200,
-            body: '{"token":"abc"}',
-            headers: {},
-            durationMs: 5,
-          ),
-        );
-        ruleBloc.add(const SendRequest(tabId: 't1'));
-        await ruleBloc.stream.firstWhere(
-          (s) => s.tabs.byId('t1')?.assertionResults.isNotEmpty ?? false,
-        );
-
-        final tabState = ruleBloc.state.tabs.byId('t1')!;
-        expect(tabState.assertionResults.single.passed, isTrue);
-        expect(tabState.extractionResults.single.variable, 'tok');
-        expect(tabState.extractionResults.single.value, 'abc');
-      },
-    );
-
-    test(
-      'large bodies run rules off the isolate (compute) and still land',
-      () async {
-        final rules = MockGetRequestRulesUseCase();
-        when(() => rules.call('t1')).thenAnswer(
-          (_) async => const RequestRulesEntity(
-            configId: 't1',
-            extractionRules: [
-              ExtractionRule(
-                id: 'e1',
-                expression: 'token',
-                targetVariable: 'tok',
-              ),
-            ],
-            assertions: [
-              Assertion(id: 'a1', expected: '200'),
-            ],
-          ),
-        );
-        final ruleBloc = TabsBloc(
-          repository: repository,
-          sendRequestUseCase: sendRequestUseCase,
-          getRequestRulesUseCase: rules,
-        );
-        addTearDown(ruleBloc.close);
-
-        when(() => repository.getPanels()).thenAnswer(
-          (_) async => [
-            PanelEntity(
-              id: 'p1',
-              name: 'Panel 1',
-              tabs: [tab('t1')],
-              activeTabId: 't1',
-            ),
-          ],
-        );
-        when(() => repository.getActivePanelId()).thenAnswer((_) async => 'p1');
-        ruleBloc.add(const LoadTabs());
-        await ruleBloc.stream.firstWhere(
-          (s) => !s.isLoading && s.tabs.isNotEmpty,
-        );
-
-        // > 64 KiB body so _applyRules takes the compute() branch.
-        final pad = 'x' * (70 * 1024);
-        stubSend(
-          () async => HttpResponseEntity(
-            statusCode: 200,
-            body: '{"token":"abc","pad":"$pad"}',
-            headers: const {},
-            durationMs: 5,
-          ),
-        );
-        ruleBloc.add(const SendRequest(tabId: 't1'));
-        await ruleBloc.stream.firstWhere(
-          (s) => s.tabs.byId('t1')?.assertionResults.isNotEmpty ?? false,
-        );
-
-        final tabState = ruleBloc.state.tabs.byId('t1')!;
-        expect(tabState.assertionResults.single.passed, isTrue);
-        expect(tabState.extractionResults.single.value, 'abc');
-      },
-    );
   });
 }

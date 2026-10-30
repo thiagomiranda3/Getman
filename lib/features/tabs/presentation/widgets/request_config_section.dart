@@ -1,11 +1,11 @@
-// Split-pane request editor: PARAMS/AUTH/HEADERS/BODY/RULES tab strip, shown
+// Split-pane request editor: PARAMS/AUTH/HEADERS/BODY/SCRIPTS tab strip, shown
 // beside ResponseSection on wide layouts. The strip's selection is
 // workspace-global (RequestSectionIndex), two-way synced per instance.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/branded_tab_bar.dart';
-import 'package:getman/features/chaining/presentation/widgets/rules_tab_view.dart';
+import 'package:getman/features/scripting/presentation/widgets/scripts_tab_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/auth_tab_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/body_tab_view.dart';
 import 'package:getman/features/tabs/presentation/widgets/headers_tab_view.dart';
@@ -94,7 +94,7 @@ class _RequestConfigSectionState extends State<RequestConfigSection>
       children: [
         BrandedTabBar(
           controller: _tabController,
-          labels: const ['PARAMS', 'AUTH', 'HEADERS', 'BODY', 'RULES'],
+          labels: const ['PARAMS', 'AUTH', 'HEADERS', 'BODY', 'SCRIPTS'],
           isScrollable: true,
           tabKeyPrefix: 'reqtab',
         ),
@@ -115,8 +115,8 @@ class _RequestConfigSectionState extends State<RequestConfigSection>
                     controller: widget.bodyController,
                     variablesController: widget.variablesController,
                   ),
-                  RulesTabView(
-                    key: ValueKey('rules_${widget.tabId}'),
+                  ScriptsTabView(
+                    key: ValueKey('scripts_${widget.tabId}'),
                     tabId: widget.tabId,
                   ),
                 ],

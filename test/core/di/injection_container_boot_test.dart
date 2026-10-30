@@ -5,9 +5,6 @@ import 'package:getman/core/di/injection_container.dart' as di;
 import 'package:getman/core/network/in_memory_cookie_store.dart';
 import 'package:getman/core/network/network_cookie.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
-import 'package:getman/features/chaining/data/models/assertion_model.dart';
-import 'package:getman/features/chaining/data/models/extraction_rule_model.dart';
-import 'package:getman/features/chaining/data/models/request_rules_model.dart';
 import 'package:getman/features/cookies/data/hive_cookie_persistence.dart';
 import 'package:getman/features/cookies/data/models/stored_cookie_model.dart';
 import 'package:hive_ce/hive.dart';
@@ -25,15 +22,6 @@ void main() {
     if (!Hive.isAdapterRegistered(6)) {
       Hive.registerAdapter(StoredCookieModelAdapter());
     }
-    if (!Hive.isAdapterRegistered(7)) {
-      Hive.registerAdapter(ExtractionRuleModelAdapter());
-    }
-    if (!Hive.isAdapterRegistered(8)) {
-      Hive.registerAdapter(AssertionModelAdapter());
-    }
-    if (!Hive.isAdapterRegistered(9)) {
-      Hive.registerAdapter(RequestRulesModelAdapter());
-    }
   });
 
   tearDown(() async {
@@ -42,7 +30,7 @@ void main() {
   });
 
   test(
-    'opens both deferred boxes and hydrates the jar from a cold (closed) state',
+    'opens the cookie box and hydrates the jar from a cold (closed) state',
     () async {
       // Persist a cookie, then close the box to simulate "app not yet booted".
       final seed = await Hive.openBox<StoredCookieModel>(HiveBoxes.cookies);
@@ -64,9 +52,9 @@ void main() {
         reason: 'cookies box must be opened on the cold-start path',
       );
       expect(
-        Hive.isBoxOpen(HiveBoxes.requestRules),
-        isTrue,
-        reason: 'request-rules box must be opened on the cold-start path',
+        Hive.isBoxOpen('request_rules'),
+        isFalse,
+        reason: 'retired rule data must remain untouched',
       );
       // Hydration ran, so the persisted cookie is sent on a matching request —
       // this is exactly what an early send dropped before the fix.
@@ -75,14 +63,19 @@ void main() {
     },
   );
 
+  test('boot leaves the retired rules box closed', () async {
+    final store = InMemoryCookieStore(persistence: HiveCookiePersistence());
+    await di.openAndHydrateDeferredBoxes(store);
+    expect(Hive.isBoxOpen('request_rules'), isFalse);
+  });
+
   test('is idempotent when the boxes are already open', () async {
     await Hive.openBox<StoredCookieModel>(HiveBoxes.cookies);
-    await Hive.openBox<RequestRulesModel>(HiveBoxes.requestRules);
     final store = InMemoryCookieStore(persistence: HiveCookiePersistence());
 
     await di.openAndHydrateDeferredBoxes(store); // must not throw
 
     expect(Hive.isBoxOpen(HiveBoxes.cookies), isTrue);
-    expect(Hive.isBoxOpen(HiveBoxes.requestRules), isTrue);
+    expect(Hive.isBoxOpen('request_rules'), isFalse);
   });
 }

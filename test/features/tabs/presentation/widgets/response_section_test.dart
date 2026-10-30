@@ -9,8 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:getman/core/domain/entities/assertion_result.dart';
-import 'package:getman/core/domain/entities/extraction_result.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/network/http_response.dart';
@@ -22,9 +20,13 @@ import 'package:getman/features/collections/presentation/bloc/collections_state.
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/history/presentation/bloc/history_event.dart';
 import 'package:getman/features/history/presentation/bloc/history_state.dart';
+import 'package:getman/features/scripting/domain/entities/script_output.dart';
+import 'package:getman/features/scripting/domain/entities/script_phase.dart';
+import 'package:getman/features/scripting/domain/entities/script_test_result.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:getman/features/tabs/domain/entities/execute_request_result.dart';
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/domain/entities/response_history_entry.dart';
@@ -755,26 +757,38 @@ void main() {
   // -------------------------------------------------------------------------
   // Test 8: TESTS tab renders assertion results, a summary, and captures
   // -------------------------------------------------------------------------
-  testWidgets('TESTS tab shows assertion results + summary + captures', (
+  testWidgets('TESTS tab shows script test results and summary', (
     tester,
   ) async {
     const tabId = 'tab8';
-    const tab = HttpRequestTabEntity(
+    final tab = HttpRequestTabEntity(
       tabId: tabId,
-      config: HttpRequestConfigEntity(id: tabId),
-      response: HttpResponseEntity(
+      config: const HttpRequestConfigEntity(id: tabId),
+      response: const HttpResponseEntity(
         statusCode: 200,
         body: '{}',
         headers: {},
         durationMs: 5,
       ),
-      assertionResults: [
-        AssertionResult(label: 'status = 200', passed: true, actual: '200'),
-        AssertionResult(label: 'status = 201', passed: false, actual: '200'),
-      ],
-      extractionResults: [
-        ExtractionResult(variable: 'tok', value: 'abc', matched: true),
-      ],
+      scriptExecutionResult: ExecuteRequestResult(
+        postResponse: ScriptOutput(
+          tests: const [
+            ScriptTestResult(
+              id: '1',
+              name: 'status = 200',
+              phase: ScriptPhase.postResponse,
+              passed: true,
+            ),
+            ScriptTestResult(
+              id: '2',
+              name: 'status = 201',
+              phase: ScriptPhase.postResponse,
+              passed: false,
+              message: 'Expected 201',
+            ),
+          ],
+        ),
+      ),
     );
     final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
     addTearDown(bloc.close);
@@ -786,10 +800,10 @@ void main() {
     await tester.tap(find.text('TESTS'));
     await _settleResponseWork(tester);
 
-    expect(find.text('1 / 2 PASSED'), findsOneWidget);
-    expect(find.textContaining('PASS · status = 200'), findsOneWidget);
-    expect(find.textContaining('FAIL · status = 201'), findsOneWidget);
-    expect(find.textContaining('{{tok}} = abc'), findsOneWidget);
+    expect(find.text('1/2 passed'), findsOneWidget);
+    expect(find.textContaining('POST-RESPONSE: status = 200'), findsOneWidget);
+    expect(find.textContaining('POST-RESPONSE: status = 201'), findsOneWidget);
+    expect(find.text('Expected 201'), findsOneWidget);
   });
 
   // -------------------------------------------------------------------------

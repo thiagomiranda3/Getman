@@ -24,7 +24,7 @@ import 'package:getman/features/tabs/presentation/widgets/response/json_tree_fil
 /// copy-value and copy-path (JSONPath) actions; container rows toggle on tap.
 ///
 /// [onExtract] (optional) adds an "Extract to {{var}}" action carrying the
-/// node's JSONPath — wired by the response pane to the chaining rules.
+/// node's JSONPath. The response pane currently provides copy actions only.
 class JsonTreeView extends StatefulWidget {
   const JsonTreeView({
     required this.data,

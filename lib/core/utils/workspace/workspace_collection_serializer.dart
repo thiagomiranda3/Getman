@@ -7,6 +7,7 @@ import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
 import 'package:getman/core/network/request_kind.dart';
+import 'package:getman/core/utils/request_scripts_json.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
 
 /// Pure JSON shaping for the on-disk workspace format. The directory layout and
@@ -124,6 +125,7 @@ class WorkspaceCollectionSerializer {
 
   static Map<String, dynamic> _configToJson(HttpRequestConfigEntity c) => {
     'id': c.id,
+    if (!c.scripts.isEmpty) 'scripts': RequestScriptsJson.toJson(c.scripts),
     'method': c.method,
     'url': c.url,
     // Human-readable name (not the int wire value) — this file lives in git.
@@ -160,6 +162,7 @@ class WorkspaceCollectionSerializer {
   static HttpRequestConfigEntity _configFromJson(Map<String, dynamic> json) {
     return HttpRequestConfigEntity(
       id: (json['id'] as String?) ?? '',
+      scripts: RequestScriptsJson.fromJson(json['scripts']),
       method: (json['method'] as String?) ?? 'GET',
       url: (json['url'] as String?) ?? '',
       kind: RequestKind.values.firstWhere(

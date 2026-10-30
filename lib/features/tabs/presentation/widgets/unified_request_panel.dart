@@ -1,13 +1,13 @@
 // Narrow-width alternative to RequestConfigSection + ResponseSection: a
-// single PARAMS/AUTH/HEADERS/BODY/RULES/RESPONSE tab strip with status
-// metadata above it. Auto-jumps to RESPONSE when a send completes, but not
-// on a cancel (which also clears isSending without a new response).
+// single PARAMS/AUTH/HEADERS/BODY/SCRIPTS/RESPONSE tab strip with status
+// metadata above it. Auto-jumps to RESPONSE for a new response or script
+// failure, including failures before HTTP; cancellation preserves selection.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/ui/widgets/branded_tab_bar.dart';
 import 'package:getman/core/utils/byte_format.dart';
-import 'package:getman/features/chaining/presentation/widgets/rules_tab_view.dart';
+import 'package:getman/features/scripting/presentation/widgets/scripts_tab_view.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
@@ -110,15 +110,18 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel>
       listenWhen: (prev, next) {
         final p = prev.tabs.byId(widget.tabId);
         final n = next.tabs.byId(widget.tabId);
-        // Send completed: isSending flipped true → false, we have a
-        // response, AND it's a NEW response instance — a cancelled request
-        // also flips isSending false but leaves the same response in place
-        // (tabs_bloc only clears isSending on cancel), which must not steal
-        // focus to RESPONSE.
+        // Completion focuses results for either a new HTTP response or a new
+        // script error. Cancellation must preserve the selected section.
+        final hasNewResponse =
+            n?.response != null && !identical(p?.response, n?.response);
+        // A stage error can already be present in the progress emission;
+        // completion may reuse that exact result instance.
+        final hasScriptError =
+            n?.scriptExecutionResult?.error != null &&
+            n?.scriptExecutionResult?.cancelled != true;
         return p?.isSending == true &&
             n?.isSending == false &&
-            n?.response != null &&
-            !identical(p?.response, n?.response);
+            (hasNewResponse || hasScriptError);
       },
       listener: (context, state) {
         if (_tabController.index == _responseTabIndex) return;
@@ -142,7 +145,7 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel>
               'AUTH',
               'HEADERS',
               'BODY',
-              'RULES',
+              'SCRIPTS',
               'RESPONSE',
             ],
             isScrollable: true,
@@ -164,8 +167,8 @@ class _UnifiedRequestPanelState extends State<UnifiedRequestPanel>
                       controller: widget.bodyController,
                       variablesController: widget.variablesController,
                     ),
-                    RulesTabView(
-                      key: ValueKey('rules_${widget.tabId}'),
+                    ScriptsTabView(
+                      key: ValueKey('scripts_${widget.tabId}'),
                       tabId: widget.tabId,
                     ),
                     ResponseArea(

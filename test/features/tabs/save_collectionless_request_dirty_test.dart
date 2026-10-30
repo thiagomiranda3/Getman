@@ -14,8 +14,10 @@ import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/body_type.dart';
 import 'package:getman/core/domain/entities/multipart_field_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/entities/request_scripts.dart';
 import 'package:getman/features/collections/data/models/collection_node_model.dart';
 import 'package:getman/features/collections/domain/entities/collection_node_entity.dart';
+import 'package:getman/features/collections/domain/entities/saved_example_entity.dart';
 import 'package:getman/features/collections/domain/repositories/collections_repository.dart';
 import 'package:getman/features/collections/domain/usecases/collections_usecases.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
@@ -50,7 +52,44 @@ void main() {
   // An unlinked tab the user has edited (non-default URL) but not yet saved.
   HttpRequestTabEntity editedUnlinkedTab() => const HttpRequestTabEntity(
     tabId: 'tab-1',
-    config: HttpRequestConfigEntity(id: 'cfg-1', url: 'https://edited.dev'),
+    config: HttpRequestConfigEntity(
+      id: 'cfg-1',
+      url: 'https://edited.dev',
+      scripts: RequestScripts(
+        preRequest: 'before();',
+        postResponse: 'after();',
+        preRequestEnabled: false,
+      ),
+    ),
+  );
+
+  test(
+    'saving an example preserves script templates through collection storage',
+    () async {
+      final collections = buildCollections();
+      addTearDown(collections.close);
+      final config = editedUnlinkedTab().config;
+      collections.add(SaveRequestToCollection('Scripted', config, id: 'node'));
+      await collections.stream.first;
+      collections.add(
+        SaveExampleToNode(
+          'node',
+          SavedExampleEntity(
+            id: 'example',
+            name: 'Response',
+            capturedAt: DateTime(2026),
+            config: config.copyWith(responseBody: '{}', statusCode: 200),
+          ),
+        ),
+      );
+      await collections.stream.first;
+      final restored = CollectionNode.fromEntity(
+        collections.state.collections.single,
+      ).toEntity();
+      expect(restored.config!.scripts, config.scripts);
+      expect(restored.examples.single.config.scripts, config.scripts);
+      expect(restored.examples.single.config.responseBody, '{}');
+    },
   );
 
   group('symptom (a): immediately after save the tab is NOT dirty', () {
@@ -160,6 +199,12 @@ void main() {
             type: AuthType.bearer,
             token: 'tok-123',
           ).toMap(),
+          scripts: const RequestScripts(
+            apiVersion: 99,
+            preRequest: 'before();',
+            postResponse: 'after();',
+            postResponseEnabled: false,
+          ),
           bodyType: BodyType.urlencoded,
           formFields: const [MultipartFieldEntity(name: 'a', value: '1')],
         );

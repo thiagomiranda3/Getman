@@ -267,6 +267,23 @@ class GitConflictService implements ConflictService {
         // '' (a pick of the side without one) clears it — the serializer
         // omits empty descriptions, so '' and null agree on the wire.
         node = node.copyWith(description: value);
+      } else if (field.startsWith('scripts.') && config != null) {
+        final scripts = config.scripts;
+        config = config.copyWith(
+          scripts: scripts.copyWith(
+            apiVersion: field == 'scripts.apiVersion'
+                ? int.tryParse(value)
+                : null,
+            preRequest: field == 'scripts.preRequest' ? value : null,
+            postResponse: field == 'scripts.postResponse' ? value : null,
+            preRequestEnabled: field == 'scripts.preRequestEnabled'
+                ? value == 'true'
+                : null,
+            postResponseEnabled: field == 'scripts.postResponseEnabled'
+                ? value == 'true'
+                : null,
+          ),
+        );
       } else if (field == 'method') {
         config = config?.copyWith(method: value);
       } else if (field == 'url') {

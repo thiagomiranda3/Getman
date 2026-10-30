@@ -1,0 +1,29 @@
+{
+  "scope": "native runtime only; no Flutter boot or HTTP latency measured",
+  "platform": "macos",
+  "dart": "3.12.2 (stable) (Tue Jun 9 01:11:39 2026 -0700) on \"macos_arm64\"",
+  "no_script_bypass": {
+    "samples": 30,
+    "median_us": 0,
+    "p95_us": 1,
+    "max_us": 6
+  },
+  "first_script_us": 3151,
+  "warm_scripts": {
+    "samples": 500,
+    "median_us": 943,
+    "p95_us": 1244,
+    "max_us": 3309
+  },
+  "rss_before": 15286272,
+  "rss_after_warmup": 19824640,
+  "rss_after_500": 21610496,
+  "live_native_controls": 0,
+  "live_native_runtimes": 0,
+  "measured_on": "2026-10-30",
+  "host": {
+    "cpu": "Apple M3 Max",
+    "memory_bytes": 38654705664,
+    "macos": "27.0.1 (26A434)"
+  }
+}

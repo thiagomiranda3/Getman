@@ -1,0 +1,38 @@
+{
+  "native": {
+    "engine": "QuickJS-NG",
+    "version": "0.14.0",
+    "upstream": "https://github.com/quickjs-ng/quickjs/releases/tag/v0.14.0",
+    "sourceArchiveSha256": "928e9406addd99eb8623348f2cfcd916eade9a263c60d42be79bc7aee4ee8453",
+    "license": "MIT",
+    "licenseFile": "packages/getman_quickjs/src/LICENSE",
+    "nativeToolchainC": "0.19.2",
+    "sources": {
+      "LICENSE": "96f73f9d2a16c21a36b418f06073be26e7d6d5e7c1bc99756b21a4f2c74ef171",
+      "bridge.c": "1501326c0da37379dcf5fdfdfe90b49c5e525383b695712b8a9b660db18c94c0",
+      "builtin-array-fromasync.h": "d47456ec04d98843d35412049377f03bde47c8bd029869f76e0f4c64bbbca6ad",
+      "builtin-iterator-zip-keyed.h": "0f9ad43935a5dd00798b07ce654fcc340d3b989416aff70b65097b5181e9a77d",
+      "builtin-iterator-zip.h": "46c358b4303a6a69050a812877b244d5d45b0c3a670ca5c3894c1e5995d2860c",
+      "cutils.h": "b93331edd1bf86e1c0b516657d0b16b95bba5f24d799d9824df16f903173b5c2",
+      "dtoa.c": "a8d2cf2d04db406e0c16acdd95ab0e709d309902865722f41dac07a1ba5676af",
+      "dtoa.h": "1c4a4540c0038632c8a4c225472fbc21bd476fb35c4da4a857a11965b58231b9",
+      "libregexp-opcode.h": "c5ee518885eb6e720537b6df5565ddc2bcaadbda512f3fc072adc96fb24a7648",
+      "libregexp.c": "d1e7c4280e1948a25310aaa80aedc273b6fe12322964965f9025ba1800f2c14d",
+      "libregexp.h": "991adcaedb0e0ab653811f7f6e1244a23a7454dff6ce647b518df9a22201c122",
+      "libunicode-table.h": "391d664bacefef239c4349d338c59bf6aa70128f23b105bb5c052db48a14c439",
+      "libunicode.c": "62bfe07a00c297d62cf89d2a147f1d0cd0e90ae7c8058e0fabb66e896950a702",
+      "libunicode.h": "70f9f38b1cd10186d22e30d5f604465f4747662701f3310e089e5749060f4d4f",
+      "list.h": "cb6e24e8ee54bccdd66234fe54cd702d1160b9841db2b9b9adeb5003afe301d5",
+      "quickjs-atom.h": "66be65be6f96379d85b55769d7a1fcf98c956ccbae166d8ffb8eee3293965af6",
+      "quickjs-c-atomics.h": "29883c742a5c512278fce54d19b1b9af949006e1d7dfc9ffa2e0946b184d8c5c",
+      "quickjs-opcode.h": "2d8fd6e896bf030e3dfb70dfaae23d3c1fb1193d23154ad605b445e8203077f1",
+      "quickjs.c": "0dc62d8f9a2ed0e6f19fba948a1c54ee09c8d5c74545a814918716da89ccc35f",
+      "quickjs.h": "729312017860128a3f3520586ca4d78031f21bf618bf68b0c1220f39423c0613"
+    }
+  },
+  "verification": {
+    "macos": "Flutter unit tests build and execute native assets",
+    "windows": "not yet verified",
+    "linux": "not yet verified"
+  }
+}

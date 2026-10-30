@@ -5,9 +5,9 @@
 ## Boot sequence (`main.dart` + `injection_container.dart`)
 
 1. `WidgetsFlutterBinding.ensureInitialized()`.
-2. `di.init()` — opens Hive, registers adapters, opens **all** boxes in parallel (`Future.wait`), reads current settings synchronously, registers all use cases, repositories, data sources, BLoCs, `NetworkService`, `AppRouter`, `TabDirtyChecker`. The `cookies` + `requestRules` boxes are opened on this cold-start path and the cookie jar is hydrated via `openAndHydrateDeferredBoxes` **before** `NetworkService` is usable — an earlier post-frame `warmUpDeferredBoxes` raced early sends (dropped cookies / skipped rules), so don't re-defer these without a readiness gate.
+2. `di.init()` — opens Hive, registers adapters, opens **all** boxes in parallel (`Future.wait`), reads current settings synchronously, registers all use cases, repositories, data sources, BLoCs, `NetworkService`, `AppRouter`, `TabDirtyChecker`. The `cookies` and primitive `scriptTrust` boxes open on this cold-start path, and the cookie jar is hydrated via `openAndHydrateDeferredBoxes` **before** `NetworkService` is usable. Retired Rules storage is never opened. QuickJS is lazy and starts only for nonempty scripts; its singleton repository is closed on DI disposal. Do not defer cookie readiness, which would race early sends.
 3. Returns `SettingsEntity` to pass as `initialSettings` into `SettingsBloc`.
-4. `MultiRepositoryProvider` exposes cross-feature services to the widget tree: `TabDirtyChecker`, `NetworkService`, `CookieStore`, `WorkspaceSyncService`, and `UrlFocusRegistry` (the last lets the Cmd/Ctrl+L action focus the active tab's URL field — each `UrlBar` registers its `FocusNode` keyed by tab id).
+4. `MultiRepositoryProvider` exposes cross-feature services to the widget tree: `TabDirtyChecker`, `NetworkService`, `CookieStore`, `WorkspaceSyncService`, `ScriptTrustRepository`, and `UrlFocusRegistry` (the last lets the Cmd/Ctrl+L action focus the active tab's URL field — each `UrlBar` registers its `FocusNode` keyed by tab id).
 5. `MultiBlocProvider` creates `SettingsBloc`, `HistoryBloc`, `CollectionsBloc`, `TabsBloc`, `BodyFieldDictionaryCubit`, `EnvironmentsBloc` (plus the git blocs and `McpBloc`). Collections/Tabs/Environments dispatch their `Load*` event eagerly; `HistoryBloc` has no load event — it starts with `isLoading: true` and populates from its `watchHistory()` subscription (the stream yields the current list on subscribe). The root `BlocBuilder<SettingsBloc>` has a `buildWhen` gated to `themeId`/`isDarkMode`/`isCompactMode` — anything else would rebuild the whole `MaterialApp` per settings keystroke.
 
 ## Dependency injection
@@ -18,8 +18,8 @@ The hand-written `Hive.registerAdapter(...)` calls also live in `injection_conta
 
 ## Provider inventory
 
-- **`MultiRepositoryProvider`** (cross-feature services): `TabDirtyChecker`, `NetworkService`, `CookieStore`, `WorkspaceSyncService`, `UrlFocusRegistry`.
-- **`MultiBlocProvider`** (feature blocs): `SettingsBloc`, `HistoryBloc`, `CollectionsBloc`, `TabsBloc`, `BodyFieldDictionaryCubit`, `EnvironmentsBloc`, the git blocs (`GitSyncBloc`, `ReviewBloc`, `PullRequestsBloc`, `ConflictBloc`), `RulesBloc`, `RealtimeBloc`, `McpBloc`.
+- **`MultiRepositoryProvider`** (cross-feature services): `TabDirtyChecker`, `NetworkService`, `CookieStore`, `WorkspaceSyncService`, `ScriptTrustRepository`, `UrlFocusRegistry`.
+- **`MultiBlocProvider`** (feature blocs): `SettingsBloc`, `HistoryBloc`, `CollectionsBloc`, `TabsBloc`, `BodyFieldDictionaryCubit`, `EnvironmentsBloc`, the git blocs (`GitSyncBloc`, `ReviewBloc`, `PullRequestsBloc`, `ConflictBloc`), `RealtimeBloc`, `McpBloc`.
 - **`ChangeNotifierProvider`** above `MaterialApp`: `UpdateController` (drives the auto-update dialog).
 
 ## Global keyboard shortcuts

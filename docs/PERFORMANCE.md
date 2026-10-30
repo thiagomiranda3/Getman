@@ -16,8 +16,6 @@ Current spans:
 |---|---|---|
 | `send.request` | `SendRequestUseCase` | URL/auth/body assembly + the network round-trip |
 | `send.recordHistory` | `SendRequestUseCase` | best-effort history write |
-| `rules.run` | `TabsBloc._applyRules` | extraction + assertions, decoded once (small body, inline) |
-| `rules.run.isolate` | `TabsBloc._applyRules` | same, on a background isolate (body > 64 KiB) |
 | `tabs.putTab` | `TabsBloc._flushDirtyTabs` | debounced incremental tab persistence |
 
 ## How to profile
@@ -30,15 +28,17 @@ Open DevTools → **Performance**. Record while exercising each scenario, then
 check the **UI** track for frames over budget (~16 ms) and the **Timeline
 Events** for the spans above:
 
-1. **Large response + chaining rules** — send a request returning a multi-MB
-   JSON body with several jsonPath extraction/assertion rules. `rules.run.isolate`
-   should appear off the UI track; the UI thread should not spike.
+1. **Large response + JavaScript scripts** — send a request returning a multi-MB
+   JSON body with post-response lookups/assertions. QuickJS runs off the UI
+   isolate; the UI thread should not spike. See [scripting verification](architecture/scripting-verification.md)
+   for measured runtime costs and remaining app-wide benchmarks.
 2. **High-rate stream** — connect an SSE/WebSocket source that emits rapidly.
    Frames coalesce (~1 emission per 16 ms window); the live panel should scroll
    without dropping frames.
 3. **Cold start** — relaunch with real data (large `tabs.hive` / `history.hive`).
-   Critical Hive boxes open in parallel; `cookies`/`requestRules` open after the
-   first frame (`warmUpDeferredBoxes`).
+   Hive boxes open in parallel, including local script approvals. Cookies are
+   hydrated before network services are exposed. QuickJS loads lazily on the
+   first nonempty script.
 4. **Rapid edits** — create/rename/move collections, edit environments, trigger
    `Set-Cookie` responses. Environments/cookies persist per-key (no whole-list
    rewrite); collections are debounced.

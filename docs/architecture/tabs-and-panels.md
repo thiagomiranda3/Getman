@@ -123,7 +123,7 @@ The response pane is a shell (`response_section.dart` → `ResponseSection`) ove
 
 ### Response body modes
 
-`_BodyModeToggle` is a 3-segment PRETTY/RAW/TREE switch (keys `body_toggle_*`). TREE renders `JsonTreeView` (collapsible, virtualized) and is only enabled when the body decodes to a JSON object/array under `kLargeResponseViewerChars` (the decode is cached in `_decoded` so the tree keeps its expansion state across rebuilds). Each tree node offers Copy value, Copy path (a JSONPath built by `core/utils/json_path_builder.dart` in the exact grammar `JsonPath` accepts), and **Extract to `{{var}}`** → `ResponseBodyView._extractToVariable` dispatches `AddExtractionRule(configId, rule)` to the global `RulesBloc` (loads+appends+saves), closing the loop with the chaining engine.
+`_BodyModeToggle` is a 3-segment PRETTY/RAW/TREE switch (keys `body_toggle_*`). TREE renders `JsonTreeView` (collapsible, virtualized) and is only enabled when the body decodes to a JSON object/array under `kLargeResponseViewerChars` (the decode is cached in `_decoded` so the tree keeps its expansion state across rebuilds). Each tree node offers Copy value and Copy path (a JSONPath built by `core/utils/json_path_builder.dart`). Response captures are JavaScript in SCRIPTS using `gm.response.lookup/header/text`; there is no Rules extraction action.
 
 ### Large response rendering
 

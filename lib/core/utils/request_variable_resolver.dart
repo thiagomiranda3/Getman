@@ -8,6 +8,7 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 import 'package:getman/features/collections/domain/logic/collections_tree_helper.dart';
 import 'package:getman/features/environments/domain/entities/environment_entity.dart';
 import 'package:getman/features/environments/domain/logic/active_environment_helper.dart';
+import 'package:getman/features/tabs/domain/entities/script_variable_snapshot.dart';
 
 /// Computes the variable map that applies to a request: the collection layer
 /// (merge of the request's ancestor folders, deepest wins) overlaid by the
@@ -15,6 +16,27 @@ import 'package:getman/features/environments/domain/logic/active_environment_hel
 /// beside the Postman mappers, which likewise bridge feature entities.
 class RequestVariableResolver {
   const RequestVariableResolver._();
+
+  static ScriptVariableSnapshot snapshotFor({
+    required List<EnvironmentEntity> environments,
+    required String? activeEnvironmentId,
+    required List<CollectionNodeEntity> collections,
+    required String? collectionNodeId,
+  }) {
+    final environment = ActiveEnvironmentHelper.activeEnvironment(
+      environments,
+      activeEnvironmentId,
+    );
+    final collection = collectionNodeId == null
+        ? (variables: const <String, String>{}, secretKeys: const <String>{})
+        : CollectionsTreeHelper.collectVariables(collections, collectionNodeId);
+    return ScriptVariableSnapshot(
+      environmentId: environment?.id,
+      environmentVariables: environment?.variables ?? const {},
+      collectionVariables: collection.variables,
+      secretKeys: {...collection.secretKeys, ...?environment?.secretKeys},
+    );
+  }
 
   static Map<String, String> variablesFor({
     required List<EnvironmentEntity> environments,

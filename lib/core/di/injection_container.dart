@@ -4,15 +4,12 @@
 // registered manually here (kept over the generated hive_registrar.g.dart)
 // and only once per process, guarded by _adaptersRegistered.
 //
-// Gotchas: the cookies + requestRules boxes hydrate via
-// openAndHydrateDeferredBoxes BEFORE NetworkService becomes usable — an
-// earlier post-frame warm-up raced early sends, silently dropping persisted
-// cookies / skipping post-response rules, so don't re-defer them without a
-// readiness gate. reset() tears down get_it + closes boxes for E2E
+// Cookie hydration completes before NetworkService becomes usable.
+// Script trust stays in a local primitive box; retired Rules data is untouched.
+// reset() tears down get_it + closes boxes for E2E
 // between-test isolation; registered adapters intentionally survive (Hive
 // can't unregister them).
 
-import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 import 'package:getman/core/git/gh_service.dart';
 import 'package:getman/core/git/git_service.dart';
@@ -26,14 +23,6 @@ import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/network/realtime_service.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
-import 'package:getman/features/chaining/data/datasources/request_rules_local_data_source.dart';
-import 'package:getman/features/chaining/data/models/assertion_model.dart';
-import 'package:getman/features/chaining/data/models/extraction_rule_model.dart';
-import 'package:getman/features/chaining/data/models/request_rules_model.dart';
-import 'package:getman/features/chaining/data/repositories/request_rules_repository_impl.dart';
-import 'package:getman/features/chaining/domain/repositories/request_rules_repository.dart';
-import 'package:getman/features/chaining/domain/usecases/request_rules_usecases.dart';
-import 'package:getman/features/chaining/presentation/bloc/rules_bloc.dart';
 import 'package:getman/features/collections/data/datasources/collections_local_data_source.dart';
 import 'package:getman/features/collections/data/datasources/workspace_data_source_factory.dart';
 import 'package:getman/features/collections/data/models/collection_node_model.dart';
@@ -72,6 +61,10 @@ import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/mcp/presentation/bloc/mcp_bloc.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
+import 'package:getman/features/scripting/data/repositories/script_runtime_repository_impl.dart';
+import 'package:getman/features/scripting/data/repositories/script_trust_repository_impl.dart';
+import 'package:getman/features/scripting/domain/repositories/script_runtime_repository.dart';
+import 'package:getman/features/scripting/domain/repositories/script_trust_repository.dart';
 import 'package:getman/features/settings/data/datasources/settings_local_data_source.dart';
 import 'package:getman/features/settings/data/models/settings_model.dart';
 import 'package:getman/features/settings/data/repositories/settings_repository_impl.dart';
@@ -87,8 +80,10 @@ import 'package:getman/features/tabs/data/models/request_tab_model.dart';
 import 'package:getman/features/tabs/data/models/stored_response_model.dart';
 import 'package:getman/features/tabs/data/repositories/body_field_dictionary_repository_impl.dart';
 import 'package:getman/features/tabs/data/repositories/tabs_repository_impl.dart';
+import 'package:getman/features/tabs/domain/logic/script_execution_registry.dart';
 import 'package:getman/features/tabs/domain/repositories/body_field_dictionary_repository.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
+import 'package:getman/features/tabs/domain/usecases/execute_request_use_case.dart';
 import 'package:getman/features/tabs/domain/usecases/send_request_use_case.dart';
 import 'package:getman/features/tabs/presentation/bloc/body_field_dictionary_cubit.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
@@ -133,20 +128,13 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
       ..registerAdapter(EnvironmentModelAdapter())
       ..registerAdapter(MultipartFieldModelAdapter())
       ..registerAdapter(ParkedParamModelAdapter())
-      ..registerAdapter(StoredCookieModelAdapter())
-      ..registerAdapter(ExtractionRuleModelAdapter())
-      ..registerAdapter(AssertionModelAdapter())
-      ..registerAdapter(RequestRulesModelAdapter());
+      ..registerAdapter(StoredCookieModelAdapter());
+
     _adaptersRegistered = true;
   }
 
-  // Open every box in PARALLEL (Future.wait) so cold start is bounded by the
-  // slowest single box, not their sum. The cookies + request-rules boxes are
-  // small and open concurrently with the rest; they used to be deferred to a
-  // post-frame callback, but that raced early sends — a request fired before
-  // the deferred warm-up finished silently dropped persisted cookies and
-  // skipped post-response rules. Opening them on the cold path closes that race
-  // for a negligible (parallel) cost. See [openAndHydrateDeferredBoxes].
+  // Open independent boxes concurrently; cookies are hydrated before network
+  // services are exposed. Retired rule storage is deliberately not opened.
   final boxes = await Future.wait<Box<dynamic>>([
     Hive.openBox<SettingsModel>(HiveBoxes.settings),
     Hive.openBox<EnvironmentModel>(HiveBoxes.environments),
@@ -155,9 +143,9 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     Hive.openBox(HiveBoxes.tabsMeta),
     Hive.openBox<CollectionNode>(HiveBoxes.collections),
     Hive.openBox<StoredCookieModel>(HiveBoxes.cookies),
-    Hive.openBox<RequestRulesModel>(HiveBoxes.requestRules),
     Hive.openBox<PanelModel>(HiveBoxes.panels),
     Hive.openBox<int>(HiveBoxes.bodyFieldDictionary),
+    Hive.openBox<String>(HiveBoxes.scriptTrust),
   ]);
   final settingsBox = boxes[0] as Box<SettingsModel>;
   final environmentsBox = boxes[1] as Box<EnvironmentModel>;
@@ -246,21 +234,6 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     ..registerFactory(() => GitSyncBloc(service: sl()))
     ..registerFactory(() => PullRequestsBloc(service: sl()))
     ..registerFactory(() => ConflictBloc(service: sl()))
-    // Features - Chaining (no-code extraction + assertions)
-    ..registerLazySingleton(
-      () => RulesBloc(
-        getRequestRulesUseCase: sl(),
-        saveRequestRulesUseCase: sl(),
-      ),
-    )
-    ..registerLazySingleton(() => GetRequestRulesUseCase(sl()))
-    ..registerLazySingleton(() => SaveRequestRulesUseCase(sl()))
-    ..registerLazySingleton<RequestRulesRepository>(
-      () => RequestRulesRepositoryImpl(sl()),
-    )
-    ..registerLazySingleton<RequestRulesLocalDataSource>(
-      RequestRulesLocalDataSourceImpl.new,
-    )
     // Features - Environments
     ..registerLazySingleton(
       () => EnvironmentsBloc(
@@ -269,8 +242,10 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
         putEnvironmentUseCase: sl(),
         deleteEnvironmentUseCase: sl(),
         initialEnvironments: initialEnvironments,
+        watchEnvironmentsUseCase: sl(),
       ),
     )
+    ..registerLazySingleton(() => WatchEnvironmentsUseCase(sl()))
     ..registerLazySingleton(() => GetEnvironmentsUseCase(sl()))
     ..registerLazySingleton(() => SaveEnvironmentsUseCase(sl()))
     ..registerLazySingleton(() => PutEnvironmentUseCase(sl()))
@@ -281,16 +256,35 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     ..registerLazySingleton<EnvironmentsLocalDataSource>(
       EnvironmentsLocalDataSourceImpl.new,
     )
+    ..registerLazySingleton<ScriptRuntimeRepository>(
+      ScriptRuntimeRepositoryImpl.new,
+      dispose: (runtime) => runtime.close(),
+    )
+    ..registerLazySingleton<ScriptTrustRepository>(
+      () => ScriptTrustRepositoryImpl(Hive.box<String>(HiveBoxes.scriptTrust)),
+    )
+    ..registerLazySingleton(ScriptExecutionRegistry.new)
+    ..registerLazySingleton(
+      () => ExecuteRequestUseCase(
+        sendRequest: sl(),
+        runtime: sl(),
+        environments: sl(),
+        trust: sl(),
+        registry: sl(),
+      ),
+    )
     // Features - Tabs
     ..registerLazySingleton<BodyFieldDictionaryRepository>(
-      () => BodyFieldDictionaryRepositoryImpl(boxes[9] as Box<int>),
+      () => BodyFieldDictionaryRepositoryImpl(
+        Hive.box<int>(HiveBoxes.bodyFieldDictionary),
+      ),
     )
     ..registerFactory(() => BodyFieldDictionaryCubit(sl()))
     ..registerLazySingleton(
       () => TabsBloc(
         repository: sl(),
         sendRequestUseCase: sl(),
-        getRequestRulesUseCase: sl(),
+        executeRequestUseCase: sl(),
       ),
     )
     ..registerLazySingleton(
@@ -325,7 +319,7 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     ..registerLazySingleton(() => UpdateController(sl<UpdateRepository>()))
     // Lets the Cmd/Ctrl+L shortcut focus the active tab's URL field.
     ..registerLazySingleton(UrlFocusRegistry.new)
-    // Session-global PARAMS/AUTH/HEADERS/BODY/RULES selection, shared across
+    // Session-global PARAMS/AUTH/HEADERS/BODY/SCRIPTS selection, shared across
     // every request tab's editor strip.
     ..registerLazySingleton(RequestSectionIndex.new)
     ..registerLazySingleton<WorkspacePulseController>(
@@ -370,83 +364,15 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     )
     ..registerLazySingleton(AppRouter.new);
 
-  // H4 housekeeping: drop request-rules entries whose owning config no longer
-  // exists anywhere (closed tabs / deleted nodes left them behind forever).
-  // All boxes it reads are open by this point (parallel wait + hydrate above).
-  await _sweepOrphanedRequestRules();
-
   return initialSettings;
 }
 
-/// Boot-time orphan sweep for the `requestRules` box (H4): rules are keyed by
-/// config id (UUIDs, never reused — duplication and history re-mint fresh
-/// ids) and nothing deleted them when their owner disappeared (tab closed,
-/// node deleted, history pruned), so the box grew forever. Runs once per
-/// boot, after every box is open.
-///
-/// The live-owner set is deliberately CONSERVATIVE — the union of every
-/// persisted store that can carry a rule-owning config id:
-///  - **open tabs** (`tabs` box): rules are only ever written keyed by a
-///    tab's config id (RULES-tab edits via `SaveRules`, and TREE-mode
-///    "Extract to {{var}}" via `AddExtractionRule`);
-///  - **collection nodes + their examples** (`collections` box, full tree
-///    walk): saving a tab stores `config.copyWith()` — SAME id — on the node,
-///    and reopening the node reuses that id, so a saved request legitimately
-///    owns its rules after the tab closes. Examples embed configs too;
-///    included defensively even though no current path keys rules by them;
-///  - **history entries** (`history` box): cannot own rules today (recording
-///    mints a fresh config id, and opening from history/command-palette mints
-///    another — `withId(Uuid().v4())`), but inclusion is free and shields a
-///    future id-reusing path from losing its rules.
-///
-/// In-memory-only id holders need no entry: the closed-tab restore stack is
-/// empty at boot, and duplicate-tab re-mints its config id. Failures only
-/// log — housekeeping must never block boot.
-Future<void> _sweepOrphanedRequestRules() async {
-  try {
-    final liveConfigIds = <String>{
-      for (final tab in Hive.box<HttpRequestTabModel>(HiveBoxes.tabs).values)
-        tab.config.id,
-      for (final config in Hive.box<HttpRequestConfig>(
-        HiveBoxes.history,
-      ).values)
-        config.id,
-    };
-    final pending = List.of(
-      Hive.box<CollectionNode>(HiveBoxes.collections).values,
-    );
-    while (pending.isNotEmpty) {
-      final node = pending.removeLast();
-      final configId = node.config?.id;
-      if (configId != null) liveConfigIds.add(configId);
-      for (final example in node.examples) {
-        liveConfigIds.add(example.config.id);
-      }
-      pending.addAll(node.children);
-    }
-    final removed = await sl<RequestRulesLocalDataSource>().sweepOrphans(
-      liveConfigIds,
-    );
-    if (removed > 0) {
-      debugPrint('Swept $removed orphaned request-rules entries');
-    }
-  } on Object catch (e) {
-    debugPrint('Request-rules orphan sweep failed (non-fatal): $e');
-  }
-}
-
-/// Ensures the cookies + request-rules boxes are open, migrates the cookie jar
-/// to its keyed layout, then hydrates [store]. [init] calls this on the
-/// cold-start path so an early send can never race an unopened box (bugs:
-/// dropped cookies / skipped post-response rules). Idempotent — the `isBoxOpen`
-/// guards make it safe to call when the boxes are already open, and it is also
-/// the single seam exercised by the boot test.
+/// Opens and hydrates cookies before an early send. Retired rule data is
+/// deliberately not opened, migrated or deleted.
 Future<void> openAndHydrateDeferredBoxes(InMemoryCookieStore store) async {
   await Future.wait<Box<dynamic>>([
     if (!Hive.isBoxOpen(HiveBoxes.cookies))
       Hive.openBox<StoredCookieModel>(HiveBoxes.cookies),
-    if (!Hive.isBoxOpen(HiveBoxes.requestRules))
-      Hive.openBox<RequestRulesModel>(HiveBoxes.requestRules),
   ]);
   await HiveCookiePersistence.migrateLegacyKeysIfNeeded();
   store.hydrate();

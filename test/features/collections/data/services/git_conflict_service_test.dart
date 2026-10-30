@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/domain/entities/parked_param_entity.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
+import 'package:getman/core/domain/entities/request_scripts.dart';
 import 'package:getman/core/git/git_service.dart';
 import 'package:getman/core/network/request_kind.dart';
 import 'package:getman/core/utils/workspace/workspace_collection_serializer.dart';
@@ -94,6 +95,54 @@ void main() {
       WorkspaceSyncService(_NoopWorkspaceDataSource()),
     );
   });
+
+  test(
+    'script conflict choices persist independent fields without concatenation',
+    () async {
+      CollectionNodeEntity scripted(String source) => _leaf().copyWith(
+        config: _leaf().config!.copyWith(
+          scripts: RequestScripts(
+            preRequest: source,
+            postResponse: 'unchanged',
+          ),
+        ),
+      );
+      for (var stage = 1; stage <= 3; stage++) {
+        when(() => git.showStage(root, 'a.req.json', stage)).thenAnswer(
+          (_) async => _reqStage(scripted('source $stage')),
+        );
+      }
+      String? written;
+      when(() => git.writeWorkingFile(root, 'a.req.json', any())).thenAnswer((
+        i,
+      ) async {
+        written = i.positionalArguments[2] as String;
+      });
+      when(() => git.add(root, 'a.req.json')).thenAnswer((_) async {});
+      await service.resolve(root, const [
+        FileResolution(
+          path: 'a.req.json',
+          fieldChoices: {
+            'scripts.preRequest': 'selected\nα',
+            'scripts.apiVersion': '99',
+            'scripts.postResponseEnabled': 'false',
+          },
+        ),
+      ]);
+      final restored = WorkspaceCollectionSerializer.requestFromJson(
+        jsonDecode(written!) as Map<String, dynamic>,
+      );
+      expect(
+        restored.config!.scripts,
+        const RequestScripts(
+          apiVersion: 99,
+          preRequest: 'selected\nα',
+          postResponse: 'unchanged',
+          postResponseEnabled: false,
+        ),
+      );
+    },
+  );
 
   group('currentConflicts / classify', () {
     test('a .req.json changed on both sides classifies as request', () async {

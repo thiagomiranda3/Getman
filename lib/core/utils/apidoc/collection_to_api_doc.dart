@@ -71,6 +71,10 @@ class CollectionToApiDoc {
     List<String> warnings,
   ) {
     final config = leaf.config!;
+    if (!config.scripts.isEmpty &&
+        !warnings.contains('Scripts are not included in generated code')) {
+      warnings.add('Scripts are not included in generated code');
+    }
     final parts = UrlQueryUtils.parse(config.url);
 
     final queryParams = [

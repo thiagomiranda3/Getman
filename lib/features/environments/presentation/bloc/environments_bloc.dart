@@ -1,12 +1,8 @@
-// EnvironmentsBloc: loads/adds/updates/deletes/imports environments, each
-// persisting via a single keyed Hive write (import batches the whole list).
-//
-// Gotchas: add/update/import re-sort the in-session list by name
-// (case-insensitive) to match the data source's read-time sort -- Hive keys
-// are UUIDs, so key order has no display meaning. MergeEnvironmentVariables
-// reads the LIVE entity inside its handler (not a stale state snapshot) so
-// two merges dispatched in the same event-loop turn both land.
+// Environment editing and optional committed-storage observation. Script and
+// legacy variable writes use repository patches; editor changes carry their
+// base snapshot. Cancels the external-change subscription on close.
 
+import 'dart:async';
 import 'dart:developer';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -22,6 +18,7 @@ class EnvironmentsBloc extends Bloc<EnvironmentsEvent, EnvironmentsState> {
     required this._saveEnvironmentsUseCase,
     required this._putEnvironmentUseCase,
     required this._deleteEnvironmentUseCase,
+    WatchEnvironmentsUseCase? watchEnvironmentsUseCase,
     List<EnvironmentEntity> initialEnvironments = const [],
   }) : super(EnvironmentsState(environments: initialEnvironments)) {
     on<LoadEnvironments>(_onLoad);
@@ -30,7 +27,31 @@ class EnvironmentsBloc extends Bloc<EnvironmentsEvent, EnvironmentsState> {
     on<MergeEnvironmentVariables>(_onMergeVariables);
     on<DeleteEnvironment>(_onDelete);
     on<ImportEnvironments>(_onImport);
+    on<EnvironmentsChanged>((event, emit) {
+      emit(state.copyWith(environments: event.environments));
+    });
+    _subscription = watchEnvironmentsUseCase?.call().listen(
+      (environments) {
+        if (!isClosed) add(EnvironmentsChanged(environments));
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        log(
+          'Environment watch failed',
+          name: 'EnvironmentsBloc',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      },
+    );
   }
+  StreamSubscription<List<EnvironmentEntity>>? _subscription;
+
+  @override
+  Future<void> close() async {
+    await _subscription?.cancel();
+    return super.close();
+  }
+
   final GetEnvironmentsUseCase _getEnvironmentsUseCase;
   final SaveEnvironmentsUseCase _saveEnvironmentsUseCase;
   final PutEnvironmentUseCase _putEnvironmentUseCase;
@@ -83,12 +104,16 @@ class EnvironmentsBloc extends Bloc<EnvironmentsEvent, EnvironmentsState> {
     final next = [...state.environments];
     next[index] = event.environment;
     emit(state.copyWith(environments: _sortedByName(next)));
-    await _persist(() => _putEnvironmentUseCase(event.environment));
+    await _persist(
+      () => _putEnvironmentUseCase(
+        event.environment,
+        previous: event.previous,
+      ),
+    );
   }
 
-  /// Atomic read-modify-write: merges into the entity as it exists NOW, so
-  /// two merges dispatched in the same event-loop turn both land (events are
-  /// processed sequentially; each handler sees the previous one's emission).
+  /// Optimistically updates the UI, then merges only captured keys through
+  /// the repository queue; persistence never uses this UI snapshot.
   Future<void> _onMergeVariables(
     MergeEnvironmentVariables event,
     Emitter<EnvironmentsState> emit,
@@ -105,7 +130,12 @@ class EnvironmentsBloc extends Bloc<EnvironmentsEvent, EnvironmentsState> {
     final next = [...state.environments];
     next[index] = merged;
     emit(state.copyWith(environments: next));
-    await _persist(() => _putEnvironmentUseCase(merged));
+    await _persist(
+      () => _putEnvironmentUseCase.mergeVariables(
+        event.environmentId,
+        event.variables,
+      ),
+    );
   }
 
   Future<void> _onDelete(
@@ -129,10 +159,9 @@ class EnvironmentsBloc extends Bloc<EnvironmentsEvent, EnvironmentsState> {
     if (event.environments.isEmpty) return;
     final next = _sortedByName([...state.environments, ...event.environments]);
     emit(state.copyWith(environments: next));
-    // Import is rare and arrives as a batch — one whole-list write is fine.
-    // The data source replaces via putAll+deleteAll (never clear), so a
-    // chaining write-back's putEnvironment landing mid-save survives it.
-    await _persist(() => _saveEnvironmentsUseCase(next));
+    // Admit only incoming records; the repository reads the live list inside
+    // the shared mutation queue, preserving concurrent script captures.
+    await _persist(() => _saveEnvironmentsUseCase.import(event.environments));
   }
 
   Future<void> _persist(Future<void> Function() write) async {
