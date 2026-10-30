@@ -207,6 +207,37 @@ void main() {
     );
   }
 
+  testWidgets('script help stays readable on a wide desktop', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(2400, 1200);
+    addTearDown(tester.view.reset);
+    final bloc = await _loadedBloc(repository, sendUseCase);
+    addTearDown(bloc.close);
+    final index = RequestSectionIndex();
+    addTearDown(index.dispose);
+    await tester.pumpWidget(
+      host(
+        bloc: bloc,
+        sectionIndex: index,
+        child: RepositoryProvider<ScriptTrustRepository>.value(
+          value: _Trust(),
+          child: const ScriptsTabView(tabId: 't1'),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text('HELP').hitTestable());
+    await tester.pumpAndSettle();
+    final paragraphs = find.byType(SelectableText);
+    expect(tester.getSize(paragraphs.first).width, lessThanOrEqualTo(600));
+    expect(paragraphs.evaluate().length, greaterThan(1));
+    expect(find.text('CLOSE').hitTestable(), findsOneWidget);
+    await tester.tap(find.text('CLOSE'));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(bloc.close);
+  });
+
   testWidgets('scripts replaces rules at section four on the first frame', (
     tester,
   ) async {

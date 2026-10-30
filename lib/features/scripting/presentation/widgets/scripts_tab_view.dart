@@ -10,6 +10,7 @@ import 'package:getman/core/ui/widgets/branded_tab_bar.dart';
 import 'package:getman/features/scripting/domain/entities/script_phase.dart';
 import 'package:getman/features/scripting/domain/logic/script_snippets.dart';
 import 'package:getman/features/scripting/domain/repositories/script_trust_repository.dart';
+import 'package:getman/features/scripting/presentation/widgets/script_help_dialog.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
@@ -412,39 +413,7 @@ class _ScriptsTabViewState extends State<ScriptsTabView>
           const Text('ENABLED'),
           const Spacer(),
           TextButton(
-            onPressed: () => showDialog<void>(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('SCRIPT HELP'),
-                content: const SingleChildScrollView(
-                  child: SelectableText(
-                    'Use gm for request, response, variables, JWT and tests. '
-                    'Scripts run only when sending HTTP requests. '
-                    'No Node, npm, fetch or pm.* compatibility. '
-                    'Each stage: 1 second, 32 MiB heap. Source: 256 KiB. '
-                    'Input: 8 MiB; output: 1 MiB; 200 tests. '
-                    'Console: 200 entries / 64 KiB. '
-                    'Use gm.variables.get/set for execution-local values; '
-                    'gm.environment.get/set/unset proposes '
-                    'persisted changes '
-                    'only after successful completion. '
-                    'Collection variables are read-only. '
-                    'gm.request.headers.set and gm.request.setBody '
-                    'work before HTTP. '
-                    'gm.response.json/header/lookup is available after HTTP. '
-                    'gm.test works in both stages. '
-                    'gm.jwt.decode reads payloads '
-                    'without signature verification. ',
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('CLOSE'),
-                  ),
-                ],
-              ),
-            ),
+            onPressed: () => ScriptHelpDialog.show(context),
             child: const Text('HELP'),
           ),
         ],

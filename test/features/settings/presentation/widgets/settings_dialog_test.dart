@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/theme/theme_ids.dart';
+import 'package:getman/core/theme/theme_registry.dart';
 import 'package:getman/core/theme/themes/brutalist/brutalist_theme.dart';
 import 'package:getman/core/ui/widgets/confirm_dialog.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
@@ -54,13 +55,14 @@ Future<void> _open(
   SettingsBloc bloc, {
   SettingsTab initialTab = SettingsTab.general,
   CookieStore? cookieStore,
+  ThemeData? theme,
 }) async {
   final controller = _controller();
   addTearDown(controller.dispose);
   final app = ChangeNotifierProvider<UpdateController>.value(
     value: controller,
     child: MaterialApp(
-      theme: brutalistTheme(Brightness.light),
+      theme: theme ?? brutalistTheme(Brightness.light),
       home: BlocProvider.value(
         value: bloc,
         child: Scaffold(
@@ -88,6 +90,34 @@ void main() {
   setUpAll(() {
     registerFallbackValue(const SettingsEntity());
   });
+
+  for (final compact in [false, true]) {
+    testWidgets(
+      'glass settings keep content width on wide windows compact=$compact',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(2400, 1200);
+        addTearDown(tester.view.reset);
+        final bloc = _bloc();
+        addTearDown(bloc.close);
+        await _open(
+          tester,
+          bloc,
+          initialTab: SettingsTab.appearance,
+          theme: resolveTheme('glass')(Brightness.light, isCompact: compact),
+        );
+        final pane = find.byType(TabBarView);
+        expect(tester.getSize(pane).width, compact ? 480 : 600);
+        tester.view.physicalSize = const Size(1200, 900);
+        await tester.pump();
+        expect(tester.getSize(pane).width, compact ? 480 : 600);
+        expect(find.text('CLOSE').hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.text('CLOSE'));
+        await tester.pumpAndSettle();
+      },
+    );
+  }
 
   testWidgets('shows five tabs; GENERAL is the default pane', (tester) async {
     final bloc = _bloc();
