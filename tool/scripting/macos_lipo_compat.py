@@ -13,7 +13,6 @@ recursive lookup. No SDK, project configuration or system executable is edited.
 import os
 from pathlib import Path
 import shlex
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -40,9 +39,11 @@ def run_lipo(real_lipo, arguments):
 
 def run_with_proxy(command):
     """Scope the compatible tool lookup to one command and clean up afterward."""
-    real_lipo = shutil.which('lipo')
-    if real_lipo is None:
-        raise FileNotFoundError('lipo is required on PATH')
+    # /usr/bin/lipo is an Xcode dispatcher, not the physical executable.
+    # Resolve the tool before setting Xcode's search path to avoid recursion.
+    real_lipo = subprocess.check_output(
+        ['/usr/bin/xcrun', '--find', 'lipo'], text=True,
+    ).strip()
     real_lipo = str(Path(real_lipo).resolve())
     with tempfile.TemporaryDirectory(prefix='getman-lipo-compat-') as directory:
         proxy = Path(directory) / 'lipo'
@@ -53,6 +54,15 @@ def run_with_proxy(command):
         proxy.chmod(0o700)
         environment = os.environ.copy()
         environment['PATH'] = directory + os.pathsep + environment.get('PATH', '')
+        # Swift Build puts this search-path list before its own toolchain in
+        # shell phases; PATH alone is appended after the toolchain and loses.
+        # Preserve existing entries and scope this override to this subprocess.
+        # Source: Core.createExecutableSearchPaths in
+        # github.com/swiftlang/swift-build/blob/main/Sources/SWBCore/Settings/Settings.swift
+        search_paths = environment.get('__XCODE_BUILT_PRODUCTS_DIR_PATHS', '')
+        environment['__XCODE_BUILT_PRODUCTS_DIR_PATHS'] = directory + (
+            os.pathsep + search_paths if search_paths else ''
+        )
         return subprocess.run(command, env=environment, check=False).returncode
 
 
