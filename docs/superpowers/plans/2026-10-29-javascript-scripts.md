@@ -21,8 +21,9 @@ Rules e seus testes de integração foram substituídos sem migração.
 A tarefa 15 consolida as verificações em
 [Registro de validação](../../architecture/scripting-verification.md): quatro
 linters separados, suíte completa, cobertura, corpus Chrome, benchmark AOT,
-manifestos/licenças e documentação/wiki. A matriz Windows/Linux e a comparação
-de cold boot/HTTP antes/depois continuam explicitamente não verificadas.
+manifestos/licenças e documentação/wiki. O build web e o release macOS arm64 passaram. Permanecem pendentes a suíte
+gráfica completa/repetível no host, o release universal macOS, a matriz
+Windows/Linux e a comparação de cold boot/HTTP antes/depois.
 Os checklists abaixo preservam a sequência originalmente planejada; o registro
 informa o resultado efetivamente executado e suas limitações.
 

@@ -27,19 +27,28 @@ controls and runtimes return to zero after error/cancel/close.
 - Full Flutter suite: **3,913 passing tests**, no failures.
 - Line coverage: **94.7%** (25,139 / 26,541 instrumented lines).
 - Real Chrome runtime/API/snippet corpus: **56 passing tests**.
-- macOS app scripting integration: **11 passing tests** (9 real HTTP/Hive/QuickJS
-  contracts plus desktop editing/results and compact error visibility).
+- macOS app scripting integration: **11 cases passed in a combined run**
+  (9 real HTTP/Hive/QuickJS contracts plus desktop editing/results and compact
+  error visibility); targeted UI cases also passed separately. The last replay
+  completed 9 runtime/pipeline cases before the graphical runner stopped
+  progressing and was interrupted. A fully repeatable final GUI run is pending.
 - Browser integrationDriver journeys: **2 passing tests**, real production
   dependencies and local HTTP fixtures.
 - Web release build: passed with `/Getman/` base href; bundled bootstrap,
   Worker and WASM bytes match the verified source assets.
+- macOS arm64 release build: passed; QuickJS framework is present in the app.
+  The temporary architecture/deployment override is described below.
 - Four independent static gates: zero analyzer, custom_lint, fixture self-test
   and bloc_lint issues. Dart formatting and owned-file whitespace checks clean.
   Upstream vendored C/license bytes retain their original whitespace so their
   recorded source hashes remain reproducible.
 
 These results are local validation, not a completed cross-platform release
-matrix. The full pre-existing macOS integration aggregator is checked separately.
+matrix. The pre-existing macOS integration aggregator completed **77 distinct
+cases across bounded runs** but did not finish: later live-window waits stalled
+in collection flows. An interrupted run reports Flutter stream-sink shutdown
+errors and a did-not-complete case; it is **not** a green full integration suite.
+The scripting-specific cases are reported separately above.
 
 ## Platform notes
 
@@ -55,6 +64,14 @@ setting `MACOSX_DEPLOYMENT_TARGET = 12.0` through `XCODE_XCCONFIG_FILE`; this do
 not change the product deployment target or system installation. Flutter builds
 and tests must run serially: simultaneous platform builds rewrite shared native
 asset and shader outputs and can make unrelated tests fail to load artifacts.
+
+The macOS universal release attempt failed inside Flutter's
+`release_unpack_macos` architecture validation: it rejected `arm64 x86_64`
+although `lipo -info` listed both slices. A separate host arm64 release build
+passed with temporary xcconfig values `ARCHS = arm64`, `ONLY_ACTIVE_ARCH = YES`
+and deployment target 12.0. The app is 57.4 MB and contains the signed native
+`getman_quickjs.framework`. No project build setting or SDK was changed to
+force this result; universal release validation remains pending.
 
 Windows/Linux are not executable on this workstation. The dedicated native
 workflow compiles and runs the bridge on their corresponding runners, including
