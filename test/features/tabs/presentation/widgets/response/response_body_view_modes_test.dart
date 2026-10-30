@@ -87,6 +87,7 @@ Future<({_FakeTabsBloc tabs, _FakeSettingsBloc settings})> _pump(
   required String body,
   required CodeLineEditingController controller,
   SettingsEntity settings = const SettingsEntity(),
+  bool settle = true,
 }) async {
   final tabsBloc = _FakeTabsBloc(TabsState(tabs: [_tabWith(body)]));
   final settingsBloc = _FakeSettingsBloc(SettingsState(settings: settings));
@@ -118,7 +119,7 @@ Future<({_FakeTabsBloc tabs, _FakeSettingsBloc settings})> _pump(
       ),
     ),
   );
-  await _settle(tester);
+  if (settle) await _settle(tester);
   return (tabs: tabsBloc, settings: settingsBloc);
 }
 
@@ -169,6 +170,67 @@ Future<void> _settleResponseWork(WidgetTester tester) async {
 }
 
 void main() {
+  group('Copy during JSON formatting', () {
+    testWidgets(
+      'copies current raw response before initial formatting finishes',
+      (
+        tester,
+      ) async {
+        final controller = CodeLineEditingController();
+        addTearDown(controller.dispose);
+        final clips = _mockClipboard(tester);
+        await _pump(
+          tester,
+          body: '{"current":1}',
+          controller: controller,
+          settle: false,
+        );
+        expect(controller.text, isEmpty, reason: 'Formatting is still pending');
+        await tester.tap(find.byTooltip('Copy response'));
+        await tester.pump();
+        expect(clips, ['{"current":1}']);
+        // Assert clipboard contents before settling the snackbar entrance.
+        await tester.pumpAndSettle();
+        expect(find.text('Response copied').hitTestable(), findsOneWidget);
+
+        await _settle(tester);
+        await tester.tap(find.byTooltip('Copy response'));
+        await tester.pump();
+        expect(clips.last, '{\n    "current": 1\n}');
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+
+    testWidgets('copies new raw response instead of stale formatted response', (
+      tester,
+    ) async {
+      final controller = CodeLineEditingController();
+      addTearDown(controller.dispose);
+      final clips = _mockClipboard(tester);
+      final harness = await _pump(
+        tester,
+        body: '{"old":1}',
+        controller: controller,
+      );
+      harness.tabs.push(TabsState(tabs: [_tabWith('{"new":2}')]));
+      await tester.pump();
+      expect(
+        controller.text,
+        '{\n    "old": 1\n}',
+        reason: 'The new response is still formatting in its isolate',
+      );
+      await tester.tap(find.byTooltip('Copy response'));
+      await tester.pump();
+      expect(clips, ['{"new":2}']);
+
+      await _settle(tester);
+      await tester.tap(find.byTooltip('Copy response'));
+      await tester.pump();
+      expect(clips.last, '{\n    "new": 2\n}');
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  });
+
   group('PRETTY / RAW toggle', () {
     testWidgets('RAW shows the verbatim body; PRETTY re-prettifies', (
       tester,

@@ -115,6 +115,10 @@ class _TextualResponseBody extends StatefulWidget {
 class _TextualResponseBodyState extends State<_TextualResponseBody> {
   int _pendingSyncId = 0;
 
+  // Copy/Save must use the current response while its formatting isolate runs,
+  // not the empty editor or the formatted contents of a previous response.
+  String? _pendingCopyBody;
+
   // Pretty (prettified JSON) / Raw (verbatim) / Tree (collapsible). Applies to
   // the normal, sub-threshold path; the large-response banner has its own
   // controls.
@@ -183,6 +187,7 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
 
   Future<void> _syncBody(String? rawBody) async {
     final syncId = ++_pendingSyncId;
+    _pendingCopyBody = rawBody ?? '';
 
     if (rawBody != null && rawBody.length > kLargeResponseViewerChars) {
       // Even the first frame uses bounded text layout for a large response.
@@ -197,6 +202,8 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
         _findActive = false;
         _clearTreeState();
       });
+      // The large-body path already exposes its current raw/formatted cache.
+      _pendingCopyBody = null;
       if (context
               .read<SettingsBloc>()
               .state
@@ -229,9 +236,11 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
         _findActive = false;
         _clearTreeState();
       });
+      _pendingCopyBody = null;
       return;
     }
     widget.responseController.text = text;
+    _pendingCopyBody = null;
     // Tree decode is now LAZY (see _decodeForTree): enable TREE optimistically
     // from a cheap shape probe; the real (possibly off-isolate) decode happens
     // only when the user selects TREE. This removes the synchronous jsonDecode
@@ -402,9 +411,11 @@ class _TextualResponseBodyState extends State<_TextualResponseBody> {
 
   /// Full displayed text for Copy/Save: raw before prettify, formatted after,
   /// independent of the shortened preview and syntax-highlighting mode.
-  String _copyableText() => _largeBody != null && !_highlightingOptedIn
-      ? (_formattedLargeBody ?? _largeBody!)
-      : widget.responseController.text;
+  String _copyableText() =>
+      _pendingCopyBody ??
+      (_largeBody != null && !_highlightingOptedIn
+          ? (_formattedLargeBody ?? _largeBody!)
+          : widget.responseController.text);
 
   /// Sub-threshold view: a Pretty/Raw/Tree toggle (+ copy) above the body.
   Widget _buildSmallMode() {
