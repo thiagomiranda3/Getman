@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -20,6 +21,17 @@ const Size kE2eWindowSize = Size(1500, 950);
 /// Channel into the macOS Runner that resizes the real `NSWindow`
 /// (see `macos/Runner/MainFlutterWindow.swift`). Test-only.
 const MethodChannel _testWindowChannel = MethodChannel('getman/test_window');
+
+/// Live pumps need a visible native window. macOS stops scheduling frames when
+/// another window obscures this one. Restore it only while a UI test owns it.
+class _VisibleTestWindow extends WidgetsBindingObserver {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.hidden) {
+      unawaited(_testWindowChannel.invokeMethod<void>('activate'));
+    }
+  }
+}
 
 /// Watch mode is on whenever a slow-motion delay is requested
 /// (`--dart-define=E2E_SLOW_MS=<ms>`). A getter (not a const) so the analyzer
@@ -115,6 +127,12 @@ Future<void> bootGetman(
       await tempDir.delete(recursive: true);
     }
   });
+
+  if (Platform.isMacOS) {
+    final visibility = _VisibleTestWindow();
+    binding.addObserver(visibility);
+    addTearDown(() => binding.removeObserver(visibility));
+  }
 
   final settings = await di.init(storageDirectoryOverride: tempDir.path);
   await disableStartupUpdateCheck();

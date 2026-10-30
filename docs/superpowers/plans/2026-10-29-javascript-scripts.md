@@ -18,12 +18,23 @@ o harness oficial Chrome passou as duas jornadas de integração. O corpus
 público executa em QuickJS nativo e WASM, incluindo os exemplos da ajuda.
 Rules e seus testes de integração foram substituídos sem migração.
 
-A tarefa 15 consolida as verificações em
-[Registro de validação](../../architecture/scripting-verification.md): quatro
-linters separados, suíte completa, cobertura, corpus Chrome, benchmark AOT,
-manifestos/licenças e documentação/wiki. O build web e o release macOS arm64 passaram. Permanecem pendentes a suíte
-gráfica completa/repetível no host, o release universal macOS, a matriz
-Windows/Linux e a comparação de cold boot/HTTP antes/depois.
+A verificação local da tarefa 15 está concluída; o
+[Registro de validação](../../architecture/scripting-verification.md) contém
+resultados e limites: **3.917 testes Flutter**, **147/147 integrações gráficas
+macOS**, **94,72% de cobertura**, quatro análises estáticas sem apontamentos e
+formatação limpa. O release universal macOS passou com ambas as arquiteturas e
+assinaturas verificadas; os resultados anteriores de Chrome/web estão registrados.
+
+A comparação final mediu 240 processos, 7.200 envios HTTP sem scripts e duas
+séries de 500 envios com scripts reais. Os quatro lotes HTTP ficaram abaixo do
+limite de 10%; um alerta de inicialização não se repetiu na única rodada
+adicional, preservando todas as amostras. A validação levou a duas correções com
+TDD: preservar as abas de resposta no reenvio e copiar o corpo atual enquanto a
+formatação termina. Ambas têm regressões unitárias e validação gráfica.
+
+Por decisão do usuário, esta continuação ficou apenas local: sem push, PR ou
+CI remoto. Windows/Linux continuam não verificados; os ajustes da wiki de
+respostas ficaram em commits locais. Nenhuma release foi publicada.
 Os checklists abaixo preservam a sequência originalmente planejada; o registro
 informa o resultado efetivamente executado e suas limitações.
 

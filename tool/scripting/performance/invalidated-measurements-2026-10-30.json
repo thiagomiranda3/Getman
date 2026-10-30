@@ -1,0 +1,15 @@
+{
+  "invalidated": [
+    "response-controller-ab-contaminated-2026-10-30.json",
+    "results-macos-arm64-fixed-contaminated-2026-10-30.json"
+  ],
+  "reason": "Concurrent recursive lipo-propagation probe caused process churn; these samples are inconclusive and excluded from acceptance/causal conclusions.",
+  "interference_start_utc": "2026-10-30T16:51:15Z",
+  "all_clear_utc": "2026-10-30T16:55:17Z",
+  "original_dataset_unaffected": "results-macos-arm64-2026-10-30.json ran 16:41:22\u201316:43:32 UTC, before interference.",
+  "incomplete": {
+    "file": "results-macos-arm64-fixed-incomplete-direct-2026-10-30.json",
+    "reason": "Baseline app stopped scheduling frames after first-frame telemetry; final report timed out. Five pairs retained, no acceptance conclusion."
+  },
+  "superseded_ab": "response-controller-ab-direct-2026-10-30.json is complete and uncontaminated but repeated with exact-PID foreground activation to match final gate."
+}

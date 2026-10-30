@@ -1,0 +1,44 @@
+{
+  "verified_at_utc": "2026-10-30T17:28:47.120309+00:00",
+  "lipo": "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/lipo",
+  "binaries": [
+    {
+      "path": "/tmp/getman-javascript-scripts/build/macos/Build/Products/Release/getman.app/Contents/MacOS/getman",
+      "architectures": [
+        "x86_64",
+        "arm64"
+      ],
+      "bytes": 766112,
+      "sha256": "ffa9d837cfa23790b3e963d82baeb5c8beebe578e55eeb395da16e2b8401ea98"
+    },
+    {
+      "path": "/tmp/getman-javascript-scripts/build/macos/Build/Products/Release/getman.app/Contents/Frameworks/FlutterMacOS.framework/Versions/A/FlutterMacOS",
+      "architectures": [
+        "x86_64",
+        "arm64"
+      ],
+      "bytes": 29683888,
+      "sha256": "089b5f24635e51b0441bd67a385752b1ae813845adbb708dce65b4312ae206fe"
+    },
+    {
+      "path": "/tmp/getman-javascript-scripts/build/macos/Build/Products/Release/getman.app/Contents/Frameworks/App.framework/Versions/A/App",
+      "architectures": [
+        "x86_64",
+        "arm64"
+      ],
+      "bytes": 24977264,
+      "sha256": "0484b2050691ce97253828223f97475302df1907a11e0dde54a59d3be18474e3"
+    },
+    {
+      "path": "/tmp/getman-javascript-scripts/build/macos/Build/Products/Release/getman.app/Contents/Frameworks/getman_quickjs.framework/getman_quickjs",
+      "architectures": [
+        "x86_64",
+        "arm64"
+      ],
+      "bytes": 2056432,
+      "sha256": "a79cd070b97374948630398d807242897638a20c33bb1a08793e03c0821d076b"
+    }
+  ],
+  "codesign_verify_deep_strict": "passed",
+  "app_disk_kib": 108300
+}

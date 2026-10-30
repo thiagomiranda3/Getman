@@ -28,6 +28,13 @@ bash integration_test/run_macos.sh
 This runs `all_flows_test.dart`, an aggregator that composes every flow into a
 single entry point. One build (~12-15s), then each case takes ~1s.
 
+The macOS runners use a bounded watchdog and, when available, `caffeinate -di`
+to prevent display and idle sleep for the test process. No system power setting
+is changed. The UI harness restores its test window if macOS marks it hidden;
+Flutter's live frame waits otherwise stop progressing. This visibility observer
+is removed before test cleanup, and native reactivation exists only in debug
+builds. Keep the test window available while running graphical tests.
+
 Run a single flow while developing it (rebuilds, but isolates one flow):
 
 ```bash

@@ -20,4 +20,10 @@ target="${1:-integration_test/scripts_flows_test.dart}"
 if [[ $# -gt 0 ]]; then shift; fi
 python3 integration_test/support/foreground_test_app.py "$PWD/build/macos/Build/Products/Debug/getman.app" &
 foreground_pid=$!
-python3 integration_test/support/run_with_watchdog.py fvm flutter test "$target" -d macos --no-pub --dart-define=E2E_SLOW_MS="${E2E_SLOW_MS:-0}" --dart-define="SCRIPT_FIXTURE_BASE_URL=http://127.0.0.1:$fixture_port" "$@"
+# Hold display/idle sleep assertions only for this bounded test process. Keep
+# this parent shell alive so the EXIT trap still closes the fixture server.
+test_runner=(python3)
+if command -v caffeinate >/dev/null 2>&1; then
+  test_runner=(caffeinate -di python3)
+fi
+"${test_runner[@]}" integration_test/support/run_with_watchdog.py fvm flutter test "$target" -d macos --no-pub --dart-define=E2E_SLOW_MS="${E2E_SLOW_MS:-0}" --dart-define="SCRIPT_FIXTURE_BASE_URL=http://127.0.0.1:$fixture_port" "$@"

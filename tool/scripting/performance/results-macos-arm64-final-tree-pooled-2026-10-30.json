@@ -1,0 +1,338 @@
+{
+  "scope": "One predefined repeat; all four final-tree batches retained without outlier exclusion.",
+  "sources": [
+    {
+      "file": "results-macos-arm64-final-tree-2026-10-30.json",
+      "sha256": "597bce59f35a7195bf28b6a7cdf9d93209f5a807c9ec8861dd54d65ca3730bc3",
+      "started_at_utc": "2026-10-30T17:23:36.428308+00:00",
+      "completed_at_utc": "2026-10-30T17:25:47.524735+00:00"
+    },
+    {
+      "file": "results-macos-arm64-final-tree-repeat-2026-10-30.json",
+      "sha256": "1b0eef085c96f82c0b6e84a2a5e034daf943597e276ad5d7e31e70ea73abef67",
+      "started_at_utc": "2026-10-30T17:29:37.316852+00:00",
+      "completed_at_utc": "2026-10-30T17:31:47.946213+00:00"
+    }
+  ],
+  "baseline_revision": "662dd548",
+  "current_revision": "5c5a4e8c+final-tree-06eac93ff0f5c2d30dea2fbf2464286cf876e93c7d0ab30ba282a8b95346cb50",
+  "harness_sha256": "9c4c3689882f8eeec65ef824f1494041668ca70d521ead0916501c8ebc631ddb",
+  "artifacts": {
+    "baseline": {
+      "dart_aot_sha256": "88c6282488c5ead9b1d6382a940bd0569f7b6acdd2baf3cf9103a8d870bd2b7f",
+      "executable": "/private/tmp/getman-performance-apps/baseline.app/Contents/MacOS/getman",
+      "bundle_bytes": 55646277,
+      "executable_sha256": "b6b7259bfc43a9f22910bdfb743c4f4b74e3520e3f577991bf11226e7ad24fce"
+    },
+    "current": {
+      "dart_aot_sha256": "8f45b582917628c62869ab290da18eb06b2aebee86e6260a98cdbb559096653f",
+      "executable": "/private/tmp/getman-performance-apps/current-final.app/Contents/MacOS/getman",
+      "bundle_bytes": 57419371,
+      "executable_sha256": "1ae2fa77b5c457503db5c5c16bd9aa2e119565f7b0b8ec48536cfc056d15e0f8"
+    }
+  },
+  "batches": [
+    {
+      "source": "results-macos-arm64-final-tree-2026-10-30.json",
+      "batch": 1,
+      "metrics": {
+        "dart_main_to_first_raster_us": {
+          "baseline": {
+            "samples": 30,
+            "median_us": 70221.5,
+            "p95_us": 78835,
+            "min_us": 55797,
+            "max_us": 83217
+          },
+          "current": {
+            "samples": 30,
+            "median_us": 69784.0,
+            "p95_us": 90135,
+            "min_us": 59382,
+            "max_us": 90309
+          },
+          "p95_change_percent": 14.33373501617301
+        },
+        "host_launch_to_first_frame_report_us": {
+          "baseline": {
+            "samples": 30,
+            "median_us": 347551.0,
+            "p95_us": 368881,
+            "min_us": 261038,
+            "max_us": 373930
+          },
+          "current": {
+            "samples": 30,
+            "median_us": 327992.5,
+            "p95_us": 374365,
+            "min_us": 260905,
+            "max_us": 375408
+          },
+          "p95_change_percent": 1.48665829901784
+        },
+        "no_script_us": {
+          "baseline": {
+            "samples": 900,
+            "median_us": 883.0,
+            "p95_us": 1615,
+            "min_us": 554,
+            "max_us": 2910
+          },
+          "current": {
+            "samples": 900,
+            "median_us": 915.5,
+            "p95_us": 1589,
+            "min_us": 568,
+            "max_us": 2858
+          },
+          "p95_change_percent": -1.609907120743037
+        }
+      }
+    },
+    {
+      "source": "results-macos-arm64-final-tree-2026-10-30.json",
+      "batch": 2,
+      "metrics": {
+        "dart_main_to_first_raster_us": {
+          "baseline": {
+            "samples": 30,
+            "median_us": 69009.5,
+            "p95_us": 82823,
+            "min_us": 64069,
+            "max_us": 88141
+          },
+          "current": {
+            "samples": 30,
+            "median_us": 68609.5,
+            "p95_us": 83809,
+            "min_us": 55506,
+            "max_us": 84707
+          },
+          "p95_change_percent": 1.190490564215252
+        },
+        "host_launch_to_first_frame_report_us": {
+          "baseline": {
+            "samples": 30,
+            "median_us": 326658.0,
+            "p95_us": 381873,
+            "min_us": 260284,
+            "max_us": 382775
+          },
+          "current": {
+            "samples": 30,
+            "median_us": 353579.5,
+            "p95_us": 379450,
+            "min_us": 258257,
+            "max_us": 383622
+          },
+          "p95_change_percent": -0.6345041414292152
+        },
+        "no_script_us": {
+          "baseline": {
+            "samples": 900,
+            "median_us": 876.0,
+            "p95_us": 1780,
+            "min_us": 508,
+            "max_us": 5092
+          },
+          "current": {
+            "samples": 900,
+            "median_us": 916.0,
+            "p95_us": 1776,
+            "min_us": 533,
+            "max_us": 3763
+          },
+          "p95_change_percent": -0.22471910112359383
+        }
+      }
+    },
+    {
+      "source": "results-macos-arm64-final-tree-repeat-2026-10-30.json",
+      "batch": 1,
+      "metrics": {
+        "dart_main_to_first_raster_us": {
+          "baseline": {
+            "samples": 30,
+            "median_us": 69002.5,
+            "p95_us": 78623,
+            "min_us": 63285,
+            "max_us": 82313
+          },
+          "current": {
+            "samples": 30,
+            "median_us": 68717.0,
+            "p95_us": 81712,
+            "min_us": 57822,
+            "max_us": 82291
+          },
+          "p95_change_percent": 3.9288757742645286
+        },
+        "host_launch_to_first_frame_report_us": {
+          "baseline": {
+            "samples": 30,
+            "median_us": 344435.5,
+            "p95_us": 360159,
+            "min_us": 261168,
+            "max_us": 365226
+          },
+          "current": {
+            "samples": 30,
+            "median_us": 329002.0,
+            "p95_us": 370380,
+            "min_us": 262211,
+            "max_us": 377632
+          },
+          "p95_change_percent": 2.837913254979041
+        },
+        "no_script_us": {
+          "baseline": {
+            "samples": 900,
+            "median_us": 890.0,
+            "p95_us": 1787,
+            "min_us": 497,
+            "max_us": 2895
+          },
+          "current": {
+            "samples": 900,
+            "median_us": 929.0,
+            "p95_us": 1909,
+            "min_us": 473,
+            "max_us": 2897
+          },
+          "p95_change_percent": 6.827084499160607
+        }
+      }
+    },
+    {
+      "source": "results-macos-arm64-final-tree-repeat-2026-10-30.json",
+      "batch": 2,
+      "metrics": {
+        "dart_main_to_first_raster_us": {
+          "baseline": {
+            "samples": 30,
+            "median_us": 67168.5,
+            "p95_us": 79771,
+            "min_us": 54856,
+            "max_us": 81885
+          },
+          "current": {
+            "samples": 30,
+            "median_us": 67250.5,
+            "p95_us": 81281,
+            "min_us": 58269,
+            "max_us": 83588
+          },
+          "p95_change_percent": 1.8929184791465659
+        },
+        "host_launch_to_first_frame_report_us": {
+          "baseline": {
+            "samples": 30,
+            "median_us": 317765.5,
+            "p95_us": 365244,
+            "min_us": 266993,
+            "max_us": 371848
+          },
+          "current": {
+            "samples": 30,
+            "median_us": 345450.0,
+            "p95_us": 371801,
+            "min_us": 255757,
+            "max_us": 374501
+          },
+          "p95_change_percent": 1.7952382516892795
+        },
+        "no_script_us": {
+          "baseline": {
+            "samples": 900,
+            "median_us": 889.5,
+            "p95_us": 1696,
+            "min_us": 429,
+            "max_us": 3326
+          },
+          "current": {
+            "samples": 900,
+            "median_us": 908.5,
+            "p95_us": 1658,
+            "min_us": 557,
+            "max_us": 2759
+          },
+          "p95_change_percent": -2.240566037735847
+        }
+      }
+    }
+  ],
+  "pooled": {
+    "dart_main_to_first_raster_us": {
+      "baseline": {
+        "samples": 120,
+        "median_us": 68797.5,
+        "p95_us": 80508,
+        "min_us": 54856,
+        "max_us": 88141
+      },
+      "current": {
+        "samples": 120,
+        "median_us": 68565.0,
+        "p95_us": 82568,
+        "min_us": 55506,
+        "max_us": 90309
+      },
+      "p95_change_percent": 2.558751925274505,
+      "batch_p95_changes_percent": [
+        14.33373501617301,
+        1.190490564215252,
+        3.9288757742645286,
+        1.8929184791465659
+      ],
+      "batches_above_10_percent": 1
+    },
+    "host_launch_to_first_frame_report_us": {
+      "baseline": {
+        "samples": 120,
+        "median_us": 341623.0,
+        "p95_us": 369888,
+        "min_us": 260284,
+        "max_us": 382775
+      },
+      "current": {
+        "samples": 120,
+        "median_us": 349368.0,
+        "p95_us": 374501,
+        "min_us": 255757,
+        "max_us": 383622
+      },
+      "p95_change_percent": 1.2471342676702246,
+      "batch_p95_changes_percent": [
+        1.48665829901784,
+        -0.6345041414292152,
+        2.837913254979041,
+        1.7952382516892795
+      ],
+      "batches_above_10_percent": 0
+    },
+    "no_script_us": {
+      "baseline": {
+        "samples": 3600,
+        "median_us": 883.5,
+        "p95_us": 1700,
+        "min_us": 429,
+        "max_us": 5092
+      },
+      "current": {
+        "samples": 3600,
+        "median_us": 917.0,
+        "p95_us": 1710,
+        "min_us": 473,
+        "max_us": 3763
+      },
+      "p95_change_percent": 0.588235294117645,
+      "batch_p95_changes_percent": [
+        -1.609907120743037,
+        -0.22471910112359383,
+        6.827084499160607,
+        -2.240566037735847
+      ],
+      "batches_above_10_percent": 0
+    }
+  }
+}
