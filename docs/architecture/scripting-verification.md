@@ -215,9 +215,14 @@ Earlier runs affected by a recursive build-tool probe, plus an incomplete
 hidden-window run, remain explicitly excluded in the invalidation manifest.
 Their samples are not used for the final-tree consolidated result.
 
-## Local delivery scope
+## Delivery scope and release authorization
 
-The follow-up remains local by the user's choice: no branch push, draft PR,
-remote CI run, release or deployment. Windows/Linux are explicitly unverified.
-The response-usage wiki changes are committed in the local wiki checkout only;
-they were not pushed. The earlier scripting wiki publication remains unchanged.
+The validation above was completed locally: at that point there had been no
+branch push, draft PR, remote CI run, release or deployment. Windows/Linux were
+not yet verified; response-usage wiki changes were committed locally only.
+The earlier scripting wiki publication was unchanged.
+
+On 2026-10-30 the user subsequently authorized pushing all completed work,
+integrating it into `master`, and publishing tag **v1.12.0** to trigger the
+release workflow. Remote CI and release results are recorded in GitHub Actions;
+the local measurements above remain the evidence for the tested local artifacts.

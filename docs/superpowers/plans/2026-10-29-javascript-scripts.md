@@ -35,6 +35,10 @@ formatação termina. Ambas têm regressões unitárias e validação gráfica.
 Por decisão do usuário, esta continuação ficou apenas local: sem push, PR ou
 CI remoto. Windows/Linux continuam não verificados; os ajustes da wiki de
 respostas ficaram em commits locais. Nenhuma release foi publicada.
+Em uma etapa posterior, o usuário autorizou o push, a integração na `master`
+e a tag `v1.12.0` para disparar a release. Essa autorização substitui a restrição
+anterior de entrega local; os resultados remotos constam no GitHub Actions.
+
 Os checklists abaixo preservam a sequência originalmente planejada; o registro
 informa o resultado efetivamente executado e suas limitações.
 
