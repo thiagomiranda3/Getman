@@ -1,6 +1,7 @@
-// App entry point: boots DI (di.init()), re-acquires macOS security-scoped
-// workspace access from a saved bookmark before the first git-mirror write,
-// then runs MyApp — MultiRepositoryProvider/MultiBlocProvider wiring every
+// App entry point: loads only saved settings before the themed StartupGate.
+// After its first frame, boots feature DI and re-acquires macOS workspace
+// access before the first git-mirror write, then runs MyApp with repository
+// and bloc providers wiring every
 // feature bloc (settings/history/collections/tabs/environments/scripting/
 // realtime/MCP/git review+sync+PRs+conflicts), the root MaterialApp.router
 // with theme resolution, and the global keyboard Shortcuts map.
@@ -30,6 +31,7 @@ import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/motion/theme_switch_transition.dart';
 import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
 import 'package:getman/core/theme/theme_registry.dart';
+import 'package:getman/core/utils/perf_trace.dart';
 import 'package:getman/core/utils/workspace/workspace_bookmark.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/presentation/bloc/collections_bloc.dart';
@@ -45,6 +47,7 @@ import 'package:getman/features/environments/presentation/bloc/environments_even
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/home/presentation/widgets/exit_flush_guard.dart';
+import 'package:getman/features/home/presentation/widgets/startup_gate.dart';
 import 'package:getman/features/home/presentation/widgets/tab_close_teardown_listener.dart';
 import 'package:getman/features/mcp/presentation/bloc/mcp_bloc.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
@@ -60,19 +63,25 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_section_index.dart';
 import 'package:getman/features/updates/presentation/update_controller.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:media_kit/media_kit.dart';
 import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  MediaKit.ensureInitialized();
   // All Google Fonts variants the app uses are bundled in assets/google_fonts/.
   // Disallow runtime fetching so a missing variant fails loudly in debug
   // instead of silently downloading over HTTP (jank + offline breakage).
   GoogleFonts.config.allowRuntimeFetching = false;
-  final initialSettings = await di.init();
-  final settings = await _resumeWorkspaceAccess(initialSettings);
-  runApp(MyApp(initialSettings: settings));
+  final initialSettings = await traceAsync('startup.settings', di.initSettings);
+  runApp(
+    StartupGate(
+      settings: initialSettings,
+      initialize: () => traceAsync('startup.services', () async {
+        await di.initServices(initialSettings);
+        final settings = await _resumeWorkspaceAccess(initialSettings);
+        return MyApp(initialSettings: settings);
+      }),
+    ),
+  );
 }
 
 /// Re-acquires macOS security-scoped access to the workspace folder from the

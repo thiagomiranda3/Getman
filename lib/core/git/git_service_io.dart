@@ -94,7 +94,9 @@ class _IoGitService implements GitService {
 
   @override
   Future<bool> isRepo(String root) async {
-    if (!Directory(root).existsSync()) return false;
+    // Keep filesystem latency off the UI isolate, including remote volumes.
+    // ignore: avoid_slow_async_io
+    if (!await Directory(root).exists()) return false;
     // The workspace must be the repo ROOT, not merely inside one: porcelain
     // paths are repo-root-relative, so a workspace nested in an outer repo
     // would misresolve every path (files misclassified as deleted, staging
@@ -110,7 +112,7 @@ class _IoGitService implements GitService {
     final toplevel = (r.stdout as String).trim();
     if (toplevel.isEmpty) return false;
     try {
-      return FileSystemEntity.identicalSync(toplevel, root);
+      return await FileSystemEntity.identical(toplevel, root);
     } on Object {
       return false;
     }
@@ -150,7 +152,9 @@ class _IoGitService implements GitService {
   @override
   Future<String?> workingContent(String root, String path) async {
     final file = File('$root/$path');
-    if (!file.existsSync()) return null;
+    // Keep filesystem latency off the UI isolate, including remote volumes.
+    // ignore: avoid_slow_async_io
+    if (!await file.exists()) return null;
     return file.readAsString();
   }
 
@@ -364,7 +368,7 @@ class _IoGitService implements GitService {
       '--git-path',
       'rebase-merge',
     ], allowFailure: true);
-    if (_gitPathExists(root, (r.stdout as String).trim())) return true;
+    if (await _gitPathExists(root, (r.stdout as String).trim())) return true;
     final r2 = await _run(root, [
       'rev-parse',
       '--git-path',
@@ -379,10 +383,12 @@ class _IoGitService implements GitService {
   /// prefixing `$root/` there produced a nonexistent path, so a genuinely
   /// paused rebase read as "not in progress" and a conflicted pull
   /// auto-aborted instead of opening the resolver.
-  static bool _gitPathExists(String root, String gitPath) {
+  static Future<bool> _gitPathExists(String root, String gitPath) async {
     if (gitPath.isEmpty) return false;
     final dir = Directory(gitPath);
-    return (dir.isAbsolute ? dir : Directory('$root/$gitPath')).existsSync();
+    // Keep filesystem latency off the UI isolate, including remote volumes.
+    // ignore: avoid_slow_async_io
+    return (dir.isAbsolute ? dir : Directory('$root/$gitPath')).exists();
   }
 
   @override

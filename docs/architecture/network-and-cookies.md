@@ -100,3 +100,11 @@ A Hive-backed cookie jar: `CookieStore` (abstract) / `InMemoryCookieStore` (runt
 2. `cookie_store.dart` / `in_memory_cookie_store.dart` — the abstract jar + runtime impl.
 3. `hive_cookie_persistence.dart` — flushes each mutation to the `cookies` box.
 4. `cookie_manager_dialog.dart` — the manager view over `CookieStore.all()` / `remove()`.
+
+## Text response decoding
+
+After stream collection/decompression/classification, textual bodies over
+64 KiB decode in a `compute` worker on native platforms. The callback is static
+and receives only bytes and headers, preserving UTF-8/Latin-1 behavior without
+capturing Dio or sockets. Cancellation is checked after the worker returns,
+before any response can reach history. Smaller bodies decode inline.

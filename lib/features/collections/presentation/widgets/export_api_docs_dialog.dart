@@ -3,6 +3,7 @@
 // variable substitution. `buildExport` is a pure, unit-testable
 // build+serialize step; the dialog itself only picks format/environment
 // and saves the file via saveTextFileWithFeedback.
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -77,6 +78,7 @@ class ExportApiDocsDialog extends StatefulWidget {
 
 class _ExportApiDocsDialogState extends State<ExportApiDocsDialog> {
   ExportDocFormat _format = ExportDocFormat.openApiJson;
+  bool _exporting = false;
   String? _envId; // null = No Environment
   bool _seeded = false;
 
@@ -162,7 +164,7 @@ class _ExportApiDocsDialogState extends State<ExportApiDocsDialog> {
         ),
         TextButton(
           key: const ValueKey('export_confirm'),
-          onPressed: () => _export(context, envs),
+          onPressed: _exporting ? null : () => _export(context, envs),
           child: const Text('EXPORT'),
         ),
       ],
@@ -173,23 +175,44 @@ class _ExportApiDocsDialogState extends State<ExportApiDocsDialog> {
     BuildContext context,
     List<EnvironmentEntity> envs,
   ) async {
-    final env = _envId == null ? null : envs.firstWhere((e) => e.id == _envId);
-    final out = buildExport(widget.node, env, _format);
-    // Capture before the first await so we don't touch context afterwards.
-    final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    // Save first (context still mounted; the picker is a native modal), then
-    // pop. saveTextFileWithFeedback captures its own messenger before awaiting.
-    await saveTextFileWithFeedback(
-      context,
-      content: out.content,
-      fileName: out.fileName,
-      dialogTitle: 'EXPORT AS API DOCS',
-      allowedExtensions: out.ext,
-    );
-    if (out.warnings.isNotEmpty && messenger != null) {
-      showAppSnackBarVia(messenger, out.warnings.first);
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    try {
+      final env = _envId == null
+          ? null
+          : envs.firstWhere((e) => e.id == _envId);
+      final out = await compute(
+        _buildExportInBackground,
+        (widget.node, env, _format),
+        debugLabel: 'export.apiDocs',
+      );
+      if (!context.mounted) return;
+      // Capture before the picker await; the dialog can be dismissed
+      // while saving.
+      final navigator = Navigator.of(context);
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      // Save first (context still mounted; the picker is a native modal), then
+      // pop. The save helper captures its messenger before awaiting.
+      await saveTextFileWithFeedback(
+        context,
+        content: out.content,
+        fileName: out.fileName,
+        dialogTitle: 'EXPORT AS API DOCS',
+        allowedExtensions: out.ext,
+      );
+      if (out.warnings.isNotEmpty && messenger != null) {
+        showAppSnackBarVia(messenger, out.warnings.first);
+      }
+      if (context.mounted) navigator.pop();
+    } on Object catch (error) {
+      if (context.mounted) showAppSnackBar(context, 'Export failed: $error');
+    } finally {
+      if (mounted) setState(() => _exporting = false);
     }
-    navigator.pop();
   }
 }
+
+({String content, String fileName, List<String> ext, List<String> warnings})
+_buildExportInBackground(
+  (CollectionNodeEntity, EnvironmentEntity?, ExportDocFormat) input,
+) => buildExport(input.$1, input.$2, input.$3);

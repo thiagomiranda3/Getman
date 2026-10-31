@@ -27,6 +27,7 @@
 import 'dart:async';
 
 import 'package:collection/collection.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -394,7 +395,7 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
   Future<void> _exportEnvironment(BuildContext context, EnvironmentEntity env) {
     return saveJsonFileWithFeedback(
       context,
-      jsonString: PostmanEnvironmentMapper.toJson(env),
+      jsonString: compute(PostmanEnvironmentMapper.toJson, env),
       fileName: '${slugFilename(env.name)}.postman_environment.json',
       dialogTitle: 'EXPORT ENVIRONMENT',
     );
@@ -406,7 +407,7 @@ class _EnvironmentsDialogState extends State<EnvironmentsDialog> {
   ) {
     return saveJsonFileWithFeedback(
       context,
-      jsonString: PostmanEnvironmentMapper.toJsonAll(envs),
+      jsonString: compute(PostmanEnvironmentMapper.toJsonAll, envs),
       fileName: 'environments.postman_environments.json',
       dialogTitle: 'EXPORT ALL ENVIRONMENTS',
     );

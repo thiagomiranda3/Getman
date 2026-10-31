@@ -34,7 +34,7 @@ widgets + screens). Shared cross-feature code lives under `lib/core/`. See
 | Path | Purpose | Key files |
 |---|---|---|
 | `lib` | App entry point. | `main.dart` (DI boot, MultiBlocProvider, global `Shortcuts` map, `MaterialApp.router`) |
-| `lib/core/di` | GetIt bootstrap. | `injection_container.dart` (registers all blocs/usecases/repos, opens Hive boxes) |
+| `lib/core/di` | GetIt bootstrap. | `injection_container.dart` (settings-only boot, then feature stores and DI after the first frame) |
 | `lib/core/domain` | Cross-feature pure-domain helpers. | `auth_application.dart`, `persistence_limits.dart` |
 | `lib/core/domain/entities` | Shared entities used by >1 feature. | `request_config_entity.dart`, `auth_config.dart`, `body_type.dart`, `multipart_field_entity.dart` |
 | `lib/core/error` | Failure / Exception hierarchy. | `failures.dart`, `exceptions.dart`, `guard.dart` |
@@ -124,7 +124,7 @@ widgets + screens). Shared cross-feature code lives under `lib/core/`. See
 |---|---|
 | `lib/features/home/domain/usecases` | `tab_dirty_checker.dart` (unsaved-changes detection). |
 | `lib/features/home/presentation/screens` | `main_screen.dart` (app shell; hosts every keyboard `Action` + tab strip). |
-| `lib/features/home/presentation/widgets` | `side_menu.dart`, `request_tab_chip.dart`, `tab_content_stack.dart`, `tab_chip.dart`, `add_tab_button.dart`, `tab_strip_double_click.dart`, `empty_tabs_placeholder.dart`, `exit_flush_guard.dart` (flush debounced saves on app exit/hide), `tab_close_teardown_listener.dart` (close realtime/MCP sessions when their tab closes). |
+| `lib/features/home/presentation/widgets` | `side_menu.dart`, `request_tab_chip.dart`, `tab_content_stack.dart`, `tab_chip.dart`, `add_tab_button.dart`, `tab_strip_double_click.dart`, `empty_tabs_placeholder.dart`, `startup_gate.dart` (saved-theme first frame before feature initialization), `exit_flush_guard.dart` (flush debounced saves on app exit/hide), `tab_close_teardown_listener.dart` (close realtime/MCP sessions when their tab closes). |
 
 ### `mcp` — Model Context Protocol client (bloc-over-service)
 

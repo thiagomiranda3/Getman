@@ -2,6 +2,7 @@
 // paste, URL) and parse, then a selectable preview before committing. See
 // the class doc below for the bloc-agnostic wiring contract.
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -74,20 +75,33 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
     super.dispose();
   }
 
-  void _parse(String text) {
+  int _parseGeneration = 0;
+  bool _parsing = false;
+
+  Future<void> _parse(String text) async {
+    if (_parsing) return;
+    setState(() => _parsing = true);
+    final generation = ++_parseGeneration;
     try {
-      final api = normalizeSpec(loadSpec(text));
+      final parsed = text.length <= 64 * 1024
+          ? _parseSpec(text)
+          : await compute(_parseSpec, text, debugLabel: 'import.openApi');
+      if (!mounted || generation != _parseGeneration) return;
       setState(() {
-        _result = buildImport(api);
-        _selected = collectLeafIds(_result!.root);
+        _result = parsed.$1;
+        _selected = parsed.$2;
         _error = null;
       });
     } on FormatException catch (e) {
+      if (!mounted || generation != _parseGeneration) return;
       setState(() => _error = e.message);
     } on Object catch (e) {
+      if (!mounted || generation != _parseGeneration) return;
       // A JSON-valid but type-wrong spec can throw TypeError out of the
       // normalizers — surface it instead of silently doing nothing.
       setState(() => _error = 'Import failed: $e');
+    } finally {
+      if (mounted) setState(() => _parsing = false);
     }
   }
 
@@ -106,7 +120,7 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
         setState(() => _error = 'Unable to read the selected file.');
         return;
       }
-      _parse(content);
+      await _parse(content);
     } on Object catch (e) {
       if (!mounted) return; // an await may have thrown after CANCEL disposed us
       setState(() => _error = 'File import failed: $e');
@@ -128,7 +142,7 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
     try {
       final response = await service.request(url: url, method: 'GET');
       if (!mounted) return;
-      _parse(response.body);
+      await _parse(response.body);
     } on Object catch (e) {
       if (!mounted) return; // CANCEL during a slow fetch disposes this State
       setState(() => _error = 'Fetch failed: $e');
@@ -139,6 +153,7 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
 
   void _setSource(SpecImportSource source) {
     if (source == _source) return;
+    _parseGeneration++;
     setState(() => _source = source);
   }
 
@@ -173,6 +188,7 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
   }
 
   void _reset() {
+    _parseGeneration++;
     setState(() {
       _result = null;
       _selected = <String>{};
@@ -195,15 +211,28 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
             // Before a successful parse, show the full source picker + input.
             // Afterwards, collapse to a compact "re-parse" row so the
             // selectable preview is the primary content.
-            if (result == null) ...[
-              SpecImportSourceSelector(source: _source, onChanged: _setSource),
-              SizedBox(height: layout.sectionSpacing),
-              _buildSourceInput(context),
-              if (_error != null) ...[
-                SizedBox(height: layout.tabSpacing),
-                SpecImportErrorText(message: _error!),
-              ],
-            ] else ...[
+            if (result == null)
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SpecImportSourceSelector(
+                        source: _source,
+                        onChanged: _setSource,
+                      ),
+                      SizedBox(height: layout.sectionSpacing),
+                      _buildSourceInput(context),
+                      if (_error != null) ...[
+                        SizedBox(height: layout.tabSpacing),
+                        SpecImportErrorText(message: _error!),
+                      ],
+                    ],
+                  ),
+                ),
+              )
+            else ...[
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
@@ -246,7 +275,7 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
         return Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
-            onPressed: _pickFile,
+            onPressed: _parsing ? null : _pickFile,
             icon: const Icon(Icons.file_open),
             label: const Text('PICK FILE'),
           ),
@@ -269,7 +298,9 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: () => _parse(_pasteController.text),
+                onPressed: _parsing
+                    ? null
+                    : () => _parse(_pasteController.text),
                 child: const Text('PARSE'),
               ),
             ),
@@ -291,11 +322,17 @@ class _SpecImportDialogState extends State<SpecImportDialog> {
             ),
             SizedBox(width: layout.tabSpacing),
             TextButton(
-              onPressed: _fetching ? null : _fetchUrl,
+              onPressed: _fetching || _parsing ? null : _fetchUrl,
               child: const Text('FETCH'),
             ),
           ],
         );
     }
   }
+}
+
+// Includes preview selection traversal so large specs do not walk twice on UI.
+(ImportResult, Set<String>) _parseSpec(String text) {
+  final result = buildImport(normalizeSpec(loadSpec(text)));
+  return (result, collectLeafIds(result.root));
 }

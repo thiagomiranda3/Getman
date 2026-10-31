@@ -29,8 +29,8 @@ Persistence is `hive_ce` + `hive_ce_flutter` (the community Hive fork — binary
 
 `body_field_dictionary` (`HiveBoxes.bodyFieldDictionary`) stores global, local
 JSON property-name usage counts as `Box<int>`: name → cumulative count. It has
-no model, adapter, or typeId and is opened alongside the other boxes during
-`di.init`. `BodyFieldDictionaryRepositoryImpl` exposes immutable snapshots
+no model, adapter, or typeId and is opened alongside the other feature boxes during
+`di.initServices`, after the themed first frame. `BodyFieldDictionaryRepositoryImpl` exposes immutable snapshots
 ranked by descending usage count, then lexical name for ties.
 
 Only property names are persisted, never request values or complete bodies.

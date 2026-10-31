@@ -43,6 +43,17 @@ void main() {
   }
 
   group('readPickedFile', () {
+    test('large picked UTF-8 content round-trips through the worker', () async {
+      final content = 'ação 🚀' * 20000;
+      final bytes = utf8.encode(content);
+      final picked = PlatformFile(
+        name: 'large.json',
+        size: bytes.length,
+        bytes: bytes,
+      );
+      expect(await readPickedFile(picked), content);
+    });
+
     test('prefers in-memory bytes over the path', () async {
       final onDisk = File('${tempDir.path}/a.json')
         ..writeAsStringSync('{"from":"disk"}');

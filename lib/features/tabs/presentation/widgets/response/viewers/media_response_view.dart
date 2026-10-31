@@ -94,6 +94,7 @@ class _MediaResponseViewState extends State<MediaResponseView> {
         url: widget.url,
       );
       path = await writeMediaTempFile(bytes, ext);
+      MediaKit.ensureInitialized();
       player = Player();
       final vc = widget.isVideo ? VideoController(player) : null;
       await player.open(Media('file://$path'), play: false);

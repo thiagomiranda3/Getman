@@ -254,7 +254,7 @@ class _CollectionsListState extends State<CollectionsList> {
     final bloc = context.read<CollectionsBloc>();
     return importJsonFilesWithFeedback<CollectionNodeEntity>(
       context,
-      parse: (content) => [PostmanCollectionMapper.fromJson(content)],
+      parse: _parsePostmanCollection,
       onImported: (imported) => bloc.add(ImportCollections(imported)),
       noun: 'collection',
     );
@@ -610,3 +610,8 @@ class _ExampleItem extends _TreeItem {
   final String nodeName;
   final SavedExampleEntity example;
 }
+
+// No widget/BuildContext capture when the importer sends this to a worker.
+List<CollectionNodeEntity> _parsePostmanCollection(String content) => [
+  PostmanCollectionMapper.fromJson(content),
+];

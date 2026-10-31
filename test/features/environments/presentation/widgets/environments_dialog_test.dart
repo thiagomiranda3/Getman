@@ -19,6 +19,7 @@
 // - narrow (fullscreen) layout: list page first, tap-to-detail, back-to-list
 //   (toolbar arrow AND system back via PopScope), close from the list page.
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -57,6 +58,7 @@ void _mockPicker(
   WidgetTester tester, {
   List<int>? importBytes,
   List<String?>? savedNames,
+  Completer<void>? pickerReached,
 }) {
   tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
     _pickerChannel,
@@ -64,6 +66,7 @@ void _mockPicker(
       if (call.method == 'save') {
         final args = call.arguments as Map<dynamic, dynamic>;
         savedNames?.add(args['fileName'] as String?);
+        pickerReached?.complete();
         return null; // user cancels the destination dialog
       }
       if (importBytes == null) return null; // user cancelled the pick
@@ -590,7 +593,12 @@ void main() {
         addTearDown(settingsBloc.close);
 
         final savedNames = <String?>[];
-        _mockPicker(tester, savedNames: savedNames);
+        final pickerReached = Completer<void>();
+        _mockPicker(
+          tester,
+          savedNames: savedNames,
+          pickerReached: pickerReached,
+        );
         await _pumpAndOpen(
           tester,
           envsBloc: envsBloc,
@@ -598,6 +606,14 @@ void main() {
         );
 
         await tester.tap(find.byTooltip('Export environment'));
+        // Alternate real worker I/O with the fake-clock widget callbacks.
+        for (var i = 0; i < 1000 && !pickerReached.isCompleted; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump(const Duration(milliseconds: 1));
+        }
+        expect(pickerReached.isCompleted, isTrue);
         await tester.pumpAndSettle();
 
         expect(savedNames, ['production.postman_environment.json']);
@@ -614,7 +630,12 @@ void main() {
         addTearDown(settingsBloc.close);
 
         final savedNames = <String?>[];
-        _mockPicker(tester, savedNames: savedNames);
+        final pickerReached = Completer<void>();
+        _mockPicker(
+          tester,
+          savedNames: savedNames,
+          pickerReached: pickerReached,
+        );
         await _pumpAndOpen(
           tester,
           envsBloc: envsBloc,
@@ -622,6 +643,14 @@ void main() {
         );
 
         await tester.tap(find.byTooltip('EXPORT ALL ENVIRONMENTS'));
+        // Alternate real worker I/O with the fake-clock widget callbacks.
+        for (var i = 0; i < 1000 && !pickerReached.isCompleted; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump(const Duration(milliseconds: 1));
+        }
+        expect(pickerReached.isCompleted, isTrue);
         await tester.pumpAndSettle();
 
         expect(savedNames, ['environments.postman_environments.json']);

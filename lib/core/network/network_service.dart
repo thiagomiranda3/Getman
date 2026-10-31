@@ -407,9 +407,18 @@ class NetworkService {
           );
 
     if (kind == ResponseMediaKind.textual) {
+      // Decoding up to 50 MiB is CPU work even though the preceding I/O was
+      // async. Pass only bytes/headers, never this service or its Dio sockets.
+      final body = bytes.length <= 64 * 1024
+          ? _decodeTextual((bytes, headersMap))
+          : await compute(_decodeTextual, (
+              bytes,
+              headersMap,
+            ), debugLabel: 'response.decodeText');
+      if (cancelToken.isCancelled) throw cancelToken.cancelError!;
       return HttpResponseEntity(
         statusCode: status,
-        body: bytes.isEmpty ? '' : _decodeTextual(bytes, headersMap),
+        body: body,
         headers: headersMap,
         durationMs: stopwatch.elapsedMilliseconds,
       );
@@ -470,7 +479,8 @@ class NetworkService {
   /// and the few ISO-8859-15 revisions come out as C1 controls — a strictly
   /// better approximation than the UTF-8 branch, which mojibakes EVERY
   /// 0x80–0xFF byte into U+FFFD.
-  String _decodeTextual(Uint8List bytes, Map<String, String> headers) {
+  static String _decodeTextual((Uint8List, Map<String, String>) input) {
+    final (bytes, headers) = input;
     final charset = _charsetOf(headers);
     if (charset != null &&
         (charset == 'windows-1252' ||
@@ -490,7 +500,7 @@ class NetworkService {
 
   /// Extracts the lowercased `charset` token from the (case-insensitive)
   /// Content-Type header, or null when absent.
-  String? _charsetOf(Map<String, String> headers) {
+  static String? _charsetOf(Map<String, String> headers) {
     for (final e in headers.entries) {
       if (e.key.toLowerCase() == 'content-type') {
         final match = _charsetPattern.firstMatch(e.value);

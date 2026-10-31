@@ -1,4 +1,4 @@
-// Native filesystem mirror of the collections forest under a workspace
+// Native filesystem mirror (entire read/write runs in a worker isolate) of the collections forest under a workspace
 // directory: one .req.json file per request, a .folder.json + nested
 // directory per folder, and a root-order manifest under .getman/. Writes are
 // atomic (write to a .tmp file, flush, then rename) and reconcile() deletes
@@ -13,6 +13,7 @@
 // workspace_data_source_factory.dart.
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:getman/core/utils/json_file_io.dart' show slugFilename;
 import 'package:getman/core/utils/workspace/workspace_collection_serializer.dart';
@@ -21,7 +22,17 @@ import 'package:getman/features/collections/domain/entities/collection_node_enti
 import 'package:uuid/uuid.dart';
 
 WorkspaceCollectionsDataSource createWorkspaceDataSource() =>
-    _IoWorkspaceDataSource();
+    _BackgroundWorkspaceDataSource();
+
+class _BackgroundWorkspaceDataSource implements WorkspaceCollectionsDataSource {
+  @override
+  Future<void> write(String root, List<CollectionNodeEntity> forest) =>
+      Isolate.run(() => _IoWorkspaceDataSource().write(root, forest));
+
+  @override
+  Future<List<CollectionNodeEntity>> read(String root) =>
+      Isolate.run(() => _IoWorkspaceDataSource().read(root));
+}
 
 class _IoWorkspaceDataSource implements WorkspaceCollectionsDataSource {
   static const String _metaDir = '.getman';

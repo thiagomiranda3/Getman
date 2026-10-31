@@ -11,6 +11,7 @@ import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/mcp_service.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/network/realtime_service.dart';
+import 'package:getman/core/storage/hive_boxes.dart';
 import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
 import 'package:getman/features/collections/data/services/workspace_sync_service.dart';
 import 'package:getman/features/collections/domain/branch_service.dart';
@@ -32,6 +33,7 @@ import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
 import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/mcp/presentation/bloc/mcp_bloc.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
+import 'package:getman/features/settings/data/models/settings_model.dart';
 import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/domain/repositories/settings_repository.dart';
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
@@ -64,6 +66,38 @@ void main() {
     await di.reset();
     if (tempDir.existsSync()) await tempDir.delete(recursive: true);
   });
+
+  test(
+    'first-frame boot reads saved settings without opening feature stores',
+    () async {
+      await di.initSettings(storageDirectoryOverride: tempDir.path);
+      const saved = SettingsEntity(themeId: 'dracula', isDarkMode: true);
+      await Hive.box<SettingsModel>(
+        HiveBoxes.settings,
+      ).put('current', SettingsModel.fromEntity(saved));
+      await di.reset();
+      final settings = await di.initSettings(
+        storageDirectoryOverride: tempDir.path,
+      );
+      expect(settings, saved);
+      for (final box in [
+        HiveBoxes.tabs,
+        HiveBoxes.history,
+        HiveBoxes.collections,
+        HiveBoxes.cookies,
+        HiveBoxes.environments,
+        HiveBoxes.scriptTrust,
+      ]) {
+        expect(Hive.isBoxOpen(box), isFalse, reason: box);
+      }
+      expect(di.sl.isRegistered<NetworkService>(), isFalse);
+      await di.initServices(settings);
+      expect(Hive.isBoxOpen(HiveBoxes.cookies), isTrue);
+      expect(di.sl.isRegistered<NetworkService>(), isTrue);
+      expect(di.sl<SettingsBloc>().state.settings, saved);
+      await di.sl<SettingsBloc>().close();
+    },
+  );
 
   test(
     'dictionary wiring persists learned names through a full reboot',

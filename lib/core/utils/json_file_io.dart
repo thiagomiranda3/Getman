@@ -11,6 +11,7 @@
 // download, so the redundant `File(...).writeAsString` is skipped behind a
 // `kIsWeb` guard.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
@@ -50,7 +51,11 @@ String? importSummaryMessage({
 /// Reads a picked file's content, preferring in-memory bytes (web) over path.
 Future<String?> readPickedFile(PlatformFile file) async {
   final bytes = file.bytes;
-  if (bytes != null) return utf8.decode(bytes);
+  if (bytes != null) {
+    return bytes.length <= 64 * 1024
+        ? utf8.decode(bytes)
+        : compute(_decodeUtf8, bytes, debugLabel: 'import.decodeText');
+  }
   final path = file.path;
   if (path != null) return File(path).readAsString();
   return null;
@@ -60,25 +65,29 @@ Future<String?> readPickedFile(PlatformFile file) async {
 /// snackbar. No-op when the user cancels the picker. Content-type agnostic.
 Future<void> saveTextFileWithFeedback(
   BuildContext context, {
-  required String content,
+  required FutureOr<String> content,
   required String fileName,
   required String dialogTitle,
   List<String> allowedExtensions = const ['json'],
 }) async {
   final messenger = ScaffoldMessenger.maybeOf(context);
   try {
+    final text = await content;
+    final bytes = text.length <= 64 * 1024
+        ? utf8.encode(text)
+        : await compute(_encodeUtf8, text, debugLabel: 'export.encodeText');
     final path = await FilePicker.saveFile(
       dialogTitle: dialogTitle,
       fileName: fileName,
       type: FileType.custom,
       allowedExtensions: allowedExtensions,
-      bytes: utf8.encode(content),
+      bytes: bytes,
     );
     if (path == null) return;
     // On desktop saveFile only returns the chosen path; the write is ours.
     // On web the bytes parameter already triggered the download.
     if (!kIsWeb) {
-      await File(path).writeAsString(content);
+      await File(path).writeAsBytes(bytes);
     }
     messenger?.showSnackBar(SnackBar(content: Text('Exported to $path')));
   } on Object catch (e) {
@@ -90,7 +99,7 @@ Future<void> saveTextFileWithFeedback(
 /// Back-compat JSON wrapper around [saveTextFileWithFeedback].
 Future<void> saveJsonFileWithFeedback(
   BuildContext context, {
-  required String jsonString,
+  required FutureOr<String> jsonString,
   required String fileName,
   required String dialogTitle,
   List<String> allowedExtensions = const ['json'],
@@ -134,7 +143,8 @@ Future<void> saveBytesFileWithFeedback(
 }
 
 /// Lets the user pick one or more `.json` files, runs each through [parse]
-/// (which may yield several entities per file), reports per-file failures in
+/// (a top-level/static callback, which may yield several entities per file),
+/// parses large inputs in a worker on native platforms, reports failures in
 /// a snackbar, and hands all successfully parsed entities to [onImported].
 Future<void> importJsonFilesWithFeedback<T>(
   BuildContext context, {
@@ -167,7 +177,11 @@ Future<void> importJsonFilesWithFeedback<T>(
         failures.add('${file.name}: unable to read file');
         continue;
       }
-      imported.addAll(parse(content));
+      imported.addAll(
+        content.length <= 64 * 1024
+            ? parse(content)
+            : await compute(parse, content, debugLabel: 'import.parseJson'),
+      );
     } on Object catch (e) {
       failures.add('${file.name}: $e');
     }
@@ -185,3 +199,7 @@ Future<void> importJsonFilesWithFeedback<T>(
     messenger?.showSnackBar(SnackBar(content: Text(message)));
   }
 }
+
+// Top-level entry points keep widget contexts out of worker messages.
+String _decodeUtf8(Uint8List bytes) => utf8.decode(bytes);
+Uint8List _encodeUtf8(String text) => utf8.encode(text);

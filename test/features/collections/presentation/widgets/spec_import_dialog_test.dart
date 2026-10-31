@@ -51,6 +51,42 @@ Future<void> _open(
 }
 
 void main() {
+  testWidgets(
+    'large spec parses in background and publishes a complete preview',
+    (tester) async {
+      await _open(tester, (_) {});
+      await tester.tap(find.text('PASTE'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextField).first,
+        '${' ' * 65537}$_spec',
+      );
+      await tester.tap(find.widgetWithText(TextButton, 'PARSE'));
+      await tester.pump();
+      // The input remains on screen while parsing; duplicate work is disabled.
+      expect(
+        tester
+            .widget<TextButton>(find.widgetWithText(TextButton, 'PARSE'))
+            .onPressed,
+        isNull,
+      );
+      for (
+        var i = 0;
+        i < 1000 && find.byType(SpecImportPreview).evaluate().isEmpty;
+        i++
+      ) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump(const Duration(milliseconds: 1));
+      }
+      expect(find.text('Users'), findsOneWidget);
+      expect(find.text('Pets'), findsWidgets);
+      expect(tester.takeException(), isNull);
+      await tester.pumpAndSettle();
+    },
+  );
+
   testWidgets('paste → preview lists folders, import fires callback', (
     tester,
   ) async {

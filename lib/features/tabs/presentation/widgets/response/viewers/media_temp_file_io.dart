@@ -44,7 +44,9 @@ Future<void> deleteMediaTempFile(String path) async {
 
 Future<void> _purgeMediaTempDir(Directory dir) async {
   try {
-    if (dir.existsSync()) await dir.delete(recursive: true);
+    // Keep filesystem latency off the UI isolate, including remote volumes.
+    // ignore: avoid_slow_async_io
+    if (await dir.exists()) await dir.delete(recursive: true);
   } on Object {
     // Best-effort: a locked leftover must not block the preview from loading.
   }

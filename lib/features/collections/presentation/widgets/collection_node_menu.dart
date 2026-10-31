@@ -8,6 +8,7 @@
 // delete/favorite show a snackbar.
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:getman/core/theme/app_theme.dart';
@@ -292,9 +293,14 @@ void _showAddSubfolderDialog(BuildContext context, CollectionNodeEntity node) {
 }
 
 Future<void> _exportNode(BuildContext context, CollectionNodeEntity node) {
+  // Capture snackbar ownership before the action sheet/menu is disposed.
   return saveJsonFileWithFeedback(
     context,
-    jsonString: PostmanCollectionMapper.toJson(node),
+    jsonString: compute(
+      PostmanCollectionMapper.toJson,
+      node,
+      debugLabel: 'export.postmanCollection',
+    ),
     fileName: '${slugFilename(node.name)}.postman_collection.json',
     dialogTitle: 'EXPORT COLLECTION',
   );

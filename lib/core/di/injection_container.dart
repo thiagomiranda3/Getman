@@ -1,5 +1,6 @@
 // GetIt (`sl`) bootstrap: registers every feature's blocs/usecases/repos and
-// data sources, opens all Hive boxes in parallel, and returns the loaded
+// data sources. initSettings opens only settings; initServices opens the rest
+// after the first frame. init composes both for test harnesses and returns the
 // SettingsEntity for main() to pass in as initialSettings. Hive adapters are
 // registered manually here (kept over the generated hive_registrar.g.dart)
 // and only once per process, guarded by _adaptersRegistered.
@@ -110,6 +111,16 @@ bool _adaptersRegistered = false;
 /// run never reads or wipes the developer's real saved data. Pair with [reset]
 /// between tests.
 Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
+  final settings = await initSettings(
+    storageDirectoryOverride: storageDirectoryOverride,
+  );
+  await initServices(settings);
+  return settings;
+}
+
+/// Minimal first-frame dependency: only the saved appearance/settings record.
+/// All larger stores and their migrations belong in [initServices].
+Future<SettingsEntity> initSettings({String? storageDirectoryOverride}) async {
   if (storageDirectoryOverride != null) {
     Hive.init(storageDirectoryOverride);
   } else {
@@ -133,10 +144,16 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     _adaptersRegistered = true;
   }
 
+  final box = await Hive.openBox<SettingsModel>(HiveBoxes.settings);
+  return box.get('current')?.toEntity() ?? const SettingsEntity();
+}
+
+/// Completes startup after the themed first frame. Call once after
+/// [initSettings]; consumers must wait for completion before accessing DI.
+Future<void> initServices(SettingsEntity initialSettings) async {
   // Open independent boxes concurrently; cookies are hydrated before network
   // services are exposed. Retired rule storage is deliberately not opened.
   final boxes = await Future.wait<Box<dynamic>>([
-    Hive.openBox<SettingsModel>(HiveBoxes.settings),
     Hive.openBox<EnvironmentModel>(HiveBoxes.environments),
     Hive.openBox<HttpRequestConfig>(HiveBoxes.history),
     Hive.openBox<HttpRequestTabModel>(HiveBoxes.tabs),
@@ -147,8 +164,7 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
     Hive.openBox<int>(HiveBoxes.bodyFieldDictionary),
     Hive.openBox<String>(HiveBoxes.scriptTrust),
   ]);
-  final settingsBox = boxes[0] as Box<SettingsModel>;
-  final environmentsBox = boxes[1] as Box<EnvironmentModel>;
+  final environmentsBox = boxes[0] as Box<EnvironmentModel>;
 
   // Re-key any legacy int-keyed environments by id so per-id put/delete writes
   // overwrite the same logical environment (no-op once keys are strings).
@@ -158,8 +174,6 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
   // collections are first read.
   await CollectionsLocalDataSourceImpl.migrateLegacyKeysIfNeeded();
 
-  final initialSettings =
-      settingsBox.get('current')?.toEntity() ?? const SettingsEntity();
   final initialEnvironments = environmentsBox.values
       .map((model) => model.toEntity())
       .toList(growable: false);
@@ -363,8 +377,6 @@ Future<SettingsEntity> init({String? storageDirectoryOverride}) async {
       ),
     )
     ..registerLazySingleton(AppRouter.new);
-
-  return initialSettings;
 }
 
 /// Opens and hydrates cookies before an early send. Retired rule data is

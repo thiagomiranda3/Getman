@@ -39,7 +39,7 @@ The tree uses `two_dimensional_scrollables`'s `TreeView` (sole consumer: `collec
 
 ## Git-friendly workspace mirror
 
-`collections/data/services/workspace_sync_service.dart` mirrors the collections forest to a clean, diff-friendly on-disk tree so it can be tracked by git. Hive stays the source of truth during a session: opening a workspace imports disk → Hive once (`read`), then every mutation debounces a Hive → disk write (`scheduleMirror`). The serializer (`core/utils/workspace/workspace_collection_serializer.dart`) omits response-cache fields and saved examples from the mirrored files. See docs/architecture/git-sync.md for the full git workflow built on top of this mirror.
+`collections/data/services/workspace_sync_service.dart` mirrors the collections forest to a clean, diff-friendly on-disk tree so it can be tracked by git. The native data source performs each complete read/write (traversal, JSON mapping and filesystem operations) in an `Isolate.run` worker. The service still owns debouncing, flush ordering and mirroring suspension. Hive stays the source of truth during a session: opening a workspace imports disk → Hive once (`read`), then every mutation debounces a Hive → disk write (`scheduleMirror`). The serializer (`core/utils/workspace/workspace_collection_serializer.dart`) omits response-cache fields and saved examples from the mirrored files. See docs/architecture/git-sync.md for the full git workflow built on top of this mirror.
 
 ## Script sharing
 
@@ -56,3 +56,13 @@ A nonempty external `event` aborts the entire import with `Postman scripts are
 not supported` and the offending item path. The import UI therefore dispatches
 no partial collection. Code generation and API-doc export omit scripts and
 surface `Scripts are not included in generated code`; neither evaluates source.
+
+## Import/export processing
+
+Large Postman/OpenAPI inputs (over 64 KiB) parse in a `compute` worker on native
+platforms; small inputs avoid isolate startup overhead. OpenAPI results are
+checked for disposal or a newer parse/source before publishing the preview.
+Postman and API-doc export mapping/serialization also run in workers; callbacks
+are top-level/static so widget contexts and services never cross the boundary.
+File export encodes once and reuses those bytes for the picker and disk write.
+Flutter web `compute` still runs on the main event loop (no Worker implied).

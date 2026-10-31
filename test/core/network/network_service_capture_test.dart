@@ -65,6 +65,26 @@ NetworkService serviceReturning(
 Future<void> _pumpCancelSpy() => Future<void>.delayed(Duration.zero);
 
 void main() {
+  for (final size in [65536, 65537, 2 * 1024 * 1024]) {
+    test('text decode preserves Latin-1 at worker boundary $size', () async {
+      final svc = serviceReturning(List<int>.filled(size, 0xe9), {
+        'content-type': ['text/plain; charset=iso-8859-1'],
+      });
+      final response = await svc.request(url: 'https://x/y', method: 'GET');
+      expect(response.body, 'é' * size);
+      expect(response.bodyBytes, isNull);
+    });
+  }
+
+  test('worker text decoding preserves multi-byte UTF-8', () async {
+    final body = 'ação 🚀' * 20000;
+    final svc = serviceReturning(utf8.encode(body), {
+      'content-type': ['text/plain; charset=utf-8'],
+    });
+    final response = await svc.request(url: 'https://x/y', method: 'GET');
+    expect(response.body, body);
+  });
+
   test('textual response decodes to body, no bodyBytes', () async {
     final svc = serviceReturning(
       utf8.encode('{"a":1}'),

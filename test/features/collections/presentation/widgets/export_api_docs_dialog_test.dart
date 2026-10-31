@@ -1,4 +1,5 @@
 // test/features/collections/presentation/widgets/export_api_docs_dialog_test.dart
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -113,6 +114,7 @@ void main() {
     late _MockEnvironmentsBloc envsBloc;
     late _MockSettingsBloc settingsBloc;
     late List<MethodCall> pickerCalls;
+    late Completer<void> pickerReached;
 
     setUp(() {
       envsBloc = _MockEnvironmentsBloc();
@@ -128,6 +130,7 @@ void main() {
       );
       when(() => settingsBloc.stream).thenAnswer((_) => const Stream.empty());
       pickerCalls = [];
+      pickerReached = Completer<void>();
     });
 
     /// Mocks file_picker's method channel: records every call and answers
@@ -138,9 +141,18 @@ void main() {
         const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
         (call) async {
           pickerCalls.add(call);
+          pickerReached.complete();
           return null;
         },
       );
+    }
+
+    Future<void> export(WidgetTester tester) async {
+      // Real worker completion is outside the widget test's fake clock.
+      await tester.runAsync(() async {
+        await tester.tap(find.byKey(const ValueKey('export_confirm')));
+        await pickerReached.future.timeout(const Duration(seconds: 10));
+      });
     }
 
     Future<void> openDialog(
@@ -211,7 +223,7 @@ void main() {
       'EXPORT hands OpenAPI JSON to the save picker with env vars resolved',
       (tester) async {
         await openDialog(tester);
-        await tester.tap(find.byKey(const ValueKey('export_confirm')));
+        await export(tester);
         await tester.pumpAndSettle();
 
         final args = savedArgs();
@@ -234,7 +246,7 @@ void main() {
       await tester.tap(find.text('No Environment').last);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const ValueKey('export_confirm')));
+      await export(tester);
       await tester.pumpAndSettle();
 
       expect(savedContent(), isNot(contains('api.test.com')));
@@ -244,7 +256,7 @@ void main() {
       await openDialog(tester);
       await tester.tap(find.byKey(const ValueKey('fmt_markdown')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('export_confirm')));
+      await export(tester);
       await tester.pumpAndSettle();
 
       final args = savedArgs();
@@ -257,7 +269,7 @@ void main() {
       await openDialog(tester);
       await tester.tap(find.byKey(const ValueKey('fmt_openapi_yaml')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('export_confirm')));
+      await export(tester);
       await tester.pumpAndSettle();
 
       expect(savedArgs()['fileName'], 'my_api.openapi.yaml');
@@ -280,7 +292,7 @@ void main() {
         ],
       );
       await openDialog(tester, node: orphanNode);
-      await tester.tap(find.byKey(const ValueKey('export_confirm')));
+      await export(tester);
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Could not determine'), findsOneWidget);
