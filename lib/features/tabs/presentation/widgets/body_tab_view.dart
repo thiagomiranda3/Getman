@@ -27,6 +27,7 @@ import 'package:getman/features/tabs/presentation/widgets/body_code_editor.dart'
 import 'package:getman/features/tabs/presentation/widgets/body_json_validation.dart';
 import 'package:getman/features/tabs/presentation/widgets/code_find_panel.dart'
     show kFindPanelHeight;
+import 'package:getman/features/tabs/presentation/widgets/code_text_loader.dart';
 import 'package:getman/features/tabs/presentation/widgets/form_data_editor.dart';
 import 'package:re_editor/re_editor.dart';
 
@@ -304,14 +305,24 @@ class _RawBodyEditorState extends State<_RawBodyEditor> {
               tooltip: 'Beautify JSON — $beautifyHint',
               onPressed: () async {
                 final messenger = ScaffoldMessenger.of(context);
-                final original = widget.controller.text;
+                final controller = widget.controller;
+                final original = controller.text;
+                bool isCurrent() =>
+                    mounted &&
+                    identical(widget.controller, controller) &&
+                    controller.text == original;
                 final prettified = await JsonUtils.prettify(original);
                 // prettify runs in an isolate: the tab may have closed
                 // (disposed controller) or the user may have kept typing
                 // (their newer text must win) while it ran.
-                if (!mounted || widget.controller.text != original) return;
+                if (!isCurrent()) return;
                 if (prettified != original) {
-                  widget.controller.text = prettified;
+                  final applied = await replaceCodeText(
+                    controller,
+                    prettified,
+                    isCurrent: isCurrent,
+                  );
+                  if (!applied) return;
                   showAppSnackBarVia(messenger, 'JSON formatted');
                 } else {
                   showAppSnackBarVia(

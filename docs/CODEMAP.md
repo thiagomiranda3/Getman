@@ -170,7 +170,7 @@ widgets + screens). Shared cross-feature code lives under `lib/core/`. See
 
 | Path | Purpose |
 |---|---|
-| `lib/features/tabs/data` | `request_serializer.dart` (wire-level auth + body serialization). |
+| `lib/features/tabs/data` | `request_serializer.dart` (wire-level auth + body serialization), `text_body_serializer.dart` (large raw/GraphQL preparation worker). |
 | `lib/features/tabs/data/datasources` | `tabs_local_data_source.dart` (tabs + panels + meta boxes). |
 | `lib/features/tabs/data/models` | `request_tab_model.dart` (typeId 2), `panel_model.dart` (12), `stored_response_model.dart` (11), `multipart_field_model.dart` (5). |
 | `lib/features/tabs/data/repositories` | `tabs_repository_impl.dart` (composes persistence + send; env substitution), `hive_tabs_persistence.dart` (mapping/caps in storage owner), `body_field_dictionary_repository_impl.dart` (local learned JSON names/counts). |
@@ -254,6 +254,7 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | JSONPath | `lib/core/utils/json_path.dart`, `lib/core/utils/json_path_builder.dart` |
 | JSON body syntax validation | `lib/features/tabs/domain/logic/json_body_validation.dart`, `lib/features/tabs/presentation/widgets/body_json_validation.dart` (debounced advisory + jump to error) |
 | Keyboard shortcuts | `lib/main.dart`, `lib/core/navigation/intents.dart`, `lib/core/navigation/shortcut_catalog.dart` (single-source labels/hints), `lib/core/ui/widgets/shortcut_reference_table.dart`, `lib/features/home/presentation/widgets/shortcuts_help_dialog.dart`, `lib/features/settings/presentation/widgets/settings_shortcuts_tab.dart` |
+| Large request editor loading and find | `lib/features/tabs/presentation/widgets/code_text_loader.dart` (async line preparation and stale-result guards), `lib/features/tabs/presentation/widgets/json_code_editor.dart` (syntax/layout budgets), `lib/features/tabs/presentation/widgets/large_line_find_guard.dart` (windowed find on oversized lines) |
 | Large responses | `lib/core/utils/large_response_text.dart`, `lib/features/tabs/presentation/widgets/response/large_response_text_view.dart`, `lib/core/domain/persistence_limits.dart`, `lib/features/tabs/presentation/widgets/response/response_large_body_view.dart` |
 | MCP (Model Context Protocol) | `lib/core/network/mcp_service.dart`, `lib/features/mcp/presentation/bloc/mcp_bloc.dart` |
 | Media / binary response viewers | `lib/features/tabs/presentation/widgets/response/viewers/response_media_panel.dart` |

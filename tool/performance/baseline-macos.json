@@ -1,0 +1,1868 @@
+{
+  "revision": "3ec67025",
+  "machine": "macOS-27.0.1-arm64-arm-64bit",
+  "app": {
+    "dart_aot_sha256": "d2d12585bb9d98877133a8295b9ad9db0ab143ae2527e36b1182f68a9da9d537",
+    "executable": "/private/tmp/getman-perf-before-3ec67025.app/Contents/MacOS/getman",
+    "bundle_bytes": 57500555,
+    "executable_sha256": "1a1076d8f3543832d230c7dbc9cb543a6014e8d286cbc8dcfd5aa65b27da0cc5"
+  },
+  "runs": [
+    {
+      "mode": "seed",
+      "variables": {
+        "TABS": 0
+      },
+      "reports": [
+        {
+          "event": "seed",
+          "directory": "/Users/thiago/Library/Containers/br.com.tommiranda.getman/Data/tmp/getman-perf-IMVqB4",
+          "host_elapsed_us": 406609
+        }
+      ],
+      "complete": true
+    },
+    {
+      "mode": "startup",
+      "variables": {
+        "STORAGE": "/Users/thiago/Library/Containers/br.com.tommiranda.getman/Data/tmp/getman-perf-IMVqB4",
+        "TABS": 0,
+        "SAMPLE": 0
+      },
+      "reports": [
+        {
+          "event": "first_frame",
+          "dart_us": 237306,
+          "host_elapsed_us": 427492
+        },
+        {
+          "event": "startup",
+          "settings_us": 56866,
+          "first_frame_us": 237306,
+          "workspace_frame_us": 248903,
+          "max_gap_us": 34676,
+          "rss": 148848640,
+          "frames": [
+            {
+              "build_us": 1,
+              "raster_us": 176803,
+              "total_us": 176832
+            },
+            {
+              "build_us": 13119,
+              "raster_us": 69029,
+              "total_us": 232588
+            },
+            {
+              "build_us": 8592,
+              "raster_us": 1960,
+              "total_us": 67936
+            },
+            {
+              "build_us": 1208,
+              "raster_us": 188695,
+              "total_us": 189989
+            },
+            {
+              "build_us": 121,
+              "raster_us": 705,
+              "total_us": 174083
+            },
+            {
+              "build_us": 230,
+              "raster_us": 1442,
+              "total_us": 1811
+            },
+            {
+              "build_us": 75,
+              "raster_us": 16963,
+              "total_us": 17096
+            },
+            {
+              "build_us": 138,
+              "raster_us": 310,
+              "total_us": 769
+            },
+            {
+              "build_us": 72,
+              "raster_us": 304,
+              "total_us": 549
+            }
+          ],
+          "host_elapsed_us": 1640500
+        },
+        {
+          "event": "done",
+          "peak_rss": 152748032,
+          "host_elapsed_us": 1641274
+        }
+      ],
+      "foreground": true,
+      "complete": true
+    },
+    {
+      "mode": "startup",
+      "variables": {
+        "STORAGE": "/Users/thiago/Library/Containers/br.com.tommiranda.getman/Data/tmp/getman-perf-IMVqB4",
+        "TABS": 0,
+        "SAMPLE": 1
+      },
+      "reports": [
+        {
+          "event": "first_frame",
+          "dart_us": 68867,
+          "host_elapsed_us": 258115
+        },
+        {
+          "event": "startup",
+          "settings_us": 56143,
+          "first_frame_us": 68867,
+          "workspace_frame_us": 97969,
+          "max_gap_us": 34033,
+          "rss": 152748032,
+          "frames": [
+            {
+              "build_us": 1,
+              "raster_us": 11455,
+              "total_us": 11482
+            },
+            {
+              "build_us": 26,
+              "raster_us": 1584,
+              "total_us": 12940
+            },
+            {
+              "build_us": 8379,
+              "raster_us": 4683,
+              "total_us": 13143
+            },
+            {
+              "build_us": 6238,
+              "raster_us": 743,
+              "total_us": 7144
+            },
+            {
+              "build_us": 732,
+              "raster_us": 8935,
+              "total_us": 9805
+            },
+            {
+              "build_us": 107,
+              "raster_us": 263,
+              "total_us": 503
+            },
+            {
+              "build_us": 113,
+              "raster_us": 278,
+              "total_us": 911
+            },
+            {
+              "build_us": 77,
+              "raster_us": 584,
+              "total_us": 851
+            },
+            {
+              "build_us": 101,
+              "raster_us": 303,
+              "total_us": 499
+            },
+            {
+              "build_us": 88,
+              "raster_us": 222,
+              "total_us": 456
+            },
+            {
+              "build_us": 90,
+              "raster_us": 425,
+              "total_us": 716
+            },
+            {
+              "build_us": 82,
+              "raster_us": 277,
+              "total_us": 463
+            },
+            {
+              "build_us": 118,
+              "raster_us": 471,
+              "total_us": 739
+            },
+            {
+              "build_us": 118,
+              "raster_us": 297,
+              "total_us": 582
+            },
+            {
+              "build_us": 89,
+              "raster_us": 274,
+              "total_us": 490
+            },
+            {
+              "build_us": 187,
+              "raster_us": 959,
+              "total_us": 2427
+            },
+            {
+              "build_us": 183,
+              "raster_us": 319,
+              "total_us": 624
+            },
+            {
+              "build_us": 100,
+              "raster_us": 308,
+              "total_us": 578
+            },
+            {
+              "build_us": 92,
+              "raster_us": 387,
+              "total_us": 579
+            },
+            {
+              "build_us": 86,
+              "raster_us": 327,
+              "total_us": 545
+            },
+            {
+              "build_us": 94,
+              "raster_us": 290,
+              "total_us": 570
+            },
+            {
+              "build_us": 85,
+              "raster_us": 246,
+              "total_us": 422
+            },
+            {
+              "build_us": 199,
+              "raster_us": 694,
+              "total_us": 992
+            }
+          ],
+          "host_elapsed_us": 1487859
+        },
+        {
+          "event": "done",
+          "peak_rss": 152895488,
+          "host_elapsed_us": 1488999
+        }
+      ],
+      "foreground": true,
+      "complete": true
+    },
+    {
+      "mode": "startup",
+      "variables": {
+        "STORAGE": "/Users/thiago/Library/Containers/br.com.tommiranda.getman/Data/tmp/getman-perf-IMVqB4",
+        "TABS": 0,
+        "SAMPLE": 2
+      },
+      "reports": [
+        {
+          "event": "first_frame",
+          "dart_us": 75575,
+          "host_elapsed_us": 264441
+        },
+        {
+          "event": "startup",
+          "settings_us": 57040,
+          "first_frame_us": 75575,
+          "workspace_frame_us": 90490,
+          "max_gap_us": 37761,
+          "rss": 152240128,
+          "frames": [
+            {
+              "build_us": 0,
+              "raster_us": 11231,
+              "total_us": 11260
+            },
+            {
+              "build_us": 8608,
+              "raster_us": 5673,
+              "total_us": 14366
+            },
+            {
+              "build_us": 6394,
+              "raster_us": 768,
+              "total_us": 7351
+            },
+            {
+              "build_us": 645,
+              "raster_us": 9196,
+              "total_us": 10003
+            },
+            {
+              "build_us": 121,
+              "raster_us": 299,
+              "total_us": 597
+            },
+            {
+              "build_us": 100,
+              "raster_us": 306,
+              "total_us": 519
+            },
+            {
+              "build_us": 94,
+              "raster_us": 673,
+              "total_us": 896
+            },
+            {
+              "build_us": 107,
+              "raster_us": 285,
+              "total_us": 555
+            },
+            {
+              "build_us": 106,
+              "raster_us": 281,
+              "total_us": 484
+            },
+            {
+              "build_us": 116,
+              "raster_us": 442,
+              "total_us": 688
+            },
+            {
+              "build_us": 93,
+              "raster_us": 269,
+              "total_us": 557
+            },
+            {
+              "build_us": 89,
+              "raster_us": 407,
+              "total_us": 610
+            },
+            {
+              "build_us": 86,
+              "raster_us": 253,
+              "total_us": 513
+            },
+            {
+              "build_us": 72,
+              "raster_us": 268,
+              "total_us": 454
+            },
+            {
+              "build_us": 212,
+              "raster_us": 1069,
+              "total_us": 1397
+            },
+            {
+              "build_us": 229,
+              "raster_us": 348,
+              "total_us": 690
+            },
+            {
+              "build_us": 100,
+              "raster_us": 321,
+              "total_us": 571
+            },
+            {
+              "build_us": 103,
+              "raster_us": 311,
+              "total_us": 530
+            },
+            {
+              "build_us": 93,
+              "raster_us": 327,
+              "total_us": 548
+            },
+            {
+              "build_us": 85,
+              "raster_us": 252,
+              "total_us": 509
+            },
+            {
+              "build_us": 101,
+              "raster_us": 321,
+              "total_us": 506
+            },
+            {
+              "build_us": 94,
+              "raster_us": 259,
+              "total_us": 484
+            }
+          ],
+          "host_elapsed_us": 1479850
+        },
+        {
+          "event": "done",
+          "peak_rss": 152371200,
+          "host_elapsed_us": 1480496
+        }
+      ],
+      "foreground": true,
+      "complete": true
+    },
+    {
+      "mode": "startup",
+      "variables": {
+        "STORAGE": "/Users/thiago/Library/Containers/br.com.tommiranda.getman/Data/tmp/getman-perf-IMVqB4",
+        "TABS": 0,
+        "SAMPLE": 3
+      },
+      "reports": [
+        {
+          "event": "first_frame",
+          "dart_us": 69040,
+          "host_elapsed_us": 264013
+        },
+        {
+          "event": "startup",
+          "settings_us": 56494,
+          "first_frame_us": 69040,
+          "workspace_frame_us": 96839,
+          "max_gap_us": 35143,
+          "rss": 152207360,
+          "frames": [
+            {
+              "build_us": 1,
+              "raster_us": 11240,
+              "total_us": 11276
+            },
+            {
+              "build_us": 7812,
+              "raster_us": 5732,
+              "total_us": 13679
+            },
+            {
+              "build_us": 6464,
+              "raster_us": 752,
+              "total_us": 7340
+            },
+            {
+              "build_us": 699,
+              "raster_us": 8939,
+              "total_us": 9826
+            },
+            {
+              "build_us": 140,
+              "raster_us": 342,
+              "total_us": 663
+            },
+            {
+              "build_us": 83,
+              "raster_us": 266,
+              "total_us": 464
+            },
+            {
+              "build_us": 109,
+              "raster_us": 765,
+              "total_us": 992
+            },
+            {
+              "build_us": 95,
+              "raster_us": 287,
+              "total_us": 550
+            },
+            {
+              "build_us": 96,
+              "raster_us": 305,
+              "total_us": 555
+            },
+            {
+              "build_us": 95,
+              "raster_us": 368,
+              "total_us": 585
+            },
+            {
+              "build_us": 103,
+              "raster_us": 273,
+              "total_us": 556
+            },
+            {
+              "build_us": 111,
+              "raster_us": 389,
+              "total_us": 630
+            },
+            {
+              "build_us": 132,
+              "raster_us": 290,
+              "total_us": 546
+            },
+            {
+              "build_us": 143,
+              "raster_us": 308,
+              "total_us": 612
+            },
+            {
+              "build_us": 195,
+              "raster_us": 938,
+              "total_us": 1664
+            },
+            {
+              "build_us": 213,
+              "raster_us": 262,
+              "total_us": 662
+            },
+            {
+              "build_us": 91,
+              "raster_us": 307,
+              "total_us": 509
+            },
+            {
+              "build_us": 113,
+              "raster_us": 332,
+              "total_us": 603
+            },
+            {
+              "build_us": 121,
+              "raster_us": 432,
+              "total_us": 748
+            },
+            {
+              "build_us": 103,
+              "raster_us": 245,
+              "total_us": 426
+            },
+            {
+              "build_us": 81,
+              "raster_us": 312,
+              "total_us": 527
+            },
+            {
+              "build_us": 89,
+              "raster_us": 289,
+              "total_us": 567
+            }
+          ],
+          "host_elapsed_us": 1493978
+        },
+        {
+          "event": "done",
+          "peak_rss": 152338432,
+          "host_elapsed_us": 1495504
+        }
+      ],
+      "foreground": true,
+      "complete": true
+    },
+    {
+      "mode": "startup",
+      "variables": {
+        "STORAGE": "/Users/thiago/Library/Containers/br.com.tommiranda.getman/Data/tmp/getman-perf-IMVqB4",
+        "TABS": 0,
+        "SAMPLE": 4
+      },
+      "reports": [
+        {
+          "event": "first_frame",
+          "dart_us": 76251,
+          "host_elapsed_us": 261617
+        },
+        {
+          "event": "startup",
+          "settings_us": 57449,
+          "first_frame_us": 76251,
+          "workspace_frame_us": 91390,
+          "max_gap_us": 37124,
+          "rss": 152453120,
+          "frames": [
+            {
+              "build_us": 1,
+              "raster_us": 10965,
+              "total_us": 10987
+            },
+            {
+              "build_us": 7934,
+              "raster_us": 5801,
+              "total_us": 13881
+            },
+            {
+              "build_us": 6174,
+              "raster_us": 734,
+              "total_us": 7025
+            },
+            {
+              "build_us": 711,
+              "raster_us": 8595,
+              "total_us": 9476
+            },
+            {
+              "build_us": 119,
+              "raster_us": 295,
+              "total_us": 577
+            },
+            {
+              "build_us": 111,
+              "raster_us": 300,
+              "total_us": 509
+            },
+            {
+              "build_us": 84,
+              "raster_us": 705,
+              "total_us": 919
+            },
+            {
+              "build_us": 104,
+              "raster_us": 292,
+              "total_us": 546
+            },
+            {
+              "build_us": 81,
+              "raster_us": 235,
+              "total_us": 484
+            },
+            {
+              "build_us": 85,
+              "raster_us": 387,
+              "total_us": 597
+            },
+            {
+              "build_us": 109,
+              "raster_us": 289,
+              "total_us": 595
+            },
+            {
+              "build_us": 92,
+              "raster_us": 375,
+              "total_us": 550
+            },
+            {
+              "build_us": 83,
+              "raster_us": 220,
+              "total_us": 455
+            },
+            {
+              "build_us": 85,
+              "raster_us": 264,
+              "total_us": 523
+            },
+            {
+              "build_us": 162,
+              "raster_us": 888,
+              "total_us": 1166
+            },
+            {
+              "build_us": 231,
+              "raster_us": 337,
+              "total_us": 707
+            },
+            {
+              "build_us": 114,
+              "raster_us": 347,
+              "total_us": 671
+            },
+            {
+              "build_us": 111,
+              "raster_us": 308,
+              "total_us": 473
+            },
+            {
+              "build_us": 99,
+              "raster_us": 345,
+              "total_us": 593
+            },
+            {
+              "build_us": 92,
+              "raster_us": 272,
+              "total_us": 426
+            },
+            {
+              "build_us": 113,
+              "raster_us": 258,
+              "total_us": 514
+            },
+            {
+              "build_us": 182,
+              "raster_us": 630,
+              "total_us": 1016
+            }
+          ],
+          "host_elapsed_us": 1476411
+        },
+        {
+          "event": "done",
+          "peak_rss": 152584192,
+          "host_elapsed_us": 1477051
+        }
+      ],
+      "foreground": true,
+      "complete": true
+    },
+    {
+      "mode": "startup",
+      "variables": {
+        "STORAGE": "/Users/thiago/Library/Containers/br.com.tommiranda.getman/Data/tmp/getman-perf-IMVqB4",
+        "TABS": 0,
+        "SAMPLE": 5
+      },
+      "reports": [
+        {
+          "event": "first_frame",
+          "dart_us": 77915,
+          "host_elapsed_us": 262688
+        },
+        {
+          "event": "startup",
+          "settings_us": 57299,
+          "first_frame_us": 77915,
+          "workspace_frame_us": 92886,
+          "max_gap_us": 34130,
+          "rss": 152600576,
+          "frames": [
+            {
+              "build_us": 1,
+              "raster_us": 11030,
+              "total_us": 11066
+            },
+            {
+              "build_us": 8450,
+              "raster_us": 5902,
+              "total_us": 14514
+            },
+            {
+              "build_us": 6520,
+              "raster_us": 721,
+              "total_us": 7328
+            },
+            {
+              "build_us": 697,
+              "raster_us": 8699,
+              "total_us": 9546
+            },
+            {
+              "build_us": 119,
+              "raster_us": 304,
+              "total_us": 571
+            },
+            {
+              "build_us": 93,
+              "raster_us": 266,
+              "total_us": 460
+            },
+            {
+              "build_us": 80,
+              "raster_us": 632,
+              "total_us": 837
+            },
+            {
+              "build_us": 98,
+              "raster_us": 263,
+              "total_us": 515
+            },
+            {
+              "build_us": 109,
+              "raster_us": 285,
+              "total_us": 454
+            },
+            {
+              "build_us": 96,
+              "raster_us": 381,
+              "total_us": 622
+            },
+            {
+              "build_us": 90,
+              "raster_us": 272,
+              "total_us": 542
+            },
+            {
+              "build_us": 90,
+              "raster_us": 338,
+              "total_us": 546
+            },
+            {
+              "build_us": 101,
+              "raster_us": 269,
+              "total_us": 546
+            },
+            {
+              "build_us": 91,
+              "raster_us": 228,
+              "total_us": 402
+            },
+            {
+              "build_us": 200,
+              "raster_us": 1065,
+              "total_us": 1407
+            },
+            {
+              "build_us": 233,
+              "raster_us": 307,
+              "total_us": 717
+            },
+            {
+              "build_us": 83,
+              "raster_us": 275,
+              "total_us": 470
+            },
+            {
+              "build_us": 103,
+              "raster_us": 292,
+              "total_us": 574
+            },
+            {
+              "build_us": 118,
+              "raster_us": 413,
+              "total_us": 612
+            },
+            {
+              "build_us": 113,
+              "raster_us": 285,
+              "total_us": 544
+            },
+            {
+              "build_us": 89,
+              "raster_us": 277,
+              "total_us": 461
+            },
+            {
+              "build_us": 107,
+              "raster_us": 294,
+              "total_us": 562
+            }
+          ],
+          "host_elapsed_us": 1477958
+        },
+        {
+          "event": "done",
+          "peak_rss": 152731648,
+          "host_elapsed_us": 1478709
+        }
+      ],
+      "foreground": true,
+      "complete": true
+    },
+    {
+      "mode": "startup",
+      "variables": {
+        "STORAGE": "/Users/thiago/Library/Containers/br.com.tommiranda.getman/Data/tmp/getman-perf-IMVqB4",
+        "TABS": 0,
+        "SAMPLE": 6
+      },
+      "reports": [
+        {
+          "event": "first_frame",
+          "dart_us": 69726,
+          "host_elapsed_us": 259724
+        },
+        {
+          "event": "startup",
+          "settings_us": 56979,
+          "first_frame_us": 69726,
+          "workspace_frame_us": 102463,
+          "max_gap_us": 36062,
+          "rss": 153059328,
+          "frames": [
+            {
+              "build_us": 1,
+              "raster_us": 11519,
+              "total_us": 11554
+            },
+            {
+              "build_us": 115,
+              "raster_us": 1596,
+              "total_us": 9601
+            },
+            {
+              "build_us": 8102,
+              "raster_us": 4519,
+              "total_us": 12760
+            },
+            {
+              "build_us": 6342,
+              "raster_us": 777,
+              "total_us": 7323
+            },
+            {
+              "build_us": 897,
+              "raster_us": 9039,
+              "total_us": 10064
+            },
+            {
+              "build_us": 135,
+              "raster_us": 350,
+              "total_us": 624
+            },
+            {
+              "build_us": 120,
+              "raster_us": 261,
+              "total_us": 842
+            },
+            {
+              "build_us": 126,
+              "raster_us": 694,
+              "total_us": 1139
+            },
+            {
+              "build_us": 101,
+              "raster_us": 248,
+              "total_us": 472
+            },
+            {
+              "build_us": 93,
+              "raster_us": 243,
+              "total_us": 525
+            },
+            {
+              "build_us": 93,
+              "raster_us": 367,
+              "total_us": 544
+            },
+            {
+              "build_us": 99,
+              "raster_us": 258,
+              "total_us": 504
+            },
+            {
+              "build_us": 116,
+              "raster_us": 458,
+              "total_us": 758
+            },
+            {
+              "build_us": 84,
+              "raster_us": 258,
+              "total_us": 425
+            },
+            {
+              "build_us": 99,
+              "raster_us": 204,
+              "total_us": 451
+            },
+            {
+              "build_us": 154,
+              "raster_us": 1094,
+              "total_us": 1417
+            },
+            {
+              "build_us": 204,
+              "raster_us": 278,
+              "total_us": 581
+            },
+            {
+              "build_us": 92,
+              "raster_us": 308,
+              "total_us": 552
+            },
+            {
+              "build_us": 126,
+              "raster_us": 333,
+              "total_us": 648
+            },
+            {
+              "build_us": 89,
+              "raster_us": 352,
+              "total_us": 535
+            },
+            {
+              "build_us": 123,
+              "raster_us": 319,
+              "total_us": 596
+            },
+            {
+              "build_us": 93,
+              "raster_us": 274,
+              "total_us": 512
+            },
+            {
+              "build_us": 114,
+              "raster_us": 321,
+              "total_us": 561
+            }
+          ],
+          "host_elapsed_us": 1493790
+        },
+        {
+          "event": "done",
+          "peak_rss": 153190400,
+          "host_elapsed_us": 1495673
+        }
+      ],
+      "foreground": true,
+      "complete": true
+    },
+    {
+      "mode": "startup",
+      "variables": {
+        "STORAGE": "/Users/thiago/Library/Containers/br.com.tommiranda.getman/Data/tmp/getman-perf-IMVqB4",
+        "TABS": 0,
+        "SAMPLE": 7
+      },
+      "reports": [
+        {
+          "event": "first_frame",
+          "dart_us": 76238,
+          "host_elapsed_us": 262125
+        },
+        {
+          "event": "startup",
+          "settings_us": 57224,
+          "first_frame_us": 76238,
+          "workspace_frame_us": 91527,
+          "max_gap_us": 38190,
+          "rss": 152289280,
+          "frames": [
+            {
+              "build_us": 1,
+              "raster_us": 11278,
+              "total_us": 11308
+            },
+            {
+              "build_us": 8287,
+              "raster_us": 5827,
+              "total_us": 14242
+            },
+            {
+              "build_us": 6549,
+              "raster_us": 813,
+              "total_us": 7454
+            },
+            {
+              "build_us": 732,
+              "raster_us": 8952,
+              "total_us": 9853
+            },
+            {
+              "build_us": 120,
+              "raster_us": 303,
+              "total_us": 589
+            },
+            {
+              "build_us": 83,
+              "raster_us": 286,
+              "total_us": 538
+            },
+            {
+              "build_us": 87,
+              "raster_us": 715,
+              "total_us": 918
+            },
+            {
+              "build_us": 107,
+              "raster_us": 293,
+              "total_us": 580
+            },
+            {
+              "build_us": 92,
+              "raster_us": 255,
+              "total_us": 435
+            },
+            {
+              "build_us": 89,
+              "raster_us": 441,
+              "total_us": 647
+            },
+            {
+              "build_us": 93,
+              "raster_us": 245,
+              "total_us": 512
+            },
+            {
+              "build_us": 91,
+              "raster_us": 381,
+              "total_us": 544
+            },
+            {
+              "build_us": 83,
+              "raster_us": 293,
+              "total_us": 515
+            },
+            {
+              "build_us": 97,
+              "raster_us": 274,
+              "total_us": 587
+            },
+            {
+              "build_us": 192,
+              "raster_us": 1072,
+              "total_us": 1429
+            },
+            {
+              "build_us": 248,
+              "raster_us": 388,
+              "total_us": 841
+            },
+            {
+              "build_us": 108,
+              "raster_us": 317,
+              "total_us": 612
+            },
+            {
+              "build_us": 112,
+              "raster_us": 364,
+              "total_us": 584
+            },
+            {
+              "build_us": 89,
+              "raster_us": 357,
+              "total_us": 620
+            },
+            {
+              "build_us": 103,
+              "raster_us": 266,
+              "total_us": 460
+            },
+            {
+              "build_us": 100,
+              "raster_us": 310,
+              "total_us": 550
+            },
+            {
+              "build_us": 103,
+              "raster_us": 278,
+              "total_us": 571
+            }
+          ],
+          "host_elapsed_us": 1478548
+        },
+        {
+          "event": "done",
+          "peak_rss": 152420352,
+          "host_elapsed_us": 1480240
+        }
+      ],
+      "foreground": true,
+      "complete": true
+    },
+    {
+      "mode": "startup",
+      "variables": {
+        "STORAGE": "/Users/thiago/Library/Containers/br.com.tommiranda.getman/Data/tmp/getman-perf-IMVqB4",
+        "TABS": 0,
+        "SAMPLE": 8
+      },
+      "reports": [
+        {
+          "event": "first_frame",
+          "dart_us": 68736,
+          "host_elapsed_us": 256875
+        },
+        {
+          "event": "startup",
+          "settings_us": 55851,
+          "first_frame_us": 68736,
+          "workspace_frame_us": 95759,
+          "max_gap_us": 33845,
+          "rss": 152141824,
+          "frames": [
+            {
+              "build_us": 1,
+              "raster_us": 11474,
+              "total_us": 11503
+            },
+            {
+              "build_us": 7871,
+              "raster_us": 5502,
+              "total_us": 13522
+            },
+            {
+              "build_us": 6435,
+              "raster_us": 702,
+              "total_us": 7249
+            },
+            {
+              "build_us": 685,
+              "raster_us": 8981,
+              "total_us": 9831
+            },
+            {
+              "build_us": 132,
+              "raster_us": 330,
+              "total_us": 629
+            },
+            {
+              "build_us": 109,
+              "raster_us": 315,
+              "total_us": 537
+            },
+            {
+              "build_us": 128,
+              "raster_us": 824,
+              "total_us": 1089
+            },
+            {
+              "build_us": 113,
+              "raster_us": 336,
+              "total_us": 633
+            },
+            {
+              "build_us": 101,
+              "raster_us": 285,
+              "total_us": 471
+            },
+            {
+              "build_us": 107,
+              "raster_us": 492,
+              "total_us": 724
+            },
+            {
+              "build_us": 94,
+              "raster_us": 250,
+              "total_us": 543
+            },
+            {
+              "build_us": 92,
+              "raster_us": 377,
+              "total_us": 586
+            },
+            {
+              "build_us": 103,
+              "raster_us": 243,
+              "total_us": 508
+            },
+            {
+              "build_us": 97,
+              "raster_us": 283,
+              "total_us": 442
+            },
+            {
+              "build_us": 212,
+              "raster_us": 1050,
+              "total_us": 2111
+            },
+            {
+              "build_us": 244,
+              "raster_us": 453,
+              "total_us": 827
+            },
+            {
+              "build_us": 106,
+              "raster_us": 318,
+              "total_us": 585
+            },
+            {
+              "build_us": 132,
+              "raster_us": 375,
+              "total_us": 706
+            },
+            {
+              "build_us": 98,
+              "raster_us": 356,
+              "total_us": 571
+            },
+            {
+              "build_us": 118,
+              "raster_us": 384,
+              "total_us": 671
+            },
+            {
+              "build_us": 111,
+              "raster_us": 275,
+              "total_us": 574
+            },
+            {
+              "build_us": 108,
+              "raster_us": 296,
+              "total_us": 494
+            }
+          ],
+          "host_elapsed_us": 1485107
+        },
+        {
+          "event": "done",
+          "peak_rss": 152272896,
+          "host_elapsed_us": 1486120
+        }
+      ],
+      "foreground": true,
+      "complete": true
+    },
+    {
+      "mode": "startup",
+      "variables": {
+        "STORAGE": "/Users/thiago/Library/Containers/br.com.tommiranda.getman/Data/tmp/getman-perf-IMVqB4",
+        "TABS": 0,
+        "SAMPLE": 9
+      },
+      "reports": [
+        {
+          "event": "first_frame",
+          "dart_us": 77611,
+          "host_elapsed_us": 261202
+        },
+        {
+          "event": "startup",
+          "settings_us": 57732,
+          "first_frame_us": 77611,
+          "workspace_frame_us": 93147,
+          "max_gap_us": 39460,
+          "rss": 152403968,
+          "frames": [
+            {
+              "build_us": 1,
+              "raster_us": 11021,
+              "total_us": 11048
+            },
+            {
+              "build_us": 7987,
+              "raster_us": 5758,
+              "total_us": 13906
+            },
+            {
+              "build_us": 6485,
+              "raster_us": 808,
+              "total_us": 7415
+            },
+            {
+              "build_us": 666,
+              "raster_us": 8974,
+              "total_us": 9781
+            },
+            {
+              "build_us": 129,
+              "raster_us": 308,
+              "total_us": 628
+            },
+            {
+              "build_us": 112,
+              "raster_us": 297,
+              "total_us": 477
+            },
+            {
+              "build_us": 130,
+              "raster_us": 802,
+              "total_us": 1061
+            },
+            {
+              "build_us": 113,
+              "raster_us": 283,
+              "total_us": 569
+            },
+            {
+              "build_us": 80,
+              "raster_us": 294,
+              "total_us": 548
+            },
+            {
+              "build_us": 120,
+              "raster_us": 430,
+              "total_us": 676
+            },
+            {
+              "build_us": 105,
+              "raster_us": 280,
+              "total_us": 554
+            },
+            {
+              "build_us": 88,
+              "raster_us": 401,
+              "total_us": 558
+            },
+            {
+              "build_us": 120,
+              "raster_us": 288,
+              "total_us": 539
+            },
+            {
+              "build_us": 108,
+              "raster_us": 286,
+              "total_us": 592
+            },
+            {
+              "build_us": 171,
+              "raster_us": 956,
+              "total_us": 1240
+            },
+            {
+              "build_us": 206,
+              "raster_us": 349,
+              "total_us": 664
+            },
+            {
+              "build_us": 120,
+              "raster_us": 296,
+              "total_us": 574
+            },
+            {
+              "build_us": 89,
+              "raster_us": 323,
+              "total_us": 563
+            },
+            {
+              "build_us": 123,
+              "raster_us": 418,
+              "total_us": 662
+            },
+            {
+              "build_us": 92,
+              "raster_us": 290,
+              "total_us": 543
+            },
+            {
+              "build_us": 117,
+              "raster_us": 346,
+              "total_us": 550
+            },
+            {
+              "build_us": 134,
+              "raster_us": 404,
+              "total_us": 610
+            }
+          ],
+          "host_elapsed_us": 1476723
+        },
+        {
+          "event": "done",
+          "peak_rss": 152535040,
+          "host_elapsed_us": 1479343
+        }
+      ],
+      "foreground": true,
+      "complete": true
+    },
+    {
+      "mode": "workloads",
+      "variables": {
+        "STORAGE": "/Users/thiago/Library/Containers/br.com.tommiranda.getman/Data/tmp/getman-perf-IMVqB4"
+      },
+      "reports": [
+        {
+          "event": "first_frame",
+          "dart_us": 69640,
+          "host_elapsed_us": 260441
+        },
+        {
+          "event": "startup",
+          "settings_us": 56655,
+          "first_frame_us": 69640,
+          "workspace_frame_us": 98452,
+          "max_gap_us": 34684,
+          "rss": 152600576,
+          "frames": [
+            {
+              "build_us": 1,
+              "raster_us": 11657,
+              "total_us": 11686
+            },
+            {
+              "build_us": 41,
+              "raster_us": 1591,
+              "total_us": 13256
+            },
+            {
+              "build_us": 7844,
+              "raster_us": 4307,
+              "total_us": 12224
+            },
+            {
+              "build_us": 6326,
+              "raster_us": 720,
+              "total_us": 7166
+            },
+            {
+              "build_us": 745,
+              "raster_us": 8916,
+              "total_us": 9800
+            },
+            {
+              "build_us": 125,
+              "raster_us": 273,
+              "total_us": 571
+            },
+            {
+              "build_us": 93,
+              "raster_us": 277,
+              "total_us": 817
+            },
+            {
+              "build_us": 98,
+              "raster_us": 647,
+              "total_us": 848
+            },
+            {
+              "build_us": 102,
+              "raster_us": 295,
+              "total_us": 528
+            },
+            {
+              "build_us": 90,
+              "raster_us": 261,
+              "total_us": 526
+            },
+            {
+              "build_us": 93,
+              "raster_us": 445,
+              "total_us": 624
+            },
+            {
+              "build_us": 123,
+              "raster_us": 302,
+              "total_us": 551
+            },
+            {
+              "build_us": 104,
+              "raster_us": 350,
+              "total_us": 543
+            },
+            {
+              "build_us": 100,
+              "raster_us": 295,
+              "total_us": 500
+            },
+            {
+              "build_us": 97,
+              "raster_us": 280,
+              "total_us": 534
+            },
+            {
+              "build_us": 174,
+              "raster_us": 996,
+              "total_us": 1850
+            },
+            {
+              "build_us": 239,
+              "raster_us": 297,
+              "total_us": 749
+            },
+            {
+              "build_us": 117,
+              "raster_us": 320,
+              "total_us": 533
+            },
+            {
+              "build_us": 117,
+              "raster_us": 364,
+              "total_us": 656
+            },
+            {
+              "build_us": 92,
+              "raster_us": 359,
+              "total_us": 547
+            },
+            {
+              "build_us": 89,
+              "raster_us": 312,
+              "total_us": 542
+            },
+            {
+              "build_us": 77,
+              "raster_us": 268,
+              "total_us": 536
+            },
+            {
+              "build_us": 185,
+              "raster_us": 647,
+              "total_us": 895
+            }
+          ],
+          "host_elapsed_us": 1491186
+        },
+        {
+          "event": "work",
+          "name": "prepare_raw",
+          "elapsed_us": 26182,
+          "max_gap_us": 13099,
+          "rss_before": 185597952,
+          "rss_after": 160989184,
+          "frames": [
+            {
+              "build_us": 58,
+              "raster_us": 4143,
+              "total_us": 4342
+            }
+          ],
+          "host_elapsed_us": 3782409
+        },
+        {
+          "event": "work",
+          "name": "prepare_graphql",
+          "elapsed_us": 97575,
+          "max_gap_us": 86904,
+          "rss_before": 160989184,
+          "rss_after": 161759232,
+          "frames": [
+            {
+              "build_us": 38,
+              "raster_us": 4525,
+              "total_us": 4742
+            }
+          ],
+          "host_elapsed_us": 6083602
+        },
+        {
+          "event": "work",
+          "name": "pretty_depth_1000",
+          "elapsed_us": 12502,
+          "max_gap_us": 1241,
+          "rss_before": 161759232,
+          "rss_after": 163758080,
+          "frames": [
+            {
+              "build_us": 122,
+              "raster_us": 13419,
+              "total_us": 13647
+            }
+          ],
+          "host_elapsed_us": 8299954
+        },
+        {
+          "event": "work",
+          "name": "mtls_configure",
+          "elapsed_us": 12996,
+          "max_gap_us": 5160,
+          "rss_before": 164003840,
+          "rss_after": 163233792,
+          "frames": [
+            {
+              "build_us": 50,
+              "raster_us": 5817,
+              "total_us": 6034
+            }
+          ],
+          "host_elapsed_us": 10516392
+        },
+        {
+          "event": "work",
+          "name": "prepare_raw",
+          "elapsed_us": 30468,
+          "max_gap_us": 13118,
+          "rss_before": 163430400,
+          "rss_after": 168361984,
+          "frames": [
+            {
+              "build_us": 35,
+              "raster_us": 4337,
+              "total_us": 4464
+            }
+          ],
+          "host_elapsed_us": 12749614
+        },
+        {
+          "event": "work",
+          "name": "prepare_graphql",
+          "elapsed_us": 80117,
+          "max_gap_us": 77026,
+          "rss_before": 168607744,
+          "rss_after": 183468032,
+          "frames": [
+            {
+              "build_us": 39,
+              "raster_us": 4354,
+              "total_us": 4554
+            }
+          ],
+          "host_elapsed_us": 15033891
+        },
+        {
+          "event": "work",
+          "name": "pretty_depth_1000",
+          "elapsed_us": 12421,
+          "max_gap_us": 1244,
+          "rss_before": 183468032,
+          "rss_after": 158564352,
+          "frames": [
+            {
+              "build_us": 126,
+              "raster_us": 5781,
+              "total_us": 6129
+            }
+          ],
+          "host_elapsed_us": 17251014
+        },
+        {
+          "event": "work",
+          "name": "mtls_configure",
+          "elapsed_us": 11583,
+          "max_gap_us": 1161,
+          "rss_before": 158564352,
+          "rss_after": 158547968,
+          "frames": [
+            {
+              "build_us": 31,
+              "raster_us": 4250,
+              "total_us": 4460
+            }
+          ],
+          "host_elapsed_us": 19465764
+        },
+        {
+          "event": "work",
+          "name": "prepare_raw",
+          "elapsed_us": 29903,
+          "max_gap_us": 18461,
+          "rss_before": 158547968,
+          "rss_after": 163348480,
+          "frames": [
+            {
+              "build_us": 31,
+              "raster_us": 4503,
+              "total_us": 4676
+            }
+          ],
+          "host_elapsed_us": 21699528
+        },
+        {
+          "event": "work",
+          "name": "prepare_graphql",
+          "elapsed_us": 95760,
+          "max_gap_us": 80163,
+          "rss_before": 163594240,
+          "rss_after": 176898048,
+          "frames": [
+            {
+              "build_us": 29,
+              "raster_us": 4317,
+              "total_us": 4470
+            }
+          ],
+          "host_elapsed_us": 23998728
+        },
+        {
+          "event": "work",
+          "name": "pretty_depth_1000",
+          "elapsed_us": 14352,
+          "max_gap_us": 1201,
+          "rss_before": 176898048,
+          "rss_after": 164872192,
+          "frames": [
+            {
+              "build_us": 75,
+              "raster_us": 5850,
+              "total_us": 6406
+            }
+          ],
+          "host_elapsed_us": 26215838
+        },
+        {
+          "event": "work",
+          "name": "mtls_configure",
+          "elapsed_us": 13664,
+          "max_gap_us": 1230,
+          "rss_before": 164872192,
+          "rss_after": 164331520,
+          "frames": [
+            {
+              "build_us": 60,
+              "raster_us": 7959,
+              "total_us": 8093
+            }
+          ],
+          "host_elapsed_us": 28432122
+        },
+        {
+          "event": "work",
+          "name": "prepare_raw",
+          "elapsed_us": 30413,
+          "max_gap_us": 12858,
+          "rss_before": 164478976,
+          "rss_after": 169508864,
+          "frames": [
+            {
+              "build_us": 35,
+              "raster_us": 4691,
+              "total_us": 4843
+            }
+          ],
+          "host_elapsed_us": 30665987
+        },
+        {
+          "event": "work",
+          "name": "prepare_graphql",
+          "elapsed_us": 96099,
+          "max_gap_us": 81631,
+          "rss_before": 169754624,
+          "rss_after": 184352768,
+          "frames": [
+            {
+              "build_us": 34,
+              "raster_us": 4207,
+              "total_us": 4379
+            }
+          ],
+          "host_elapsed_us": 32966685
+        },
+        {
+          "event": "work",
+          "name": "pretty_depth_1000",
+          "elapsed_us": 12085,
+          "max_gap_us": 1163,
+          "rss_before": 184352768,
+          "rss_after": 158679040,
+          "frames": [
+            {
+              "build_us": 45,
+              "raster_us": 4753,
+              "total_us": 4896
+            }
+          ],
+          "host_elapsed_us": 35181935
+        },
+        {
+          "event": "work",
+          "name": "mtls_configure",
+          "elapsed_us": 14366,
+          "max_gap_us": 1160,
+          "rss_before": 158679040,
+          "rss_after": 158662656,
+          "frames": [
+            {
+              "build_us": 32,
+              "raster_us": 4247,
+              "total_us": 4373
+            }
+          ],
+          "host_elapsed_us": 37399775
+        },
+        {
+          "event": "work",
+          "name": "prepare_raw",
+          "elapsed_us": 28860,
+          "max_gap_us": 18592,
+          "rss_before": 158662656,
+          "rss_after": 163463168,
+          "frames": [
+            {
+              "build_us": 36,
+              "raster_us": 4634,
+              "total_us": 4738
+            }
+          ],
+          "host_elapsed_us": 39631897
+        },
+        {
+          "event": "work",
+          "name": "prepare_graphql",
+          "elapsed_us": 77350,
+          "max_gap_us": 77179,
+          "rss_before": 163823616,
+          "rss_after": 161759232,
+          "frames": [
+            {
+              "build_us": 31,
+              "raster_us": 4378,
+              "total_us": 67617
+            },
+            {
+              "build_us": 261,
+              "raster_us": 5897,
+              "total_us": 6304
+            }
+          ],
+          "host_elapsed_us": 41911816
+        },
+        {
+          "event": "work",
+          "name": "pretty_depth_1000",
+          "elapsed_us": 16543,
+          "max_gap_us": 1168,
+          "rss_before": 161759232,
+          "rss_after": 165969920,
+          "frames": [
+            {
+              "build_us": 34,
+              "raster_us": 4012,
+              "total_us": 4132
+            }
+          ],
+          "host_elapsed_us": 44131724
+        },
+        {
+          "event": "work",
+          "name": "mtls_configure",
+          "elapsed_us": 13933,
+          "max_gap_us": 1222,
+          "rss_before": 165969920,
+          "rss_after": 164986880,
+          "frames": [
+            {
+              "build_us": 58,
+              "raster_us": 9006,
+              "total_us": 9136
+            }
+          ],
+          "host_elapsed_us": 46348652
+        }
+      ],
+      "foreground": true
+    }
+  ],
+  "scope": "release; warm filesystem; synthetic data; real shell; loopback telemetry",
+  "logs": "/var/folders/4d/9ykq4r3d7_31_xhvvz151ws40000gn/T/getman-perf-logs-gldc8tal"
+}

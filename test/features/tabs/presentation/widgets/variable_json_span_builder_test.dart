@@ -5,6 +5,38 @@ import 'package:getman/features/tabs/presentation/widgets/variable_json_span_bui
 import 'package:re_editor/re_editor.dart';
 
 void main() {
+  testWidgets('long minified lines preserve all text without decoration', (
+    tester,
+  ) async {
+    // See docs/PERFORMANCE.md: the release baseline timed out inside the
+    // highlighter after 120 seconds. Only decoration is bounded, never data.
+    final text = '[${List.filled(2000, '"{{host}}"').join(',')}]';
+    final original = TextSpan(text: text);
+    late TextSpan result;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) {
+            result = variableAwareJsonSpan(
+              context: context,
+              index: 0,
+              codeLine: CodeLine(text),
+              textSpan: original,
+              style: const TextStyle(),
+              variables: const {'host': 'example.test'},
+              resolvedColor: Colors.green,
+              unresolvedColor: Colors.red,
+            );
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+    expect(identical(result, original), isTrue);
+    expect(result.toPlainText(), text);
+    expect(text.length, greaterThan(maxHighlightedLineChars));
+  });
+
   testWidgets('colors a {{var}} token inside a JSON string', (tester) async {
     late TextSpan span;
     await tester.pumpWidget(

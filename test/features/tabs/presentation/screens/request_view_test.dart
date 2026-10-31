@@ -174,11 +174,10 @@ Future<void> _pump(
       ),
     ),
   );
-  // A looping progress indicator never settles — loading tests pump once.
+  // pumpWidget already rendered the first frame. Do not let a second pump
+  // heal async loading before the loading tests assert what the user sees.
   if (settle) {
     await tester.pumpAndSettle();
-  } else {
-    await tester.pump();
   }
 }
 
@@ -216,6 +215,44 @@ void main() {
     when(() => repository.putPanel(any())).thenAnswer((_) async {});
     when(() => repository.deletePanels(any())).thenAnswer((_) async {});
     when(() => repository.savePanelMeta(any(), any())).thenAnswer((_) async {});
+  });
+
+  testWidgets('large restored body loads without a blank write to the bloc', (
+    tester,
+  ) async {
+    final body = List.filled(10000, '{"a":1}').join('\n');
+    final tab = HttpRequestTabEntity(
+      tabId: 'large',
+      config: HttpRequestConfigEntity(id: 'large', body: body),
+    );
+    final bloc = await _loadedBloc(repository, sendRequestUseCase, tab);
+    addTearDown(bloc.close);
+    await _pump(tester, tabsBloc: bloc, tabId: 'large', settle: false);
+    expect(
+      find.byType(CircularProgressIndicator).hitTestable(),
+      findsOneWidget,
+    );
+    expect(bloc.state.tabs.single.config.body, body);
+    for (
+      var i = 0;
+      i < 500 && find.byKey(const ValueKey('url_field')).evaluate().isEmpty;
+      i++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+    }
+    expect(find.byKey(const ValueKey('url_field')), findsOneWidget);
+    expect(
+      tester
+          .widget<RequestConfigSection>(find.byType(RequestConfigSection))
+          .bodyController
+          .text,
+      body,
+    );
+    expect(bloc.state.tabs.single.config.body, body);
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('renders url bar and split panes without overflow', (

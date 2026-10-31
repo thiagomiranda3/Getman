@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/features/tabs/presentation/widgets/code_find_panel.dart';
+import 'package:getman/features/tabs/presentation/widgets/large_line_find_guard.dart';
 import 'package:getman/features/tabs/presentation/widgets/variable_json_span_builder.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:re_highlight/languages/json.dart';
@@ -103,6 +104,14 @@ class AppCodeShortcutsActivatorsBuilder extends CodeShortcutsActivatorsBuilder {
 final Highlight _jsonHighlight = Highlight()
   ..registerLanguage('json', langJson);
 
+/// Long minified lines can keep re_highlight busy for minutes. Preserve their
+/// complete editable text while bounding optional syntax/variable decoration.
+const maxHighlightedLineChars = 8192;
+
+/// Bounds Skia layout for a single minified line. re_editor shows an ellipsis;
+/// the controller retains every character for copying, saving and sending.
+const maxRenderedLineChars = 16384;
+
 /// Synchronous, per-line JSON syntax highlighter used as a controller's
 /// [CodeLineSpanBuilder].
 ///
@@ -110,7 +119,8 @@ final Highlight _jsonHighlight = Highlight()
 /// (`isolate_manager`) whose results never reach the paint path in this app —
 /// every token fell back to the base text colour ("single colour"). We colour
 /// each visible line on the UI thread instead: it is viewport-bound (re_editor
-/// only builds spans for on-screen lines) and cheap. Pretty-printed JSON keeps
+/// only builds spans for on-screen lines), with a per-line length budget.
+/// Pretty-printed JSON keeps
 /// every token on a single line (JSON strings cannot contain raw newlines), so
 /// per-line parsing is accurate; non-JSON or partial lines degrade gracefully
 /// to the base colour.
@@ -122,7 +132,7 @@ TextSpan jsonHighlightSpanBuilder({
   required TextStyle style,
 }) {
   final text = codeLine.text;
-  if (text.isEmpty) return textSpan;
+  if (text.isEmpty || text.length > maxHighlightedLineChars) return textSpan;
 
   final tokenTheme = Theme.of(context).brightness == Brightness.dark
       ? atomOneDarkTheme
@@ -199,9 +209,8 @@ class JsonCodeEditor extends StatelessWidget {
 
   /// Externally-owned find controller. Pass one when the host widget needs to
   /// observe find-mode state (e.g. the body editor's Beautify overlay moves
-  /// below the open find panel). Null lets [CodeEditor] create and own its
-  /// internal one — behavior is unchanged. The caller keeps ownership: it must
-  /// dispose the controller itself (re_editor only disposes internal ones).
+  /// below the open find panel). Null lets [LargeLineFindGuard] own an internal
+  /// finder. An external caller retains ownership and must dispose its finder.
   final CodeFindController? findController;
 
   @override
@@ -210,70 +219,76 @@ class JsonCodeEditor extends StatelessWidget {
 
     return ColoredBox(
       color: theme.colorScheme.surface,
-      child: CodeEditor(
-        // A stable global key tied to the (retained) controller. When a theme
-        // switch toggles the glass `frost` wrapper around this editor, the
-        // element type at the panel slot changes, which would otherwise tear
-        // down and remount this CodeEditor. Because the controller outlives the
-        // rebuild, the remounted editor's initState notifies it while the
-        // just-deactivated old editor is still subscribed, and re_editor then
-        // touches a deactivated element (unsafe ancestor / renderObject lookup)
-        // -> crash. Keying by the controller makes Flutter REPARENT the single
-        // editor element instead, preserving its state across the toggle.
-        key: GlobalObjectKey(controller),
+      child: LargeLineFindGuard(
         controller: controller,
         findController: findController,
-        readOnly: readOnly,
-        wordWrap: wordWrap,
-        autofocus: autofocus,
-        focusNode: focusNode,
-        // Let the app's global Cmd/Ctrl+S (save), Cmd/Ctrl+(Numpad)Enter
-        // (send), Cmd/Ctrl+L (focus URL), and Cmd/Ctrl+/ (cheat sheet)
-        // shortcuts fire even while this editor has focus
-        // (see [AppCodeShortcutsActivatorsBuilder]).
-        shortcutsActivatorsBuilder: const AppCodeShortcutsActivatorsBuilder(),
-        findBuilder: (context, controller, readOnly) =>
-            CodeFindPanel(controller: controller, readOnly: readOnly),
-        // Token colours come from [jsonHighlightSpanBuilder] on the controller,
-        // not from a `codeTheme` here — re_editor's isolate highlighter does
-        // not deliver coloured results in this app.
-        style: CodeEditorStyle(
-          fontSize: context.appLayout.fontSizeCode,
-          fontFamily: context.appTypography.codeFontFamily,
-          backgroundColor: context.appPalette.codeBackground,
-          // Use the colorScheme accent, not the legacy `primaryColor`: in a
-          // dark theme that never sets `primaryColor` explicitly (the AURIS
-          // kit) it defaults to a dark surface, so the cursor vanishes against
-          // the dark code background. `colorScheme.primary` is the real brand
-          // accent and equals `primaryColor` in every other theme.
-          cursorColor: theme.colorScheme.primary,
-          selectionColor: theme.colorScheme.primary.withValues(alpha: 0.3),
-          cursorLineColor: theme.colorScheme.primary.withValues(
-            alpha: readOnly ? 0.2 : 0.1,
+        lineLimit: maxRenderedLineChars,
+        editorBuilder: (finder) => CodeEditor(
+          // A stable global key tied to the (retained) controller. When a theme
+          // switch toggles the glass `frost` wrapper around this editor, the
+          // element type at the panel slot changes, which would otherwise tear
+          // down and remount this CodeEditor. The controller outlives the
+          // rebuild, the remounted editor's initState notifies it while the
+          // just-deactivated old editor is still subscribed, and re_editor then
+          // touches a deactivated element (unsafe renderObject lookup)
+          // -> crash. The controller key makes Flutter reparent the single
+          // editor element instead, preserving its state across the toggle.
+          key: GlobalObjectKey(controller),
+          controller: controller,
+          findController: finder,
+          readOnly: readOnly,
+          wordWrap: wordWrap,
+          maxLengthSingleLineRendering: maxRenderedLineChars,
+          autofocus: autofocus,
+          focusNode: focusNode,
+          // Let the app's global Cmd/Ctrl+S (save), Cmd/Ctrl+(Numpad)Enter
+          // (send), Cmd/Ctrl+L (focus URL), and Cmd/Ctrl+/ (cheat sheet)
+          // shortcuts fire even while this editor has focus
+          // (see [AppCodeShortcutsActivatorsBuilder]).
+          shortcutsActivatorsBuilder: const AppCodeShortcutsActivatorsBuilder(),
+          findBuilder: (context, controller, readOnly) =>
+              CodeFindPanel(controller: controller, readOnly: readOnly),
+          // Token colours come from jsonHighlightSpanBuilder on the controller,
+          // not from a `codeTheme` here — re_editor's isolate highlighter does
+          // not deliver coloured results in this app.
+          style: CodeEditorStyle(
+            fontSize: context.appLayout.fontSizeCode,
+            fontFamily: context.appTypography.codeFontFamily,
+            backgroundColor: context.appPalette.codeBackground,
+            // Use the colorScheme accent, not the legacy `primaryColor`: in a
+            // dark theme without explicit primaryColor (the AURIS
+            // kit) it defaults to a dark surface, so the cursor vanishes on
+            // the dark code background. `colorScheme.primary` is the real brand
+            // accent and equals `primaryColor` in every other theme.
+            cursorColor: theme.colorScheme.primary,
+            selectionColor: theme.colorScheme.primary.withValues(alpha: 0.3),
+            cursorLineColor: theme.colorScheme.primary.withValues(
+              alpha: readOnly ? 0.2 : 0.1,
+            ),
           ),
+          indicatorBuilder:
+              indicatorBuilder ??
+              (context, controller, chunkController, notifier) {
+                // Line numbers + JSON fold markers. re_editor's
+                // DefaultCodeChunkAnalyzer (on by default) detects {}/[] regions; the
+                // chunk indicator paints the collapse/expand chevrons in the gutter
+                // and toggles them on tap.
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DefaultCodeLineNumber(
+                      controller: controller,
+                      notifier: notifier,
+                    ),
+                    DefaultCodeChunkIndicator(
+                      width: context.appLayout.foldGutterWidth,
+                      controller: chunkController,
+                      notifier: notifier,
+                    ),
+                  ],
+                );
+              },
         ),
-        indicatorBuilder:
-            indicatorBuilder ??
-            (context, controller, chunkController, notifier) {
-              // Line numbers + JSON fold markers. re_editor's
-              // DefaultCodeChunkAnalyzer (on by default) detects {}/[] regions; the
-              // chunk indicator paints the collapse/expand chevrons in the gutter
-              // and toggles them on tap.
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DefaultCodeLineNumber(
-                    controller: controller,
-                    notifier: notifier,
-                  ),
-                  DefaultCodeChunkIndicator(
-                    width: context.appLayout.foldGutterWidth,
-                    controller: chunkController,
-                    notifier: notifier,
-                  ),
-                ],
-              );
-            },
       ),
     );
   }

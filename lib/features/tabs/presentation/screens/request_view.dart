@@ -26,6 +26,7 @@ import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_event.dart';
 import 'package:getman/features/tabs/presentation/bloc/tabs_state.dart';
+import 'package:getman/features/tabs/presentation/widgets/code_text_loader.dart';
 import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart';
 import 'package:getman/features/tabs/presentation/widgets/request_config_section.dart';
 import 'package:getman/features/tabs/presentation/widgets/response_area.dart';
@@ -51,6 +52,8 @@ class RequestView extends StatefulWidget {
 
 class _RequestViewState extends State<RequestView> {
   late final CodeLineEditingController _bodyController;
+  late final CodeTextLoader _bodyLoader;
+  late final CodeTextLoader _graphqlLoader;
   late final CodeLineEditingController _graphqlVarsController;
   late final CodeLineEditingController _responseController;
 
@@ -83,6 +86,12 @@ class _RequestViewState extends State<RequestView> {
       unresolvedColor: () => _unresolvedColor,
     );
     _responseController = createJsonCodeController();
+    void editorReady() {
+      if (mounted) setState(() {});
+    }
+
+    _bodyLoader = CodeTextLoader(_bodyController, editorReady);
+    _graphqlLoader = CodeTextLoader(_graphqlVarsController, editorReady);
     _bodyController.addListener(_onBodyChanged);
     _graphqlVarsController.addListener(_onGraphqlVarsChanged);
   }
@@ -91,12 +100,9 @@ class _RequestViewState extends State<RequestView> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final tab = context.read<TabsBloc>().state.tabs.byId(widget.tabId);
-    if (tab != null && _bodyController.text != tab.config.body) {
-      _bodyController.text = tab.config.body;
-    }
-    if (tab != null &&
-        _graphqlVarsController.text != tab.config.graphqlVariables) {
-      _graphqlVarsController.text = tab.config.graphqlVariables;
+    if (tab != null) {
+      _bodyLoader.load(tab.config.body);
+      _graphqlLoader.load(tab.config.graphqlVariables);
     }
     // Theme is available here (not in initState). Recolor `{{var}}` tokens when
     // the variable palette changes (e.g. dark/light or theme switch).
@@ -113,7 +119,8 @@ class _RequestViewState extends State<RequestView> {
     final tabsBloc = context.read<TabsBloc>();
     final tab = tabsBloc.state.tabs.byId(widget.tabId);
     if (tab == null) return;
-    final newText = _graphqlVarsController.text;
+    final newText = _graphqlLoader.takeEdit();
+    if (newText == null) return;
     if (tab.config.graphqlVariables == newText) return;
 
     tabsBloc.add(
@@ -139,7 +146,8 @@ class _RequestViewState extends State<RequestView> {
     final tabsBloc = context.read<TabsBloc>();
     final tab = tabsBloc.state.tabs.byId(widget.tabId);
     if (tab == null) return;
-    final newText = _bodyController.text;
+    final newText = _bodyLoader.takeEdit();
+    if (newText == null) return;
     if (tab.config.body == newText) return;
 
     tabsBloc.add(
@@ -151,6 +159,8 @@ class _RequestViewState extends State<RequestView> {
 
   @override
   void dispose() {
+    _bodyLoader.dispose();
+    _graphqlLoader.dispose();
     _bodyController
       ..removeListener(_onBodyChanged)
       ..dispose();
@@ -182,11 +192,16 @@ class _RequestViewState extends State<RequestView> {
           listener: (context, state) {
             final tab = state.tabs.byId(widget.tabId);
             if (tab == null) return;
-            if (_bodyController.text != tab.config.body) {
-              _bodyController.text = tab.config.body;
-            }
-            if (_graphqlVarsController.text != tab.config.graphqlVariables) {
-              _graphqlVarsController.text = tab.config.graphqlVariables;
+            final wasLoading = _bodyLoader.loading || _graphqlLoader.loading;
+            final hadError =
+                _bodyLoader.error != null || _graphqlLoader.error != null;
+            _bodyLoader.load(tab.config.body);
+            _graphqlLoader.load(tab.config.graphqlVariables);
+            if (wasLoading != (_bodyLoader.loading || _graphqlLoader.loading) ||
+                hadError !=
+                    (_bodyLoader.error != null ||
+                        _graphqlLoader.error != null)) {
+              setState(() {});
             }
           },
           buildWhen: (prev, next) {
@@ -196,8 +211,15 @@ class _RequestViewState extends State<RequestView> {
             return prevExists != nextExists;
           },
           builder: (context, tabsState) {
-            if (tabsState.isLoading) {
+            if (tabsState.isLoading ||
+                _bodyLoader.loading ||
+                _graphqlLoader.loading) {
               return const Center(child: CircularProgressIndicator());
+            }
+            if (_bodyLoader.error != null || _graphqlLoader.error != null) {
+              return const Center(
+                child: Text('Unable to load request editor.'),
+              );
             }
             final tab = tabsState.tabs.byId(widget.tabId);
             if (tab == null) return const SizedBox.shrink();
@@ -217,7 +239,12 @@ class _RequestViewState extends State<RequestView> {
                     if (!mounted || _bodyController.text != original) {
                       return null;
                     }
-                    _bodyController.text = prettified;
+                    await replaceCodeText(
+                      _bodyController,
+                      prettified,
+                      isCurrent: () =>
+                          mounted && _bodyController.text == original,
+                    );
                     return null;
                   },
                 ),

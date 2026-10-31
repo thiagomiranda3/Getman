@@ -35,11 +35,15 @@ class LargeBodyFindView extends StatefulWidget {
     required this.body,
     required this.fallback,
     required this.onClose,
+    this.initialQuery = '',
     super.key,
   });
 
   /// The verbatim large-body cache (the same text Copy uses).
   final String body;
+
+  /// Optional selected text when entering search. Read only on first mount.
+  final String initialQuery;
 
   /// Shown below the bar while the query is empty or matchless — the caller
   /// passes its normal plain-text view so behavior is unchanged until a
@@ -69,7 +73,9 @@ class _LargeBodyFindViewState extends State<LargeBodyFindView> {
   @override
   void initState() {
     super.initState();
+    _query.text = widget.initialQuery;
     _query.addListener(_onQueryChanged);
+    if (_query.text.isNotEmpty) _onQueryChanged();
   }
 
   @override

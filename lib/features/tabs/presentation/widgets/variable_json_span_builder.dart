@@ -6,7 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:getman/core/utils/environment_resolver.dart';
 import 'package:getman/features/tabs/presentation/widgets/json_code_editor.dart'
-    show jsonHighlightSpanBuilder;
+    show jsonHighlightSpanBuilder, maxHighlightedLineChars;
 import 'package:re_editor/re_editor.dart';
 
 /// JSON-highlights [codeLine], then recolors every `{{var}}` token: resolved
@@ -33,7 +33,9 @@ TextSpan variableAwareJsonSpan({
   final text = codeLine.text;
   // Fast-out: no `{{` on the line means no variable token is possible, so the
   // (regex) scan + run flattening is pure waste. Most JSON lines hit this.
-  if (!text.contains('{{')) return base;
+  if (text.length > maxHighlightedLineChars || !text.contains('{{')) {
+    return base;
+  }
 
   final matches = EnvironmentResolver.findVariables(text).toList();
   if (matches.isEmpty) return base;

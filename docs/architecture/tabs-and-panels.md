@@ -63,6 +63,38 @@ The metadata-row timeline is `ResponseHistoryTimeline` (hidden under 2 entries);
 
 ### Request-body autocomplete and syntax diagnostics
 
+Large native request bodies and GraphQL variables (at least 64 Ki characters)
+use `CodeTextLoader` to prepare re_editor `CodeLines` in a worker before
+installing them on the UI controller. The request view shows progress during
+loading and a visible error on failure; loading must never write an empty body
+back to the bloc. Revisions reject obsolete loads after a new model value,
+user edit or disposal. Selection/repaint notifications do not join all lines.
+Beautify uses `replaceCodeText` with the same async preparation, undo support
+and a current-text/mounted guard. Flutter controller updates/layout stay local.
+
+`JsonCodeEditor` skips syntax and variable decoration on lines longer than
+8,192 characters, and sets re_editor's single-line rendering budget to 16,384.
+The editor displays an ellipsis beyond that budget; the complete controller
+text remains available to copy/save/send. These are rendering limits, not
+request payload limits. **re_editor 0.9.0 disables its layout limit while find
+mode is open**. `LargeLineFindGuard` therefore replaces that viewport with
+`LargeBodyFindView` when a document contains an oversized line (including
+folded chunks): search scans the full text in a worker and renders a 4 KiB
+window around matches. Close/Escape restores the original editor/controller;
+the search preview is read-only. Selected text prefills the query only up to
+1,024 characters, avoiding a huge single-line search field. The guard owns a
+finder only when none was provided, has a distinct controller-keyed global key
+for theme reparenting, and ignores selection/repaint/match-result echoes.
+See the measured cases and remaining work in
+[PERFORMANCE.md](../PERFORMANCE.md). Native `compute` uses isolates; web does
+not gain parallelism from these helpers.
+
+`RequestSerializer` delegates raw substitution and GraphQL variable
+decode/envelope encode to `text_body_serializer.dart`. Inputs whose body plus
+variables reach 64 Ki characters use a worker; smaller inputs stay local.
+Only text/maps are transferred, retaining Content-Type and typed invalid
+GraphQL-variable errors. Transport/cancellation objects stay with the caller.
+
 `BodyCodeEditor` adds request-only assistance around `JsonCodeEditor`; response
 editors keep their existing behavior. `body_completion.dart` computes the caret
 context and complete replacement range. Typing a property name in a JSON object,

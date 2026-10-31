@@ -1,7 +1,5 @@
 // Wire-level request builder: auth injection + body serialization (raw,
 // urlencoded, multipart, binary, GraphQL) for TabsRepositoryImpl.sendRequest.
-import 'dart:convert';
-
 import 'package:dio/dio.dart';
 import 'package:getman/core/domain/auth_application.dart';
 import 'package:getman/core/domain/entities/auth_config.dart';
@@ -13,6 +11,7 @@ import 'package:getman/core/utils/body_type_utils.dart';
 import 'package:getman/core/utils/environment_resolver.dart';
 import 'package:getman/core/utils/io/file_reader.dart';
 import 'package:getman/core/utils/path_utils.dart';
+import 'package:getman/features/tabs/data/text_body_serializer.dart';
 
 /// Data-layer helper that turns a request's auth + body configuration into the
 /// concrete headers / query / payload handed to [NetworkService]. Lives in the
@@ -87,7 +86,12 @@ class RequestSerializer {
         // anyway (ImplyContentTypeInterceptor); set it here so the wire, the
         // HEADERS tab and code-gen agree on one explicit value.
         BodyTypeUtils.applyContentType(headers, BodyType.raw);
-        return r(config.body);
+        return serializeTextBody(
+          type: BodyType.raw,
+          body: config.body,
+          variables: '',
+          environment: envVars,
+        );
       case BodyType.urlencoded:
         BodyTypeUtils.applyContentType(headers, BodyType.urlencoded);
         // Accumulate list values so repeated field names survive: Dio's
@@ -132,26 +136,17 @@ class RequestSerializer {
         return _readBytes(path);
       case BodyType.graphql:
         BodyTypeUtils.applyContentType(headers, BodyType.graphql);
-        final varsText = r(config.graphqlVariables).trim();
-        Object? variables;
-        if (varsText.isEmpty) {
-          variables = const <String, dynamic>{};
-        } else {
-          try {
-            variables = jsonDecode(varsText);
-          } on FormatException catch (e) {
-            throw GraphqlVariablesException(e.message);
-          }
-        }
         // Return the JSON STRING, not a Map: Dio's transformer only
         // json-encodes a Map when the content-type is a JSON mime type — with
         // a user-set non-JSON Content-Type (application/graphql, text/plain)
         // it would form-urlencode the Map into garbage. A String passes
         // through verbatim regardless of content-type.
-        return jsonEncode(<String, dynamic>{
-          'query': r(config.body),
-          'variables': variables,
-        });
+        return serializeTextBody(
+          type: BodyType.graphql,
+          body: config.body,
+          variables: config.graphqlVariables,
+          environment: envVars,
+        );
     }
   }
 

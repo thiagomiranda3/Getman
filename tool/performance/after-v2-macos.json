@@ -1,0 +1,747 @@
+{
+  "revision": "3ec67025+text-worker+bounded-highlighting+async-editor",
+  "machine": "macOS-27.0.1-arm64-arm-64bit",
+  "app": {
+    "dart_aot_sha256": "ce223ba55de3acb16bf088d91bd6f9d1b692f29326bc5cb350335ee7cb2e2105",
+    "executable": "/private/tmp/getman-perf-after-v2.app/Contents/MacOS/getman",
+    "bundle_bytes": 57500555,
+    "executable_sha256": "1a1076d8f3543832d230c7dbc9cb543a6014e8d286cbc8dcfd5aa65b27da0cc5"
+  },
+  "runs": [
+    {
+      "mode": "seed",
+      "executable": "/tmp/getman-perf-after-v2.app/Contents/MacOS/getman",
+      "variables": {
+        "TABS": 0
+      },
+      "reports": [
+        {
+          "event": "seed",
+          "directory": "/Users/thiago/Library/Containers/br.com.tommiranda.getman/Data/tmp/getman-perf-8GhHRI",
+          "host_elapsed_us": 387250
+        }
+      ],
+      "complete": true
+    },
+    {
+      "mode": "workloads",
+      "executable": "/tmp/getman-perf-after-v2.app/Contents/MacOS/getman",
+      "variables": {
+        "STORAGE": "/Users/thiago/Library/Containers/br.com.tommiranda.getman/Data/tmp/getman-perf-8GhHRI"
+      },
+      "reports": [
+        {
+          "event": "first_frame",
+          "dart_us": 43701,
+          "host_elapsed_us": 230178
+        },
+        {
+          "event": "startup",
+          "settings_us": 16412,
+          "first_frame_us": 43701,
+          "workspace_frame_us": 78713,
+          "max_gap_us": 20584,
+          "rss": 153403392,
+          "frames": [
+            {
+              "build_us": 1,
+              "raster_us": 16627,
+              "total_us": 16658
+            },
+            {
+              "build_us": 88,
+              "raster_us": 1489,
+              "total_us": 23923
+            },
+            {
+              "build_us": 95,
+              "raster_us": 1512,
+              "total_us": 8810
+            },
+            {
+              "build_us": 13187,
+              "raster_us": 5064,
+              "total_us": 18336
+            },
+            {
+              "build_us": 6997,
+              "raster_us": 743,
+              "total_us": 7829
+            },
+            {
+              "build_us": 1279,
+              "raster_us": 8378,
+              "total_us": 9748
+            },
+            {
+              "build_us": 125,
+              "raster_us": 263,
+              "total_us": 461
+            },
+            {
+              "build_us": 139,
+              "raster_us": 337,
+              "total_us": 556
+            },
+            {
+              "build_us": 109,
+              "raster_us": 705,
+              "total_us": 888
+            },
+            {
+              "build_us": 108,
+              "raster_us": 296,
+              "total_us": 478
+            },
+            {
+              "build_us": 126,
+              "raster_us": 282,
+              "total_us": 487
+            },
+            {
+              "build_us": 106,
+              "raster_us": 423,
+              "total_us": 610
+            },
+            {
+              "build_us": 101,
+              "raster_us": 302,
+              "total_us": 481
+            },
+            {
+              "build_us": 108,
+              "raster_us": 436,
+              "total_us": 619
+            },
+            {
+              "build_us": 102,
+              "raster_us": 271,
+              "total_us": 446
+            },
+            {
+              "build_us": 116,
+              "raster_us": 292,
+              "total_us": 482
+            },
+            {
+              "build_us": 199,
+              "raster_us": 1074,
+              "total_us": 1358
+            },
+            {
+              "build_us": 244,
+              "raster_us": 418,
+              "total_us": 740
+            },
+            {
+              "build_us": 112,
+              "raster_us": 323,
+              "total_us": 523
+            },
+            {
+              "build_us": 127,
+              "raster_us": 314,
+              "total_us": 515
+            },
+            {
+              "build_us": 124,
+              "raster_us": 394,
+              "total_us": 591
+            },
+            {
+              "build_us": 141,
+              "raster_us": 460,
+              "total_us": 703
+            },
+            {
+              "build_us": 137,
+              "raster_us": 424,
+              "total_us": 656
+            },
+            {
+              "build_us": 136,
+              "raster_us": 385,
+              "total_us": 612
+            }
+          ],
+          "host_elapsed_us": 1465986
+        },
+        {
+          "event": "work",
+          "name": "prepare_raw",
+          "elapsed_us": 31288,
+          "max_gap_us": 6269,
+          "rss_before": 186368000,
+          "rss_after": 161824768,
+          "frames": [
+            {
+              "build_us": 34,
+              "raster_us": 4237,
+              "total_us": 4349
+            }
+          ],
+          "host_elapsed_us": 3758209
+        },
+        {
+          "event": "work",
+          "name": "prepare_graphql",
+          "elapsed_us": 80638,
+          "max_gap_us": 3804,
+          "rss_before": 161824768,
+          "rss_after": 162496512,
+          "frames": [
+            {
+              "build_us": 36,
+              "raster_us": 4280,
+              "total_us": 4378
+            }
+          ],
+          "host_elapsed_us": 6041984
+        },
+        {
+          "event": "work",
+          "name": "pretty_depth_1000",
+          "elapsed_us": 14589,
+          "max_gap_us": 1367,
+          "rss_before": 162496512,
+          "rss_after": 164478976,
+          "frames": [
+            {
+              "build_us": 54,
+              "raster_us": 9287,
+              "total_us": 9607
+            }
+          ],
+          "host_elapsed_us": 8259025
+        },
+        {
+          "event": "work",
+          "name": "mtls_configure",
+          "elapsed_us": 13300,
+          "max_gap_us": 2802,
+          "rss_before": 164724736,
+          "rss_after": 163938304,
+          "frames": [
+            {
+              "build_us": 98,
+              "raster_us": 12251,
+              "total_us": 12693
+            }
+          ],
+          "host_elapsed_us": 10476988
+        },
+        {
+          "event": "work",
+          "name": "prepare_raw",
+          "elapsed_us": 28687,
+          "max_gap_us": 6011,
+          "rss_before": 160153600,
+          "rss_after": 165101568,
+          "frames": [
+            {
+              "build_us": 36,
+              "raster_us": 4167,
+              "total_us": 4248
+            }
+          ],
+          "host_elapsed_us": 12709336
+        },
+        {
+          "event": "work",
+          "name": "prepare_graphql",
+          "elapsed_us": 97095,
+          "max_gap_us": 4259,
+          "rss_before": 165298176,
+          "rss_after": 181174272,
+          "frames": [
+            {
+              "build_us": 36,
+              "raster_us": 4096,
+              "total_us": 4201
+            }
+          ],
+          "host_elapsed_us": 15008816
+        },
+        {
+          "event": "work",
+          "name": "pretty_depth_1000",
+          "elapsed_us": 13115,
+          "max_gap_us": 1284,
+          "rss_before": 181174272,
+          "rss_after": 155205632,
+          "frames": [
+            {
+              "build_us": 33,
+              "raster_us": 4563,
+              "total_us": 4692
+            }
+          ],
+          "host_elapsed_us": 17225201
+        },
+        {
+          "event": "work",
+          "name": "mtls_configure",
+          "elapsed_us": 14192,
+          "max_gap_us": 1355,
+          "rss_before": 155205632,
+          "rss_after": 155222016,
+          "frames": [
+            {
+              "build_us": 122,
+              "raster_us": 10593,
+              "total_us": 10857
+            }
+          ],
+          "host_elapsed_us": 19441957
+        },
+        {
+          "event": "work",
+          "name": "prepare_raw",
+          "elapsed_us": 46290,
+          "max_gap_us": 6530,
+          "rss_before": 155222016,
+          "rss_after": 160088064,
+          "frames": [
+            {
+              "build_us": 34,
+              "raster_us": 4170,
+              "total_us": 4275
+            }
+          ],
+          "host_elapsed_us": 21691482
+        },
+        {
+          "event": "work",
+          "name": "prepare_graphql",
+          "elapsed_us": 97857,
+          "max_gap_us": 3463,
+          "rss_before": 160333824,
+          "rss_after": 178651136,
+          "frames": [
+            {
+              "build_us": 39,
+              "raster_us": 4312,
+              "total_us": 4429
+            }
+          ],
+          "host_elapsed_us": 23992260
+        },
+        {
+          "event": "work",
+          "name": "pretty_depth_1000",
+          "elapsed_us": 12936,
+          "max_gap_us": 1286,
+          "rss_before": 178651136,
+          "rss_after": 166576128,
+          "frames": [
+            {
+              "build_us": 32,
+              "raster_us": 4434,
+              "total_us": 4518
+            }
+          ],
+          "host_elapsed_us": 26208730
+        },
+        {
+          "event": "work",
+          "name": "mtls_configure",
+          "elapsed_us": 13758,
+          "max_gap_us": 1351,
+          "rss_before": 166576128,
+          "rss_after": 166084608,
+          "frames": [
+            {
+              "build_us": 120,
+              "raster_us": 11745,
+              "total_us": 11984
+            }
+          ],
+          "host_elapsed_us": 28426439
+        },
+        {
+          "event": "work",
+          "name": "prepare_raw",
+          "elapsed_us": 28425,
+          "max_gap_us": 6295,
+          "rss_before": 166084608,
+          "rss_after": 154927104,
+          "frames": [
+            {
+              "build_us": 29,
+              "raster_us": 4140,
+              "total_us": 4276
+            }
+          ],
+          "host_elapsed_us": 30659719
+        },
+        {
+          "event": "work",
+          "name": "prepare_graphql",
+          "elapsed_us": 95213,
+          "max_gap_us": 3897,
+          "rss_before": 155172864,
+          "rss_after": 158728192,
+          "frames": [
+            {
+              "build_us": 35,
+              "raster_us": 4186,
+              "total_us": 4299
+            }
+          ],
+          "host_elapsed_us": 32959055
+        },
+        {
+          "event": "work",
+          "name": "pretty_depth_1000",
+          "elapsed_us": 13409,
+          "max_gap_us": 1349,
+          "rss_before": 158728192,
+          "rss_after": 160677888,
+          "frames": [
+            {
+              "build_us": 128,
+              "raster_us": 9559,
+              "total_us": 9821
+            }
+          ],
+          "host_elapsed_us": 35174448
+        },
+        {
+          "event": "work",
+          "name": "mtls_configure",
+          "elapsed_us": 14572,
+          "max_gap_us": 1332,
+          "rss_before": 160874496,
+          "rss_after": 160038912,
+          "frames": [
+            {
+              "build_us": 105,
+              "raster_us": 15575,
+              "total_us": 15800
+            }
+          ],
+          "host_elapsed_us": 37391788
+        },
+        {
+          "event": "work",
+          "name": "prepare_raw",
+          "elapsed_us": 30507,
+          "max_gap_us": 5616,
+          "rss_before": 160317440,
+          "rss_after": 165298176,
+          "frames": [
+            {
+              "build_us": 29,
+              "raster_us": 4300,
+              "total_us": 4424
+            }
+          ],
+          "host_elapsed_us": 39625870
+        },
+        {
+          "event": "work",
+          "name": "prepare_graphql",
+          "elapsed_us": 79709,
+          "max_gap_us": 3593,
+          "rss_before": 165543936,
+          "rss_after": 181403648,
+          "frames": [
+            {
+              "build_us": 32,
+              "raster_us": 4385,
+              "total_us": 4511
+            }
+          ],
+          "host_elapsed_us": 41908105
+        },
+        {
+          "event": "work",
+          "name": "pretty_depth_1000",
+          "elapsed_us": 14162,
+          "max_gap_us": 1293,
+          "rss_before": 181403648,
+          "rss_after": 155697152,
+          "frames": [
+            {
+              "build_us": 37,
+              "raster_us": 4320,
+              "total_us": 4473
+            }
+          ],
+          "host_elapsed_us": 44125281
+        },
+        {
+          "event": "work",
+          "name": "mtls_configure",
+          "elapsed_us": 13305,
+          "max_gap_us": 1340,
+          "rss_before": 155697152,
+          "rss_after": 155697152,
+          "frames": [
+            {
+              "build_us": 98,
+              "raster_us": 13684,
+              "total_us": 13915
+            }
+          ],
+          "host_elapsed_us": 46342008
+        },
+        {
+          "event": "work",
+          "name": "open_singleline_body",
+          "elapsed_us": 618587,
+          "max_gap_us": 536770,
+          "rss_before": 169984000,
+          "rss_after": 1028997120,
+          "frames": [
+            {
+              "build_us": 7990,
+              "raster_us": 2899,
+              "total_us": 11034
+            },
+            {
+              "build_us": 535735,
+              "raster_us": 4840,
+              "total_us": 540723
+            },
+            {
+              "build_us": 324,
+              "raster_us": 1869,
+              "total_us": 525971
+            },
+            {
+              "build_us": 164,
+              "raster_us": 557,
+              "total_us": 1005
+            },
+            {
+              "build_us": 67,
+              "raster_us": 604,
+              "total_us": 812
+            }
+          ],
+          "host_elapsed_us": 49224813
+        },
+        {
+          "event": "work",
+          "name": "open_multiline_body",
+          "elapsed_us": 630732,
+          "max_gap_us": 50705,
+          "rss_before": 1028997120,
+          "rss_after": 1089667072,
+          "frames": [
+            {
+              "build_us": 1691,
+              "raster_us": 6444,
+              "total_us": 8235
+            },
+            {
+              "build_us": 223,
+              "raster_us": 1561,
+              "total_us": 1915
+            },
+            {
+              "build_us": 374,
+              "raster_us": 892,
+              "total_us": 1397
+            },
+            {
+              "build_us": 182,
+              "raster_us": 801,
+              "total_us": 1113
+            },
+            {
+              "build_us": 371,
+              "raster_us": 413,
+              "total_us": 921
+            },
+            {
+              "build_us": 371,
+              "raster_us": 546,
+              "total_us": 1058
+            },
+            {
+              "build_us": 183,
+              "raster_us": 498,
+              "total_us": 813
+            },
+            {
+              "build_us": 174,
+              "raster_us": 448,
+              "total_us": 777
+            },
+            {
+              "build_us": 197,
+              "raster_us": 403,
+              "total_us": 739
+            },
+            {
+              "build_us": 220,
+              "raster_us": 508,
+              "total_us": 877
+            },
+            {
+              "build_us": 163,
+              "raster_us": 428,
+              "total_us": 745
+            },
+            {
+              "build_us": 160,
+              "raster_us": 422,
+              "total_us": 740
+            },
+            {
+              "build_us": 146,
+              "raster_us": 419,
+              "total_us": 719
+            },
+            {
+              "build_us": 192,
+              "raster_us": 513,
+              "total_us": 856
+            },
+            {
+              "build_us": 134,
+              "raster_us": 388,
+              "total_us": 677
+            },
+            {
+              "build_us": 160,
+              "raster_us": 492,
+              "total_us": 807
+            },
+            {
+              "build_us": 140,
+              "raster_us": 337,
+              "total_us": 628
+            },
+            {
+              "build_us": 155,
+              "raster_us": 425,
+              "total_us": 696
+            },
+            {
+              "build_us": 50217,
+              "raster_us": 1447,
+              "total_us": 51753
+            },
+            {
+              "build_us": 1213,
+              "raster_us": 824,
+              "total_us": 58877
+            },
+            {
+              "build_us": 106,
+              "raster_us": 774,
+              "total_us": 5217
+            },
+            {
+              "build_us": 68,
+              "raster_us": 890,
+              "total_us": 1082
+            },
+            {
+              "build_us": 78,
+              "raster_us": 1725,
+              "total_us": 1957
+            },
+            {
+              "build_us": 72,
+              "raster_us": 438,
+              "total_us": 631
+            },
+            {
+              "build_us": 91,
+              "raster_us": 410,
+              "total_us": 572
+            },
+            {
+              "build_us": 85,
+              "raster_us": 462,
+              "total_us": 666
+            },
+            {
+              "build_us": 74,
+              "raster_us": 386,
+              "total_us": 531
+            },
+            {
+              "build_us": 67,
+              "raster_us": 344,
+              "total_us": 533
+            },
+            {
+              "build_us": 66,
+              "raster_us": 457,
+              "total_us": 657
+            },
+            {
+              "build_us": 80,
+              "raster_us": 417,
+              "total_us": 653
+            },
+            {
+              "build_us": 71,
+              "raster_us": 367,
+              "total_us": 589
+            },
+            {
+              "build_us": 57,
+              "raster_us": 338,
+              "total_us": 544
+            },
+            {
+              "build_us": 63,
+              "raster_us": 311,
+              "total_us": 493
+            },
+            {
+              "build_us": 62,
+              "raster_us": 379,
+              "total_us": 593
+            },
+            {
+              "build_us": 74,
+              "raster_us": 444,
+              "total_us": 681
+            },
+            {
+              "build_us": 83,
+              "raster_us": 477,
+              "total_us": 721
+            }
+          ],
+          "host_elapsed_us": 52057341
+        },
+        {
+          "event": "done",
+          "peak_rss": 1108623360,
+          "host_elapsed_us": 52059536
+        }
+      ],
+      "foreground": true,
+      "complete": true
+    },
+    {
+      "mode": "cleanup",
+      "executable": "/tmp/getman-perf-after-v2.app/Contents/MacOS/getman",
+      "variables": {
+        "STORAGE": "/Users/thiago/Library/Containers/br.com.tommiranda.getman/Data/tmp/getman-perf-8GhHRI"
+      },
+      "reports": [
+        {
+          "event": "cleanup",
+          "host_elapsed_us": 221792
+        }
+      ],
+      "complete": true
+    }
+  ],
+  "scope": "release; warm filesystem; synthetic data; real shell; loopback telemetry",
+  "harness_sha256": {
+    "run.py": "dc9ca558bf1593402c23be4081bc9091db4e502661600b41cf21593c448fac27",
+    "app.dart": "44dde6dc775b17c7e8b8b44f60e3eedeb84d62c8161bfd5a71b55c9aabff0123"
+  },
+  "logs": "/var/folders/4d/9ykq4r3d7_31_xhvvz151ws40000gn/T/getman-perf-logs-s99mbv21",
+  "complete": true
+}
