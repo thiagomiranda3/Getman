@@ -27,6 +27,7 @@ import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/mcp_service.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/network/realtime_service.dart';
+import 'package:getman/core/storage/storage_connection.dart';
 import 'package:getman/core/theme/app_theme.dart';
 import 'package:getman/core/theme/motion/theme_switch_transition.dart';
 import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
@@ -261,6 +262,7 @@ class MyApp extends StatelessWidget {
           BlocProvider(create: (_) => di.sl<ConflictBloc>()),
         ],
         child: ExitFlushGuard(
+          flushStorage: di.sl<StorageConnection>().flush,
           child: TabCloseTeardownListener(
             child: NetworkSettingsListener(
               child: WorkspaceSyncListener(

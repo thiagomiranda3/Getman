@@ -1,152 +1,56 @@
-// TabsRepository implementation: maps HttpRequestTabEntity/PanelEntity to
-// their Hive models via TabsLocalDataSource, and builds+sends the network
-// request (query/header/body resolution, auth injection via
-// RequestSerializer).
-//
-// Gotchas:
-// - _toPersistableModel caps the current response body AND every
-//   responseHistory entry over kMaxPersistedResponseBodyChars (1 MiB) to
-//   kResponseBodyTooLargePlaceholder before writing to disk; the in-memory
-//   session always keeps the full bodies.
-// - That on-disk cap is unconditional and distinct from the
-//   saveLargeResponsesInHistory downgrade of superseded history entries to
-//   kHistoryBodyNotKeptPlaceholder, which happens earlier in
-//   TabsBloc._recordResponse (a different threshold and placeholder).
-// - getPanels() upgrades a legacy (pre-panels) install by wrapping all saved
-//   tabs, in their saved order, into one synthesized "Panel 1"; the bloc
-//   persists that assembled panel back on first load.
+// Composes tab/panel persistence with HTTP request assembly and sending.
+// Production injects worker persistence; tests can inject a local data source.
 import 'package:getman/core/domain/entities/auth_config.dart';
 import 'package:getman/core/domain/entities/request_config_entity.dart';
-import 'package:getman/core/domain/persistence_limits.dart';
 import 'package:getman/core/error/exceptions.dart';
 import 'package:getman/core/error/failures.dart';
-import 'package:getman/core/error/guard.dart';
 import 'package:getman/core/network/http_response.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/utils/environment_resolver.dart';
 import 'package:getman/core/utils/url_query_utils.dart';
 import 'package:getman/features/tabs/data/datasources/tabs_local_data_source.dart';
-import 'package:getman/features/tabs/data/models/panel_model.dart';
-import 'package:getman/features/tabs/data/models/request_tab_model.dart';
+import 'package:getman/features/tabs/data/repositories/hive_tabs_persistence.dart';
 import 'package:getman/features/tabs/data/request_serializer.dart';
 import 'package:getman/features/tabs/domain/entities/panel_entity.dart';
 import 'package:getman/features/tabs/domain/entities/request_tab_entity.dart';
+import 'package:getman/features/tabs/domain/repositories/tabs_persistence.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
-import 'package:uuid/uuid.dart';
 
 class TabsRepositoryImpl implements TabsRepository {
   TabsRepositoryImpl({
-    required this.localDataSource,
     required this.networkService,
-  });
-  final TabsLocalDataSource localDataSource;
+    TabsLocalDataSource? localDataSource,
+    TabsPersistence? persistence,
+  }) : assert(
+         localDataSource != null || persistence != null,
+         'Provide localDataSource or persistence',
+       ),
+       persistence = persistence ?? HiveTabsPersistence(localDataSource!);
+  final TabsPersistence persistence;
   final NetworkService networkService;
 
   @override
-  Future<List<HttpRequestTabEntity>> getTabs() => guardPersistence(() async {
-    final models = await localDataSource.getTabs();
-    return models.map((m) => m.toEntity()).toList();
-  });
-
+  Future<List<HttpRequestTabEntity>> getTabs() => persistence.getTabs();
   @override
   Future<void> saveTabs(List<HttpRequestTabEntity> tabs) =>
-      guardPersistence(() async {
-        final models = tabs.map(_toPersistableModel).toList();
-        await localDataSource.saveTabs(models);
-      });
-
+      persistence.saveTabs(tabs);
   @override
-  Future<void> putTab(HttpRequestTabEntity tab) => guardPersistence(() async {
-    await localDataSource.putTab(_toPersistableModel(tab));
-  });
-
+  Future<void> putTab(HttpRequestTabEntity tab) => persistence.putTab(tab);
   @override
-  Future<void> deleteTabs(List<String> tabIds) => guardPersistence(() async {
-    await localDataSource.deleteTabs(tabIds);
-  });
-
+  Future<void> deleteTabs(List<String> ids) => persistence.deleteTabs(ids);
   @override
-  Future<void> saveTabOrder(List<String> orderedTabIds) =>
-      guardPersistence(() async {
-        await localDataSource.saveOrder(orderedTabIds);
-      });
-
+  Future<void> saveTabOrder(List<String> ids) => persistence.saveTabOrder(ids);
   @override
-  Future<List<PanelEntity>> getPanels() => guardPersistence(() async {
-    final tabModels = await localDataSource.getTabs();
-    final tabsById = {for (final m in tabModels) m.tabId: m.toEntity()};
-    final panelModels = await localDataSource.getPanels();
-    if (panelModels.isEmpty) {
-      if (tabsById.isEmpty) return <PanelEntity>[];
-      // Legacy upgrade: wrap all existing tabs (in their saved order) into
-      // one "Panel 1". The bloc persists this on first load.
-      final ordered = tabModels.map((m) => m.tabId).toList();
-      return [
-        PanelEntity(
-          id: const Uuid().v4(),
-          name: 'Panel 1',
-          tabs: ordered.map((id) => tabsById[id]!).toList(),
-          activeTabId: ordered.first,
-        ),
-      ];
-    }
-    return panelModels.map((pm) => pm.toEntity(tabsById)).toList();
-  });
-
+  Future<List<PanelEntity>> getPanels() => persistence.getPanels();
   @override
-  Future<String?> getActivePanelId() =>
-      guardPersistence(localDataSource.getActivePanelId);
-
+  Future<String?> getActivePanelId() => persistence.getActivePanelId();
   @override
-  Future<void> putPanel(PanelEntity panel) => guardPersistence(
-    () => localDataSource.putPanel(PanelModel.fromEntity(panel)),
-  );
-
+  Future<void> putPanel(PanelEntity panel) => persistence.putPanel(panel);
   @override
-  Future<void> deletePanels(List<String> panelIds) =>
-      guardPersistence(() => localDataSource.deletePanels(panelIds));
-
+  Future<void> deletePanels(List<String> ids) => persistence.deletePanels(ids);
   @override
-  Future<void> savePanelMeta(List<String> panelOrder, String activePanelId) =>
-      guardPersistence(
-        () => localDataSource.savePanelMeta(panelOrder, activePanelId),
-      );
-
-  /// Maps the entity to its Hive model, replacing any over-limit response body
-  /// — the displayed response and every time-travel history entry — with
-  /// [kResponseBodyTooLargePlaceholder]. The in-memory session keeps the full
-  /// bodies; only the on-disk copy is capped (see persistence_limits.dart).
-  HttpRequestTabModel _toPersistableModel(HttpRequestTabEntity entity) {
-    var capped = entity;
-
-    final response = capped.response;
-    if (response != null &&
-        response.body.length > kMaxPersistedResponseBodyChars) {
-      capped = capped.copyWith(
-        response: response.copyWithBody(kResponseBodyTooLargePlaceholder),
-      );
-    }
-
-    if (capped.responseHistory.any(
-      (e) => e.response.body.length > kMaxPersistedResponseBodyChars,
-    )) {
-      capped = capped.copyWith(
-        responseHistory: capped.responseHistory
-            .map(
-              (e) => e.response.body.length > kMaxPersistedResponseBodyChars
-                  ? e.copyWith(
-                      response: e.response.copyWithBody(
-                        kResponseBodyTooLargePlaceholder,
-                      ),
-                    )
-                  : e,
-            )
-            .toList(),
-      );
-    }
-
-    return HttpRequestTabModel.fromEntity(capped);
-  }
+  Future<void> savePanelMeta(List<String> order, String activeId) =>
+      persistence.savePanelMeta(order, activeId);
 
   @override
   Future<HttpResponseEntity> sendRequest(

@@ -34,14 +34,14 @@ widgets + screens). Shared cross-feature code lives under `lib/core/`. See
 | Path | Purpose | Key files |
 |---|---|---|
 | `lib` | App entry point. | `main.dart` (DI boot, MultiBlocProvider, global `Shortcuts` map, `MaterialApp.router`) |
-| `lib/core/di` | GetIt bootstrap. | `injection_container.dart` (settings-only boot, then feature stores and DI after the first frame) |
+| `lib/core/di` | GetIt bootstrap. | `injection_container.dart` (settings-only boot, then storage worker and DI after the first frame) |
 | `lib/core/domain` | Cross-feature pure-domain helpers. | `auth_application.dart`, `persistence_limits.dart` |
 | `lib/core/domain/entities` | Shared entities used by >1 feature. | `request_config_entity.dart`, `auth_config.dart`, `body_type.dart`, `multipart_field_entity.dart` |
 | `lib/core/error` | Failure / Exception hierarchy. | `failures.dart`, `exceptions.dart`, `guard.dart` |
 | `lib/core/git` | Abstract `git`/`gh` CLI gateways (+ io/stub impls). | `git_service.dart`, `git_service_io.dart`, `gh_service.dart`, `gh_output_parser.dart` |
 | `lib/core/navigation` | Router + keyboard intents + shortcut labels. | `app_router.dart`, `intents.dart`, `url_focus_registry.dart`, `shortcut_catalog.dart`, `app_messenger.dart` (root ScaffoldMessenger key for coordinators above MaterialApp) |
 | `lib/core/network` | Dio client, cookies, realtime, MCP transport. | `network_service.dart`, `realtime_service.dart`, `mcp_service.dart`, `cookie_interceptor.dart`, `web_socket_connector.dart` (io/stub: WS handshake headers on desktop), `auto_generated_headers.dart` (what the client adds at send), `default_user_agent.dart` (io/stub) |
-| `lib/core/storage` | Hive box-name constants + helpers. | `hive_boxes.dart`, `hive_helpers.dart` |
+| `lib/core/storage` | Persistent native storage owner and repository RPC; local web fallback. | `storage_connection.dart` (+ io/stub), `storage_backend.dart` (feature stores), `background_repositories.dart` (UI proxies), `hive_adapters.dart`, `hive_boxes.dart`, `hive_helpers.dart` |
 | `lib/core/theme` | Theme registry + responsive tiers. | `theme_registry.dart`, `theme_ids.dart`, `responsive.dart`, `app_theme.dart` |
 | `lib/core/theme/extensions` | The 8 `ThemeExtension`s + `context.app*` accessors. | `app_palette.dart`, `app_components.dart`, `app_theme_access.dart`, `app_layout.dart` |
 | `lib/core/theme/motion` | Ambient/pulse/theme-switch motion helpers. | `ambient_signals.dart`, `workspace_pulse_controller.dart`, `theme_switch_transition.dart` |
@@ -173,10 +173,10 @@ widgets + screens). Shared cross-feature code lives under `lib/core/`. See
 | `lib/features/tabs/data` | `request_serializer.dart` (wire-level auth + body serialization). |
 | `lib/features/tabs/data/datasources` | `tabs_local_data_source.dart` (tabs + panels + meta boxes). |
 | `lib/features/tabs/data/models` | `request_tab_model.dart` (typeId 2), `panel_model.dart` (12), `stored_response_model.dart` (11), `multipart_field_model.dart` (5). |
-| `lib/features/tabs/data/repositories` | `tabs_repository_impl.dart` (persistence + send; env substitution), `body_field_dictionary_repository_impl.dart` (local learned JSON names/counts). |
+| `lib/features/tabs/data/repositories` | `tabs_repository_impl.dart` (composes persistence + send; env substitution), `hive_tabs_persistence.dart` (mapping/caps in storage owner), `body_field_dictionary_repository_impl.dart` (local learned JSON names/counts). |
 | `lib/features/tabs/domain/entities` | `request_tab_entity.dart`, `panel_entity.dart`, `response_history_entry.dart`, `body_field_entry.dart`. |
 | `lib/features/tabs/domain/logic` | `body_completion.dart` (caret context/replacement ranges), `json_field_extractor.dart` (incomplete JSON key counts), `body_field_dictionary_limits.dart` (name eligibility), `json_body_validation.dart` (template syntax diagnostics). |
-| `lib/features/tabs/domain/repositories` | `tabs_repository.dart`, `body_field_dictionary_repository.dart` (abstract). |
+| `lib/features/tabs/domain/repositories` | `tabs_repository.dart`, `tabs_persistence.dart` (storage contract without HTTP), `body_field_dictionary_repository.dart` (abstract). |
 | `lib/features/tabs/domain/usecases` | `send_request_use_case.dart` (couples send + history write). |
 | `lib/features/tabs/presentation/bloc` | `tabs_bloc.dart` (panel-aware), `tabs_event.dart`, `tabs_state.dart`, `request_manager.dart`, `body_field_dictionary_cubit.dart` (shared learned names). |
 | `lib/features/tabs/presentation/screens` | `request_view.dart` (per-tab request/response screen; owns code controllers + split). |
@@ -247,7 +247,7 @@ Alphabetical. Each concept points at its primary file(s); read the file's own
 | GraphQL | `lib/core/domain/entities/body_type.dart`, `lib/features/tabs/data/request_serializer.dart`, `lib/features/tabs/presentation/widgets/body_tab_view.dart` |
 | History + dedup | `lib/features/history/data/datasources/history_local_data_source.dart` |
 | History day grouping (TODAY/YESTERDAY headers) | `lib/features/history/domain/logic/history_day_grouper.dart`, `lib/features/history/presentation/widgets/history_list.dart` |
-| Hive boxes / storage | `lib/core/storage/hive_boxes.dart`, `lib/core/storage/hive_helpers.dart` |
+| Hive boxes / storage | `lib/core/storage/storage_connection.dart`, `lib/core/storage/storage_backend.dart`, `lib/core/storage/background_repositories.dart`, `lib/core/storage/hive_boxes.dart`, `lib/core/storage/hive_helpers.dart` |
 | Hover copy (data rows) | `lib/core/ui/widgets/hover_copy_row.dart` |
 | HTTP methods list | `lib/core/network/http_methods.dart` |
 | HTTP send / network client | `lib/core/network/network_service.dart` |
@@ -308,13 +308,13 @@ features; follow them to trace an end-to-end behavior.
 5. `lib/core/network/network_service.dart` — performs the send with the manual redirect loop; the cookie interceptor (`cookie_interceptor.dart`) runs per hop.
 6. `lib/features/tabs/presentation/bloc/tabs_bloc.dart` — `_recordResponse` stores the response, trims time-travel history, publishes script phase results through ExecuteRequestUseCase.
 7. `lib/features/tabs/presentation/widgets/response_section.dart` (+ `response/` tab bodies) — renders the response.
-   - Side branch: `lib/features/history/data/datasources/history_local_data_source.dart` — the use case writes the templated (unresolved) config to history.
+   - Side branch: `lib/core/storage/background_repositories.dart` → `lib/features/history/data/datasources/history_local_data_source.dart` — the use case writes the templated (unresolved) config to history through the storage owner.
 
 ### 2. Cookie round-trip
 
 1. `lib/core/network/cookie_interceptor.dart` — attaches the `Cookie` header on request, captures `Set-Cookie` on response.
 2. `lib/core/network/cookie_store.dart` / `lib/core/network/in_memory_cookie_store.dart` — the abstract jar + runtime impl (matching, expiry, ordering).
-3. `lib/features/cookies/data/hive_cookie_persistence.dart` — flushes each mutation to the `cookies` Hive box.
+3. `lib/core/storage/background_repositories.dart` → `lib/features/cookies/data/hive_cookie_persistence.dart` — sends each mutation to the storage owner for the `cookies` Hive box.
 4. `lib/features/cookies/presentation/widgets/cookie_manager_dialog.dart` — Settings → COOKIES → MANAGE view over `CookieStore.all()` / `remove()`.
 
 ### 3. Environment / variable resolution

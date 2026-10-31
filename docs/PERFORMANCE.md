@@ -40,7 +40,7 @@ Events** for the spans above:
    without dropping frames.
 3. **Cold start** — relaunch with real data (large `tabs.hive` / `history.hive`).
    Only settings open before the loading window; other Hive boxes open after
-   the first frame. Cookies hydrate before request controls are exposed. QuickJS loads lazily on the
+   the first frame in the native storage worker. Cookies hydrate before request controls are exposed. QuickJS loads lazily on the
    first nonempty script.
 4. **Rapid edits** — create/rename/move collections, edit environments, trigger
    `Set-Cookie` responses. Environments/cookies persist per-key (no whole-list
@@ -68,12 +68,21 @@ open an issue with the trace.
   cancellation check before publishing the result.
 - **Import/export:** large Postman/OpenAPI parsing and text decoding use workers;
   Postman/API-doc export serialization uses workers. Export reuses encoded bytes.
+- **Native persistence:** a persistent isolate owns all nine feature boxes.
+  Repository RPC moves box decoding, legacy migrations, model conversion,
+  history dedup/sorting and write serialization off the UI isolate. Settings
+  stay UI-side. Existing file formats, caps, watcher semantics and boot cookie
+  hydration are preserved; close drains accepted writes, and the exit guard
+  awaits a storage flush after debounced saves. Media buffers and transient
+  script state are stripped before sending tabs across the port. Details and
+  the `IsolatedHive`/`HiveObject` constraint are in
+  [storage ownership](architecture/persistence-hive.md#storage-ownership).
 
 ### Remaining risks, in priority order
 
 | Priority | Evidence in current code | Next change / measurement |
 |---|---|---|
-| P0 | `Hive.openBox`, `Box.put` and model/entity mapping in DI/data sources run on the UI isolate. Opening boxes with `Future.wait` overlaps I/O but does not parallelize adapter CPU. | Move ownership of feature stores into a persistent storage isolate, via `IsolatedHive` or repository RPC. Keep settings minimal. Migrate synchronous snapshots/watchers/cookie hydration with crash/restart and legacy-store tests; never open the same box from two independent owners. |
+| P1 | Native feature persistence now has a worker, but settings and live cookie matching remain UI-side. RPC copies mutable graphs, and one FIFO owner can queue behind a large collection write. | Profile huge collections/headers and write bursts; consider bounded batches or incremental snapshots if transfer costs or queue depth exceed budget. Keep feature boxes exclusive to their owner. |
 | P1 | `dio_adapter_config_io.dart` uses synchronous `SecurityContext.useCertificateChain/usePrivateKey` at configuration and WS connect. | Async certificate-file loading plus a transport owner isolate if parsing itself exceeds budget. SecurityContext/socket objects cannot simply be sent with `compute`. Preserve errors and config/cancellation ordering. |
 | P1 | `request_view.dart`/re_editor controller construction, JSON highlighting, body completion, unresolved-variable scans, collection sorting/filtering and command-palette matching still execute UI-side. | Profile worst-case request size, single-line bodies, collection count and visible rows. Bound rendered work and use asynchronous snapshots with stale-result guards. Moving parsers alone does not move Flutter layout. |
 | P1 | Script protocol encoding/validation, MCP JSON, request-variable substitution and GraphQL serialization remain CPU work on the caller. | Profile big inputs; move pure preparation/validation into workers without transferring cancellation handles, sockets or repository state. |
@@ -101,6 +110,36 @@ Automated correctness tests verify theme/order, storage readiness, worker
 round-trips and lifecycle. They **do not establish startup latency or zero jank**.
 No end-to-end cold-start or frame-time baseline was captured for this revision;
 no numerical startup improvement or universal no-freeze claim is made.
+
+### Storage scheduling measurement — 2026-10-31
+
+Run the opt-in synthetic comparison separately from the test suite:
+
+```sh
+fvm flutter test --no-pub tool/storage_worker_benchmark.dart --reporter expanded
+```
+
+It creates temporary real Hive files with 500 tabs and 128 KiB of response text
+per tab (62.5 MiB of body data), then reads the same bytes three times locally
+and three times through the persistent worker, alternating order. A 1 ms timer
+on the caller measures the largest gap between callbacks. Each sample includes
+open/read/close; worker samples also open the other empty feature boxes. This
+is Flutter 3.44.4 debug/JIT on the local macOS workstation, with warm filesystem
+caches and **no widget rendering**. It measures scheduling, not process startup.
+
+| Measurement | Local Hive | Persistent worker |
+|---|---:|---:|
+| Largest event-loop gap, samples (ms) | 201.715 / 195.639 / 192.321 | 2.765 / 2.587 / 2.753 |
+| Median of largest gaps (ms) | 195.639 | 2.753 |
+| Median total sample duration (ms) | 214.801 | 220.063 |
+
+The worker kept the caller responsive while similar total work completed.
+These three samples are evidence for this fixture, not a p95 estimate or a
+maximum latency guarantee. Arbitrary object graphs, CPU contention and widget
+build/layout still require the profile/release scenarios above. Correctness
+tests separately cover existing-file migration/reopen, queued-write shutdown,
+watcher cancellation/resubscription, cookie boot hydration, script trust,
+failed commands/startup, duplicate-owner rejection and exit flush ordering.
 
 References: [Flutter isolates](https://docs.flutter.dev/perf/isolates),
 [Hive CE isolation](https://pub.dev/packages/hive_ce).

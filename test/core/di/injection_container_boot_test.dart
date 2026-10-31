@@ -1,81 +1,66 @@
+// Boot the production storage path with persisted cookies. The themed gate
+// must not expose send controls before hydration; only the worker owns the jar.
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:getman/core/di/injection_container.dart' as di;
-import 'package:getman/core/network/in_memory_cookie_store.dart';
+import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/network_cookie.dart';
+import 'package:getman/core/storage/hive_adapters.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
-import 'package:getman/features/cookies/data/hive_cookie_persistence.dart';
 import 'package:getman/features/cookies/data/models/stored_cookie_model.dart';
 import 'package:hive_ce/hive.dart';
 
-/// Guards the cold-start ordering behind bugs #1/#2: the cookies + request-rules
-/// boxes must be opened and the cookie jar hydrated on the boot path, not after
-/// the first frame — otherwise an early send drops persisted cookies and skips
-/// post-response rules.
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late Directory tempDir;
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('getman_boot_test');
     Hive.init(tempDir.path);
-    if (!Hive.isAdapterRegistered(6)) {
-      Hive.registerAdapter(StoredCookieModelAdapter());
-    }
+    registerHiveAdapters();
   });
 
   tearDown(() async {
-    await Hive.deleteFromDisk();
-    if (tempDir.existsSync()) await tempDir.delete(recursive: true);
+    await di.reset();
+    await tempDir.delete(recursive: true);
   });
 
-  test(
-    'opens the cookie box and hydrates the jar from a cold (closed) state',
-    () async {
-      // Persist a cookie, then close the box to simulate "app not yet booted".
-      final seed = await Hive.openBox<StoredCookieModel>(HiveBoxes.cookies);
-      await seed.put(
-        'api.dev|/|sid',
-        StoredCookieModel.fromCookie(
-          const NetworkCookie(name: 'sid', value: 'abc', domain: 'api.dev'),
-        ),
-      );
-      await seed.close();
-      expect(Hive.isBoxOpen(HiveBoxes.cookies), isFalse);
-
-      final store = InMemoryCookieStore(persistence: HiveCookiePersistence());
-      await di.openAndHydrateDeferredBoxes(store);
-
-      expect(
-        Hive.isBoxOpen(HiveBoxes.cookies),
-        isTrue,
-        reason: 'cookies box must be opened on the cold-start path',
-      );
-      expect(
-        Hive.isBoxOpen('request_rules'),
-        isFalse,
-        reason: 'retired rule data must remain untouched',
-      );
-      // Hydration ran, so the persisted cookie is sent on a matching request —
-      // this is exactly what an early send dropped before the fix.
-      final header = store.cookieHeaderFor(Uri.parse('https://api.dev/users'));
-      expect(header, contains('sid=abc'));
-    },
-  );
-
-  test('boot leaves the retired rules box closed', () async {
-    final store = InMemoryCookieStore(persistence: HiveCookiePersistence());
-    await di.openAndHydrateDeferredBoxes(store);
+  test('first usable jar contains cookies from the previous launch', () async {
+    final seed = await Hive.openBox<StoredCookieModel>(HiveBoxes.cookies);
+    await seed.put(
+      'api.dev|/|sid',
+      StoredCookieModel.fromCookie(
+        const NetworkCookie(name: 'sid', value: 'abc', domain: 'api.dev'),
+      ),
+    );
+    await seed.close();
+    final settings = await di.initSettings(
+      storageDirectoryOverride: tempDir.path,
+    );
+    expect(di.sl.isRegistered<CookieStore>(), isFalse);
+    await di.initServices(settings);
+    expect(Hive.isBoxOpen(HiveBoxes.cookies), isFalse);
+    expect(
+      di.sl<CookieStore>().cookieHeaderFor(Uri.parse('https://api.dev/users')),
+      contains('sid=abc'),
+    );
     expect(Hive.isBoxOpen('request_rules'), isFalse);
   });
 
-  test('is idempotent when the boxes are already open', () async {
-    await Hive.openBox<StoredCookieModel>(HiveBoxes.cookies);
-    final store = InMemoryCookieStore(persistence: HiveCookiePersistence());
-
-    await di.openAndHydrateDeferredBoxes(store); // must not throw
-
-    expect(Hive.isBoxOpen(HiveBoxes.cookies), isTrue);
-    expect(Hive.isBoxOpen('request_rules'), isFalse);
+  test('cookie writes drain on shutdown and hydrate on next boot', () async {
+    await di.init(storageDirectoryOverride: tempDir.path);
+    di.sl<CookieStore>().storeFromSetCookie(
+      Uri.parse('https://api.dev'),
+      'sid=new; Path=/',
+    );
+    // Writes are fire-and-forget at the interceptor; shutdown must drain them.
+    await di.reset();
+    await di.init(storageDirectoryOverride: tempDir.path);
+    expect(di.sl<CookieStore>().all().single.value, 'new');
+    await di.sl<CookieStore>().clear();
+    await di.reset();
+    await di.init(storageDirectoryOverride: tempDir.path);
+    expect(di.sl<CookieStore>().all(), isEmpty);
   });
 }

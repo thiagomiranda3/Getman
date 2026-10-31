@@ -1,9 +1,8 @@
 // GetIt (`sl`) bootstrap: registers every feature's blocs/usecases/repos and
-// data sources. initSettings opens only settings; initServices opens the rest
-// after the first frame. init composes both for test harnesses and returns the
-// SettingsEntity for main() to pass in as initialSettings. Hive adapters are
-// registered manually here (kept over the generated hive_registrar.g.dart)
-// and only once per process, guarded by _adaptersRegistered.
+// data sources. initSettings opens only settings; initServices starts the
+// feature-storage owner isolate after the first frame. init composes both for
+// test harnesses and returns the SettingsEntity for main(). Hive adapters are
+// registered idempotently by hive_adapters.dart in each owning isolate.
 //
 // Cookie hydration completes before NetworkService becomes usable.
 // Script trust stays in a local primitive box; retired Rules data is untouched.
@@ -20,15 +19,15 @@ import 'package:getman/core/network/cookie_interceptor.dart';
 import 'package:getman/core/network/cookie_store.dart';
 import 'package:getman/core/network/in_memory_cookie_store.dart';
 import 'package:getman/core/network/mcp_service.dart';
+import 'package:getman/core/network/network_cookie.dart';
 import 'package:getman/core/network/network_service.dart';
 import 'package:getman/core/network/realtime_service.dart';
+import 'package:getman/core/storage/background_repositories.dart';
+import 'package:getman/core/storage/hive_adapters.dart';
 import 'package:getman/core/storage/hive_boxes.dart';
+import 'package:getman/core/storage/storage_connection.dart';
 import 'package:getman/core/theme/motion/workspace_pulse_controller.dart';
-import 'package:getman/features/collections/data/datasources/collections_local_data_source.dart';
 import 'package:getman/features/collections/data/datasources/workspace_data_source_factory.dart';
-import 'package:getman/features/collections/data/models/collection_node_model.dart';
-import 'package:getman/features/collections/data/models/saved_example_model.dart';
-import 'package:getman/features/collections/data/repositories/collections_repository_impl.dart';
 import 'package:getman/features/collections/data/services/gh_pull_request_service.dart';
 import 'package:getman/features/collections/data/services/git_branch_service.dart';
 import 'package:getman/features/collections/data/services/git_conflict_service.dart';
@@ -45,17 +44,9 @@ import 'package:getman/features/collections/presentation/bloc/conflict_bloc.dart
 import 'package:getman/features/collections/presentation/bloc/git_sync_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/pull_requests_bloc.dart';
 import 'package:getman/features/collections/presentation/bloc/review_bloc.dart';
-import 'package:getman/features/cookies/data/hive_cookie_persistence.dart';
-import 'package:getman/features/cookies/data/models/stored_cookie_model.dart';
-import 'package:getman/features/environments/data/datasources/environments_local_data_source.dart';
-import 'package:getman/features/environments/data/models/environment_model.dart';
-import 'package:getman/features/environments/data/repositories/environments_repository_impl.dart';
 import 'package:getman/features/environments/domain/repositories/environments_repository.dart';
 import 'package:getman/features/environments/domain/usecases/environments_usecases.dart';
 import 'package:getman/features/environments/presentation/bloc/environments_bloc.dart';
-import 'package:getman/features/history/data/datasources/history_local_data_source.dart';
-import 'package:getman/features/history/data/models/request_config_model.dart';
-import 'package:getman/features/history/data/repositories/history_repository_impl.dart';
 import 'package:getman/features/history/domain/repositories/history_repository.dart';
 import 'package:getman/features/history/domain/usecases/history_usecases.dart';
 import 'package:getman/features/history/presentation/bloc/history_bloc.dart';
@@ -63,7 +54,6 @@ import 'package:getman/features/home/domain/usecases/tab_dirty_checker.dart';
 import 'package:getman/features/mcp/presentation/bloc/mcp_bloc.dart';
 import 'package:getman/features/realtime/presentation/bloc/realtime_bloc.dart';
 import 'package:getman/features/scripting/data/repositories/script_runtime_repository_impl.dart';
-import 'package:getman/features/scripting/data/repositories/script_trust_repository_impl.dart';
 import 'package:getman/features/scripting/domain/repositories/script_runtime_repository.dart';
 import 'package:getman/features/scripting/domain/repositories/script_trust_repository.dart';
 import 'package:getman/features/settings/data/datasources/settings_local_data_source.dart';
@@ -73,14 +63,8 @@ import 'package:getman/features/settings/domain/entities/settings_entity.dart';
 import 'package:getman/features/settings/domain/repositories/settings_repository.dart';
 import 'package:getman/features/settings/domain/usecases/settings_usecases.dart';
 import 'package:getman/features/settings/presentation/bloc/settings_bloc.dart';
-import 'package:getman/features/tabs/data/datasources/tabs_local_data_source.dart';
-import 'package:getman/features/tabs/data/models/multipart_field_model.dart';
-import 'package:getman/features/tabs/data/models/panel_model.dart';
-import 'package:getman/features/tabs/data/models/parked_param_model.dart';
-import 'package:getman/features/tabs/data/models/request_tab_model.dart';
-import 'package:getman/features/tabs/data/models/stored_response_model.dart';
-import 'package:getman/features/tabs/data/repositories/body_field_dictionary_repository_impl.dart';
 import 'package:getman/features/tabs/data/repositories/tabs_repository_impl.dart';
+import 'package:getman/features/tabs/domain/entities/body_field_entry.dart';
 import 'package:getman/features/tabs/domain/logic/script_execution_registry.dart';
 import 'package:getman/features/tabs/domain/repositories/body_field_dictionary_repository.dart';
 import 'package:getman/features/tabs/domain/repositories/tabs_repository.dart';
@@ -96,12 +80,6 @@ import 'package:getman/features/updates/presentation/update_controller.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
 final GetIt sl = GetIt.instance;
-
-// Hive adapters register only once per process (re-registering a typeId throws,
-// and there is no unregister). [reset] keeps them registered while tearing down
-// get_it + boxes, so [init] must not re-register them on a second call (E2E
-// boots the app once per test). Guarded by this flag.
-bool _adaptersRegistered = false;
 
 /// Boots the dependency graph and returns the settings to launch with.
 ///
@@ -127,22 +105,7 @@ Future<SettingsEntity> initSettings({String? storageDirectoryOverride}) async {
     await Hive.initFlutter();
   }
 
-  if (!_adaptersRegistered) {
-    Hive
-      ..registerAdapter(SettingsModelAdapter())
-      ..registerAdapter(HttpRequestConfigAdapter())
-      ..registerAdapter(HttpRequestTabModelAdapter())
-      ..registerAdapter(StoredResponseModelAdapter())
-      ..registerAdapter(PanelModelAdapter())
-      ..registerAdapter(CollectionNodeAdapter())
-      ..registerAdapter(SavedExampleModelAdapter())
-      ..registerAdapter(EnvironmentModelAdapter())
-      ..registerAdapter(MultipartFieldModelAdapter())
-      ..registerAdapter(ParkedParamModelAdapter())
-      ..registerAdapter(StoredCookieModelAdapter());
-
-    _adaptersRegistered = true;
-  }
+  registerHiveAdapters();
 
   final box = await Hive.openBox<SettingsModel>(HiveBoxes.settings);
   return box.get('current')?.toEntity() ?? const SettingsEntity();
@@ -151,32 +114,21 @@ Future<SettingsEntity> initSettings({String? storageDirectoryOverride}) async {
 /// Completes startup after the themed first frame. Call once after
 /// [initSettings]; consumers must wait for completion before accessing DI.
 Future<void> initServices(SettingsEntity initialSettings) async {
-  // Open independent boxes concurrently; cookies are hydrated before network
-  // services are exposed. Retired rule storage is deliberately not opened.
-  final boxes = await Future.wait<Box<dynamic>>([
-    Hive.openBox<EnvironmentModel>(HiveBoxes.environments),
-    Hive.openBox<HttpRequestConfig>(HiveBoxes.history),
-    Hive.openBox<HttpRequestTabModel>(HiveBoxes.tabs),
-    Hive.openBox(HiveBoxes.tabsMeta),
-    Hive.openBox<CollectionNode>(HiveBoxes.collections),
-    Hive.openBox<StoredCookieModel>(HiveBoxes.cookies),
-    Hive.openBox<PanelModel>(HiveBoxes.panels),
-    Hive.openBox<int>(HiveBoxes.bodyFieldDictionary),
-    Hive.openBox<String>(HiveBoxes.scriptTrust),
-  ]);
-  final environmentsBox = boxes[0] as Box<EnvironmentModel>;
-
-  // Re-key any legacy int-keyed environments by id so per-id put/delete writes
-  // overwrite the same logical environment (no-op once keys are strings).
-  await EnvironmentsLocalDataSourceImpl.migrateLegacyKeysIfNeeded();
-  // Same for collections: re-key the legacy auto-increment box by root id so
-  // per-root keyed writes overwrite the same logical root (L12). Runs before
-  // collections are first read.
-  await CollectionsLocalDataSourceImpl.migrateLegacyKeysIfNeeded();
-
-  final initialEnvironments = environmentsBox.values
-      .map((model) => model.toEntity())
-      .toList(growable: false);
+  final storage = await openStorageConnection(
+    Hive.box<SettingsModel>(HiveBoxes.settings).path,
+  );
+  sl.registerSingleton<StorageConnection>(
+    storage,
+    dispose: (connection) => connection.close(),
+  );
+  final environments = BackgroundEnvironmentsRepository(storage);
+  final initialEnvironments = await environments.getEnvironments();
+  final cookies = await storage.invoke<List<NetworkCookie>>(
+    StorageOperation.cookiesGet,
+  );
+  final dictionary = await storage.invoke<List<BodyFieldEntry>>(
+    StorageOperation.dictionaryGet,
+  );
 
   sl
     // Features - Settings
@@ -209,10 +161,7 @@ Future<void> initServices(SettingsEntity initialSettings) async {
     ..registerLazySingleton(() => ClearHistoryUseCase(sl()))
     ..registerLazySingleton(() => RestoreHistoryEntriesUseCase(sl()))
     ..registerLazySingleton<HistoryRepository>(
-      () => HistoryRepositoryImpl(sl()),
-    )
-    ..registerLazySingleton<HistoryLocalDataSource>(
-      HistoryLocalDataSourceImpl.new,
+      () => BackgroundHistoryRepository(storage),
     )
     // Features - Collections
     ..registerLazySingleton(
@@ -224,10 +173,7 @@ Future<void> initServices(SettingsEntity initialSettings) async {
     ..registerLazySingleton(() => GetCollectionsUseCase(sl()))
     ..registerLazySingleton(() => SaveCollectionsUseCase(sl()))
     ..registerLazySingleton<CollectionsRepository>(
-      () => CollectionsRepositoryImpl(sl()),
-    )
-    ..registerLazySingleton<CollectionsLocalDataSource>(
-      CollectionsLocalDataSourceImpl.new,
+      () => BackgroundCollectionsRepository(storage),
     )
     ..registerLazySingleton(
       () => WorkspaceSyncService(createWorkspaceDataSource()),
@@ -265,17 +211,14 @@ Future<void> initServices(SettingsEntity initialSettings) async {
     ..registerLazySingleton(() => PutEnvironmentUseCase(sl()))
     ..registerLazySingleton(() => DeleteEnvironmentUseCase(sl()))
     ..registerLazySingleton<EnvironmentsRepository>(
-      () => EnvironmentsRepositoryImpl(sl()),
-    )
-    ..registerLazySingleton<EnvironmentsLocalDataSource>(
-      EnvironmentsLocalDataSourceImpl.new,
+      () => environments,
     )
     ..registerLazySingleton<ScriptRuntimeRepository>(
       ScriptRuntimeRepositoryImpl.new,
       dispose: (runtime) => runtime.close(),
     )
     ..registerLazySingleton<ScriptTrustRepository>(
-      () => ScriptTrustRepositoryImpl(Hive.box<String>(HiveBoxes.scriptTrust)),
+      () => BackgroundScriptTrustRepository(storage),
     )
     ..registerLazySingleton(ScriptExecutionRegistry.new)
     ..registerLazySingleton(
@@ -289,9 +232,8 @@ Future<void> initServices(SettingsEntity initialSettings) async {
     )
     // Features - Tabs
     ..registerLazySingleton<BodyFieldDictionaryRepository>(
-      () => BodyFieldDictionaryRepositoryImpl(
-        Hive.box<int>(HiveBoxes.bodyFieldDictionary),
-      ),
+      () =>
+          BackgroundBodyFieldDictionary(storage, List.unmodifiable(dictionary)),
     )
     ..registerFactory(() => BodyFieldDictionaryCubit(sl()))
     ..registerLazySingleton(
@@ -310,11 +252,10 @@ Future<void> initServices(SettingsEntity initialSettings) async {
     )
     ..registerLazySingleton<TabsRepository>(
       () => TabsRepositoryImpl(
-        localDataSource: sl(),
+        persistence: BackgroundTabsPersistence(storage),
         networkService: sl(),
       ),
     )
-    ..registerLazySingleton<TabsLocalDataSource>(TabsLocalDataSourceImpl.new)
     // Features - Realtime (WebSocket / SSE). RealtimeService itself is
     // registered below, alongside NetworkService, once the cookie store and
     // initial NetworkConfig it needs (H2) are available.
@@ -340,11 +281,12 @@ Future<void> initServices(SettingsEntity initialSettings) async {
       WorkspacePulseController.new,
     );
 
-  // Core. The cookie box is already open (parallel wait above); hydrate the jar
+  // Core. The cookie snapshot came from the worker; hydrate the jar
   // before the network service can be used so the first send sees stored
   // cookies.
-  final cookieStore = InMemoryCookieStore(persistence: HiveCookiePersistence());
-  await openAndHydrateDeferredBoxes(cookieStore);
+  final cookieStore = InMemoryCookieStore(
+    persistence: BackgroundCookiePersistence(storage, cookies),
+  )..hydrate();
   sl
     ..registerLazySingleton<CookieStore>(() => cookieStore)
     ..registerLazySingleton(
@@ -377,17 +319,6 @@ Future<void> initServices(SettingsEntity initialSettings) async {
       ),
     )
     ..registerLazySingleton(AppRouter.new);
-}
-
-/// Opens and hydrates cookies before an early send. Retired rule data is
-/// deliberately not opened, migrated or deleted.
-Future<void> openAndHydrateDeferredBoxes(InMemoryCookieStore store) async {
-  await Future.wait<Box<dynamic>>([
-    if (!Hive.isBoxOpen(HiveBoxes.cookies))
-      Hive.openBox<StoredCookieModel>(HiveBoxes.cookies),
-  ]);
-  await HiveCookiePersistence.migrateLegacyKeysIfNeeded();
-  store.hydrate();
 }
 
 /// Tears down the DI container and closes all Hive boxes so [init] can be

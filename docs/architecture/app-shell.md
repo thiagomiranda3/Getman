@@ -6,7 +6,7 @@
 
 1. `WidgetsFlutterBinding.ensureInitialized()`.
 2. `di.initSettings()` initializes Hive/adapters and opens **only settings**. The saved theme, dark mode and compact mode are available before `runApp`, so there is no default-theme flash.
-3. `StartupGate` paints a themed loading window. After the first frame (and an event-loop yield), `di.initServices(settings)` opens the other boxes concurrently, migrates legacy keys, hydrates cookies, and registers DI. Workspace bookmark access is resumed before mounting `MyApp`. The loading gate exposes no request controls: early sends cannot race cookie or environment readiness. Initialization failures leave a visible error. `di.init()` still composes both phases for existing test harnesses. **Deferred does not mean off-isolate**: ordinary Hive still decodes/encodes on the UI isolate; see `docs/PERFORMANCE.md`. QuickJS and MediaKit initialize only on first script/media use.
+3. `StartupGate` paints a themed loading window. After the first frame (and an event-loop yield), `di.initServices(settings)` starts the persistent native storage isolate. That owner opens the nine feature boxes, migrates legacy keys, and performs repository mapping/serialization. DI receives domain snapshots for environments, cookies and learned JSON names before mounting `MyApp`. Workspace bookmark access is also resumed before mounting. The loading gate exposes no request controls: early sends cannot race cookie or environment readiness. Initialization failures leave a visible error. `di.init()` composes both phases for test harnesses. Web uses the same repository API with a local backend (no Dart isolates). QuickJS and MediaKit initialize only on first script/media use. See [storage ownership](persistence-hive.md#storage-ownership) and `docs/PERFORMANCE.md`.
 4. `MultiRepositoryProvider` exposes cross-feature services to the widget tree: `TabDirtyChecker`, `NetworkService`, `CookieStore`, `WorkspaceSyncService`, `ScriptTrustRepository`, and `UrlFocusRegistry` (the last lets the Cmd/Ctrl+L action focus the active tab's URL field — each `UrlBar` registers its `FocusNode` keyed by tab id).
 5. `MultiBlocProvider` creates `SettingsBloc`, `HistoryBloc`, `CollectionsBloc`, `TabsBloc`, `BodyFieldDictionaryCubit`, `EnvironmentsBloc` (plus the git blocs and `McpBloc`). Collections/Tabs/Environments dispatch their `Load*` event eagerly; `HistoryBloc` has no load event — it starts with `isLoading: true` and populates from its `watchHistory()` subscription (the stream yields the current list on subscribe). The root `BlocBuilder<SettingsBloc>` has a `buildWhen` gated to `themeId`/`isDarkMode`/`isCompactMode` — anything else would rebuild the whole `MaterialApp` per settings keystroke.
 
@@ -14,7 +14,7 @@
 
 `get_it` (see `lib/core/di/injection_container.dart`) is the sole DI container. `GetIt` is referenced only from `main.dart` and DI setup — **never from widgets**. Widgets reach services via `BlocProvider`, `RepositoryProvider`, or constructor injection; the `avoid_get_it_in_widgets` custom lint enforces this.
 
-The hand-written `Hive.registerAdapter(...)` calls also live in `injection_container.dart`. The generator auto-emits an unused `lib/hive_registrar.g.dart`; we keep the manual registration instead.
+Hand-written adapter registration lives in `core/storage/hive_adapters.dart`, called idempotently by each owning isolate. The generator auto-emits an unused `lib/hive_registrar.g.dart`; we keep the manual registration instead. `StorageConnection` is registered with an asynchronous disposer; `di.reset()` drains/closes the worker before closing UI-owned settings. `ExitFlushGuard` receives its flush callback from `main.dart` and awaits it **after** the pending tab/collection/workspace saves, before acknowledging a cancellable OS exit.
 
 ## Provider inventory
 
@@ -53,7 +53,9 @@ Enter/Tab accept the selected completion and Escape closes its menu. The local
 handler is inactive when the editor is offstage or lacks focus, so the chord
 does not open suggestions in another tab or a modal dialog. The shared
 `BodyFieldDictionaryCubit` provider carries learned names between request
-editors; it hydrates synchronously from the already-open primitive Hive box.
+editors; it hydrates synchronously from the domain snapshot loaded during DI.
+Usage increments and sorting execute in the storage owner; the UI proxy updates
+its immutable snapshot after the worker acknowledges the write.
 
 ## Snackbar action API
 

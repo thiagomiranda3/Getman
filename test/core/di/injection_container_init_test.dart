@@ -92,7 +92,11 @@ void main() {
       }
       expect(di.sl.isRegistered<NetworkService>(), isFalse);
       await di.initServices(settings);
-      expect(Hive.isBoxOpen(HiveBoxes.cookies), isTrue);
+      expect(
+        Hive.isBoxOpen(HiveBoxes.cookies),
+        isFalse,
+        reason: 'feature boxes are owned by the storage worker',
+      );
       expect(di.sl.isRegistered<NetworkService>(), isTrue);
       expect(di.sl<SettingsBloc>().state.settings, saved);
       await di.sl<SettingsBloc>().close();

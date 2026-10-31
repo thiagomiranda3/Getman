@@ -20,8 +20,9 @@ import 'package:getman/features/tabs/presentation/bloc/tabs_bloc.dart';
 /// Widget-layer coordinator (same shape as `BranchSyncListener`): it reaches
 /// both blocs via `context.read`, keeping the blocs free of lifecycle wiring.
 class ExitFlushGuard extends StatefulWidget {
-  const ExitFlushGuard({required this.child, super.key});
+  const ExitFlushGuard({required this.child, this.flushStorage, super.key});
   final Widget child;
+  final Future<void> Function()? flushStorage;
 
   @override
   State<ExitFlushGuard> createState() => _ExitFlushGuardState();
@@ -48,15 +49,18 @@ class _ExitFlushGuardState extends State<ExitFlushGuard> {
     super.dispose();
   }
 
-  Future<void> _flushAll() => Future.wait([
-    context.read<TabsBloc>().flushPendingSaves(),
-    context.read<CollectionsBloc>().flushPendingSaves(),
-    // The workspace MIRROR too, not just Hive: its own 1 s debounce means a
-    // quit right after a tree edit would persist the edit to Hive but not
-    // to the git workspace on disk — and the boot import merges DISK-wins,
-    // so the un-mirrored edit would be deleted at next launch.
-    context.read<WorkspaceSyncService>().flushPending(),
-  ]);
+  Future<void> _flushAll() async {
+    await Future.wait([
+      context.read<TabsBloc>().flushPendingSaves(),
+      context.read<CollectionsBloc>().flushPendingSaves(),
+      // The workspace MIRROR too, not just Hive: its own 1 s debounce means a
+      // quit right after a tree edit would persist the edit to Hive but not
+      // to the git workspace on disk — and the boot import merges DISK-wins,
+      // so the un-mirrored edit would be deleted at next launch.
+      context.read<WorkspaceSyncService>().flushPending(),
+    ]);
+    await widget.flushStorage?.call();
+  }
 
   @override
   Widget build(BuildContext context) => widget.child;
