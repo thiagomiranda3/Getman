@@ -5,6 +5,54 @@ All notable changes to **Getman** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.1] - 2026-11-03
+
+Improved desktop responsiveness during startup, persistence and large-body
+editing, with measured performance results and fixes for dialog layout.
+
+### Changed
+
+- The saved theme appears in a loading window before feature initialization.
+  Settings still load before the first frame to avoid a theme flash; media
+  playback initializes only when needed.
+- Desktop feature persistence runs in a dedicated worker, including record
+  decoding, migrations and serialization. Workspace file processing, large
+  response text decoding and large import/export work also use workers.
+  Pending saves are flushed when closing the app.
+- Large RAW and GraphQL request bodies prepare in background workers on
+  desktop. Large request editors and **Beautify** prepare their lines
+  asynchronously, preserving undo and newer edits made while work is pending.
+- Code-editor lines longer than 8,192 characters skip syntax and variable
+  coloring. Lines longer than 16,384 characters display a prefix and an
+  ellipsis; the complete text remains available to copy, save and send.
+- **Find** in documents with oversized lines searches the complete text and
+  displays a small region around each match. Close search or press **Esc** to
+  return to editing. Selected text prefills this search only up to 1,024
+  characters.
+
+### Fixed
+
+- Avoid long UI stalls when opening or searching very large minified bodies.
+- Prevent obsolete asynchronous editor loads and formatting results from
+  overwriting newer edits or touching disposed controllers.
+- Keep dialogs within their intended width in the Glass theme, and present
+  **SCRIPT HELP** in readable, scrollable sections.
+
+### Performance measurements
+
+On an Apple M3 Max running macOS in release mode with synthetic data, median
+UI event-loop gaps during large GraphQL preparation fell from 80.2 ms to
+3.4 ms, and RAW preparation from 13.1 ms to 5.2 ms (five rounds each). Opening
+search on a very large single line fell from 505 ms to 6 ms in the measured
+before/after samples.
+
+These are scenario measurements, not a guarantee of zero stalls. Opening the
+200,004-line fixture still showed a roughly 50 ms gap; the final optimization
+round showed no consistent Dart startup improvement. Desktop workers do not
+automatically provide parallelism on the web. See
+[the performance report](https://github.com/thiagomiranda3/Getman/blob/v1.12.1/docs/PERFORMANCE.md)
+for inputs, raw results and limits.
+
 ## [1.12.0] - 2026-10-30
 
 Requests now support JavaScript automation with an isolated QuickJS runtime,
@@ -657,6 +705,7 @@ workflow. Runs on macOS, Windows, and Linux.
   machine.
 - Ships for **macOS**, **Windows**, and **Linux** desktop.
 
+[1.12.1]: https://github.com/thiagomiranda3/Getman/releases/tag/v1.12.1
 [1.12.0]: https://github.com/thiagomiranda3/Getman/releases/tag/v1.12.0
 [1.11.1]: https://github.com/thiagomiranda3/Getman/releases/tag/v1.11.1
 [1.11.0]: https://github.com/thiagomiranda3/Getman/releases/tag/v1.11.0
