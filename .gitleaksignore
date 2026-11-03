@@ -5,3 +5,52 @@
 # SHA-256 of the checked-in QuickJS builtin-iterator-zip-keyed.h source bytes,
 # independently recomputed and matched to the runtime integrity manifest.
 9bc6da4a3ccef104caa546ee9a058bbec92cf6c0:tool/scripting/runtime-manifest.json:generic-api-key:14
+
+# SHA-256 source-file digests in the performance reports, not credentials.
+# All 44 values were independently recomputed from the referenced Git blobs
+# at 69685b1c and matched exactly. Ignore only these commit/file/rule/line
+# fingerprints; other report contents and future findings remain scanned.
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure.json:generic-api-key:57
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure.json:generic-api-key:58
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure.json:generic-api-key:126
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure.json:generic-api-key:189
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure.json:generic-api-key:190
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure.json:generic-api-key:193
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure.json:generic-api-key:219
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure.json:generic-api-key:222
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure.json:generic-api-key:223
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure.json:generic-api-key:305
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure.json:generic-api-key:456
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure-2.json:generic-api-key:57
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure-2.json:generic-api-key:58
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure-2.json:generic-api-key:126
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure-2.json:generic-api-key:189
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure-2.json:generic-api-key:190
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure-2.json:generic-api-key:193
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure-2.json:generic-api-key:219
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure-2.json:generic-api-key:222
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure-2.json:generic-api-key:223
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure-2.json:generic-api-key:305
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-attempt-foreground-failure-2.json:generic-api-key:456
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-macos.json:generic-api-key:7845
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-macos.json:generic-api-key:7846
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-macos.json:generic-api-key:7914
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-macos.json:generic-api-key:7977
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-macos.json:generic-api-key:7978
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-macos.json:generic-api-key:7981
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-macos.json:generic-api-key:8007
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-macos.json:generic-api-key:8010
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-macos.json:generic-api-key:8011
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-macos.json:generic-api-key:8093
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/final-macos.json:generic-api-key:8244
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/before-windowed-find-macos.json:generic-api-key:7764
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/before-windowed-find-macos.json:generic-api-key:7765
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/before-windowed-find-macos.json:generic-api-key:7833
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/before-windowed-find-macos.json:generic-api-key:7896
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/before-windowed-find-macos.json:generic-api-key:7897
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/before-windowed-find-macos.json:generic-api-key:7900
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/before-windowed-find-macos.json:generic-api-key:7926
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/before-windowed-find-macos.json:generic-api-key:7929
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/before-windowed-find-macos.json:generic-api-key:7930
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/before-windowed-find-macos.json:generic-api-key:8012
+69685b1c81ed217a26ee2bae27882116fc6295d6:tool/performance/before-windowed-find-macos.json:generic-api-key:8163
