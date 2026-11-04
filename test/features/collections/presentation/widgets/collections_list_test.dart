@@ -683,7 +683,7 @@ void main() {
   );
 
   testWidgets(
-    'FROM POSTMAN imports a picked collection file into the tree',
+    'FROM POSTMAN imports a collection with empty script placeholders',
     (tester) async {
       // Mock the file_picker channel: picking returns one in-memory Postman
       // v2.1 collection file.
@@ -695,7 +695,21 @@ void main() {
                 'https://schema.getpostman.com/json/collection/'
                 'v2.1.0/collection.json',
           },
-          'item': <dynamic>[],
+          'item': [
+            {
+              'name': 'Request with unused hook',
+              'event': [
+                {
+                  'listen': 'prerequest',
+                  'script': {
+                    'type': 'text/javascript',
+                    'exec': [''],
+                  },
+                },
+              ],
+              'request': {'method': 'GET', 'url': 'https://example.com/items'},
+            },
+          ],
         }),
       );
       const channel = MethodChannel('miguelruivo.flutter.plugins.filepicker');
@@ -739,6 +753,11 @@ void main() {
         bloc.state.collections.map((n) => n.name),
         contains('Imported API'),
       );
+      final imported = bloc.state.collections.firstWhere(
+        (node) => node.name == 'Imported API',
+      );
+      expect(imported.children.single.name, 'Request with unused hook');
+      expect(imported.children.single.config!.url, 'https://example.com/items');
       // The imported root shows in the tree and the summary snackbar.
       expect(find.text('Imported API'), findsOneWidget);
       expect(find.textContaining('Imported 1 collection'), findsOneWidget);
