@@ -188,8 +188,10 @@ transforms may evade recognition. Source may contain literal secrets, so prefer
 variables rather than embedding credentials.
 
 Workspace JSON stores request.scripts; Postman round-trip uses inert
-`x-getman-scripts`. External Postman events are rejected recursively before any
-collection nodes are saved. There is no pm/npm/Node/fetch/module compatibility.
+`x-getman-scripts`. Empty Postman event placeholders (missing or blank source,
+including `exec: [""]`) are ignored. Events with code, external source references
+or malformed data are rejected recursively before any collection nodes are
+saved. There is no pm/npm/Node/fetch/module compatibility.
 Code generation displays `Scripts not included` and never evaluates source.
 Diff/merge treats each source/enablement field independently; conflicts choose
 content and never concatenate code.

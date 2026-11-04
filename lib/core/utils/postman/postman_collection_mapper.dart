@@ -29,6 +29,9 @@
 // Getman-only fidelity rides keys inert to real Postman: the `_getman_kind`
 // vendor key round-trips RequestKind (WS/SSE/MCP; absent = http), and
 // formdata entries carry Postman-native `contentType` both ways.
+// Empty Postman event placeholders (including exec: ['']) are harmless;
+// actual script sources, external references and malformed events are rejected
+// recursively before any collection nodes are constructed.
 
 import 'dart:convert';
 import 'package:getman/core/domain/entities/auth_config.dart';
@@ -134,9 +137,8 @@ class PostmanCollectionMapper {
   // Validate the complete tree before constructing any node. Import callers
   // receive a single failure and cannot dispatch a partial collection.
   static void _rejectExternalEvents(Map<dynamic, dynamic> node, String path) {
-    if (node.containsKey('event') &&
-        node['event'] != null &&
-        (node['event'] is! List || (node['event'] as List).isNotEmpty)) {
+    final events = node['event'];
+    if (events != null && (events is! List || events.any(_hasExternalScript))) {
       throw FormatException('Postman scripts are not supported: $path');
     }
     final request = node['request'];
@@ -153,6 +155,24 @@ class PostmanCollectionMapper {
         }
       }
     }
+  }
+
+  // Postman exports unused hooks as script.exec: ['']. Inspect the source,
+  // not the presence of an event, without interpreting or executing JavaScript.
+  static bool _hasExternalScript(dynamic event) {
+    if (event is! Map) return true;
+    final script = event['script'];
+    if (script == null) return false;
+    if (script is! Map) return true;
+    final src = script['src'];
+    if (src != null && src != '') return true;
+    final exec = script['exec'];
+    if (exec == null) return false;
+    if (exec is String) return exec.trim().isNotEmpty;
+    if (exec is List) {
+      return exec.any((line) => line is! String || line.trim().isNotEmpty);
+    }
+    return true;
   }
 
   // ---------- export helpers ----------

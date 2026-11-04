@@ -52,8 +52,10 @@ results are local and never imported or exported by these serializers.
 Postman sharing uses the inert `x-getman-scripts` extension inside `request`;
 Getman JavaScript is never translated into Postman `event` scripts. Import
 preflights every collection, folder and request before constructing the tree.
-A nonempty external `event` aborts the entire import with `Postman scripts are
-not supported` and the offending item path. The import UI therefore dispatches
+Empty event placeholders (including `script.exec: [""]` and whitespace-only
+sources) are ignored. Actual external script code, source references and
+malformed events abort the entire import with `Postman scripts are not supported`
+and the offending item path. The import UI therefore dispatches
 no partial collection. Code generation and API-doc export omit scripts and
 surface `Scripts are not included in generated code`; neither evaluates source.
 
